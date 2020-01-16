@@ -8,23 +8,29 @@ use hex_grid_point::HexGridPoint;
 use snake::Snake;
 use ggez::input::keyboard::KeyCode;
 use crate::game::snake::Dir;
+use std::time::Duration;
+use tuple::Map;
+use std::thread;
 
 mod hex_grid_point;
 mod snake;
 
 // hexagonal cell side length
-const L: f32 = 10.;
+//const L: f32 = 10.;
 
 pub struct Game {
     shape: HexGridPoint,
     snake: Snake,
+    
+    cell_side_len: f32,
 }
 
 impl Game {
-    pub fn new(horizontal: usize, vertical: usize) -> Self {
+    pub fn new(horizontal: usize, vertical: usize, cell_side_len: f32) -> Self {
         Self {
             shape: HexGridPoint { h: horizontal, v: vertical },
-            snake: Snake::new(horizontal / 2, vertical / 2),
+            snake: Snake::new(horizontal, vertical),
+            cell_side_len,
         }
     }
 }
@@ -32,6 +38,7 @@ impl Game {
 impl EventHandler for Game {
     fn update(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         self.snake.advance();
+        thread::sleep(Duration::from_millis(500));
         Ok(())
     }
 
@@ -45,25 +52,28 @@ impl EventHandler for Game {
         for hor in 0..self.shape.h {
             for ver in 0..self.shape.v {
                 let a = 1. / 3. * PI; // 120deg
-                let (sin, cos) = (a.sin(), a.cos());
+                let sl = self.cell_side_len;
+                let (s, c) = a.sin_cos().map(|x| x * sl);
+
+                // with 0, 0 the board is touching top-left (nothing hidden)
+                let (dx, dy) = (0., 0.);
+
                 let hexagon = [
-                    (0., 0.),
-                    (L, 0.),
-                    (L + L * cos, L * sin),
-                    (L, 2. * L * sin),
-                    (0., 2. * L * sin),
-                    (-L * cos, L * sin),
-                    (0., 0.),
+                    (c, 0.),
+                    (sl + c, 0.),
+                    (sl + 2. * c, s),
+                    (sl + c, 2. * s),
+                    (c, 2. * s),
+                    (0., s),
+                    (c, 0.),
                 ].iter()
                     .map(|&(x, y)| Point2 {
-                        x: x + hor as f32 * (L + L * cos),
-                        y: y + ver as f32 * 2. * L * sin + if hor % 2 == 0 { 0. } else { L * sin },
+                        x: dx + x + hor as f32 * (sl + c),
+                        y: dy + y + ver as f32 * 2. * s + if hor % 2 == 0 { 0. } else { s },
                     })
                     .collect::<Vec<_>>();
 
-                let snake_here = self.snake.is_at(HexGridPoint { h: hor, v: ver });
-
-                if snake_here {
+                if self.snake.is_at(HexGridPoint { h: hor, v: ver }) {
                     builder.polyline(
                         DrawMode::Fill(FillOptions::DEFAULT),
                         &hexagon,

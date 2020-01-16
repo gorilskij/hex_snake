@@ -28,6 +28,6 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut game = Game::new(100, 80);
+    let mut game = Game::new(20, 20, 10.);
     run(ctx, event_loop, &mut game).expect("crashed")
 }
