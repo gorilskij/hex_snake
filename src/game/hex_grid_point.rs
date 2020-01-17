@@ -12,12 +12,12 @@ impl Debug for HexGridPoint {
     }
 }
 
-impl HexGridPoint {
-    // translates x/y with special treatment for y (v)
-    pub fn translate(self, h: isize, v: isize) -> Self {
-        Self {
-            h: (self.h as isize + h) as usize,
-            v: (self.v as isize + v / 2) as usize,
-        }
-    }
-}
+//impl HexGridPoint {
+//    // translates x/y with special treatment for y (v)
+//    pub fn translate(self, h: isize, v: isize) -> Self {
+//        Self {
+//            h: (self.h as isize + h) as usize,
+//            v: (self.v as isize + v / 2) as usize,
+//        }
+//    }
+//}

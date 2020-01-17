@@ -6,7 +6,7 @@ pub enum Dir {
 }
 
 pub struct Snake {
-    body: Vec<HexGridPoint>,
+    pub body: Vec<HexGridPoint>,
     dir: Dir,
     width: usize,
     height: usize,
@@ -25,11 +25,6 @@ impl Snake {
             width,
             height,
         }
-    }
-
-    pub fn is_at(&self, point: HexGridPoint) -> bool {
-        self.body.iter()
-            .any(|&p| p == point)
     }
 
     pub fn advance(&mut self) {

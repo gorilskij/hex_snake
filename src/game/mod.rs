@@ -1,9 +1,8 @@
 use ggez::event::{EventHandler, KeyMods};
-use ggez::{Context, GameError};
-use ggez::graphics::{clear, WHITE, present, MeshBuilder, DrawMode, FillOptions, BLACK, draw, DrawParam, StrokeOptions, Color};
+use ggez::{Context, GameError, GameResult};
+use ggez::graphics::{clear, WHITE, present, DrawMode, BLACK, draw, DrawParam, StrokeOptions, Mesh, Drawable};
 use std::f32::consts::PI;
 use mint::Point2;
-use crate::{HEIGHT, WIDTH};
 use hex_grid_point::HexGridPoint;
 use snake::Snake;
 use ggez::input::keyboard::KeyCode;
@@ -14,9 +13,6 @@ use std::thread;
 
 mod hex_grid_point;
 mod snake;
-
-// hexagonal cell side length
-//const L: f32 = 10.;
 
 pub struct Game {
     shape: HexGridPoint,
@@ -36,7 +32,7 @@ impl Game {
 }
 
 impl EventHandler for Game {
-    fn update(&mut self, ctx: &mut Context) -> Result<(), GameError> {
+    fn update(&mut self, _ctx: &mut Context) -> Result<(), GameError> {
         self.snake.advance();
         thread::sleep(Duration::from_millis(500));
         Ok(())
@@ -45,57 +41,69 @@ impl EventHandler for Game {
     // TODO: calculate how many hexagons in width and height and draw them as
     //  vertical zigzag lines, not polygons
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
+        // TODO: reimplement optional pushing to left-top hiding part of the hexagon
+        // with 0, 0 the board is touching top-left (nothing hidden)
+//        let (dx, dy) = (0., 0.);
+
+        let a = 1. / 3. * PI; // 120deg
+        let sl = self.cell_side_len;
+        let (s, c) = a.sin_cos().map(|x| x * sl);
+
+        let hexagon_points = [
+            (c, 0.),
+            (sl + c, 0.),
+            (sl + 2. * c, s),
+            (sl + c, 2. * s),
+            (c, 2. * s),
+            (0., s),
+            (c, 0.),
+        ].iter()
+            .map(|&(x, y)| Point2 { x, y })
+            .collect::<Vec<_>>();
+
+        let hexagon_stroke = Mesh::new_polyline(
+            ctx, DrawMode::Stroke(StrokeOptions::default()),
+            &hexagon_points, BLACK)?;
+
+        let hexagon_fill = Mesh::new_polyline(
+            ctx, DrawMode::fill(),
+            &hexagon_points, BLACK)?;
+
         clear(ctx, WHITE);
 
-        let mut builder = MeshBuilder::new();
+        #[inline(always)]
+        fn draw_cell<D: Drawable>(
+            h: usize,
+            v: usize,
+            drawable: &D,
+            ctx: &mut Context,
+            sl: f32,
+            s: f32,
+            c: f32,
+        ) -> GameResult<()> {
+            let point = Point2 {
+                x: h as f32 * (sl + c),
+                y: v as f32 * 2. * s + if h % 2 == 0 { 0. } else { s },
+            };
 
-        for hor in 0..self.shape.h {
-            for ver in 0..self.shape.v {
-                let a = 1. / 3. * PI; // 120deg
-                let sl = self.cell_side_len;
-                let (s, c) = a.sin_cos().map(|x| x * sl);
+            draw(ctx, drawable,
+                 DrawParam::from((point, 0.0, WHITE)))
+        }
 
-                // with 0, 0 the board is touching top-left (nothing hidden)
-                let (dx, dy) = (0., 0.);
-
-                let hexagon = [
-                    (c, 0.),
-                    (sl + c, 0.),
-                    (sl + 2. * c, s),
-                    (sl + c, 2. * s),
-                    (c, 2. * s),
-                    (0., s),
-                    (c, 0.),
-                ].iter()
-                    .map(|&(x, y)| Point2 {
-                        x: dx + x + hor as f32 * (sl + c),
-                        y: dy + y + ver as f32 * 2. * s + if hor % 2 == 0 { 0. } else { s },
-                    })
-                    .collect::<Vec<_>>();
-
-                if self.snake.is_at(HexGridPoint { h: hor, v: ver }) {
-                    builder.polyline(
-                        DrawMode::Fill(FillOptions::DEFAULT),
-                        &hexagon,
-                        Color::new(0., 0.8, 0., 1.),
-                    )?;
-                } else {
-                    builder.polyline(
-                        DrawMode::Stroke(StrokeOptions::DEFAULT),
-                        &hexagon,
-                        BLACK,
-                    )?;
-                }
+        for h in 0..self.shape.h {
+            for v in 0..self.shape.v {
+                draw_cell(h, v, &hexagon_stroke, ctx, sl, s, c)?
             }
         }
 
-        let mesh = builder.build(ctx)?;
-        draw(ctx, &mesh, DrawParam::new())?;
+        for &segment in &self.snake.body {
+            draw_cell(segment.h, segment.v, &hexagon_fill, ctx, sl, s, c)?
+        }
 
         present(ctx)
     }
 
-    fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, mods: KeyMods, _: bool) {
+    fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
         let new_direction = match key {
             KeyCode::H => Dir::LeftUp,
             KeyCode::T => Dir::Up,

@@ -1,5 +1,5 @@
 use ggez::conf::{WindowMode, FullscreenType};
-use ggez::{ContextBuilder, conf};
+use ggez::ContextBuilder;
 use ggez::event::run;
 use crate::game::Game;
 
