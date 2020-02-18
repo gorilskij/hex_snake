@@ -1,40 +1,98 @@
 use ggez::event::{EventHandler, KeyMods};
 use ggez::{Context, GameError, GameResult};
-use ggez::graphics::{clear, WHITE, present, DrawMode, BLACK, draw, DrawParam, StrokeOptions, Mesh, Drawable};
+use ggez::graphics::*;
 use std::f32::consts::PI;
 use mint::Point2;
-use hex_grid_point::HexGridPoint;
 use snake::Snake;
 use ggez::input::keyboard::KeyCode;
 use crate::game::snake::Dir;
 use tuple::Map;
 use std::thread;
-use std::time::Duration;
+use rand::prelude::*;
+use crate::game::hex::Hex;
+use crate::game::hex::HexType::{Apple, Crashed, Normal, Eaten};
+use crate::game::hex::hex_pos::HexPos;
 
-mod hex_grid_point;
+mod hex;
 mod snake;
 
 pub struct Game {
-    dim: HexGridPoint,
+    running: bool,
+
+    dim: HexPos,
     snake: Snake,
+    apples: Vec<Hex>,
     
     cell_side_len: f32,
+
+    rng: ThreadRng,
 }
 
 impl Game {
     pub fn new(horizontal: usize, vertical: usize, cell_side_len: f32) -> Self {
-        let dim = HexGridPoint { h: horizontal as isize, v: vertical as isize };
+        let dim = HexPos { h: horizontal as isize, v: vertical as isize };
         Self {
+            running: true,
+
             dim,
             snake: Snake::new(dim),
+            apples: vec![],
+
             cell_side_len,
+
+            rng: thread_rng(),
+        }
+    }
+
+    // spawns apples until there are `total` apples in the game
+    pub fn spawn_apples(&mut self, total: usize) {
+        'outer: while self.apples.len() < total {
+            let mut attempts = 0_u8;
+            'apple_maker: loop {
+                let apple_pos = HexPos::random_in(self.dim, &mut self.rng);
+                attempts += 1;
+                for s in self.snake.body.iter().chain(&self.apples) {
+                    if s.pos == apple_pos {
+                        // make a new apple
+                        assert!(attempts < 5);
+                        continue 'apple_maker;
+                    }
+                }
+
+                // apple made successfully
+                self.apples.push(Hex { typ: Apple, pos: apple_pos });
+                continue 'outer;
+            }
         }
     }
 }
 
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> Result<(), GameError> {
+        if !self.running { return Ok(()) }
+
         self.snake.advance();
+
+        // check if crashed into itself
+        if self.snake.crashed() {
+            self.snake.body[0].typ = Crashed;
+            self.running = false
+        }
+
+        // check if ate apple
+        let mut delete_apple = None;
+        for (i, &apple) in self.apples.iter().enumerate() {
+            if self.snake.head().pos == apple.pos {
+                delete_apple = Some(i)
+            }
+        }
+        if let Some(i) = delete_apple {
+            self.apples.remove(i);
+            self.snake.grow(1);
+            self.snake.body[0].typ = Eaten;
+        }
+
+        self.spawn_apples(50);
         thread::yield_now();
         Ok(())
     }
@@ -42,6 +100,7 @@ impl EventHandler for Game {
     // TODO: calculate how many hexagons in width and height and draw them as
     //  vertical zigzag lines, not polygons
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
+        // note could be fun to implement optionally printing as a square grid
         // TODO: reimplement optional pushing to left-top hiding part of the hexagon
         // with 0, 0 the board is touching top-left (nothing hidden)
 //        let (dx, dy) = (0., 0.);
@@ -66,9 +125,9 @@ impl EventHandler for Game {
             ctx, DrawMode::Stroke(StrokeOptions::default()),
             &hexagon_points, BLACK)?;
 
-        let hexagon_fill = Mesh::new_polyline(
+        let apple_fill = Mesh::new_polyline(
             ctx, DrawMode::fill(),
-            &hexagon_points, BLACK)?;
+            &hexagon_points, Color { r: 1., g: 0., b: 0., a: 1. })?;
 
         clear(ctx, WHITE);
 
@@ -97,8 +156,30 @@ impl EventHandler for Game {
             }
         }
 
-        for segment in &self.snake.body {
-            draw_cell(segment.h as usize, segment.v as usize, &hexagon_fill, ctx, sl, s, c)?
+        // head to tail
+        for (i, segment) in self.snake.body.iter().rev().enumerate() {
+            let color = match segment.typ {
+                Normal => {
+                    // [0.5, 1]
+                    let drk = (1. - i as f32 / self.snake.body.len() as f32) / 2.;
+                    Color { r: drk, b: drk, g: drk, a: 1. }
+                }
+                Crashed => Color { r: 1., b: 0., g: 0., a: 1. },
+                Eaten => Color { r: 0., b: 0.5, g: 0.5, a: 1. },
+                _ => panic!(),
+            };
+
+            let segment_fill = Mesh::new_polyline(
+                ctx, DrawMode::fill(),
+                &hexagon_points, color)?;
+
+            draw_cell(segment.h as usize, segment.v as usize,
+                      &segment_fill, ctx, sl, s, c)?
+        }
+
+        for apple in &self.apples {
+            draw_cell(apple.h as usize, apple.v as usize,
+                      &apple_fill, ctx, sl, s, c)?
         }
 
         present(ctx)
@@ -116,6 +197,6 @@ impl EventHandler for Game {
             _ => return,
         };
 
-        self.snake.set_direction(new_direction);
+        self.snake.set_direction_safe(new_direction);
     }
 }
