@@ -1,3 +1,5 @@
+#[macro_use] extern crate derive_more;
+
 use ggez::conf::{WindowMode, FullscreenType};
 use ggez::ContextBuilder;
 use ggez::event::run;
@@ -28,6 +30,6 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut game = Game::new(20, 20, 10.);
+    let mut game = Game::new(40, 40, 10.);
     run(ctx, event_loop, &mut game).expect("crashed")
 }

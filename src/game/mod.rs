@@ -7,15 +7,15 @@ use hex_grid_point::HexGridPoint;
 use snake::Snake;
 use ggez::input::keyboard::KeyCode;
 use crate::game::snake::Dir;
-use std::time::Duration;
 use tuple::Map;
 use std::thread;
+use std::time::Duration;
 
 mod hex_grid_point;
 mod snake;
 
 pub struct Game {
-    shape: HexGridPoint,
+    dim: HexGridPoint,
     snake: Snake,
     
     cell_side_len: f32,
@@ -23,9 +23,10 @@ pub struct Game {
 
 impl Game {
     pub fn new(horizontal: usize, vertical: usize, cell_side_len: f32) -> Self {
+        let dim = HexGridPoint { h: horizontal as isize, v: vertical as isize };
         Self {
-            shape: HexGridPoint { h: horizontal, v: vertical },
-            snake: Snake::new(horizontal, vertical),
+            dim,
+            snake: Snake::new(dim),
             cell_side_len,
         }
     }
@@ -34,7 +35,7 @@ impl Game {
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> Result<(), GameError> {
         self.snake.advance();
-        thread::sleep(Duration::from_millis(500));
+        thread::yield_now();
         Ok(())
     }
 
@@ -90,29 +91,31 @@ impl EventHandler for Game {
                  DrawParam::from((point, 0.0, WHITE)))
         }
 
-        for h in 0..self.shape.h {
-            for v in 0..self.shape.v {
+        for h in 0..self.dim.h as usize {
+            for v in 0..self.dim.v as usize {
                 draw_cell(h, v, &hexagon_stroke, ctx, sl, s, c)?
             }
         }
 
-        for &segment in &self.snake.body {
-            draw_cell(segment.h, segment.v, &hexagon_fill, ctx, sl, s, c)?
+        for segment in &self.snake.body {
+            draw_cell(segment.h as usize, segment.v as usize, &hexagon_fill, ctx, sl, s, c)?
         }
 
         present(ctx)
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
+        use KeyCode::*;
         let new_direction = match key {
-            KeyCode::H => Dir::LeftUp,
-            KeyCode::T => Dir::Up,
-            KeyCode::N => Dir::RightUp,
-            KeyCode::M => Dir::LeftDown,
-            KeyCode::W => Dir::Down,
-            KeyCode::V => Dir::RightDown,
+            H => Dir::UL,
+            T => Dir::U,
+            N => Dir::UR,
+            M => Dir::DL,
+            W => Dir::D,
+            V => Dir::DR,
             _ => return,
         };
+
         self.snake.set_direction(new_direction);
     }
 }
