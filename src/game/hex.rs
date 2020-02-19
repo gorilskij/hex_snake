@@ -2,26 +2,31 @@ use std::ops::{Deref, DerefMut};
 use crate::game::hex::hex_pos::HexPos;
 
 pub mod hex_pos {
-    use std::ops::{Rem, Add};
     use std::fmt::{Debug, Formatter, Error};
     use rand::Rng;
     use crate::game::snake::Dir;
     use Dir::*;
 
-    trait IsEven where Self: Sized {
+    // todo move to a better place
+    pub trait IsEven where Self: Sized {
         fn is_even(self) -> bool;
         fn is_odd(self) -> bool {
             !self.is_even()
         }
     }
 
-    impl<T: Copy + Rem<T, Output=T> + Add<T, Output=T> + PartialEq + From<i8>> IsEven for T {
-        fn is_even(self) -> bool {
-            let two = 2.into();
-            ((self % two) + two) % two == 0.into()
-        }
+    macro_rules! impl_is_even {
+        ($type:ty) => {
+            impl IsEven for $type {
+                fn is_even(self) -> bool {
+                    ((self % 2 as $type) + 2 as $type) % 2 as $type == 0 as $type
+                }
+            }
+        };
     }
 
+    impl_is_even!(isize);
+    impl_is_even!(usize);
 
     #[derive(Eq, PartialEq, Copy, Clone, Div)]
     pub struct HexPos {
