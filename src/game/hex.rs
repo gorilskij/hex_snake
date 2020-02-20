@@ -28,7 +28,7 @@ pub mod hex_pos {
     impl_is_even!(isize);
     impl_is_even!(usize);
 
-    #[derive(Eq, PartialEq, Copy, Clone, Div)]
+    #[derive(Eq, PartialEq, Copy, Clone, Div, Add)]
     pub struct HexPos {
         pub h: isize,
         pub v: isize,

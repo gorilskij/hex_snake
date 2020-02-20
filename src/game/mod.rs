@@ -13,37 +13,73 @@ use crate::game::hex::Hex;
 use crate::game::hex::HexType::{Apple, Crashed, Normal, Eaten};
 use crate::game::hex::hex_pos::HexPos;
 use hex::hex_pos::IsEven;
+use crate::game::effect::Effect;
+use std::time::Duration;
 
 mod hex;
 mod snake;
+mod effect;
+
+struct Ctrl {
+    u: KeyCode,
+    d: KeyCode,
+    ul: KeyCode,
+    ur: KeyCode,
+    dl: KeyCode,
+    dr: KeyCode,
+}
 
 pub struct Game {
     running: bool,
 
     dim: HexPos,
-    snake: Snake,
+    snakes: Vec<(Ctrl, Snake)>,
     apples: Vec<Hex>,
     
     cell_side_len: f32,
 
     rng: ThreadRng,
     grid_mesh: Option<Mesh>,
+    effect: Option<Effect>,
 }
 
 impl Game {
     pub fn new(horizontal: usize, vertical: usize, cell_side_len: f32) -> Self {
         let dim = HexPos { h: horizontal as isize, v: vertical as isize };
+
+        let ctrl_right_hand_dvorak = Ctrl {
+            u: KeyCode::T,
+            d: KeyCode::W,
+            ul: KeyCode::H,
+            ur: KeyCode::N,
+            dl: KeyCode::M,
+            dr: KeyCode::V,
+        };
+
+        let ctrl_left_hand_dvorak = Ctrl {
+            u: KeyCode::E,
+            d: KeyCode::Q,
+            ul: KeyCode::O,
+            ur: KeyCode::U,
+            dl: KeyCode::Semicolon,
+            dr: KeyCode::J,
+        };
+
         Self {
             running: true,
 
             dim,
-            snake: Snake::new(dim),
+            snakes: vec![
+                (ctrl_left_hand_dvorak, Snake::new(dim, HexPos { h: -2, v: 0 })),
+                (ctrl_right_hand_dvorak, Snake::new(dim, HexPos { h: 2, v: 0 })),
+            ],
             apples: vec![],
 
             cell_side_len,
 
             rng: thread_rng(),
             grid_mesh: None,
+            effect: None,
         }
     }
 
@@ -54,7 +90,13 @@ impl Game {
             'apple_maker: loop {
                 let apple_pos = HexPos::random_in(self.dim, &mut self.rng);
                 attempts += 1;
-                for s in self.snake.body.iter().chain(&self.apples) {
+                for s in self
+                    .snakes
+                    .iter()
+                    .map(|(_, s)| s.body.iter())
+                    .flatten()
+                    .chain(&self.apples)
+                {
                     if s.pos == apple_pos {
                         // make a new apple
                         assert!(attempts < 5);
@@ -74,37 +116,61 @@ impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> Result<(), GameError> {
         if !self.running { return Ok(()) }
 
-        self.snake.advance();
+        thread::sleep(Duration::from_millis(100));
 
-        // check if crashed into itself
-        if self.snake.crashed() {
-            self.snake.body[0].typ = Crashed;
-            self.running = false
+        for (_, snake) in &mut self.snakes {
+            snake.advance()
+        }
+
+        // check if crashed
+        let mut crashed_snake_indices = vec![];
+        'outer: for (i, (_, snake)) in self.snakes.iter().enumerate() {
+            for (_, other) in &self.snakes {
+                for segment in &other.body[1..] {
+                    if snake.body[0].pos == segment.pos {
+//                        snake.body[0].typ = Crashed;
+                        crashed_snake_indices.push(i);
+                        self.running = false;
+                        continue 'outer;
+                    }
+                }
+            }
+        }
+        for i in crashed_snake_indices {
+            self.snakes[i].1.body[0].typ = Crashed
         }
 
         // check if ate apple
-        let mut delete_apple = None;
-        for (i, &apple) in self.apples.iter().enumerate() {
-            if self.snake.head().pos == apple.pos {
-                delete_apple = Some(i)
+        let mut eaten_apples = vec![];
+        for (a, &apple) in self.apples.iter().enumerate() {
+            for (s, (_, snake)) in self.snakes.iter().enumerate() {
+                if snake.body[0].pos == apple.pos {
+                    eaten_apples.push((a, s))
+                }
             }
         }
-        if let Some(i) = delete_apple {
-            self.apples.remove(i);
-            self.snake.grow(1);
-            self.snake.body[0].typ = Eaten;
+        // reverse index order so removal doesn't affect later apples
+        eaten_apples.sort_by(|(a1, _), (a2, _)| a1.cmp(a2));
+        for &(a, s) in eaten_apples.iter().rev() {
+            self.apples.remove(a);
+            self.snakes[s].1.grow(1);
+            self.snakes[s].1.body[0].typ = Eaten;
+
+            // apply effect, might be too much with multiple snakes
+            // todo apply effect per-snake
+//            self.effect = Some(Effect::SmallHex {
+//                min_scale: 0.2,
+//                iterations: 10,
+//                passed: 0,
+//            });
         }
 
         self.spawn_apples(50);
-
-//        println!("updt: {}ms", start.elapsed().as_millis());
 
         thread::yield_now();
         Ok(())
     }
 
-    // TODO: calculate how many hexagons in width and height and draw them as
-    //  vertical zigzag lines, not polygons
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         // note could be fun to implement optionally printing as a square grid
         // TODO: reimplement optional pushing to left-top hiding part of the hexagon
@@ -182,36 +248,63 @@ impl EventHandler for Game {
                     b.x += 2. * sl + 2. * c;
                 }
             }
-
             if self.dim.h.is_even() {
-                builder.polyline(draw_mode, &wall_points_a, BLACK)?;
+                builder.polyline(draw_mode, &wall_points_a[..wall_points_a.len() - 1],
+                                 BLACK)?;
             }
 
             self.grid_mesh = Some(builder.build(ctx)?);
         }
         draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
 
-        let hexagon_points = [
-            (c, 0.),
-            (sl + c, 0.),
-            (sl + 2. * c, s),
-            (sl + c, 2. * s),
-            (c, 2. * s),
-            (0., s),
-            (c, 0.),
-        ].iter()
-            .map(|&(x, y)| Point2 { x, y })
-            .collect::<Vec<_>>();
+        let mut hexagon_points = [
+            Point2 { x: c, y: 0. },
+            Point2 { x: sl + c, y: 0. },
+            Point2 { x: sl + 2. * c, y: s },
+            Point2 { x: sl + c, y: 2. * s },
+            Point2 { x: c, y: 2. * s },
+            Point2 { x: 0., y: s },
+            Point2 { x: c, y: 0. },
+        ];
 
-//        let hexagon_stroke = Mesh::new_polyline(
-//            ctx, DrawMode::Stroke(StrokeOptions::default()),
-//            &hexagon_points, BLACK)?;
+        if let Some(Effect::SmallHex {
+                        min_scale,
+                        iterations,
+                        passed
+                    }) = self.effect {
+            let scale_factor = if passed < iterations / 2 {
+                let fraction = passed as f32 / (iterations as f32 / 2.);
+                1. - fraction * (1. - min_scale)
+            } else {
+                let fraction = (passed - iterations / 2) as f32 / (iterations - iterations / 2) as f32;
+                1. - (1. - fraction) * (1. - min_scale)
+            };
 
+            // scale down and reposition in the middle of the hexagon
+            for pt in &mut hexagon_points {
+                pt.x *= scale_factor;
+                pt.y *= scale_factor;
+                // formula is (dimension / 2) * (1 - scale factor) [simplified]
+                pt.x += (c + sl / 2.) * (1. - scale_factor);
+                pt.y += s * (1. - scale_factor); // actually 2 * s / 2
+            }
+
+            if passed == iterations {
+                self.effect = None;
+            } else {
+                // always succeeds, only used to unwrap
+                if let Some(Effect::SmallHex { passed, .. }) = &mut self.effect {
+                    *passed += 1
+                }
+            }
+        }
+        
         let apple_fill = Mesh::new_polyline(
             ctx, DrawMode::fill(),
             &hexagon_points, Color { r: 1., g: 0., b: 0., a: 1. })?;
 
 
+        // todo supersede
         #[inline(always)]
         fn draw_cell<D: Drawable>(
             h: usize,
@@ -231,31 +324,20 @@ impl EventHandler for Game {
                  DrawParam::from((point, 0.0, WHITE)))
         }
 
-//        for h in 0..self.dim.h as usize {
-//            for v in 0..self.dim.v as usize {
-//                draw_cell(h, v, &hexagon_stroke, ctx, sl, s, c)?
-//            }
-//        }
-
-        // head to tail
-        for (i, segment) in self.snake.body.iter().rev().enumerate() {
-            let color = match segment.typ {
-                Normal => {
-                    // [0.5, 1]
-                    let drk = (1. - i as f32 / self.snake.body.len() as f32) / 2.;
-                    Color { r: drk, b: drk, g: drk, a: 1. }
-                }
-                Crashed => Color { r: 1., b: 0., g: 0., a: 1. },
-                Eaten => Color { r: 0., b: 0.5, g: 0.5, a: 1. },
-                _ => panic!(),
-            };
-
-            let segment_fill = Mesh::new_polyline(
-                ctx, DrawMode::fill(),
-                &hexagon_points, color)?;
-
-            draw_cell(segment.h as usize, segment.v as usize,
-                      &segment_fill, ctx, sl, s, c)?
+        // draw snakes, crashed snakes on top (last)
+        for (_, snake) in self
+            .snakes
+            .iter()
+            .filter(|(_, s)| s.body[0].typ != Crashed)
+        {
+            snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c)?
+        }
+        for (_, snake) in self
+            .snakes
+            .iter()
+            .filter(|(_, s)| s.body[0].typ == Crashed)
+        {
+            snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c)?
         }
 
         for apple in &self.apples {
@@ -270,17 +352,21 @@ impl EventHandler for Game {
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
-        use KeyCode::*;
-        let new_direction = match key {
-            H => Dir::UL,
-            T => Dir::U,
-            N => Dir::UR,
-            M => Dir::DL,
-            W => Dir::D,
-            V => Dir::DR,
-            _ => return,
-        };
+        use Dir::*;
+        for (ctrl, snake) in &mut self.snakes {
+            let new_dir = match key {
+                k if k == ctrl.u => Some(U),
+                k if k == ctrl.d => Some(D),
+                k if k == ctrl.ul => Some(UL),
+                k if k == ctrl.ur => Some(UR),
+                k if k == ctrl.dl => Some(DL),
+                k if k == ctrl.dr => Some(DR),
+                _ => None,
+            };
 
-        self.snake.set_direction_safe(new_direction);
+            if let Some(d) = new_dir {
+                snake.set_direction_safe(d)
+            }
+        }
     }
 }

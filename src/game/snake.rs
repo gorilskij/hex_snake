@@ -2,6 +2,9 @@ use Dir::*;
 use std::ops::Neg;
 use super::hex::{Hex, HexType::*};
 use crate::game::hex::hex_pos::HexPos;
+use ggez::{Context, GameResult};
+use ggez::graphics::{Color, Mesh, DrawMode, Drawable};
+use mint::Point2;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Dir { U, D, UL, UR, DL, DR }
@@ -25,8 +28,8 @@ pub struct Snake {
 }
 
 impl Snake {
-    pub fn new(dim: HexPos) -> Self {
-        let center = Hex { typ: Normal, pos: dim / 2 };
+    pub fn new(dim: HexPos, offset: HexPos) -> Self {
+        let center = Hex { typ: Normal, pos: dim / 2 + offset };
         Self {
             body: vec![center],
             growing: 15,
@@ -70,12 +73,41 @@ impl Snake {
         }
     }
 
-    pub fn crashed(&self) -> bool {
-        self.body[1..].iter().any(|b| b.pos == self.body[0].pos)
-    }
-
     // ignore opposite direction
     pub fn set_direction_safe(&mut self, new_dir: Dir) {
         if self.dir != -new_dir { self.dir = new_dir }
+    }
+
+    pub fn draw(
+        &self,
+        ctx: &mut Context,
+        hexagon_points: &[Point2<f32>],
+        draw_cell: fn(usize, usize, &Mesh, &mut Context, f32, f32, f32) -> GameResult,
+        sl: f32,
+        s: f32,
+        c: f32,
+    ) -> GameResult {
+        // head to tail
+        for (i, segment) in self.body.iter().rev().enumerate() {
+            let color = match segment.typ {
+                Normal => {
+                    // [0.5, 1]
+                    let drk = (1. - i as f32 / self.body.len() as f32) / 2.;
+                    Color { r: drk, b: drk, g: drk, a: 1. }
+                }
+                Crashed => Color { r: 1., b: 0.5, g: 0., a: 1. },
+                Eaten => Color { r: 0., b: 0.5, g: 1., a: 1. },
+                _ => panic!(),
+            };
+
+            let segment_fill = Mesh::new_polyline(
+                ctx, DrawMode::fill(),
+                hexagon_points, color)?;
+
+            draw_cell(segment.h as usize, segment.v as usize,
+                      &segment_fill, ctx, sl, s, c)?
+        }
+
+        Ok(())
     }
 }
