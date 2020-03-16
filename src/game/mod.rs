@@ -17,10 +17,12 @@ use crate::game::effect::Effect;
 use std::time::Duration;
 use crate::game::ctrl::{CTRL_DVORAK_RIGHT_RIGHT, CTRL_DVORAK_LEFT_RIGHT};
 use ggez::conf::WindowMode;
+use crate::game::palette::Palette;
 
 mod hex;
 mod snake;
 mod effect;
+pub mod palette;
 
 #[macro_use]
 #[allow(dead_code)]
@@ -34,6 +36,7 @@ pub struct Game {
     apples: Vec<Hex>,
     
     cell_side_len: f32,
+    palette: Palette,
 
     rng: ThreadRng,
     grid_mesh: Option<Mesh>,
@@ -49,7 +52,7 @@ fn wh_to_dim(width: f32, height: f32, cell_side_len: f32) -> HexPos {
 }
 
 impl Game {
-    pub fn new(cell_side_len: f32, wm: WindowMode) -> Self {
+    pub fn new(cell_side_len: f32, palette: Palette, wm: WindowMode) -> Self {
         let left_side_control = ctrl! {
             layout: dvorak,
             side: left,
@@ -72,6 +75,7 @@ impl Game {
             apples: vec![],
 
             cell_side_len,
+            palette,
 
             rng: thread_rng(),
             grid_mesh: None,
@@ -179,7 +183,7 @@ impl EventHandler for Game {
         // TODO: reimplement optional pushing to left-top hiding part of the hexagon
         // with 0, 0 the board is touching top-left (nothing hidden)
 
-        clear(ctx, WHITE);
+        clear(ctx, self.palette.background_color);
 
         // general useful lengths
         let a = 1. / 3. * PI; // 120deg
@@ -218,9 +222,10 @@ impl EventHandler for Game {
             let mut builder = MeshBuilder::new();
 
             let draw_mode = DrawMode::stroke(2.);
+            let fg = self.palette.foreground_color;
             for h in 0 .. (self.dim.h + 1) / 2 {
-                builder.polyline(draw_mode, &wall_points_a, BLACK)?;
-                builder.polyline(draw_mode, &wall_points_b, BLACK)?;
+                builder.polyline(draw_mode, &wall_points_a, fg)?;
+                builder.polyline(draw_mode, &wall_points_b, fg)?;
 
                 let dh = h as f32 * (2. * sl + 2. * c);
 
@@ -229,19 +234,19 @@ impl EventHandler for Game {
                     builder.line(&[
                         Point2 { x: c + dh, y: dv },
                         Point2 { x: c + sl + dh, y: dv }
-                    ], 2., BLACK)?;
+                    ], 2., fg)?;
 
                     builder.line(&[
                         Point2 { x: 2. * c + sl + dh, y: s + dv },
                         Point2 { x: 2. * c + 2. * sl + dh, y: s + dv },
-                    ], 2., BLACK)?;
+                    ], 2., fg)?;
                 }
                 {
                     let dv = self.dim.v as f32 * 2. * s;
                     builder.line(&[
                         Point2 { x: c + dh, y: dv },
                         Point2 { x: c + sl + dh, y: dv }
-                    ], 2., BLACK)?;
+                    ], 2., fg)?;
                 }
 
                 for (a, b) in wall_points_a
@@ -253,7 +258,7 @@ impl EventHandler for Game {
             }
             if self.dim.h.is_even() {
                 builder.polyline(draw_mode, &wall_points_a[..wall_points_a.len() - 1],
-                                 BLACK)?;
+                                 fg)?;
             }
 
             self.grid_mesh = Some(builder.build(ctx)?);
@@ -304,7 +309,7 @@ impl EventHandler for Game {
         
         let apple_fill = Mesh::new_polyline(
             ctx, DrawMode::fill(),
-            &hexagon_points, Color { r: 1., g: 0., b: 0., a: 1. })?;
+            &hexagon_points, self.palette.apple_fill_color)?;
 
 
         // todo supersede
