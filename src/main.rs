@@ -7,13 +7,10 @@ use crate::game::Game;
 
 mod game;
 
-const WIDTH: f32 = 1000.;
-const HEIGHT: f32 = 800.;
-
 fn main() {
     let wm = WindowMode {
-        width: WIDTH,
-        height: HEIGHT,
+        width: 1000.,
+        height: 800.,
         maximized: false,
         fullscreen_type: FullscreenType::Windowed,
         borderless: false,
@@ -21,7 +18,7 @@ fn main() {
         min_height: 0.,
         max_width: 0.,
         max_height: 0.,
-        resizable: false
+        resizable: true,
     };
 
     let (ref mut ctx, ref mut event_loop)
@@ -30,6 +27,6 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut game = Game::new(40, 40, 10.);
+    let mut game = Game::new(10., wm);
     run(ctx, event_loop, &mut game).expect("crashed")
 }

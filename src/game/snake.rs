@@ -5,7 +5,7 @@ use crate::game::hex::hex_pos::HexPos;
 use ggez::{Context, GameResult};
 use ggez::graphics::{Color, Mesh, DrawMode};
 use mint::Point2;
-use ggez::input::keyboard::KeyCode;
+use crate::game::ctrl::Ctrl;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Dir { U, D, UL, UR, DL, DR }
@@ -21,20 +21,11 @@ impl Neg for Dir {
 }
 
 
-pub struct Ctrl {
-    pub u: KeyCode,
-    pub d: KeyCode,
-    pub ul: KeyCode,
-    pub ur: KeyCode,
-    pub dl: KeyCode,
-    pub dr: KeyCode,
-}
-
 pub struct Snake {
     pub body: Vec<Hex>,
     growing: usize,
     dir: Dir,
-    dim: HexPos,
+    pub(crate) dim: HexPos,
 
     pub ctrl: Ctrl,
 }

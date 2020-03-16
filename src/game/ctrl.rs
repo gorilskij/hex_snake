@@ -1,8 +1,18 @@
-use crate::game::snake::Ctrl;
 use ggez::input::keyboard::KeyCode::*;
+use ggez::input::keyboard::KeyCode;
+
+
+pub struct Ctrl {
+    pub u: KeyCode,
+    pub d: KeyCode,
+    pub ul: KeyCode,
+    pub ur: KeyCode,
+    pub dl: KeyCode,
+    pub dr: KeyCode,
+}
+
 
 // CTRL_{layout}_{location on keyboard}_{hand used to play}
-
 // DVORAK
 pub const CTRL_DVORAK_RIGHT_RIGHT: Ctrl = Ctrl {
     ul: H,

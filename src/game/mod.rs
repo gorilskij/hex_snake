@@ -5,17 +5,18 @@ use std::f32::consts::PI;
 use mint::Point2;
 use snake::Snake;
 use ggez::input::keyboard::KeyCode;
-use crate::game::snake::{Dir, Ctrl};
+use crate::game::snake::Dir;
 use tuple::Map;
 use std::thread;
 use rand::prelude::*;
 use crate::game::hex::Hex;
-use crate::game::hex::HexType::{Apple, Crashed, Normal, Eaten};
+use crate::game::hex::HexType::*;
 use crate::game::hex::hex_pos::HexPos;
 use hex::hex_pos::IsEven;
 use crate::game::effect::Effect;
 use std::time::Duration;
-use crate::game::ctrl_settings::{CTRL_DVORAK_RIGHT_RIGHT, CTRL_DVORAK_LEFT_RIGHT};
+use crate::game::ctrl::{CTRL_DVORAK_RIGHT_RIGHT, CTRL_DVORAK_LEFT_RIGHT};
+use ggez::conf::WindowMode;
 
 mod hex;
 mod snake;
@@ -23,7 +24,7 @@ mod effect;
 
 #[macro_use]
 #[allow(dead_code)]
-mod ctrl_settings;
+mod ctrl;
 
 pub struct Game {
     running: bool,
@@ -39,10 +40,16 @@ pub struct Game {
     effect: Option<Effect>,
 }
 
-impl Game {
-    pub fn new(horizontal: usize, vertical: usize, cell_side_len: f32) -> Self {
-        let dim = HexPos { h: horizontal as isize, v: vertical as isize };
+fn wh_to_dim(width: f32, height: f32, cell_side_len: f32) -> HexPos {
+    let (s, c) = (1. / 3. * PI).sin_cos().map(|i| i * cell_side_len);
+    let horizontal = width / (cell_side_len + c);
+    let vertical = height / (2. * s);
 
+    HexPos { h: horizontal as isize, v: vertical as isize }
+}
+
+impl Game {
+    pub fn new(cell_side_len: f32, wm: WindowMode) -> Self {
         let left_side_control = ctrl! {
             layout: dvorak,
             side: left,
@@ -55,14 +62,13 @@ impl Game {
             hand: right,
         };
 
-        Self {
+        let dim = wh_to_dim(wm.width, wm.height, cell_side_len);
+
+        let mut game = Self {
             running: true,
 
             dim,
-            snakes: vec![
-                Snake::new(dim, HexPos { h: -2, v: 0 }, left_side_control),
-                Snake::new(dim, HexPos { h: 2, v: 0 }, right_side_control),
-            ],
+            snakes: vec![],
             apples: vec![],
 
             cell_side_len,
@@ -70,7 +76,15 @@ impl Game {
             rng: thread_rng(),
             grid_mesh: None,
             effect: None,
-        }
+        };
+
+        // spawn snakes
+        game.snakes.push(
+            Snake::new(dim, HexPos { h: -2, v: 0 }, left_side_control));
+        game.snakes.push(
+            Snake::new(dim, HexPos { h: 2, v: 0 }, right_side_control));
+
+        game
     }
 
     // spawns apples until there are `total` apples in the game
@@ -173,7 +187,7 @@ impl EventHandler for Game {
         let (s, c) = a.sin_cos().map(|x| x * sl);
 
         // generate grid mesh first time, later reuse
-        if let None = self.grid_mesh {
+        if self.grid_mesh.is_none() {
             let mut wall_points_a = vec![];
             let mut wall_points_b = vec![];
 
@@ -358,5 +372,20 @@ impl EventHandler for Game {
                 snake.set_direction_safe(d)
             }
         }
+    }
+
+    fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
+        let dim = wh_to_dim(width, height, self.cell_side_len);
+        self.dim = dim;
+        for snake in &mut self.snakes {
+            snake.dim = dim;
+        }
+
+        println!("w/h: {}/{}", width, height);
+        self.effect = Some(Effect::SmallHex {
+            min_scale: 0.1,
+            iterations: 10,
+            passed: 0,
+        });
     }
 }

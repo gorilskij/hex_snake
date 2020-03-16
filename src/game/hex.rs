@@ -93,7 +93,7 @@ pub mod hex_pos {
 }
 
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum HexType {
     Normal,
     Crashed,
@@ -102,7 +102,7 @@ pub enum HexType {
     Apple,
 }
 
-#[derive(Copy, Clone)] // ?
+#[derive(Copy, Clone, Debug)] // ?
 pub struct Hex {
     pub typ: HexType,
     pub pos: HexPos,
