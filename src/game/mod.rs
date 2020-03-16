@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 use mint::Point2;
 use snake::Snake;
 use ggez::input::keyboard::KeyCode;
-use crate::game::snake::Dir;
+use crate::game::snake::{Dir, Ctrl};
 use tuple::Map;
 use std::thread;
 use rand::prelude::*;
@@ -15,25 +15,21 @@ use crate::game::hex::hex_pos::HexPos;
 use hex::hex_pos::IsEven;
 use crate::game::effect::Effect;
 use std::time::Duration;
+use crate::game::ctrl_settings::{CTRL_DVORAK_RIGHT_RIGHT, CTRL_DVORAK_LEFT_RIGHT};
 
 mod hex;
 mod snake;
 mod effect;
 
-struct Ctrl {
-    u: KeyCode,
-    d: KeyCode,
-    ul: KeyCode,
-    ur: KeyCode,
-    dl: KeyCode,
-    dr: KeyCode,
-}
+#[macro_use]
+#[allow(dead_code)]
+mod ctrl_settings;
 
 pub struct Game {
     running: bool,
 
     dim: HexPos,
-    snakes: Vec<(Ctrl, Snake)>,
+    snakes: Vec<Snake>,
     apples: Vec<Hex>,
     
     cell_side_len: f32,
@@ -47,22 +43,16 @@ impl Game {
     pub fn new(horizontal: usize, vertical: usize, cell_side_len: f32) -> Self {
         let dim = HexPos { h: horizontal as isize, v: vertical as isize };
 
-        let ctrl_right_hand_dvorak = Ctrl {
-            u: KeyCode::T,
-            d: KeyCode::W,
-            ul: KeyCode::H,
-            ur: KeyCode::N,
-            dl: KeyCode::M,
-            dr: KeyCode::V,
+        let left_side_control = ctrl! {
+            layout: dvorak,
+            side: left,
+            hand: right,
         };
 
-        let ctrl_left_hand_dvorak = Ctrl {
-            u: KeyCode::E,
-            d: KeyCode::Q,
-            ul: KeyCode::O,
-            ur: KeyCode::U,
-            dl: KeyCode::Semicolon,
-            dr: KeyCode::J,
+        let right_side_control = ctrl! {
+            layout: dvorak,
+            side: right,
+            hand: right,
         };
 
         Self {
@@ -70,8 +60,8 @@ impl Game {
 
             dim,
             snakes: vec![
-                (ctrl_left_hand_dvorak, Snake::new(dim, HexPos { h: -2, v: 0 })),
-                (ctrl_right_hand_dvorak, Snake::new(dim, HexPos { h: 2, v: 0 })),
+                Snake::new(dim, HexPos { h: -2, v: 0 }, left_side_control),
+                Snake::new(dim, HexPos { h: 2, v: 0 }, right_side_control),
             ],
             apples: vec![],
 
@@ -93,7 +83,7 @@ impl Game {
                 for s in self
                     .snakes
                     .iter()
-                    .map(|(_, s)| s.body.iter())
+                    .map(|s| s.body.iter())
                     .flatten()
                     .chain(&self.apples)
                 {
@@ -118,17 +108,16 @@ impl EventHandler for Game {
 
         thread::sleep(Duration::from_millis(100));
 
-        for (_, snake) in &mut self.snakes {
+        for snake in &mut self.snakes {
             snake.advance()
         }
 
         // check if crashed
         let mut crashed_snake_indices = vec![];
-        'outer: for (i, (_, snake)) in self.snakes.iter().enumerate() {
-            for (_, other) in &self.snakes {
+        'outer: for (i, snake) in self.snakes.iter().enumerate() {
+            for other in &self.snakes {
                 for segment in &other.body[1..] {
                     if snake.body[0].pos == segment.pos {
-//                        snake.body[0].typ = Crashed;
                         crashed_snake_indices.push(i);
                         self.running = false;
                         continue 'outer;
@@ -137,13 +126,13 @@ impl EventHandler for Game {
             }
         }
         for i in crashed_snake_indices {
-            self.snakes[i].1.body[0].typ = Crashed
+            self.snakes[i].body[0].typ = Crashed
         }
 
         // check if ate apple
         let mut eaten_apples = vec![];
         for (a, &apple) in self.apples.iter().enumerate() {
-            for (s, (_, snake)) in self.snakes.iter().enumerate() {
+            for (s, snake) in self.snakes.iter().enumerate() {
                 if snake.body[0].pos == apple.pos {
                     eaten_apples.push((a, s))
                 }
@@ -153,8 +142,8 @@ impl EventHandler for Game {
         eaten_apples.sort_by(|(a1, _), (a2, _)| a1.cmp(a2));
         for &(a, s) in eaten_apples.iter().rev() {
             self.apples.remove(a);
-            self.snakes[s].1.grow(1);
-            self.snakes[s].1.body[0].typ = Eaten;
+            self.snakes[s].grow(1);
+            self.snakes[s].body[0].typ = Eaten;
 
             // apply effect, might be too much with multiple snakes
             // todo apply effect per-snake
@@ -325,17 +314,17 @@ impl EventHandler for Game {
         }
 
         // draw snakes, crashed snakes on top (last)
-        for (_, snake) in self
+        for snake in self
             .snakes
             .iter()
-            .filter(|(_, s)| s.body[0].typ != Crashed)
+            .filter(|s| s.body[0].typ != Crashed)
         {
             snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c)?
         }
-        for (_, snake) in self
+        for snake in self
             .snakes
             .iter()
-            .filter(|(_, s)| s.body[0].typ == Crashed)
+            .filter(|s| s.body[0].typ == Crashed)
         {
             snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c)?
         }
@@ -353,7 +342,8 @@ impl EventHandler for Game {
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
         use Dir::*;
-        for (ctrl, snake) in &mut self.snakes {
+        for snake in &mut self.snakes {
+            let ctrl = &snake.ctrl;
             let new_dir = match key {
                 k if k == ctrl.u => Some(U),
                 k if k == ctrl.d => Some(D),

@@ -3,8 +3,9 @@ use std::ops::Neg;
 use super::hex::{Hex, HexType::*};
 use crate::game::hex::hex_pos::HexPos;
 use ggez::{Context, GameResult};
-use ggez::graphics::{Color, Mesh, DrawMode, Drawable};
+use ggez::graphics::{Color, Mesh, DrawMode};
 use mint::Point2;
+use ggez::input::keyboard::KeyCode;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Dir { U, D, UL, UR, DL, DR }
@@ -20,26 +21,35 @@ impl Neg for Dir {
 }
 
 
+pub struct Ctrl {
+    pub u: KeyCode,
+    pub d: KeyCode,
+    pub ul: KeyCode,
+    pub ur: KeyCode,
+    pub dl: KeyCode,
+    pub dr: KeyCode,
+}
+
 pub struct Snake {
     pub body: Vec<Hex>,
     growing: usize,
     dir: Dir,
     dim: HexPos,
+
+    pub ctrl: Ctrl,
 }
 
 impl Snake {
-    pub fn new(dim: HexPos, offset: HexPos) -> Self {
+    pub fn new(dim: HexPos, offset: HexPos, ctrl: Ctrl) -> Self {
         let center = Hex { typ: Normal, pos: dim / 2 + offset };
         Self {
             body: vec![center],
             growing: 15,
             dir: Dir::U,
             dim,
-        }
-    }
 
-    pub fn head(&self) -> Hex {
-        self.body[0]
+            ctrl,
+        }
     }
 
     pub fn grow(&mut self, amount: usize) {
