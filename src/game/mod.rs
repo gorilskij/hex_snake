@@ -25,6 +25,14 @@ pub mod theme;
 #[allow(dead_code)]
 mod ctrl;
 
+// todo explain this (cos_len < sin_len) (120deg angle was used)
+#[derive(Copy, Clone)]
+struct CellDim {
+    side: f32,
+    sin: f32,
+    cos: f32,
+}
+
 pub struct Game {
     running: bool,
 
@@ -32,7 +40,7 @@ pub struct Game {
     snakes: Vec<Snake>,
     apples: Vec<Hex>,
     
-    cell_side_len: f32,
+    cell_dim: CellDim,
     theme: Theme,
 
     apple_count: usize,
@@ -42,24 +50,26 @@ pub struct Game {
     effect: Option<Effect>,
 }
 
-fn wh_to_dim(width: f32, height: f32, cell_side_len: f32) -> HexPos {
-    let (s, c) = (1. / 3. * PI).sin_cos().map(|i| i * cell_side_len);
-    let horizontal = width / (cell_side_len + c);
-    let vertical = height / (2. * s);
-
-    HexPos { h: horizontal as isize, v: vertical as isize }
-}
-
 impl Game {
     pub fn new(cell_side_len: f32, theme: Theme, wm: WindowMode) -> Self {
+        let (s, c) = (1. / 3. * PI).sin_cos().map(|i| i * cell_side_len);
+
+        let h = wm.width / (cell_side_len + c);
+        let v = wm.height / (2. * s);
+        let dim = HexPos { h: h as isize, v: v as isize };
+
         let mut game = Self {
             running: true,
 
-            dim: wh_to_dim(wm.width, wm.height, cell_side_len),
+            dim,
             snakes: vec![],
             apples: vec![],
 
-            cell_side_len,
+            cell_dim: CellDim {
+                side: cell_side_len,
+                sin: s,
+                cos: c,
+            },
             theme,
 
             apple_count: 50,
@@ -186,15 +196,13 @@ impl EventHandler for Game {
 
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         // note could be fun to implement optionally printing as a square grid
-        // TODO: reimplement optional pushing to left-top hiding part of the hexagon
+        // TODO: reimplement optional pushing to left-top (hiding part of the hexagon)
         // with 0, 0 the board is touching top-left (nothing hidden)
 
         clear(ctx, self.theme.palette.background_color);
 
-        // general useful lengths
-        let a = 1. / 3. * PI; // 120deg
-        let sl = self.cell_side_len;
-        let (s, c) = a.sin_cos().map(|x| x * sl);
+        // shorter names look nice in formulas
+        let CellDim { side: sl, sin: s, cos: c} = self.cell_dim;
 
         // generate grid mesh first time, later reuse
         if self.grid_mesh.is_none() {
@@ -325,13 +333,11 @@ impl EventHandler for Game {
             v: usize,
             drawable: &D,
             ctx: &mut Context,
-            sl: f32,
-            s: f32,
-            c: f32,
+            cell_dim: CellDim,
         ) -> GameResult<()> {
             let point = Point2 {
-                x: h as f32 * (sl + c),
-                y: v as f32 * 2. * s + if h % 2 == 0 { 0. } else { s },
+                x: h as f32 * (cell_dim.side + cell_dim.cos),
+                y: v as f32 * 2. * cell_dim.sin + if h % 2 == 0 { 0. } else { cell_dim.sin },
             };
 
             draw(ctx, drawable,
@@ -357,16 +363,16 @@ impl EventHandler for Game {
         // draw snakes, crashed points on top
         for snake in &self.snakes {
             snake.draw_non_crash_points(
-                ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?;
+                ctx, &hexagon_points, draw_cell, self.cell_dim, &self.theme.palette)?;
         }
         for snake in &self.snakes {
             snake.draw_crash_point(
-                ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?;
+                ctx, &hexagon_points, draw_cell, self.cell_dim, &self.theme.palette)?;
         }
 
         for apple in &self.apples {
             draw_cell(apple.h as usize, apple.v as usize,
-                      &apple_fill, ctx, sl, s, c)?
+                      &apple_fill, ctx, self.cell_dim)?
         }
 
 //        println!("draw: {}ms", start.elapsed().as_millis());
@@ -397,10 +403,8 @@ impl EventHandler for Game {
         }
 
         // other keys
-        if key == KeyCode::Space {
-            if !self.running {
-                self.restart();
-            }
+        if key == KeyCode::Space && !self.running {
+            self.restart();
         }
     }
 

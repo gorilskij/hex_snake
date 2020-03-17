@@ -6,6 +6,7 @@ use ggez::graphics::{Color, Mesh, DrawMode};
 use mint::Point2;
 use crate::game::ctrl::Ctrl;
 use crate::game::theme::Palette;
+use crate::game::CellDim;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Dir { U, D, UL, UR, DL, DR }
@@ -86,14 +87,12 @@ impl Snake {
         if self.dir != -new_dir { self.dir = new_dir }
     }
 
-    pub fn draw_non_crash_points(
+    pub(in crate::game) fn draw_non_crash_points(
         &self,
         ctx: &mut Context,
         hexagon_points: &[Point2<f32>],
-        draw_cell: fn(usize, usize, &Mesh, &mut Context, f32, f32, f32) -> GameResult,
-        sl: f32,
-        s: f32,
-        c: f32,
+        draw_cell: fn(usize, usize, &Mesh, &mut Context, CellDim) -> GameResult,
+        cell_dim: CellDim,
         palette: &Palette,
     ) -> GameResult {
         let head = palette.snake_head_color;
@@ -127,20 +126,18 @@ impl Snake {
                 hexagon_points, color)?;
 
             draw_cell(segment.h as usize, segment.v as usize,
-                      &segment_fill, ctx, sl, s, c)?
+                      &segment_fill, ctx, cell_dim)?
         }
 
         Ok(())
     }
 
-    pub fn draw_crash_point(
+    pub(in crate::game) fn draw_crash_point(
         &self,
         ctx: &mut Context,
         hexagon_points: &[Point2<f32>],
-        draw_cell: fn(usize, usize, &Mesh, &mut Context, f32, f32, f32) -> GameResult,
-        sl: f32,
-        s: f32,
-        c: f32,
+        draw_cell: fn(usize, usize, &Mesh, &mut Context, CellDim) -> GameResult,
+        cell_dim: CellDim,
         palette: &Palette,
     ) -> GameResult {
         let color = palette.snake_crash_color;
@@ -149,7 +146,7 @@ impl Snake {
                 ctx, DrawMode::fill(),
                 hexagon_points, color)?;
             draw_cell(self.body[0].h as usize, self.body[0].v as usize,
-                      &segment_fill, ctx, sl, s, c)?
+                      &segment_fill, ctx, cell_dim)?
         }
         Ok(())
     }
