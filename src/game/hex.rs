@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
-use crate::game::hex::hex_pos::HexPos;
+pub use hex_pos::{HexPos, IsEven};
 
-pub mod hex_pos {
+mod hex_pos {
     use std::fmt::{Debug, Formatter, Error};
     use rand::Rng;
     use crate::game::snake::Dir;

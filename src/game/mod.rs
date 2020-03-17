@@ -3,26 +3,23 @@ use ggez::{Context, GameError, GameResult};
 use ggez::graphics::*;
 use std::f32::consts::PI;
 use mint::Point2;
-use snake::Snake;
+use snake::{Dir, Snake};
 use ggez::input::keyboard::KeyCode;
-use crate::game::snake::Dir;
 use tuple::Map;
 use std::thread;
 use rand::prelude::*;
-use crate::game::hex::Hex;
-use crate::game::hex::HexType::*;
-use crate::game::hex::hex_pos::HexPos;
-use hex::hex_pos::IsEven;
-use crate::game::effect::Effect;
+use hex::{Hex, IsEven, HexType::*, HexPos};
+use effect::Effect;
 use std::time::Duration;
-use crate::game::ctrl::{CTRL_DVORAK_RIGHT_RIGHT, CTRL_DVORAK_LEFT_RIGHT};
+use ctrl::{CTRL_DVORAK_RIGHT_RIGHT, CTRL_DVORAK_LEFT_RIGHT};
 use ggez::conf::WindowMode;
-use crate::game::palette::Palette;
+use theme::Theme;
+use crate::game::theme::Palette;
 
 mod hex;
 mod snake;
 mod effect;
-pub mod palette;
+pub mod theme;
 
 #[macro_use]
 #[allow(dead_code)]
@@ -36,7 +33,7 @@ pub struct Game {
     apples: Vec<Hex>,
     
     cell_side_len: f32,
-    palette: Palette,
+    theme: Theme,
 
     rng: ThreadRng,
     grid_mesh: Option<Mesh>,
@@ -52,7 +49,7 @@ fn wh_to_dim(width: f32, height: f32, cell_side_len: f32) -> HexPos {
 }
 
 impl Game {
-    pub fn new(cell_side_len: f32, palette: Palette, wm: WindowMode) -> Self {
+    pub fn new(cell_side_len: f32, theme: Theme, wm: WindowMode) -> Self {
         let left_side_control = ctrl! {
             layout: dvorak,
             side: left,
@@ -75,7 +72,7 @@ impl Game {
             apples: vec![],
 
             cell_side_len,
-            palette,
+            theme,
 
             rng: thread_rng(),
             grid_mesh: None,
@@ -183,7 +180,7 @@ impl EventHandler for Game {
         // TODO: reimplement optional pushing to left-top hiding part of the hexagon
         // with 0, 0 the board is touching top-left (nothing hidden)
 
-        clear(ctx, self.palette.background_color);
+        clear(ctx, self.theme.palette.background_color);
 
         // general useful lengths
         let a = 1. / 3. * PI; // 120deg
@@ -221,8 +218,8 @@ impl EventHandler for Game {
 
             let mut builder = MeshBuilder::new();
 
-            let draw_mode = DrawMode::stroke(2.);
-            let fg = self.palette.foreground_color;
+            let draw_mode = DrawMode::stroke(self.theme.line_thickness);
+            let fg = self.theme.palette.foreground_color;
             for h in 0 .. (self.dim.h + 1) / 2 {
                 builder.polyline(draw_mode, &wall_points_a, fg)?;
                 builder.polyline(draw_mode, &wall_points_b, fg)?;
@@ -309,7 +306,7 @@ impl EventHandler for Game {
         
         let apple_fill = Mesh::new_polyline(
             ctx, DrawMode::fill(),
-            &hexagon_points, self.palette.apple_fill_color)?;
+            &hexagon_points, self.theme.palette.apple_fill_color)?;
 
 
         // todo supersede
@@ -338,14 +335,14 @@ impl EventHandler for Game {
             .iter()
             .filter(|s| s.body[0].typ != Crashed)
         {
-            snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c)?
+            snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?
         }
         for snake in self
             .snakes
             .iter()
             .filter(|s| s.body[0].typ == Crashed)
         {
-            snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c)?
+            snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?
         }
 
         for apple in &self.apples {

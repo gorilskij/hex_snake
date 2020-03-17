@@ -1,11 +1,11 @@
 use Dir::*;
 use std::ops::Neg;
-use super::hex::{Hex, HexType::*};
-use crate::game::hex::hex_pos::HexPos;
+use super::hex::{Hex, HexPos, HexType::*};
 use ggez::{Context, GameResult};
 use ggez::graphics::{Color, Mesh, DrawMode};
 use mint::Point2;
 use crate::game::ctrl::Ctrl;
+use crate::game::theme::Palette;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Dir { U, D, UL, UR, DL, DR }
@@ -87,14 +87,25 @@ impl Snake {
         sl: f32,
         s: f32,
         c: f32,
+        palette: &Palette,
     ) -> GameResult {
+        let head = palette.snake_head_color;
+        let tail = palette.snake_tail_color;
+
         // head to tail
-        for (i, segment) in self.body.iter().rev().enumerate() {
+        for (i, segment) in self.body.iter().enumerate() {
             let color = match segment.typ {
                 Normal => {
-                    // [0.5, 1]
-                    let drk = (1. - i as f32 / self.body.len() as f32) / 2.;
-                    Color { r: drk, b: drk, g: drk, a: 1. }
+                    // darkness of the color, range: [0.5, 1]
+                    // let darkness = (1. - i as f32 / self.body.len() as f32) / 2.;
+                    let head_color_ratio = 1. - i as f32 / (self.body.len() - 1) as f32;
+                    let tail_color_ratio = 1. - head_color_ratio;
+                    Color {
+                        r: head_color_ratio * head.r + tail_color_ratio * tail.r,
+                        g: head_color_ratio * head.g + tail_color_ratio * tail.g,
+                        b: head_color_ratio * head.b + tail_color_ratio * tail.b,
+                        a: 1.,
+                    }
                 }
                 Crashed => Color { r: 1., b: 0.5, g: 0., a: 1. },
                 Eaten => Color { r: 0., b: 0.5, g: 1., a: 1. },

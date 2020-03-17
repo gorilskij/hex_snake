@@ -4,7 +4,7 @@ use ggez::conf::{WindowMode, FullscreenType};
 use ggez::ContextBuilder;
 use ggez::event::run;
 use crate::game::Game;
-use crate::game::palette::Palette;
+use crate::game::theme::Theme;
 
 mod game;
 
@@ -28,6 +28,6 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut game = Game::new(10., Palette::dark(), wm);
+    let mut game = Game::new(10., Theme::DEFAULT_DARK, wm);
     run(ctx, event_loop, &mut game).expect("crashed")
 }
