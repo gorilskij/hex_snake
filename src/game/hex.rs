@@ -1,32 +1,12 @@
 use std::ops::{Deref, DerefMut};
-pub use hex_pos::{HexPos, IsEven};
+pub use hex_pos::HexPos;
 
 mod hex_pos {
     use std::fmt::{Debug, Formatter, Error};
     use rand::Rng;
     use crate::game::snake::Dir;
     use Dir::*;
-
-    // todo move to a better place
-    pub trait IsEven where Self: Sized {
-        fn is_even(self) -> bool;
-        fn is_odd(self) -> bool {
-            !self.is_even()
-        }
-    }
-
-    macro_rules! impl_is_even {
-        ($type:ty) => {
-            impl IsEven for $type {
-                fn is_even(self) -> bool {
-                    ((self % 2 as $type) + 2 as $type) % 2 as $type == 0 as $type
-                }
-            }
-        };
-    }
-
-    impl_is_even!(isize);
-    impl_is_even!(usize);
+    use num_integer::Integer;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add)]
     pub struct HexPos {

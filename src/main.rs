@@ -19,7 +19,7 @@ fn main() {
         min_height: 0.,
         max_width: 0.,
         max_height: 0.,
-        resizable: true,
+        resizable: false,
     };
     
     let ws = WindowSetup {

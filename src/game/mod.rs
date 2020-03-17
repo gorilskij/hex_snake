@@ -8,13 +8,13 @@ use ggez::input::keyboard::KeyCode;
 use tuple::Map;
 use std::thread;
 use rand::prelude::*;
-use hex::{Hex, IsEven, HexType::*, HexPos};
+use hex::{Hex, HexType::*, HexPos};
 use effect::Effect;
 use std::time::Duration;
-use ggez::conf::{WindowMode, FullscreenType};
+use ggez::conf::WindowMode;
 use theme::Theme;
-use crate::game::theme::Palette;
 use crate::game::snake::SnakeState;
+use num_integer::Integer;
 
 mod hex;
 mod snake;
@@ -404,36 +404,37 @@ impl EventHandler for Game {
         }
     }
 
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        println!("WARNING: resize broken");
-        return;
-
-        let dim = wh_to_dim(width, height, self.cell_side_len);
-        self.dim = dim;
-        for snake in &mut self.snakes {
-            snake.game_dim = dim;
-        }
-
-        let new_wm = WindowMode {
-            width,
-            height,
-            maximized: false,
-            fullscreen_type: FullscreenType::Windowed,
-            borderless: false,
-            min_width: 0.,
-            min_height: 0.,
-            max_width: 0.,
-            max_height: 0.,
-            resizable: true,
-        };
-        set_mode(ctx, new_wm)
-            .expect("failed to resize window");
-
-        // println!("w/h: {}/{}", width, height);
-        // self.effect = Some(Effect::SmallHex {
-        //     min_scale: 0.1,
-        //     iterations: 10,
-        //     passed: 0,
-        // });
-    }
+    // broken (may be a mac problem)
+    // fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
+    //     println!("WARNING: resize broken");
+    //     return;
+    //
+    //     let dim = wh_to_dim(width, height, self.cell_side_len);
+    //     self.dim = dim;
+    //     for snake in &mut self.snakes {
+    //         snake.game_dim = dim;
+    //     }
+    //
+    //     let new_wm = WindowMode {
+    //         width,
+    //         height,
+    //         maximized: false,
+    //         fullscreen_type: FullscreenType::Windowed,
+    //         borderless: false,
+    //         min_width: 0.,
+    //         min_height: 0.,
+    //         max_width: 0.,
+    //         max_height: 0.,
+    //         resizable: true,
+    //     };
+    //     set_mode(ctx, new_wm)
+    //         .expect("failed to resize window");
+    //
+    //     // println!("w/h: {}/{}", width, height);
+    //     // self.effect = Some(Effect::SmallHex {
+    //     //     min_scale: 0.1,
+    //     //     iterations: 10,
+    //     //     passed: 0,
+    //     // });
+    // }
 }

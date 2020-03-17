@@ -143,7 +143,7 @@ impl Snake {
         c: f32,
         palette: &Palette,
     ) -> GameResult {
-        let color = Color { r: 1., b: 0.5, g: 0., a: 1. };
+        let color = palette.snake_crash_color;
         if self.body[0].typ == Crashed {
             let segment_fill = Mesh::new_polyline(
                 ctx, DrawMode::fill(),
