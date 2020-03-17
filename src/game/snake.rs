@@ -21,11 +21,16 @@ impl Neg for Dir {
 }
 
 
+#[derive(Eq, PartialEq)]
+pub enum SnakeState { Living, Crashed }
+
 pub struct Snake {
     pub body: Vec<Hex>,
     growing: usize,
     dir: Dir,
-    pub(crate) dim: HexPos,
+    pub game_dim: HexPos, // cached value
+
+    pub state: SnakeState,
 
     pub ctrl: Ctrl,
 }
@@ -37,7 +42,9 @@ impl Snake {
             body: vec![center],
             growing: 15,
             dir: Dir::U,
-            dim,
+            game_dim: dim,
+
+            state: SnakeState::Living,
 
             ctrl,
         }
@@ -55,11 +62,11 @@ impl Snake {
 
         // todo make O(1)
         new_head.translate(self.dir, 1);
-        if !new_head.is_in(self.dim) {
+        if !new_head.is_in(self.game_dim) {
             // step back
             new_head.translate(self.dir, -1);
 
-            while new_head.is_in(self.dim) {
+            while new_head.is_in(self.game_dim) {
                 new_head.translate(self.dir, -1);
             }
             new_head.translate(self.dir, 1);
@@ -79,7 +86,7 @@ impl Snake {
         if self.dir != -new_dir { self.dir = new_dir }
     }
 
-    pub fn draw(
+    pub fn draw_non_crash_points(
         &self,
         ctx: &mut Context,
         hexagon_points: &[Point2<f32>],
@@ -94,6 +101,10 @@ impl Snake {
 
         // head to tail
         for (i, segment) in self.body.iter().enumerate() {
+            if segment.typ == Crashed {
+                continue
+            }
+
             let color = match segment.typ {
                 Normal => {
                     // darkness of the color, range: [0.5, 1]
@@ -107,8 +118,7 @@ impl Snake {
                         a: 1.,
                     }
                 }
-                Crashed => Color { r: 1., b: 0.5, g: 0., a: 1. },
-                Eaten => Color { r: 0., b: 0.5, g: 1., a: 1. },
+                Eaten => Color { r: 0., b: 0.5, g: 1., a: 1. }, // todo darkening for these too
                 _ => panic!(),
             };
 
@@ -120,6 +130,27 @@ impl Snake {
                       &segment_fill, ctx, sl, s, c)?
         }
 
+        Ok(())
+    }
+
+    pub fn draw_crash_point(
+        &self,
+        ctx: &mut Context,
+        hexagon_points: &[Point2<f32>],
+        draw_cell: fn(usize, usize, &Mesh, &mut Context, f32, f32, f32) -> GameResult,
+        sl: f32,
+        s: f32,
+        c: f32,
+        palette: &Palette,
+    ) -> GameResult {
+        let color = Color { r: 1., b: 0.5, g: 0., a: 1. };
+        if self.body[0].typ == Crashed {
+            let segment_fill = Mesh::new_polyline(
+                ctx, DrawMode::fill(),
+                hexagon_points, color)?;
+            draw_cell(self.body[0].h as usize, self.body[0].v as usize,
+                      &segment_fill, ctx, sl, s, c)?
+        }
         Ok(())
     }
 }

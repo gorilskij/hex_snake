@@ -1,6 +1,6 @@
 #[macro_use] extern crate derive_more;
 
-use ggez::conf::{WindowMode, FullscreenType};
+use ggez::conf::{WindowMode, FullscreenType, WindowSetup, NumSamples};
 use ggez::ContextBuilder;
 use ggez::event::run;
 use crate::game::Game;
@@ -21,10 +21,19 @@ fn main() {
         max_height: 0.,
         resizable: true,
     };
+    
+    let ws = WindowSetup {
+        title: "Hex Snake".to_string(),
+        samples: NumSamples::Zero,
+        vsync: true,
+        icon: "".to_string(),
+        srgb: true,
+    };
 
-    let (ref mut ctx, ref mut event_loop)
-        = ContextBuilder::new("game", "author")
+    let (ctx, event_loop)
+        = &mut ContextBuilder::new("game", "author")
         .window_mode(wm)
+        .window_setup(ws)
         .build()
         .unwrap();
 

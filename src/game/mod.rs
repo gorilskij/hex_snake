@@ -11,10 +11,10 @@ use rand::prelude::*;
 use hex::{Hex, IsEven, HexType::*, HexPos};
 use effect::Effect;
 use std::time::Duration;
-use ctrl::{CTRL_DVORAK_RIGHT_RIGHT, CTRL_DVORAK_LEFT_RIGHT};
-use ggez::conf::WindowMode;
+use ggez::conf::{WindowMode, FullscreenType};
 use theme::Theme;
 use crate::game::theme::Palette;
+use crate::game::snake::SnakeState;
 
 mod hex;
 mod snake;
@@ -35,6 +35,8 @@ pub struct Game {
     cell_side_len: f32,
     theme: Theme,
 
+    apple_count: usize,
+
     rng: ThreadRng,
     grid_mesh: Option<Mesh>,
     effect: Option<Effect>,
@@ -50,47 +52,53 @@ fn wh_to_dim(width: f32, height: f32, cell_side_len: f32) -> HexPos {
 
 impl Game {
     pub fn new(cell_side_len: f32, theme: Theme, wm: WindowMode) -> Self {
-        let left_side_control = ctrl! {
-            layout: dvorak,
-            side: left,
-            hand: right,
-        };
-
-        let right_side_control = ctrl! {
-            layout: dvorak,
-            side: right,
-            hand: right,
-        };
-
-        let dim = wh_to_dim(wm.width, wm.height, cell_side_len);
-
         let mut game = Self {
             running: true,
 
-            dim,
+            dim: wh_to_dim(wm.width, wm.height, cell_side_len),
             snakes: vec![],
             apples: vec![],
 
             cell_side_len,
             theme,
 
+            apple_count: 50,
+
             rng: thread_rng(),
             grid_mesh: None,
             effect: None,
         };
-
-        // spawn snakes
-        game.snakes.push(
-            Snake::new(dim, HexPos { h: -2, v: 0 }, left_side_control));
-        game.snakes.push(
-            Snake::new(dim, HexPos { h: 2, v: 0 }, right_side_control));
-
+        game.restart();
         game
     }
 
+    // spawn 2 snakes in the middle
+    fn restart(&mut self) {
+        self.snakes.clear();
+        self.apples.clear();
+
+        let left_side_control = ctrl! {
+            layout: dvorak,
+            side: left,
+            hand: right,
+        };
+        let right_side_control = ctrl! {
+            layout: dvorak,
+            side: right,
+            hand: right,
+        };
+
+        self.snakes.push(
+            Snake::new(self.dim, HexPos { h: -2, v: 0 }, left_side_control));
+        self.snakes.push(
+            Snake::new(self.dim, HexPos { h: 2, v: 0 }, right_side_control));
+        self.spawn_apples();
+        self.running = true;
+    }
+
     // spawns apples until there are `total` apples in the game
-    pub fn spawn_apples(&mut self, total: usize) {
-        'outer: while self.apples.len() < total {
+    pub fn spawn_apples(&mut self) {
+        'outer: while self.apples.len() < self.apple_count {
             let mut attempts = 0_u8;
             'apple_maker: loop {
                 let apple_pos = HexPos::random_in(self.dim, &mut self.rng);
@@ -141,7 +149,8 @@ impl EventHandler for Game {
             }
         }
         for i in crashed_snake_indices {
-            self.snakes[i].body[0].typ = Crashed
+            self.snakes[i].state = SnakeState::Crashed;
+            self.snakes[i].body[0].typ = Crashed;
         }
 
         // check if ate apple
@@ -169,7 +178,7 @@ impl EventHandler for Game {
 //            });
         }
 
-        self.spawn_apples(50);
+        self.spawn_apples();
 
         thread::yield_now();
         Ok(())
@@ -330,19 +339,29 @@ impl EventHandler for Game {
         }
 
         // draw snakes, crashed snakes on top (last)
-        for snake in self
-            .snakes
-            .iter()
-            .filter(|s| s.body[0].typ != Crashed)
-        {
-            snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?
+        // for snake in self
+        //     .snakes
+        //     .iter()
+        //     .filter(|s| s.state != SnakeState::Crashed)
+        // {
+        //     snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?
+        // }
+        // for snake in self
+        //     .snakes
+        //     .iter()
+        //     .filter(|s| s.state == SnakeState::Crashed)
+        // {
+        //     snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?
+        // }
+
+        // draw snakes, crashed points on top
+        for snake in &self.snakes {
+            snake.draw_non_crash_points(
+                ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?;
         }
-        for snake in self
-            .snakes
-            .iter()
-            .filter(|s| s.body[0].typ == Crashed)
-        {
-            snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?
+        for snake in &self.snakes {
+            snake.draw_crash_point(
+                ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?;
         }
 
         for apple in &self.apples {
@@ -357,6 +376,7 @@ impl EventHandler for Game {
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
+        // snake control keys
         use Dir::*;
         for snake in &mut self.snakes {
             let ctrl = &snake.ctrl;
@@ -371,23 +391,49 @@ impl EventHandler for Game {
             };
 
             if let Some(d) = new_dir {
-                snake.set_direction_safe(d)
+                snake.set_direction_safe(d);
+                return;
+            }
+        }
+
+        // other keys
+        if key == KeyCode::Space {
+            if !self.running {
+                self.restart();
             }
         }
     }
 
-    fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
+        println!("WARNING: resize broken");
+        return;
+
         let dim = wh_to_dim(width, height, self.cell_side_len);
         self.dim = dim;
         for snake in &mut self.snakes {
-            snake.dim = dim;
+            snake.game_dim = dim;
         }
 
-        println!("w/h: {}/{}", width, height);
-        self.effect = Some(Effect::SmallHex {
-            min_scale: 0.1,
-            iterations: 10,
-            passed: 0,
-        });
+        let new_wm = WindowMode {
+            width,
+            height,
+            maximized: false,
+            fullscreen_type: FullscreenType::Windowed,
+            borderless: false,
+            min_width: 0.,
+            min_height: 0.,
+            max_width: 0.,
+            max_height: 0.,
+            resizable: true,
+        };
+        set_mode(ctx, new_wm)
+            .expect("failed to resize window");
+
+        // println!("w/h: {}/{}", width, height);
+        // self.effect = Some(Effect::SmallHex {
+        //     min_scale: 0.1,
+        //     iterations: 10,
+        //     passed: 0,
+        // });
     }
 }

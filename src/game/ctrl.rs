@@ -98,8 +98,8 @@ macro_rules! ctrl {
     (hand: $h:tt, layout: $l:tt, side: $s:tt $(,)?) => { ctrl!(@ $l, $s, $h) };
     (hand: $h:tt, side: $s:tt, layout: $l:tt $(,)?) => { ctrl!(@ $l, $s, $h) };
 
-    (@ dvorak, right, right) => { CTRL_DVORAK_RIGHT_RIGHT };
-    (@ dvorak, right, left) => { CTRL_DVORAK_RIGHT_LEFT };
-    (@ dvorak, left, right) => { CTRL_DVORAK_LEFT_RIGHT };
-    (@ dvorak, left, left) => { CTRL_DVORAK_LEFT_LEFT };
+    (@ dvorak, right, right) => { crate::game::ctrl::CTRL_DVORAK_RIGHT_RIGHT };
+    (@ dvorak, right, left) => { crate::game::ctrl::CTRL_DVORAK_RIGHT_LEFT };
+    (@ dvorak, left, right) => { crate::game::ctrl::CTRL_DVORAK_LEFT_RIGHT };
+    (@ dvorak, left, left) => { crate::game::ctrl::CTRL_DVORAK_LEFT_LEFT };
 }
