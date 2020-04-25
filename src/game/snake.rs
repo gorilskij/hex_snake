@@ -1,29 +1,43 @@
-use Dir::*;
-use std::ops::Neg;
 use super::hex::{Hex, HexPos, HexType::*};
-use ggez::{Context, GameResult};
-use ggez::graphics::{Color, Mesh, DrawMode};
+use crate::game::{ctrl::Ctrl, theme::Palette, CellDim};
+use ggez::{
+    graphics::{Color, DrawMode, Mesh},
+    Context, GameResult,
+};
 use mint::Point2;
-use crate::game::ctrl::Ctrl;
-use crate::game::theme::Palette;
-use crate::game::CellDim;
+use std::ops::Neg;
+use Dir::*;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Dir { U, D, UL, UR, DL, DR }
+pub enum Dir {
+    U,
+    D,
+    UL,
+    UR,
+    DL,
+    DR,
+}
 
 impl Neg for Dir {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
         match self {
-            U => D, D => U, UL => DR, UR => DL, DL => UR, DR => UL,
+            U => D,
+            D => U,
+            UL => DR,
+            UR => DL,
+            DL => UR,
+            DR => UL,
         }
     }
 }
 
-
 #[derive(Eq, PartialEq)]
-pub enum SnakeState { Living, Crashed }
+pub enum SnakeState {
+    Living,
+    Crashed,
+}
 
 pub struct Snake {
     pub body: Vec<Hex>,
@@ -38,7 +52,10 @@ pub struct Snake {
 
 impl Snake {
     pub fn new(dim: HexPos, offset: HexPos, ctrl: Ctrl) -> Self {
-        let center = Hex { typ: Normal, pos: dim / 2 + offset };
+        let center = Hex {
+            typ: Normal,
+            pos: dim / 2 + offset,
+        };
         Self {
             body: vec![center],
             growing: 15,
@@ -84,7 +101,9 @@ impl Snake {
 
     // ignore opposite direction
     pub fn set_direction_safe(&mut self, new_dir: Dir) {
-        if self.dir != -new_dir { self.dir = new_dir }
+        if self.dir != -new_dir {
+            self.dir = new_dir
+        }
     }
 
     pub(in crate::game) fn draw_non_crash_points(
@@ -101,7 +120,7 @@ impl Snake {
         // head to tail
         for (i, segment) in self.body.iter().enumerate() {
             if segment.typ == Crashed {
-                continue
+                continue;
             }
 
             let color = match segment.typ {
@@ -117,16 +136,24 @@ impl Snake {
                         a: 1.,
                     }
                 }
-                Eaten => Color { r: 0., b: 0.5, g: 1., a: 1. }, // todo darkening for these too
+                Eaten => Color {
+                    r: 0.,
+                    b: 0.5,
+                    g: 1.,
+                    a: 1.,
+                }, // todo darkening for these too
                 _ => panic!(),
             };
 
-            let segment_fill = Mesh::new_polyline(
-                ctx, DrawMode::fill(),
-                hexagon_points, color)?;
+            let segment_fill = Mesh::new_polyline(ctx, DrawMode::fill(), hexagon_points, color)?;
 
-            draw_cell(segment.h as usize, segment.v as usize,
-                      &segment_fill, ctx, cell_dim)?
+            draw_cell(
+                segment.h as usize,
+                segment.v as usize,
+                &segment_fill,
+                ctx,
+                cell_dim,
+            )?
         }
 
         Ok(())
@@ -142,11 +169,14 @@ impl Snake {
     ) -> GameResult {
         let color = palette.snake_crash_color;
         if self.body[0].typ == Crashed {
-            let segment_fill = Mesh::new_polyline(
-                ctx, DrawMode::fill(),
-                hexagon_points, color)?;
-            draw_cell(self.body[0].h as usize, self.body[0].v as usize,
-                      &segment_fill, ctx, cell_dim)?
+            let segment_fill = Mesh::new_polyline(ctx, DrawMode::fill(), hexagon_points, color)?;
+            draw_cell(
+                self.body[0].h as usize,
+                self.body[0].v as usize,
+                &segment_fill,
+                ctx,
+                cell_dim,
+            )?
         }
         Ok(())
     }

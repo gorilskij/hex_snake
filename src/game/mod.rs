@@ -1,29 +1,29 @@
-use ggez::event::{EventHandler, KeyMods};
-use ggez::{Context, GameError, GameResult};
-use ggez::graphics::*;
-use std::f32::consts::PI;
-use mint::Point2;
-use snake::{Dir, Snake};
-use ggez::input::keyboard::KeyCode;
-use tuple::Map;
-use std::thread;
-use rand::prelude::*;
-use hex::{Hex, HexType::*, HexPos};
+use crate::game::{ctrl::Ctrl, snake::SnakeState};
 use effect::Effect;
-use std::time::Duration;
-use ggez::conf::WindowMode;
-use theme::Theme;
-use crate::game::snake::SnakeState;
+use ggez::{
+    conf::WindowMode,
+    event::{EventHandler, KeyMods},
+    graphics::*,
+    input::keyboard::KeyCode,
+    Context, GameError, GameResult,
+};
+use hex::{HexPos, HexType::*};
+use mint::Point2;
 use num_integer::Integer;
+use rand::prelude::*;
+use snake::{Dir, Snake};
+use std::{f32::consts::PI, thread};
+use theme::Theme;
+use tuple::Map;
 
+mod effect;
 mod hex;
 mod snake;
-mod effect;
 pub mod theme;
 
 #[macro_use]
 #[allow(dead_code)]
-mod ctrl;
+pub mod ctrl;
 
 // todo explain this (cos_len < sin_len) (120deg angle was used)
 #[derive(Copy, Clone)]
@@ -33,13 +33,40 @@ struct CellDim {
     cos: f32,
 }
 
+// ggez frames per game frame
+struct FramesPerFrame(u8, u8);
+
+impl FramesPerFrame {
+    fn new(fpf: u8) -> Self {
+        Self(fpf, 0)
+    }
+    fn advance(&mut self) -> bool {
+        self.1 += 1;
+        if self.1 == self.0 {
+            self.1 = 0;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Eq, PartialEq)]
+enum GameState {
+    Playing,
+    Paused,
+    Crashed,
+}
+
 pub struct Game {
-    running: bool,
+    state: GameState,
+    fpf: FramesPerFrame,
 
     dim: HexPos,
+    players: Vec<Ctrl>,
     snakes: Vec<Snake>,
-    apples: Vec<Hex>,
-    
+    apples: Vec<HexPos>,
+
     cell_dim: CellDim,
     theme: Theme,
 
@@ -51,17 +78,25 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(cell_side_len: f32, theme: Theme, wm: WindowMode) -> Self {
+    pub fn new(cell_side_len: f32, players: Vec<Ctrl>, theme: Theme, wm: WindowMode) -> Self {
+        assert!(!players.is_empty(), "No players specified");
+        assert!(players.len() <= 2, "More than 2 players not supported");
+
         let (s, c) = (1. / 3. * PI).sin_cos().map(|i| i * cell_side_len);
 
         let h = wm.width / (cell_side_len + c);
         let v = wm.height / (2. * s);
-        let dim = HexPos { h: h as isize, v: v as isize };
+        let dim = HexPos {
+            h: h as isize,
+            v: v as isize,
+        };
 
         let mut game = Self {
-            running: true,
+            state: GameState::Playing,
+            fpf: FramesPerFrame::new(10),
 
             dim,
+            players,
             snakes: vec![],
             apples: vec![],
 
@@ -87,23 +122,19 @@ impl Game {
         self.snakes.clear();
         self.apples.clear();
 
-        let left_side_control = ctrl! {
-            layout: dvorak,
-            side: left,
-            hand: right,
-        };
-        let right_side_control = ctrl! {
-            layout: dvorak,
-            side: right,
-            hand: right,
-        };
+        // self.snakes.push(
+        //     Snake::new(self.dim, HexPos { h: -2, v: 0 }, left_side_control));
+        // self.snakes.push(
+        //     Snake::new(self.dim, HexPos { h: 2, v: 0 }, right_side_control));
+        // assert!()\
+        // todo!()
 
-        self.snakes.push(
-            Snake::new(self.dim, HexPos { h: -2, v: 0 }, left_side_control));
-        self.snakes.push(
-            Snake::new(self.dim, HexPos { h: 2, v: 0 }, right_side_control));
+        for (ctrl, &h) in self.players.iter().zip([-2, 2].iter()) {
+            self.snakes
+                .push(Snake::new(self.dim, HexPos { h, v: 0 }, ctrl.clone()))
+        }
         self.spawn_apples();
-        self.running = true;
+        self.state = GameState::Playing;
     }
 
     // spawns apples until there are `total` apples in the game
@@ -116,11 +147,11 @@ impl Game {
                 for s in self
                     .snakes
                     .iter()
-                    .map(|s| s.body.iter())
+                    .map(|s| s.body.iter().map(|b| b.pos))
                     .flatten()
-                    .chain(&self.apples)
+                    .chain(self.apples.iter().copied())
                 {
-                    if s.pos == apple_pos {
+                    if s == apple_pos {
                         // make a new apple
                         assert!(attempts < 5);
                         continue 'apple_maker;
@@ -128,7 +159,7 @@ impl Game {
                 }
 
                 // apple made successfully
-                self.apples.push(Hex { typ: Apple, pos: apple_pos });
+                self.apples.push(apple_pos);
                 continue 'outer;
             }
         }
@@ -137,9 +168,17 @@ impl Game {
 
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> Result<(), GameError> {
-        if !self.running { return Ok(()) }
+        if self.state != GameState::Playing {
+            return Ok(());
+        } // note might be a spinner, bad for performance
 
-        thread::sleep(Duration::from_millis(100));
+        // note makes it possible to change direction like u -> ul -> d and eat yourself
+        //  from the head, bad, implement a last_moved_dir or something
+        if !self.fpf.advance() {
+            return Ok(());
+        }
+
+        // todo set framerate
 
         for snake in &mut self.snakes {
             snake.advance()
@@ -152,7 +191,7 @@ impl EventHandler for Game {
                 for segment in &other.body[1..] {
                     if snake.body[0].pos == segment.pos {
                         crashed_snake_indices.push(i);
-                        self.running = false;
+                        self.state = GameState::Crashed;
                         continue 'outer;
                     }
                 }
@@ -165,9 +204,9 @@ impl EventHandler for Game {
 
         // check if ate apple
         let mut eaten_apples = vec![];
-        for (a, &apple) in self.apples.iter().enumerate() {
+        for (a, &apple_pos) in self.apples.iter().enumerate() {
             for (s, snake) in self.snakes.iter().enumerate() {
-                if snake.body[0].pos == apple.pos {
+                if snake.body[0].pos == apple_pos {
                     eaten_apples.push((a, s))
                 }
             }
@@ -181,11 +220,11 @@ impl EventHandler for Game {
 
             // apply effect, might be too much with multiple snakes
             // todo apply effect per-snake
-//            self.effect = Some(Effect::SmallHex {
-//                min_scale: 0.2,
-//                iterations: 10,
-//                passed: 0,
-//            });
+            //            self.effect = Some(Effect::SmallHex {
+            //                min_scale: 0.2,
+            //                iterations: 10,
+            //                passed: 0,
+            //            });
         }
 
         self.spawn_apples();
@@ -202,7 +241,11 @@ impl EventHandler for Game {
         clear(ctx, self.theme.palette.background_color);
 
         // shorter names look nice in formulas
-        let CellDim { side: sl, sin: s, cos: c} = self.cell_dim;
+        let CellDim {
+            side: sl,
+            sin: s,
+            cos: c,
+        } = self.cell_dim;
 
         // generate grid mesh first time, later reuse
         if self.grid_mesh.is_none() {
@@ -212,20 +255,29 @@ impl EventHandler for Game {
             let mut between_a_b = vec![];
             let mut between_b_a = vec![];
 
-            for v in 0 .. self.dim.v {
+            for v in 0..self.dim.v {
                 let dv = v as f32 * 2. * s;
 
                 wall_points_a.push(Point2 { x: c, y: dv });
                 wall_points_a.push(Point2 { x: 0., y: dv + s });
 
                 wall_points_b.push(Point2 { x: c + sl, y: dv });
-                wall_points_b.push(Point2 { x: 2. * c + sl, y: dv + s });
+                wall_points_b.push(Point2 {
+                    x: 2. * c + sl,
+                    y: dv + s,
+                });
 
                 between_a_b.push(Point2 { x: c, y: dv });
                 between_a_b.push(Point2 { x: c + sl, y: dv });
 
-                between_b_a.push(Point2 { x: 2. * c + sl, y: dv + s });
-                between_b_a.push(Point2 { x: 2. * c + 2. * sl, y: dv + s });
+                between_b_a.push(Point2 {
+                    x: 2. * c + sl,
+                    y: dv + s,
+                });
+                between_b_a.push(Point2 {
+                    x: 2. * c + 2. * sl,
+                    y: dv + s,
+                });
             }
             {
                 let dv = self.dim.v as f32 * 2. * s;
@@ -237,42 +289,63 @@ impl EventHandler for Game {
 
             let draw_mode = DrawMode::stroke(self.theme.line_thickness);
             let fg = self.theme.palette.foreground_color;
-            for h in 0 .. (self.dim.h + 1) / 2 {
+            for h in 0..(self.dim.h + 1) / 2 {
                 builder.polyline(draw_mode, &wall_points_a, fg)?;
                 builder.polyline(draw_mode, &wall_points_b, fg)?;
 
                 let dh = h as f32 * (2. * sl + 2. * c);
 
-                for v in 0 .. self.dim.v {
+                for v in 0..self.dim.v {
                     let dv = v as f32 * 2. * s;
-                    builder.line(&[
-                        Point2 { x: c + dh, y: dv },
-                        Point2 { x: c + sl + dh, y: dv }
-                    ], 2., fg)?;
+                    builder.line(
+                        &[
+                            Point2 { x: c + dh, y: dv },
+                            Point2 {
+                                x: c + sl + dh,
+                                y: dv,
+                            },
+                        ],
+                        2.,
+                        fg,
+                    )?;
 
-                    builder.line(&[
-                        Point2 { x: 2. * c + sl + dh, y: s + dv },
-                        Point2 { x: 2. * c + 2. * sl + dh, y: s + dv },
-                    ], 2., fg)?;
+                    builder.line(
+                        &[
+                            Point2 {
+                                x: 2. * c + sl + dh,
+                                y: s + dv,
+                            },
+                            Point2 {
+                                x: 2. * c + 2. * sl + dh,
+                                y: s + dv,
+                            },
+                        ],
+                        2.,
+                        fg,
+                    )?;
                 }
                 {
                     let dv = self.dim.v as f32 * 2. * s;
-                    builder.line(&[
-                        Point2 { x: c + dh, y: dv },
-                        Point2 { x: c + sl + dh, y: dv }
-                    ], 2., fg)?;
+                    builder.line(
+                        &[
+                            Point2 { x: c + dh, y: dv },
+                            Point2 {
+                                x: c + sl + dh,
+                                y: dv,
+                            },
+                        ],
+                        2.,
+                        fg,
+                    )?;
                 }
 
-                for (a, b) in wall_points_a
-                    .iter_mut()
-                    .zip(&mut wall_points_b) {
+                for (a, b) in wall_points_a.iter_mut().zip(&mut wall_points_b) {
                     a.x += 2. * sl + 2. * c;
                     b.x += 2. * sl + 2. * c;
                 }
             }
             if self.dim.h.is_even() {
-                builder.polyline(draw_mode, &wall_points_a[..wall_points_a.len() - 1],
-                                 fg)?;
+                builder.polyline(draw_mode, &wall_points_a[..wall_points_a.len() - 1], fg)?;
             }
 
             self.grid_mesh = Some(builder.build(ctx)?);
@@ -282,23 +355,31 @@ impl EventHandler for Game {
         let mut hexagon_points = [
             Point2 { x: c, y: 0. },
             Point2 { x: sl + c, y: 0. },
-            Point2 { x: sl + 2. * c, y: s },
-            Point2 { x: sl + c, y: 2. * s },
+            Point2 {
+                x: sl + 2. * c,
+                y: s,
+            },
+            Point2 {
+                x: sl + c,
+                y: 2. * s,
+            },
             Point2 { x: c, y: 2. * s },
             Point2 { x: 0., y: s },
             Point2 { x: c, y: 0. },
         ];
 
         if let Some(Effect::SmallHex {
-                        min_scale,
-                        iterations,
-                        passed
-                    }) = self.effect {
+            min_scale,
+            iterations,
+            passed,
+        }) = self.effect
+        {
             let scale_factor = if passed < iterations / 2 {
                 let fraction = passed as f32 / (iterations as f32 / 2.);
                 1. - fraction * (1. - min_scale)
             } else {
-                let fraction = (passed - iterations / 2) as f32 / (iterations - iterations / 2) as f32;
+                let fraction =
+                    (passed - iterations / 2) as f32 / (iterations - iterations / 2) as f32;
                 1. - (1. - fraction) * (1. - min_scale)
             };
 
@@ -320,11 +401,13 @@ impl EventHandler for Game {
                 }
             }
         }
-        
-        let apple_fill = Mesh::new_polyline(
-            ctx, DrawMode::fill(),
-            &hexagon_points, self.theme.palette.apple_fill_color)?;
 
+        let apple_fill = Mesh::new_polyline(
+            ctx,
+            DrawMode::fill(),
+            &hexagon_points,
+            self.theme.palette.apple_fill_color,
+        )?;
 
         // todo supersede
         #[inline(always)]
@@ -340,8 +423,7 @@ impl EventHandler for Game {
                 y: v as f32 * 2. * cell_dim.sin + if h % 2 == 0 { 0. } else { cell_dim.sin },
             };
 
-            draw(ctx, drawable,
-                 DrawParam::from((point, 0.0, WHITE)))
+            draw(ctx, drawable, DrawParam::from((point, 0.0, WHITE)))
         }
 
         // draw snakes, crashed snakes on top (last)
@@ -363,19 +445,34 @@ impl EventHandler for Game {
         // draw snakes, crashed points on top
         for snake in &self.snakes {
             snake.draw_non_crash_points(
-                ctx, &hexagon_points, draw_cell, self.cell_dim, &self.theme.palette)?;
+                ctx,
+                &hexagon_points,
+                draw_cell,
+                self.cell_dim,
+                &self.theme.palette,
+            )?;
         }
         for snake in &self.snakes {
             snake.draw_crash_point(
-                ctx, &hexagon_points, draw_cell, self.cell_dim, &self.theme.palette)?;
+                ctx,
+                &hexagon_points,
+                draw_cell,
+                self.cell_dim,
+                &self.theme.palette,
+            )?;
         }
 
         for apple in &self.apples {
-            draw_cell(apple.h as usize, apple.v as usize,
-                      &apple_fill, ctx, self.cell_dim)?
+            draw_cell(
+                apple.h as usize,
+                apple.v as usize,
+                &apple_fill,
+                ctx,
+                self.cell_dim,
+            )?
         }
 
-//        println!("draw: {}ms", start.elapsed().as_millis());
+        //        println!("draw: {}ms", start.elapsed().as_millis());
 
         thread::yield_now();
         present(ctx)
@@ -403,8 +500,13 @@ impl EventHandler for Game {
         }
 
         // other keys
-        if key == KeyCode::Space && !self.running {
-            self.restart();
+        if key == KeyCode::Space {
+            use GameState::*;
+            match self.state {
+                Crashed => self.restart(),
+                Playing => self.state = Paused,
+                Paused => self.state = Playing,
+            }
         }
     }
 

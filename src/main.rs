@@ -1,12 +1,20 @@
-#[macro_use] extern crate derive_more;
+#[macro_use]
+extern crate derive_more;
 
-use ggez::conf::{WindowMode, FullscreenType, WindowSetup, NumSamples};
-use ggez::ContextBuilder;
-use ggez::event::run;
-use crate::game::Game;
-use crate::game::theme::Theme;
+use crate::game::{theme::Theme, Game};
+use ggez::{
+    conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
+    event::run,
+    ContextBuilder,
+};
 
 mod game;
+
+// error
+// NOTE it's still possible to eat yourself by going back, input queue needed!
+//  also, two snakes's heads can pass through each other if iterated at the same time,
+//  this seems like a bit of a fundamental problem (can't move 1/2 a cell)
+// todo fix
 
 fn main() {
     let wm = WindowMode {
@@ -21,7 +29,7 @@ fn main() {
         max_height: 0.,
         resizable: false,
     };
-    
+
     let ws = WindowSetup {
         title: "Hex Snake".to_string(),
         samples: NumSamples::Zero,
@@ -30,13 +38,26 @@ fn main() {
         srgb: true,
     };
 
-    let (ctx, event_loop)
-        = &mut ContextBuilder::new("game", "author")
+    let (ctx, event_loop) = &mut ContextBuilder::new("game", "author")
         .window_mode(wm)
         .window_setup(ws)
         .build()
         .unwrap();
 
-    let mut game = Game::new(10., Theme::DEFAULT_DARK, wm);
+    let players = vec![
+        ctrl! {
+            layout: qwerty,
+            side: right,
+            hand: right,
+        },
+        // uncomment for 2-player
+        // ctrl! {
+        //     layout: qwerty,
+        //     side: left,
+        //     hand: right,
+        // },
+    ];
+    let mut game = Game::new(10., players, Theme::DEFAULT_DARK, wm);
+
     run(ctx, event_loop, &mut game).expect("crashed")
 }

@@ -1,12 +1,12 @@
-use std::ops::{Deref, DerefMut};
 pub use hex_pos::HexPos;
+use std::ops::{Deref, DerefMut};
 
 mod hex_pos {
-    use std::fmt::{Debug, Formatter, Error};
-    use rand::Rng;
     use crate::game::snake::Dir;
-    use Dir::*;
     use num_integer::Integer;
+    use rand::Rng;
+    use std::fmt::{Debug, Error, Formatter};
+    use Dir::*;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add)]
     pub struct HexPos {
@@ -42,36 +42,40 @@ mod hex_pos {
                 UL => {
                     self.h -= dist;
                     self.v -= half;
-                    if self.h.is_even() { self.v += 1 }
+                    if self.h.is_even() {
+                        self.v += 1
+                    }
                 }
                 UR => {
                     self.h += dist;
                     self.v -= half;
-                    if self.h.is_even() { self.v += 1 }
+                    if self.h.is_even() {
+                        self.v += 1
+                    }
                 }
                 DL => {
                     self.h -= dist;
                     self.v += half;
-                    if self.h.is_odd() { self.v -= 1 }
+                    if self.h.is_odd() {
+                        self.v -= 1
+                    }
                 }
                 DR => {
                     self.h += dist;
                     self.v += half;
-                    if self.h.is_odd() { self.v -= 1 }
+                    if self.h.is_odd() {
+                        self.v -= 1
+                    }
                 }
             }
         }
 
         // checks if between (0,0) and dim
         pub fn is_in(self, dim: HexPos) -> bool {
-            self.h >= 0
-                && self.h < dim.h
-                && self.v >= 0
-                && self.v < dim.v
+            self.h >= 0 && self.h < dim.h && self.v >= 0 && self.v < dim.v
         }
     }
 }
-
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum HexType {
