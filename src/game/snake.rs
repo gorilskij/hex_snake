@@ -1,11 +1,12 @@
 use super::hex::{Hex, HexPos, HexType::*};
 use crate::game::{ctrl::Ctrl, theme::Palette, CellDim};
 use ggez::{
+    event::KeyCode,
     graphics::{Color, DrawMode, Mesh},
     Context, GameResult,
 };
 use mint::Point2;
-use std::ops::Neg;
+use std::{collections::VecDeque, ops::Neg};
 use Dir::*;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -48,9 +49,12 @@ pub struct Snake {
     pub state: SnakeState,
 
     pub ctrl: Ctrl,
+    ctrl_queue: VecDeque<Dir>,
 }
 
 impl Snake {
+    const CTRL_QUEUE_LIMIT: usize = 3;
+
     pub fn new(dim: HexPos, offset: HexPos, ctrl: Ctrl) -> Self {
         let center = Hex {
             typ: Normal,
@@ -65,6 +69,7 @@ impl Snake {
             state: SnakeState::Living,
 
             ctrl,
+            ctrl_queue: VecDeque::with_capacity(Self::CTRL_QUEUE_LIMIT),
         }
     }
 
@@ -73,12 +78,16 @@ impl Snake {
     }
 
     pub fn advance(&mut self) {
+        self.pop_ctrl_queue();
+
         let mut new_head = Hex {
             typ: Normal,
             pos: self.body[0].pos,
         };
 
         // todo make O(1)
+        //  at the moment this just moves the head back until the last cell that's still in the map
+        //  this could be done as a single calculation
         new_head.translate(self.dir, 1);
         if !new_head.is_in(self.game_dim) {
             // step back
@@ -96,13 +105,6 @@ impl Snake {
         } else {
             self.body.rotate_right(1);
             self.body[0] = new_head;
-        }
-    }
-
-    // ignore opposite direction
-    pub fn set_direction_safe(&mut self, new_dir: Dir) {
-        if self.dir != -new_dir {
-            self.dir = new_dir
         }
     }
 
@@ -179,5 +181,31 @@ impl Snake {
             )?
         }
         Ok(())
+    }
+
+    // -- control --
+    pub fn key_pressed(&mut self, key: KeyCode) {
+        let new_dir = match key {
+            k if k == self.ctrl.u => U,
+            k if k == self.ctrl.d => D,
+            k if k == self.ctrl.ul => UL,
+            k if k == self.ctrl.ur => UR,
+            k if k == self.ctrl.dl => DL,
+            k if k == self.ctrl.dr => DR,
+            _ => return,
+        };
+
+        if self.ctrl_queue.is_empty() && new_dir != -self.dir
+            || self.ctrl_queue.len() < Self::CTRL_QUEUE_LIMIT
+                && new_dir != -self.ctrl_queue[self.ctrl_queue.len() - 1]
+        {
+            self.ctrl_queue.push_back(new_dir)
+        }
+    }
+
+    fn pop_ctrl_queue(&mut self) {
+        if let Some(new_dir) = self.ctrl_queue.pop_front() {
+            self.dir = new_dir
+        }
     }
 }

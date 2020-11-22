@@ -479,33 +479,16 @@ impl EventHandler for Game {
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
-        // snake control keys
-        use Dir::*;
-        for snake in &mut self.snakes {
-            let ctrl = &snake.ctrl;
-            let new_dir = match key {
-                k if k == ctrl.u => Some(U),
-                k if k == ctrl.d => Some(D),
-                k if k == ctrl.ul => Some(UL),
-                k if k == ctrl.ur => Some(UR),
-                k if k == ctrl.dl => Some(DL),
-                k if k == ctrl.dr => Some(DR),
-                _ => None,
-            };
-
-            if let Some(d) = new_dir {
-                snake.set_direction_safe(d);
-                return;
-            }
-        }
-
-        // other keys
         if key == KeyCode::Space {
             use GameState::*;
             match self.state {
                 Crashed => self.restart(),
                 Playing => self.state = Paused,
                 Paused => self.state = Playing,
+            }
+        } else {
+            for snake in &mut self.snakes {
+                snake.key_pressed(key)
             }
         }
     }

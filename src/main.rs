@@ -10,11 +10,9 @@ use ggez::{
 
 mod game;
 
-// error
-// NOTE it's still possible to eat yourself by going back, input queue needed!
-//  also, two snakes's heads can pass through each other if iterated at the same time,
+// TODO
+//  two snakes's heads can pass through each other if iterated at the same time,
 //  this seems like a bit of a fundamental problem (can't move 1/2 a cell)
-// todo fix
 
 fn main() {
     let wm = WindowMode {
@@ -46,7 +44,7 @@ fn main() {
 
     let players = vec![
         ctrl! {
-            layout: qwerty,
+            layout: dvorak,
             side: right,
             hand: right,
         },

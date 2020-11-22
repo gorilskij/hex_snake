@@ -86,7 +86,7 @@ pub enum HexType {
     Apple,
 }
 
-#[derive(Copy, Clone, Debug)] // ?
+#[derive(Copy, Clone, Debug)]
 pub struct Hex {
     pub typ: HexType,
     pub pos: HexPos,
