@@ -412,78 +412,35 @@ impl EventHandler for Game {
             }
         }
 
-        let apple_fill = Mesh::new_polyline(
-            ctx,
-            DrawMode::fill(),
-            &hexagon_points,
-            self.theme.palette.apple_fill_color,
-        )?;
-
-        // todo supersede
-        #[inline(always)]
-        fn draw_cell<D: Drawable>(
-            h: usize,
-            v: usize,
-            drawable: &D,
-            ctx: &mut Context,
-            cell_dim: CellDim,
-        ) -> GameResult<()> {
+        let mut draw_cell = |h: usize, v: usize, c: Color| {
             let point = Point2 {
-                x: h as f32 * (cell_dim.side + cell_dim.cos),
-                y: v as f32 * 2. * cell_dim.sin + if h % 2 == 0 { 0. } else { cell_dim.sin },
+                x: h as f32 * (self.cell_dim.side + self.cell_dim.cos),
+                y: v as f32 * 2. * self.cell_dim.sin
+                    + if h % 2 == 0 { 0. } else { self.cell_dim.sin },
             };
 
-            draw(ctx, drawable, DrawParam::from((point, 0.0, WHITE)))
-        }
+            let segment_fill = &Mesh::new_polyline(ctx, DrawMode::fill(), &hexagon_points, c)?;
+            draw(ctx, segment_fill, DrawParam::from((point, 0.0, WHITE)))
+        };
 
-        // draw snakes, crashed snakes on top (last)
-        // for snake in self
-        //     .snakes
-        //     .iter()
-        //     .filter(|s| s.state != SnakeState::Crashed)
-        // {
-        //     snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?
-        // }
-        // for snake in self
-        //     .snakes
-        //     .iter()
-        //     .filter(|s| s.state == SnakeState::Crashed)
-        // {
-        //     snake.draw(ctx, &hexagon_points, draw_cell, sl, s, c, &self.theme.palette)?
-        // }
-
-        // draw snakes, crashed points on top
+        // draw snakes, crashed (collision) points on top
         for snake in &self.snakes {
-            snake.draw_non_crash_points(
-                ctx,
-                &hexagon_points,
-                draw_cell,
-                self.cell_dim,
-                &self.theme.palette,
-            )?;
+            snake.draw_non_crash_points(&mut draw_cell, &self.theme.palette)?;
         }
 
         for snake in &self.snakes {
-            snake.draw_crash_point(
-                ctx,
-                &hexagon_points,
-                draw_cell,
-                self.cell_dim,
-                &self.theme.palette,
-            )?;
+            snake.draw_crash_point(&mut draw_cell, &self.theme.palette)?;
         }
 
         for apple in &self.apples {
             draw_cell(
                 apple.h as usize,
                 apple.v as usize,
-                &apple_fill,
-                ctx,
-                self.cell_dim,
+                self.theme.palette.apple_fill_color,
             )?
         }
 
-        //        println!("draw: {}ms", start.elapsed().as_millis());
+        // println!("draw: {}ms", start.elapsed().as_millis());
 
         thread::yield_now();
         present(ctx)

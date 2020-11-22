@@ -110,10 +110,7 @@ impl Snake {
 
     pub(in crate::game) fn draw_non_crash_points(
         &self,
-        ctx: &mut Context,
-        hexagon_points: &[Point2<f32>],
-        draw_cell: fn(usize, usize, &Mesh, &mut Context, CellDim) -> GameResult,
-        cell_dim: CellDim,
+        draw_cell: &mut impl FnMut(usize, usize, Color) -> GameResult,
         palette: &Palette,
     ) -> GameResult {
         let head = palette.snake_head_color;
@@ -121,11 +118,8 @@ impl Snake {
 
         // head to tail
         for (i, segment) in self.body.iter().enumerate() {
-            if segment.typ == Crashed {
-                continue;
-            }
-
             let color = match segment.typ {
+                Crashed => continue,
                 Normal => {
                     // darkness of the color, range: [0.5, 1]
                     // let darkness = (1. - i as f32 / self.body.len() as f32) / 2.;
@@ -144,18 +138,10 @@ impl Snake {
                     g: 1.,
                     a: 1.,
                 }, // todo darkening for these too
-                _ => panic!(),
+                _ => unreachable!(),
             };
 
-            let segment_fill = Mesh::new_polyline(ctx, DrawMode::fill(), hexagon_points, color)?;
-
-            draw_cell(
-                segment.h as usize,
-                segment.v as usize,
-                &segment_fill,
-                ctx,
-                cell_dim,
-            )?
+            draw_cell(segment.h as usize, segment.v as usize, color)?
         }
 
         Ok(())
@@ -163,21 +149,14 @@ impl Snake {
 
     pub(in crate::game) fn draw_crash_point(
         &self,
-        ctx: &mut Context,
-        hexagon_points: &[Point2<f32>],
-        draw_cell: fn(usize, usize, &Mesh, &mut Context, CellDim) -> GameResult,
-        cell_dim: CellDim,
+        draw_cell: &mut impl FnMut(usize, usize, Color) -> GameResult,
         palette: &Palette,
     ) -> GameResult {
-        let color = palette.snake_crash_color;
         if self.body[0].typ == Crashed {
-            let segment_fill = Mesh::new_polyline(ctx, DrawMode::fill(), hexagon_points, color)?;
             draw_cell(
                 self.body[0].h as usize,
                 self.body[0].v as usize,
-                &segment_fill,
-                ctx,
-                cell_dim,
+                palette.snake_crash_color,
             )?
         }
         Ok(())
