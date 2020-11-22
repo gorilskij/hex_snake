@@ -36,7 +36,7 @@ fn main() {
         srgb: true,
     };
 
-    let (ctx, event_loop) = &mut ContextBuilder::new("game", "author")
+    let (ctx, event_loop) = &mut ContextBuilder::new("hex_snake", "gorilskij")
         .window_mode(wm)
         .window_setup(ws)
         .build()
@@ -49,11 +49,11 @@ fn main() {
             hand: right,
         },
         // uncomment for 2-player
-        // ctrl! {
-        //     layout: qwerty,
-        //     side: left,
-        //     hand: right,
-        // },
+        ctrl! {
+            layout: dvorak,
+            side: left,
+            hand: left,
+        },
     ];
     let mut game = Game::new(10., players, Theme::DEFAULT_DARK, wm);
 

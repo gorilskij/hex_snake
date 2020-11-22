@@ -187,7 +187,16 @@ impl EventHandler for Game {
         // check if crashed
         let mut crashed_snake_indices = vec![];
         'outer: for (i, snake) in self.snakes.iter().enumerate() {
-            for other in &self.snakes {
+            for (j, other) in self.snakes.iter().enumerate() {
+                // check head-head crash
+                if i != j && snake.body[0].pos == other.body[0].pos {
+                    // snake j will be added when it's reached by the outer loop
+                    crashed_snake_indices.push(i);
+                    self.state = GameState::Crashed;
+                    continue 'outer;
+                }
+
+                // check head-body crash (this also checks if a snake crashed with itself)
                 for segment in &other.body[1..] {
                     if snake.body[0].pos == segment.pos {
                         crashed_snake_indices.push(i);
@@ -279,6 +288,7 @@ impl EventHandler for Game {
                     y: dv + s,
                 });
             }
+
             {
                 let dv = self.dim.v as f32 * 2. * s;
                 wall_points_a.push(Point2 { x: c, y: dv });
@@ -452,6 +462,7 @@ impl EventHandler for Game {
                 &self.theme.palette,
             )?;
         }
+
         for snake in &self.snakes {
             snake.draw_crash_point(
                 ctx,

@@ -196,7 +196,8 @@ impl Snake {
         };
 
         if self.ctrl_queue.is_empty() && new_dir != -self.dir
-            || self.ctrl_queue.len() < Self::CTRL_QUEUE_LIMIT
+            || !self.ctrl_queue.is_empty()
+                && self.ctrl_queue.len() < Self::CTRL_QUEUE_LIMIT
                 && new_dir != -self.ctrl_queue[self.ctrl_queue.len() - 1]
         {
             self.ctrl_queue.push_back(new_dir)
