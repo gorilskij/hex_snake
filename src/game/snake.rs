@@ -1,11 +1,6 @@
 use super::hex::{Hex, HexPos, HexType::*};
-use crate::game::{ctrl::Ctrl, hex::HexType, theme::Palette, CellDim};
-use ggez::{
-    event::KeyCode,
-    graphics::{Color, DrawMode, Mesh},
-    Context, GameResult,
-};
-use mint::Point2;
+use crate::game::{ctrl::Ctrl, hex::HexType, theme::Palette};
+use ggez::{event::KeyCode, graphics::Color, GameResult};
 use std::{collections::VecDeque, ops::Neg};
 use Dir::*;
 

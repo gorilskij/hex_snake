@@ -11,7 +11,7 @@ use hex::{HexPos, HexType::*};
 use mint::Point2;
 use num_integer::Integer;
 use rand::prelude::*;
-use snake::{Dir, Snake};
+use snake::Snake;
 use std::{f32::consts::PI, thread};
 use theme::Theme;
 use tuple::Map;
@@ -164,27 +164,133 @@ impl Game {
             }
         }
     }
+
+    fn generate_grid_mesh(&self, ctx: &mut Context) -> GameResult<Mesh> {
+        let CellDim {
+            side: sl,
+            sin: s,
+            cos: c,
+        } = self.cell_dim;
+
+        let mut wall_points_a = vec![];
+        let mut wall_points_b = vec![];
+
+        let mut between_a_b = vec![];
+        let mut between_b_a = vec![];
+
+        for v in 0..self.dim.v {
+            let dv = v as f32 * 2. * s;
+
+            wall_points_a.push(Point2 { x: c, y: dv });
+            wall_points_a.push(Point2 { x: 0., y: dv + s });
+
+            wall_points_b.push(Point2 { x: c + sl, y: dv });
+            wall_points_b.push(Point2 {
+                x: 2. * c + sl,
+                y: dv + s,
+            });
+
+            between_a_b.push(Point2 { x: c, y: dv });
+            between_a_b.push(Point2 { x: c + sl, y: dv });
+
+            between_b_a.push(Point2 {
+                x: 2. * c + sl,
+                y: dv + s,
+            });
+            between_b_a.push(Point2 {
+                x: 2. * c + 2. * sl,
+                y: dv + s,
+            });
+        }
+
+        {
+            let dv = self.dim.v as f32 * 2. * s;
+            wall_points_a.push(Point2 { x: c, y: dv });
+            wall_points_b.push(Point2 { x: c + sl, y: dv });
+        }
+
+        let mut builder = MeshBuilder::new();
+
+        let draw_mode = DrawMode::stroke(self.theme.line_thickness);
+        let fg = self.theme.palette.foreground_color;
+        for h in 0..(self.dim.h + 1) / 2 {
+            builder.polyline(draw_mode, &wall_points_a, fg)?;
+            builder.polyline(draw_mode, &wall_points_b, fg)?;
+
+            let dh = h as f32 * (2. * sl + 2. * c);
+
+            for v in 0..self.dim.v {
+                let dv = v as f32 * 2. * s;
+                builder.line(
+                    &[
+                        Point2 { x: c + dh, y: dv },
+                        Point2 {
+                            x: c + sl + dh,
+                            y: dv,
+                        },
+                    ],
+                    2.,
+                    fg,
+                )?;
+
+                builder.line(
+                    &[
+                        Point2 {
+                            x: 2. * c + sl + dh,
+                            y: s + dv,
+                        },
+                        Point2 {
+                            x: 2. * c + 2. * sl + dh,
+                            y: s + dv,
+                        },
+                    ],
+                    2.,
+                    fg,
+                )?;
+            }
+            {
+                let dv = self.dim.v as f32 * 2. * s;
+                builder.line(
+                    &[
+                        Point2 { x: c + dh, y: dv },
+                        Point2 {
+                            x: c + sl + dh,
+                            y: dv,
+                        },
+                    ],
+                    2.,
+                    fg,
+                )?;
+            }
+
+            for (a, b) in wall_points_a.iter_mut().zip(&mut wall_points_b) {
+                a.x += 2. * sl + 2. * c;
+                b.x += 2. * sl + 2. * c;
+            }
+        }
+        if self.dim.h.is_even() {
+            builder.polyline(draw_mode, &wall_points_a[..wall_points_a.len() - 1], fg)?;
+        }
+
+        builder.build(ctx)
+    }
 }
 
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> Result<(), GameError> {
         if self.state != GameState::Playing {
             return Ok(());
-        } // note might be a spinner, bad for performance
+        }
 
-        // note makes it possible to change direction like u -> ul -> d and eat yourself
-        //  from the head, bad, implement a last_moved_dir or something
         if !self.fpf.advance() {
             return Ok(());
         }
-
-        // todo set framerate
 
         for snake in &mut self.snakes {
             snake.advance()
         }
 
-        // check if crashed
+        // check for crashes
         let mut crashed_snake_indices = vec![];
         'outer: for (i, snake) in self.snakes.iter().enumerate() {
             for (j, other) in self.snakes.iter().enumerate() {
@@ -211,28 +317,14 @@ impl EventHandler for Game {
             self.snakes[i].body[0].typ = Crashed;
         }
 
-        // check if ate apple
-        let mut eaten_apples = vec![];
-        for (a, &apple_pos) in self.apples.iter().enumerate() {
-            for (s, snake) in self.snakes.iter().enumerate() {
-                if snake.body[0].pos == apple_pos {
-                    eaten_apples.push((a, s))
+        // check apple eating
+        for i in (0..self.apples.len()).rev() {
+            for snake in &mut self.snakes {
+                if snake.body[0].pos == self.apples[i] {
+                    self.apples.remove(i);
+                    snake.body[0].typ = Eaten(5);
                 }
             }
-        }
-        // reverse index order so removal doesn't affect later apples
-        eaten_apples.sort_by(|(a1, _), (a2, _)| a1.cmp(a2));
-        for &(a, s) in eaten_apples.iter().rev() {
-            self.apples.remove(a);
-            self.snakes[s].body[0].typ = Eaten(5);
-
-            // apply effect, might be too much with multiple snakes
-            // todo apply effect per-snake
-            //            self.effect = Some(Effect::SmallHex {
-            //                min_scale: 0.2,
-            //                iterations: 10,
-            //                passed: 0,
-            //            });
         }
 
         self.spawn_apples();
@@ -243,7 +335,7 @@ impl EventHandler for Game {
 
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         // note could be fun to implement optionally printing as a square grid
-        // TODO: reimplement optional pushing to left-top (hiding part of the hexagon)
+        // TODO: implement optional pushing to left-top (hiding part of the hexagon)
         // with 0, 0 the board is touching top-left (nothing hidden)
 
         clear(ctx, self.theme.palette.background_color);
@@ -257,107 +349,7 @@ impl EventHandler for Game {
 
         // generate grid mesh first time, later reuse
         if self.grid_mesh.is_none() {
-            let mut wall_points_a = vec![];
-            let mut wall_points_b = vec![];
-
-            let mut between_a_b = vec![];
-            let mut between_b_a = vec![];
-
-            for v in 0..self.dim.v {
-                let dv = v as f32 * 2. * s;
-
-                wall_points_a.push(Point2 { x: c, y: dv });
-                wall_points_a.push(Point2 { x: 0., y: dv + s });
-
-                wall_points_b.push(Point2 { x: c + sl, y: dv });
-                wall_points_b.push(Point2 {
-                    x: 2. * c + sl,
-                    y: dv + s,
-                });
-
-                between_a_b.push(Point2 { x: c, y: dv });
-                between_a_b.push(Point2 { x: c + sl, y: dv });
-
-                between_b_a.push(Point2 {
-                    x: 2. * c + sl,
-                    y: dv + s,
-                });
-                between_b_a.push(Point2 {
-                    x: 2. * c + 2. * sl,
-                    y: dv + s,
-                });
-            }
-
-            {
-                let dv = self.dim.v as f32 * 2. * s;
-                wall_points_a.push(Point2 { x: c, y: dv });
-                wall_points_b.push(Point2 { x: c + sl, y: dv });
-            }
-
-            let mut builder = MeshBuilder::new();
-
-            let draw_mode = DrawMode::stroke(self.theme.line_thickness);
-            let fg = self.theme.palette.foreground_color;
-            for h in 0..(self.dim.h + 1) / 2 {
-                builder.polyline(draw_mode, &wall_points_a, fg)?;
-                builder.polyline(draw_mode, &wall_points_b, fg)?;
-
-                let dh = h as f32 * (2. * sl + 2. * c);
-
-                for v in 0..self.dim.v {
-                    let dv = v as f32 * 2. * s;
-                    builder.line(
-                        &[
-                            Point2 { x: c + dh, y: dv },
-                            Point2 {
-                                x: c + sl + dh,
-                                y: dv,
-                            },
-                        ],
-                        2.,
-                        fg,
-                    )?;
-
-                    builder.line(
-                        &[
-                            Point2 {
-                                x: 2. * c + sl + dh,
-                                y: s + dv,
-                            },
-                            Point2 {
-                                x: 2. * c + 2. * sl + dh,
-                                y: s + dv,
-                            },
-                        ],
-                        2.,
-                        fg,
-                    )?;
-                }
-                {
-                    let dv = self.dim.v as f32 * 2. * s;
-                    builder.line(
-                        &[
-                            Point2 { x: c + dh, y: dv },
-                            Point2 {
-                                x: c + sl + dh,
-                                y: dv,
-                            },
-                        ],
-                        2.,
-                        fg,
-                    )?;
-                }
-
-                for (a, b) in wall_points_a.iter_mut().zip(&mut wall_points_b) {
-                    a.x += 2. * sl + 2. * c;
-                    b.x += 2. * sl + 2. * c;
-                }
-            }
-            if self.dim.h.is_even() {
-                builder.polyline(draw_mode, &wall_points_a[..wall_points_a.len() - 1], fg)?;
-            }
-
-            self.grid_mesh = Some(builder.build(ctx)?);
+            self.grid_mesh = Some(self.generate_grid_mesh(ctx)?);
         }
         draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
 
@@ -377,6 +369,7 @@ impl EventHandler for Game {
             Point2 { x: c, y: 0. },
         ];
 
+        // TODO: improve effect drawing and move it somewhere else
         if let Some(Effect::SmallHex {
             min_scale,
             iterations,
@@ -418,8 +411,6 @@ impl EventHandler for Game {
             let offset_y =
                 v as f32 * 2. * self.cell_dim.sin + if h % 2 == 0 { 0. } else { self.cell_dim.sin };
 
-            // let segment_fill = &Mesh::new_polyline(ctx, DrawMode::fill(), &hexagon_points, c)?;
-            // draw(ctx, segment_fill, DrawParam::from((point, 0.0, WHITE)))
             let translated_hexagon = hexagon_points
                 .iter()
                 .map(|Point2 { x, y }| Point2 {
@@ -451,8 +442,6 @@ impl EventHandler for Game {
 
         let mesh = &builder.build(ctx)?;
         draw(ctx, mesh, DrawParam::default())?;
-
-        // println!("draw: {}ms", start.elapsed().as_millis());
 
         thread::yield_now();
         present(ctx)
