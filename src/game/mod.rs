@@ -224,7 +224,6 @@ impl EventHandler for Game {
         eaten_apples.sort_by(|(a1, _), (a2, _)| a1.cmp(a2));
         for &(a, s) in eaten_apples.iter().rev() {
             self.apples.remove(a);
-            self.snakes[s].grow(1);
             self.snakes[s].body[0].typ = Eaten(5);
 
             // apply effect, might be too much with multiple snakes

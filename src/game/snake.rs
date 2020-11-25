@@ -73,10 +73,6 @@ impl Snake {
         }
     }
 
-    pub fn grow(&mut self, amount: usize) {
-        // self.growing += amount
-    }
-
     pub fn advance(&mut self) {
         self.pop_ctrl_queue();
 
