@@ -81,7 +81,7 @@ mod hex_pos {
 pub enum HexType {
     Normal,
     Crashed,
-    Eaten,
+    Eaten(u8),
 
     Apple,
 }

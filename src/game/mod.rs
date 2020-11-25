@@ -93,7 +93,7 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            fpf: FramesPerFrame::new(10),
+            fpf: FramesPerFrame::new(5),
 
             dim,
             players,
@@ -225,7 +225,7 @@ impl EventHandler for Game {
         for &(a, s) in eaten_apples.iter().rev() {
             self.apples.remove(a);
             self.snakes[s].grow(1);
-            self.snakes[s].body[0].typ = Eaten;
+            self.snakes[s].body[0].typ = Eaten(5);
 
             // apply effect, might be too much with multiple snakes
             // todo apply effect per-snake
@@ -412,15 +412,25 @@ impl EventHandler for Game {
             }
         }
 
-        let mut draw_cell = |h: usize, v: usize, c: Color| {
-            let point = Point2 {
-                x: h as f32 * (self.cell_dim.side + self.cell_dim.cos),
-                y: v as f32 * 2. * self.cell_dim.sin
-                    + if h % 2 == 0 { 0. } else { self.cell_dim.sin },
-            };
+        let mut builder = MeshBuilder::new();
 
-            let segment_fill = &Mesh::new_polyline(ctx, DrawMode::fill(), &hexagon_points, c)?;
-            draw(ctx, segment_fill, DrawParam::from((point, 0.0, WHITE)))
+        let mut draw_cell = |h: usize, v: usize, c: Color| {
+            let offset_x = h as f32 * (self.cell_dim.side + self.cell_dim.cos);
+            let offset_y =
+                v as f32 * 2. * self.cell_dim.sin + if h % 2 == 0 { 0. } else { self.cell_dim.sin };
+
+            // let segment_fill = &Mesh::new_polyline(ctx, DrawMode::fill(), &hexagon_points, c)?;
+            // draw(ctx, segment_fill, DrawParam::from((point, 0.0, WHITE)))
+            let translated_hexagon = hexagon_points
+                .iter()
+                .map(|Point2 { x, y }| Point2 {
+                    x: x + offset_x,
+                    y: y + offset_y,
+                })
+                .collect::<Vec<_>>();
+            builder
+                .polyline(DrawMode::fill(), &translated_hexagon, c)
+                .map(|_| ())
         };
 
         // draw snakes, crashed (collision) points on top
@@ -439,6 +449,9 @@ impl EventHandler for Game {
                 self.theme.palette.apple_fill_color,
             )?
         }
+
+        let mesh = &builder.build(ctx)?;
+        draw(ctx, mesh, DrawParam::default())?;
 
         // println!("draw: {}ms", start.elapsed().as_millis());
 

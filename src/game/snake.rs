@@ -1,5 +1,5 @@
 use super::hex::{Hex, HexPos, HexType::*};
-use crate::game::{ctrl::Ctrl, theme::Palette, CellDim};
+use crate::game::{ctrl::Ctrl, hex::HexType, theme::Palette, CellDim};
 use ggez::{
     event::KeyCode,
     graphics::{Color, DrawMode, Mesh},
@@ -74,7 +74,7 @@ impl Snake {
     }
 
     pub fn grow(&mut self, amount: usize) {
-        self.growing += amount
+        // self.growing += amount
     }
 
     pub fn advance(&mut self) {
@@ -97,6 +97,16 @@ impl Snake {
                 new_head.translate(self.dir, -1);
             }
             new_head.translate(self.dir, 1);
+        }
+
+        let body_last = self.body.len() - 1;
+        if let HexType::Eaten(amount) = &mut self.body[body_last].typ {
+            if *amount == 0 {
+                self.body[body_last].typ = HexType::Normal;
+            } else {
+                self.growing += 1;
+                *amount -= 1;
+            }
         }
 
         if self.growing > 0 {
@@ -132,7 +142,7 @@ impl Snake {
                         a: 1.,
                     }
                 }
-                Eaten => Color {
+                Eaten(_) => Color {
                     r: 0.,
                     b: 0.5,
                     g: 1.,

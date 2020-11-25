@@ -49,11 +49,11 @@ fn main() {
             hand: right,
         },
         // uncomment for 2-player
-        ctrl! {
-            layout: dvorak,
-            side: left,
-            hand: left,
-        },
+        // ctrl! {
+        //     layout: dvorak,
+        //     side: left,
+        //     hand: left,
+        // },
     ];
     let mut game = Game::new(10., players, Theme::DEFAULT_DARK, wm);
 
