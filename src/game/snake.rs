@@ -80,18 +80,21 @@ impl Snake {
         //  at the moment this just moves the head back until the last cell that's still in the map
         //  this could be done as a single calculation
         new_head.translate(self.dir, 1);
+        let teleported;
         if !new_head.is_in(self.game_dim) {
-            // step back
+            teleported = true;
+            // find reappearance point
             new_head.translate(self.dir, -1);
-
             while new_head.is_in(self.game_dim) {
                 new_head.translate(self.dir, -1);
             }
             new_head.translate(self.dir, 1);
+        } else {
+            teleported = false;
         }
 
         let body_last = self.body.len() - 1;
-        if let HexType::Eaten(amount) = &mut self.body[body_last].typ {
+        if let HexType::Eaten(amount, _) = &mut self.body[body_last].typ {
             if *amount == 0 {
                 self.body[body_last].typ = HexType::Normal;
             } else {
@@ -106,6 +109,19 @@ impl Snake {
         } else {
             self.body.rotate_right(1);
             self.body[0] = new_head;
+        }
+
+        if teleported {
+            self.body[0].typ = match self.body[0].typ {
+                Normal => HexType::Teleported,
+                Eaten(n, _) => Eaten(n, true),
+                t => t,
+            };
+            self.body[1].typ = match self.body[1].typ {
+                Normal => HexType::Teleported,
+                Eaten(n, _) => Eaten(n, true),
+                t => t,
+            };
         }
     }
 
@@ -133,13 +149,28 @@ impl Snake {
                         a: 1.,
                     }
                 }
-                Eaten(_) => Color {
-                    r: 0.,
-                    b: 0.5,
-                    g: 1.,
+                // todo: include these in the palette
+                Eaten(_, telepordted) => if telepordted {
+                    Color {
+                        r: 0.50,
+                        g: 0.80,
+                        b: 0.3,
+                        a: 1.,
+                    }
+                } else {
+                    Color {
+                        r: 0.,
+                        g: 1.,
+                        b: 0.5,
+                        a: 1.,
+                    }
+                },
+                Teleported => Color {
+                    r: 0.96,
+                    g: 0.75,
+                    b: 0.26,
                     a: 1.,
-                }, // todo darkening for these too
-                _ => unreachable!(),
+                },
             };
 
             draw_cell(segment.h as usize, segment.v as usize, color)?

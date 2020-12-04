@@ -107,7 +107,7 @@ impl Game {
             },
             theme,
 
-            apple_count: 50,
+            apple_count: 5,
 
             rng: thread_rng(),
             grid_mesh: None,
@@ -121,13 +121,6 @@ impl Game {
     fn restart(&mut self) {
         self.snakes.clear();
         self.apples.clear();
-
-        // self.snakes.push(
-        //     Snake::new(self.dim, HexPos { h: -2, v: 0 }, left_side_control));
-        // self.snakes.push(
-        //     Snake::new(self.dim, HexPos { h: 2, v: 0 }, right_side_control));
-        // assert!()\
-        // todo!()
 
         for (ctrl, &h) in self.players.iter().zip([-2, 2].iter()) {
             self.snakes
@@ -322,7 +315,7 @@ impl EventHandler for Game {
             for snake in &mut self.snakes {
                 if snake.body[0].pos == self.apples[i] {
                     self.apples.remove(i);
-                    snake.body[0].typ = Eaten(5);
+                    snake.body[0].typ = Eaten(5, false);
                 }
             }
         }

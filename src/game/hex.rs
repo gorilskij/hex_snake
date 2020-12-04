@@ -81,9 +81,8 @@ mod hex_pos {
 pub enum HexType {
     Normal,
     Crashed,
-    Eaten(u8),
-
-    Apple,
+    Eaten(u8, bool), // (amount, teleported)
+    Teleported,
 }
 
 #[derive(Copy, Clone, Debug)]
