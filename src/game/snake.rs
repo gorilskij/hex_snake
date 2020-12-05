@@ -4,7 +4,7 @@ use ggez::{event::KeyCode, graphics::Color, GameResult};
 use std::{collections::VecDeque, ops::Neg};
 use Dir::*;
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Dir {
     U,
     D,
@@ -54,6 +54,7 @@ impl Snake {
         let center = Hex {
             typ: Normal,
             pos: dim / 2 + offset,
+            teleported: None,
         };
         Self {
             body: vec![center],
@@ -74,6 +75,7 @@ impl Snake {
         let mut new_head = Hex {
             typ: Normal,
             pos: self.body[0].pos,
+            teleported: None,
         };
 
         // todo make O(1)
@@ -94,7 +96,7 @@ impl Snake {
         }
 
         let body_last = self.body.len() - 1;
-        if let HexType::Eaten(amount, _) = &mut self.body[body_last].typ {
+        if let HexType::Eaten(amount) = &mut self.body[body_last].typ {
             if *amount == 0 {
                 self.body[body_last].typ = HexType::Normal;
             } else {
@@ -112,22 +114,14 @@ impl Snake {
         }
 
         if teleported {
-            self.body[0].typ = match self.body[0].typ {
-                Normal => HexType::Teleported,
-                Eaten(n, _) => Eaten(n, true),
-                t => t,
-            };
-            self.body[1].typ = match self.body[1].typ {
-                Normal => HexType::Teleported,
-                Eaten(n, _) => Eaten(n, true),
-                t => t,
-            };
+            self.body[0].teleported = Some(-self.dir);
+            self.body[1].teleported = Some(self.dir);
         }
     }
 
     pub(in crate::game) fn draw_non_crash_points(
         &self,
-        draw_cell: &mut impl FnMut(usize, usize, Color) -> GameResult,
+        draw_cell: &mut impl FnMut(usize, usize, Color, Option<Dir>) -> GameResult,
         palette: &Palette,
     ) -> GameResult {
         let (head, tail) = palette.normal_color;
@@ -148,16 +142,16 @@ impl Snake {
                         a: 1.,
                     }
                 }
-                // todo: include these in the palette
-                Eaten(_, teleported) => if teleported {
-                    palette.eaten_teleported_color
-                } else {
-                    palette.eaten_color
-                },
-                Teleported => palette.teleported_color,
+                Eaten(_) => palette.eaten_color,
             };
 
-            draw_cell(segment.h as usize, segment.v as usize, color)?
+            match segment.teleported {
+                None => draw_cell(segment.h as usize, segment.v as usize, color, None)?,
+                Some(dir) => {
+                    draw_cell(segment.h as usize, segment.v as usize, color, Some(-dir))?;
+                    draw_cell(segment.h as usize, segment.v as usize, palette.teleported_color, Some(dir))?;
+                },
+            }
         }
 
         Ok(())
@@ -165,7 +159,7 @@ impl Snake {
 
     pub(in crate::game) fn draw_crash_point(
         &self,
-        draw_cell: &mut impl FnMut(usize, usize, Color) -> GameResult,
+        draw_cell: &mut impl FnMut(usize, usize, Color, Option<Dir>) -> GameResult,
         palette: &Palette,
     ) -> GameResult {
         if self.body[0].typ == Crashed {
@@ -173,6 +167,7 @@ impl Snake {
                 self.body[0].h as usize,
                 self.body[0].v as usize,
                 palette.crash_color,
+                None,
             )?
         }
         Ok(())

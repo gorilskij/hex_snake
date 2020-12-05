@@ -1,5 +1,6 @@
 pub use hex_pos::HexPos;
 use std::ops::{Deref, DerefMut};
+use crate::game::snake::Dir;
 
 mod hex_pos {
     use crate::game::snake::Dir;
@@ -81,14 +82,14 @@ mod hex_pos {
 pub enum HexType {
     Normal,
     Crashed,
-    Eaten(u8, bool), // (amount, teleported)
-    Teleported,
+    Eaten(u8),
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct Hex {
     pub typ: HexType,
     pub pos: HexPos,
+    pub teleported: Option<Dir>,
 }
 
 impl Deref for Hex {

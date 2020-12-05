@@ -9,10 +9,10 @@ pub struct Theme {
 
 #[allow(dead_code)]
 impl Theme {
-    // pub const DEFAULT_LIGHT: Self = Self {
-    //     palette: Palette::LIGHT,
-    //     line_thickness: 2.,
-    // };
+    pub const DEFAULT_LIGHT: Self = Self {
+        palette: Palette::LIGHT,
+        line_thickness: 2.,
+    };
 
     pub const DEFAULT_DARK: Self = Self {
         palette: Palette::DARK,

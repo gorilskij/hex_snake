@@ -15,6 +15,8 @@ use snake::Snake;
 use std::{f32::consts::PI, thread};
 use theme::Theme;
 use tuple::Map;
+use crate::game::hex::Hex;
+use crate::game::snake::Dir;
 
 mod effect;
 mod hex;
@@ -51,6 +53,16 @@ impl FramesPerFrame {
     }
 }
 
+struct HexagonPoints {
+    full: [Point2<f32>; 6],
+    u: [Point2<f32>; 4],
+    d: [Point2<f32>; 4],
+    ul: [Point2<f32>; 4],
+    ur: [Point2<f32>; 4],
+    dl: [Point2<f32>; 4],
+    dr: [Point2<f32>; 4],
+}
+
 #[derive(Eq, PartialEq)]
 enum GameState {
     Playing,
@@ -73,6 +85,7 @@ pub struct Game {
     apple_count: usize,
 
     rng: ThreadRng,
+    hexagon_points: HexagonPoints,
     grid_mesh: Option<Mesh>,
     effect: Option<Effect>,
 }
@@ -82,13 +95,61 @@ impl Game {
         assert!(!players.is_empty(), "No players specified");
         assert!(players.len() <= 2, "More than 2 players not supported");
 
-        let (s, c) = (1. / 3. * PI).sin_cos().map(|i| i * cell_side_len);
+        let side = cell_side_len;
+        let (sin, cos) = (1. / 3. * PI).sin_cos().map(|i| i * side);
 
-        let h = wm.width / (cell_side_len + c);
-        let v = wm.height / (2. * s);
+        let h = wm.width / (side + cos);
+        let v = wm.height / (2. * sin);
         let dim = HexPos {
             h: h as isize,
             v: v as isize,
+        };
+
+        let hexagon_points = HexagonPoints {
+            full: [
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: side + cos, y: 2. * sin },
+                Point2 { x: cos, y: 2. * sin },
+                Point2 { x: 0., y: sin },
+            ],
+            u: [
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: 0., y: sin },
+            ],
+            d: [
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: side + cos, y: 2. * sin },
+                Point2 { x: cos, y: 2. * sin },
+                Point2 { x: 0., y: sin },
+            ],
+            ul: [
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: cos, y: 2. * sin },
+                Point2 { x: 0., y: sin },
+            ],
+            ur: [
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: side + cos, y: 2. * sin },
+            ],
+            dl: [
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 2. * sin },
+                Point2 { x: cos, y: 2. * sin },
+                Point2 { x: 0., y: sin },
+            ],
+            dr: [
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: side + cos, y: 2. * sin },
+                Point2 { x: cos, y: 2. * sin },
+            ],
         };
 
         let mut game = Self {
@@ -101,15 +162,16 @@ impl Game {
             apples: vec![],
 
             cell_dim: CellDim {
-                side: cell_side_len,
-                sin: s,
-                cos: c,
+                side,
+                sin,
+                cos,
             },
             theme,
 
             apple_count: 5,
 
             rng: thread_rng(),
+            hexagon_points,
             grid_mesh: None,
             effect: None,
         };
@@ -315,7 +377,7 @@ impl EventHandler for Game {
             for snake in &mut self.snakes {
                 if snake.body[0].pos == self.apples[i] {
                     self.apples.remove(i);
-                    snake.body[0].typ = Eaten(5, false);
+                    snake.body[0].typ = Eaten(5);
                 }
             }
         }
@@ -333,78 +395,66 @@ impl EventHandler for Game {
 
         clear(ctx, self.theme.palette.background_color);
 
-        // shorter names look nice in formulas
-        let CellDim {
-            side: sl,
-            sin: s,
-            cos: c,
-        } = self.cell_dim;
-
         // generate grid mesh first time, later reuse
         if self.grid_mesh.is_none() {
             self.grid_mesh = Some(self.generate_grid_mesh(ctx)?);
         }
         draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
 
-        let mut hexagon_points = [
-            Point2 { x: c, y: 0. },
-            Point2 { x: sl + c, y: 0. },
-            Point2 {
-                x: sl + 2. * c,
-                y: s,
-            },
-            Point2 {
-                x: sl + c,
-                y: 2. * s,
-            },
-            Point2 { x: c, y: 2. * s },
-            Point2 { x: 0., y: s },
-            Point2 { x: c, y: 0. },
-        ];
-
         // TODO: improve effect drawing and move it somewhere else
-        if let Some(Effect::SmallHex {
-            min_scale,
-            iterations,
-            passed,
-        }) = self.effect
-        {
-            let scale_factor = if passed < iterations / 2 {
-                let fraction = passed as f32 / (iterations as f32 / 2.);
-                1. - fraction * (1. - min_scale)
-            } else {
-                let fraction =
-                    (passed - iterations / 2) as f32 / (iterations - iterations / 2) as f32;
-                1. - (1. - fraction) * (1. - min_scale)
-            };
-
-            // scale down and reposition in the middle of the hexagon
-            for pt in &mut hexagon_points {
-                pt.x *= scale_factor;
-                pt.y *= scale_factor;
-                // formula is (dimension / 2) * (1 - scale factor) [simplified]
-                pt.x += (c + sl / 2.) * (1. - scale_factor);
-                pt.y += s * (1. - scale_factor); // actually 2 * s / 2
-            }
-
-            if passed == iterations {
-                self.effect = None;
-            } else {
-                // always succeeds, only used to unwrap
-                if let Some(Effect::SmallHex { passed, .. }) = &mut self.effect {
-                    *passed += 1
-                }
-            }
-        }
+        // if let Some(Effect::SmallHex {
+        //                 min_scale,
+        //                 iterations,
+        //                 passed,
+        //             }) = self.effect
+        // {
+        //     let scale_factor = if passed < iterations / 2 {
+        //         let fraction = passed as f32 / (iterations as f32 / 2.);
+        //         1. - fraction * (1. - min_scale)
+        //     } else {
+        //         let fraction =
+        //             (passed - iterations / 2) as f32 / (iterations - iterations / 2) as f32;
+        //         1. - (1. - fraction) * (1. - min_scale)
+        //     };
+        //
+        //     // scale down and reposition in the middle of the hexagon
+        //     for pt in &mut hexagon_points {
+        //         pt.x *= scale_factor;
+        //         pt.y *= scale_factor;
+        //         // formula is (dimension / 2) * (1 - scale factor) [simplified]
+        //         pt.x += (cos + side / 2.) * (1. - scale_factor);
+        //         pt.y += sin * (1. - scale_factor); // actually 2 * s / 2
+        //     }
+        //
+        //     if passed == iterations {
+        //         self.effect = None;
+        //     } else {
+        //         // always succeeds, only used to unwrap
+        //         if let Some(Effect::SmallHex { passed, .. }) = &mut self.effect {
+        //             *passed += 1
+        //         }
+        //     }
+        // }
 
         let mut builder = MeshBuilder::new();
 
-        let mut draw_cell = |h: usize, v: usize, c: Color| {
+        let mut draw_cell = |h: usize, v: usize, c: Color, dir: Option<Dir>| {
             let offset_x = h as f32 * (self.cell_dim.side + self.cell_dim.cos);
             let offset_y =
                 v as f32 * 2. * self.cell_dim.sin + if h % 2 == 0 { 0. } else { self.cell_dim.sin };
 
-            let translated_hexagon = hexagon_points
+            use Dir::*;
+            let points: &[_] = match dir {
+                None => &self.hexagon_points.full,
+                Some(U) => &self.hexagon_points.u,
+                Some(D) => &self.hexagon_points.d,
+                Some(UL) => &self.hexagon_points.ul,
+                Some(UR) => &self.hexagon_points.ur,
+                Some(DL) => &self.hexagon_points.dl,
+                Some(DR) => &self.hexagon_points.dr,
+            };
+
+            let translated_points = points
                 .iter()
                 .map(|Point2 { x, y }| Point2 {
                     x: x + offset_x,
@@ -412,7 +462,7 @@ impl EventHandler for Game {
                 })
                 .collect::<Vec<_>>();
             builder
-                .polyline(DrawMode::fill(), &translated_hexagon, c)
+                .polyline(DrawMode::fill(), &translated_points, c)
                 .map(|_| ())
         };
 
@@ -430,6 +480,7 @@ impl EventHandler for Game {
                 apple.h as usize,
                 apple.v as usize,
                 self.theme.palette.apple_fill_color,
+                None,
             )?
         }
 
