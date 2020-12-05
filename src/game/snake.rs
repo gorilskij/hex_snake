@@ -130,8 +130,7 @@ impl Snake {
         draw_cell: &mut impl FnMut(usize, usize, Color) -> GameResult,
         palette: &Palette,
     ) -> GameResult {
-        let head = palette.snake_head_color;
-        let tail = palette.snake_tail_color;
+        let (head, tail) = palette.normal_color;
 
         // head to tail
         for (i, segment) in self.body.iter().enumerate() {
@@ -150,27 +149,12 @@ impl Snake {
                     }
                 }
                 // todo: include these in the palette
-                Eaten(_, telepordted) => if telepordted {
-                    Color {
-                        r: 0.50,
-                        g: 0.80,
-                        b: 0.3,
-                        a: 1.,
-                    }
+                Eaten(_, teleported) => if teleported {
+                    palette.eaten_teleported_color
                 } else {
-                    Color {
-                        r: 0.,
-                        g: 1.,
-                        b: 0.5,
-                        a: 1.,
-                    }
+                    palette.eaten_color
                 },
-                Teleported => Color {
-                    r: 0.96,
-                    g: 0.75,
-                    b: 0.26,
-                    a: 1.,
-                },
+                Teleported => palette.teleported_color,
             };
 
             draw_cell(segment.h as usize, segment.v as usize, color)?
@@ -188,7 +172,7 @@ impl Snake {
             draw_cell(
                 self.body[0].h as usize,
                 self.body[0].v as usize,
-                palette.snake_crash_color,
+                palette.crash_color,
             )?
         }
         Ok(())
