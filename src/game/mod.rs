@@ -98,11 +98,9 @@ impl Game {
         let side = cell_side_len;
         let (sin, cos) = (1. / 3. * PI).sin_cos().map(|i| i * side);
 
-        let h = wm.width / (side + cos);
-        let v = wm.height / (2. * sin);
-        let dim = HexPos {
-            h: h as isize,
-            v: v as isize,
+        let mut dim = HexPos {
+            h: (wm.width / (side + cos)) as isize,
+            v: (wm.height / (2. * sin)) as isize - 1,
         };
 
         let hexagon_points = HexagonPoints {
@@ -221,47 +219,18 @@ impl Game {
     }
 
     fn generate_grid_mesh(&self, ctx: &mut Context) -> GameResult<Mesh> {
-        let CellDim {
-            side: sl,
-            sin: s,
-            cos: c,
-        } = self.cell_dim;
+        let CellDim { side, sin, cos } = self.cell_dim;
 
-        let mut wall_points_a = vec![];
-        let mut wall_points_b = vec![];
+        // two kinds of alternating vertical lines
+        let mut vline_a = vec![];
+        let mut vline_b = vec![];
 
-        let mut between_a_b = vec![];
-        let mut between_b_a = vec![];
+        for dv in (0..=self.dim.v).map(|v| v as f32 * 2. * sin) {
+            vline_a.push(Point2 { x: cos, y: dv });
+            vline_a.push(Point2 { x: 0., y: dv + sin });
 
-        for v in 0..self.dim.v {
-            let dv = v as f32 * 2. * s;
-
-            wall_points_a.push(Point2 { x: c, y: dv });
-            wall_points_a.push(Point2 { x: 0., y: dv + s });
-
-            wall_points_b.push(Point2 { x: c + sl, y: dv });
-            wall_points_b.push(Point2 {
-                x: 2. * c + sl,
-                y: dv + s,
-            });
-
-            between_a_b.push(Point2 { x: c, y: dv });
-            between_a_b.push(Point2 { x: c + sl, y: dv });
-
-            between_b_a.push(Point2 {
-                x: 2. * c + sl,
-                y: dv + s,
-            });
-            between_b_a.push(Point2 {
-                x: 2. * c + 2. * sl,
-                y: dv + s,
-            });
-        }
-
-        {
-            let dv = self.dim.v as f32 * 2. * s;
-            wall_points_a.push(Point2 { x: c, y: dv });
-            wall_points_b.push(Point2 { x: c + sl, y: dv });
+            vline_b.push(Point2 { x: cos + side, y: dv });
+            vline_b.push(Point2 { x: 2. * cos + side, y: dv + sin });
         }
 
         let mut builder = MeshBuilder::new();
@@ -269,62 +238,49 @@ impl Game {
         let draw_mode = DrawMode::stroke(self.theme.line_thickness);
         let fg = self.theme.palette.foreground_color;
         for h in 0..(self.dim.h + 1) / 2 {
-            builder.polyline(draw_mode, &wall_points_a, fg)?;
-            builder.polyline(draw_mode, &wall_points_b, fg)?;
-
-            let dh = h as f32 * (2. * sl + 2. * c);
-
-            for v in 0..self.dim.v {
-                let dv = v as f32 * 2. * s;
-                builder.line(
-                    &[
-                        Point2 { x: c + dh, y: dv },
-                        Point2 {
-                            x: c + sl + dh,
-                            y: dv,
-                        },
-                    ],
-                    2.,
-                    fg,
-                )?;
-
-                builder.line(
-                    &[
-                        Point2 {
-                            x: 2. * c + sl + dh,
-                            y: s + dv,
-                        },
-                        Point2 {
-                            x: 2. * c + 2. * sl + dh,
-                            y: s + dv,
-                        },
-                    ],
-                    2.,
-                    fg,
-                )?;
+            if h == 0 {
+                builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], fg)?;
+            } else {
+                builder.polyline(draw_mode, &vline_a, fg)?;
             }
-            {
-                let dv = self.dim.v as f32 * 2. * s;
-                builder.line(
-                    &[
-                        Point2 { x: c + dh, y: dv },
-                        Point2 {
-                            x: c + sl + dh,
-                            y: dv,
-                        },
-                    ],
-                    2.,
-                    fg,
-                )?;
+            if self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1 {
+                builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], fg)?;
+            } else {
+                builder.polyline(draw_mode, &vline_b, fg)?;
             }
 
-            for (a, b) in wall_points_a.iter_mut().zip(&mut wall_points_b) {
-                a.x += 2. * sl + 2. * c;
-                b.x += 2. * sl + 2. * c;
+            let dh = h as f32 * (2. * side + 2. * cos);
+
+            for v in 0..=self.dim.v {
+                let dv = v as f32 * 2. * sin;
+
+                // line between a and b
+                builder.line(
+                    &[
+                        Point2 { x: cos + dh, y: dv },
+                        Point2 { x: cos + side + dh, y: dv },
+                    ], 2., fg,
+                )?;
+
+                // line between b and a
+                if !(self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1) {
+                    builder.line(
+                        &[
+                            Point2 { x: 2. * cos + side + dh, y: sin + dv },
+                            Point2 { x: 2. * cos + 2. * side + dh, y: sin + dv },
+                        ], 2., fg,
+                    )?;
+                }
+            }
+
+            // shift the lines right by 2 cells
+            for (a, b) in vline_a.iter_mut().zip(&mut vline_b) {
+                a.x += 2. * (side + cos);
+                b.x += 2. * (side + cos);
             }
         }
         if self.dim.h.is_even() {
-            builder.polyline(draw_mode, &wall_points_a[..wall_points_a.len() - 1], fg)?;
+            builder.polyline(draw_mode, &vline_a[1..], fg)?;
         }
 
         builder.build(ctx)
@@ -389,7 +345,7 @@ impl EventHandler for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
-        // note could be fun to implement optionally printing as a square grid
+        // NOTE: could be fun to implement optionally printing as a square grid
         // TODO: implement optional pushing to left-top (hiding part of the hexagon)
         // with 0, 0 the board is touching top-left (nothing hidden)
 
@@ -492,14 +448,14 @@ impl EventHandler for Game {
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
+        use GameState::*;
         if key == KeyCode::Space {
-            use GameState::*;
             match self.state {
                 Crashed => self.restart(),
                 Playing => self.state = Paused,
                 Paused => self.state = Playing,
             }
-        } else {
+        } else if self.state == Playing {
             for snake in &mut self.snakes {
                 snake.key_pressed(key)
             }
