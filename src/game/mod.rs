@@ -70,6 +70,18 @@ enum GameState {
     Crashed,
 }
 
+struct Prefs {
+    draw_grid: bool,
+}
+
+impl Default for Prefs {
+    fn default() -> Self {
+        Self {
+            draw_grid: true,
+        }
+    }
+}
+
 pub struct Game {
     state: GameState,
     fpf: FramesPerFrame,
@@ -88,6 +100,8 @@ pub struct Game {
     hexagon_points: HexagonPoints,
     grid_mesh: Option<Mesh>,
     effect: Option<Effect>,
+
+    prefs: Prefs,
 }
 
 impl Game {
@@ -172,6 +186,8 @@ impl Game {
             hexagon_points,
             grid_mesh: None,
             effect: None,
+
+            prefs: Prefs::default(),
         };
         game.restart();
         game
@@ -351,11 +367,13 @@ impl EventHandler for Game {
 
         clear(ctx, self.theme.palette.background_color);
 
-        // generate grid mesh first time, later reuse
-        if self.grid_mesh.is_none() {
-            self.grid_mesh = Some(self.generate_grid_mesh(ctx)?);
+        if self.prefs.draw_grid {
+            // generate grid mesh first time, later reuse
+            if self.grid_mesh.is_none() {
+                self.grid_mesh = Some(self.generate_grid_mesh(ctx)?);
+            }
+            draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
         }
-        draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
 
         // TODO: improve effect drawing and move it somewhere else
         // if let Some(Effect::SmallHex {
@@ -449,15 +467,18 @@ impl EventHandler for Game {
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
         use GameState::*;
-        if key == KeyCode::Space {
-            match self.state {
+        use KeyCode::*;
+        match key {
+            Space => match self.state {
                 Crashed => self.restart(),
                 Playing => self.state = Paused,
                 Paused => self.state = Playing,
-            }
-        } else if self.state == Playing {
-            for snake in &mut self.snakes {
-                snake.key_pressed(key)
+            },
+            G => self.prefs.draw_grid = !self.prefs.draw_grid,
+            k => if self.state == Playing {
+                for snake in &mut self.snakes {
+                    snake.key_pressed(k)
+                }
             }
         }
     }
