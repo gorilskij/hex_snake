@@ -17,6 +17,7 @@ use theme::Theme;
 use tuple::Map;
 use crate::game::hex::Hex;
 use crate::game::snake::Dir;
+use ggez::conf::FullscreenType;
 
 mod effect;
 mod hex;
@@ -105,17 +106,21 @@ pub struct Game {
 }
 
 impl Game {
+    fn wh_to_dim(cell_dim: CellDim, width: f32, height: f32) -> HexPos {
+        let CellDim { side, sin, cos } = cell_dim;
+        HexPos {
+            h: (width / (side + cos)) as isize,
+            v: (height / (2. * sin)) as isize - 1,
+        }
+    }
+
     pub fn new(cell_side_len: f32, players: Vec<Ctrl>, theme: Theme, wm: WindowMode) -> Self {
         assert!(!players.is_empty(), "No players specified");
         assert!(players.len() <= 2, "More than 2 players not supported");
 
         let side = cell_side_len;
         let (sin, cos) = (1. / 3. * PI).sin_cos().map(|i| i * side);
-
-        let mut dim = HexPos {
-            h: (wm.width / (side + cos)) as isize,
-            v: (wm.height / (2. * sin)) as isize - 1,
-        };
+        let cell_dim = CellDim { side, sin, cos };
 
         let hexagon_points = HexagonPoints {
             full: [
@@ -168,16 +173,12 @@ impl Game {
             state: GameState::Playing,
             fpf: FramesPerFrame::new(5),
 
-            dim,
+            dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
             players,
             snakes: vec![],
             apples: vec![],
 
-            cell_dim: CellDim {
-                side,
-                sin,
-                cos,
-            },
+            cell_dim,
             theme,
 
             apple_count: 5,
@@ -483,37 +484,20 @@ impl EventHandler for Game {
         }
     }
 
-    // broken (may be a mac problem)
-    // fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-    //     println!("WARNING: resize broken");
-    //     return;
-    //
-    //     let dim = wh_to_dim(width, height, self.cell_side_len);
-    //     self.dim = dim;
-    //     for snake in &mut self.snakes {
-    //         snake.game_dim = dim;
-    //     }
-    //
-    //     let new_wm = WindowMode {
-    //         width,
-    //         height,
-    //         maximized: false,
-    //         fullscreen_type: FullscreenType::Windowed,
-    //         borderless: false,
-    //         min_width: 0.,
-    //         min_height: 0.,
-    //         max_width: 0.,
-    //         max_height: 0.,
-    //         resizable: true,
-    //     };
-    //     set_mode(ctx, new_wm)
-    //         .expect("failed to resize window");
-    //
-    //     // println!("w/h: {}/{}", width, height);
-    //     // self.effect = Some(Effect::SmallHex {
-    //     //     min_scale: 0.1,
-    //     //     iterations: 10,
-    //     //     passed: 0,
-    //     // });
-    // }
+    // TODO: forbid resizing in-game
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
+        ggez::graphics::set_screen_coordinates(ctx, Rect {
+            x: 0.0,
+            y: 0.0,
+            w: width,
+            h: height,
+        }).unwrap();
+
+        let dim = Self::wh_to_dim(self.cell_dim, width, height);
+        self.dim = dim;
+        for snake in &mut self.snakes {
+            snake.game_dim = dim;
+        }
+        self.grid_mesh = None;
+    }
 }

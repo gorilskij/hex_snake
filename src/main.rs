@@ -25,7 +25,8 @@ fn main() {
         min_height: 0.,
         max_width: 0.,
         max_height: 0.,
-        resizable: false,
+        // resizable: false,
+        resizable: true,
     };
 
     let ws = WindowSetup {
