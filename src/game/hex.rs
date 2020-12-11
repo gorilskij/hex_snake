@@ -9,7 +9,7 @@ mod hex_pos {
     use std::fmt::{Debug, Error, Formatter};
     use Dir::*;
 
-    #[derive(Eq, PartialEq, Copy, Clone, Div, Add)]
+    #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
     pub struct HexPos {
         pub h: isize,
         pub v: isize,
@@ -22,13 +22,6 @@ mod hex_pos {
     }
 
     impl HexPos {
-        pub fn random_in<R: Rng>(dim: Self, rng: &mut R) -> Self {
-            Self {
-                h: rng.gen_range(0, dim.h),
-                v: rng.gen_range(0, dim.v),
-            }
-        }
-
         // translates h/v with special treatment for v
         pub fn translate(&mut self, dir: Dir, dist: isize) {
             if dist < 0 {

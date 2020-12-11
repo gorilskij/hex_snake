@@ -15,9 +15,11 @@ use snake::Snake;
 use std::{f32::consts::PI, thread};
 use theme::Theme;
 use tuple::Map;
-use crate::game::hex::Hex;
+use crate::game::hex::{Hex, HexType};
 use crate::game::snake::Dir;
 use ggez::conf::FullscreenType;
+use itertools::Itertools;
+use std::time::Instant;
 
 mod effect;
 mod hex;
@@ -207,31 +209,54 @@ impl Game {
         self.state = GameState::Playing;
     }
 
-    // spawns apples until there are `total` apples in the game
-    pub fn spawn_apples(&mut self) {
-        'outer: while self.apples.len() < self.apple_count {
-            let mut attempts = 0_u8;
-            'apple_maker: loop {
-                let apple_pos = HexPos::random_in(self.dim, &mut self.rng);
-                attempts += 1;
-                for s in self
-                    .snakes
-                    .iter()
-                    .map(|s| s.body.iter().map(|b| b.pos))
-                    .flatten()
-                    .chain(self.apples.iter().copied())
-                {
-                    if s == apple_pos {
-                        // make a new apple
-                        assert!(attempts < 5);
-                        continue 'apple_maker;
-                    }
-                }
-
-                // apple made successfully
-                self.apples.push(apple_pos);
-                continue 'outer;
+    pub fn num_occupied_cells(&self) -> usize {
+        let mut num = self.apples.len();
+        let mut crashed_heads = vec![];
+        for snake in &self.snakes {
+            num += snake.body.len();
+            let Hex { typ, pos, .. } = snake.body[0];
+            if typ == HexType::Crashed {
+                crashed_heads.push(pos);
             }
+        }
+        // apply correction
+        // every crashed head is double-counted because it overlaps with another body segment
+        // unless it overlaps with another head, then only one of them is double-counted
+        num -= crashed_heads.iter().unique().count();
+        num
+    }
+
+    pub fn occupied_cells(&self) -> Vec<HexPos> {
+        let mut occupied_cells = Vec::with_capacity(self.num_occupied_cells());
+        occupied_cells.extend_from_slice(&self.apples);
+        for snake in &self.snakes {
+            occupied_cells.extend(snake.body.iter().map(|hex| hex.pos));
+        }
+        occupied_cells.sort_by_key(|x| x.v * self.dim.h + x.h);
+        occupied_cells
+    }
+
+    pub fn spawn_apples(&mut self) {
+        while self.apples.len() < self.apple_count {
+            let free_spaces = (self.dim.h * self.dim.v) as usize - self.num_occupied_cells();
+            if free_spaces == 0 {
+                println!("warning: no space left for new apples ({} apples will be missing)",
+                         self.apple_count - self.apples.len());
+                return;
+            }
+            let mut new_idx = self.rng.gen_range(0, free_spaces);
+            for HexPos { h, v } in &self.occupied_cells() {
+                let idx = (v * self.dim.h + h) as usize;
+                if idx <= new_idx {
+                    new_idx += 1;
+                }
+            }
+            assert!(new_idx < (self.dim.h * self.dim.v) as usize);
+            let new_apple = HexPos {
+                h: new_idx as isize % self.dim.h,
+                v: new_idx as isize / self.dim.h,
+            };
+            self.apples.push(new_apple);
         }
     }
 
