@@ -26,12 +26,7 @@ impl Palette {
     pub const LIGHT: Self = Self {
         background_color: WHITE,
         foreground_color: BLACK,
-        apple_fill_color: Color {
-            r: 1.,
-            g: 0.,
-            b: 0.,
-            a: 1.,
-        },
+        apple_fill_color: Color { r: 1., g: 0., b: 0., a: 1., },
         normal_color: (BLACK, gray!(0.5)),
         crash_color: Color { r: 1., b: 0.5, g: 0., a: 1. },
         eaten_color: Color { r: 0., g: 1., b: 0.5, a: 1. },

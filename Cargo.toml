@@ -5,7 +5,7 @@ authors = ["gorilskij <43991400@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
-ggez = "0.5.1"
+ggez = "0.5"
 mint = "~0.5"
 rand = "~0.7"
 tuple = "~0.4"

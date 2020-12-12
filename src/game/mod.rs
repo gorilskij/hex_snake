@@ -8,7 +8,7 @@ use ggez::{
     Context, GameError, GameResult,
 };
 use hex::{HexPos, HexType::*};
-use mint::Point2;
+use mint::{Point2, Vector2};
 use num_integer::Integer;
 use rand::prelude::*;
 use snake::Snake;
@@ -19,7 +19,6 @@ use crate::game::hex::{Hex, HexType};
 use crate::game::snake::Dir;
 use ggez::conf::FullscreenType;
 use itertools::Itertools;
-use std::time::Instant;
 
 mod effect;
 mod hex;
@@ -38,6 +37,7 @@ struct CellDim {
     cos: f32,
 }
 
+// TODO: base framerate on time, not ggez, check guarantees
 // ggez frames per game frame
 struct FramesPerFrame(u8, u8);
 
@@ -85,6 +85,8 @@ impl Default for Prefs {
     }
 }
 
+struct Message(String, u8);
+
 pub struct Game {
     state: GameState,
     fpf: FramesPerFrame,
@@ -105,6 +107,7 @@ pub struct Game {
     effect: Option<Effect>,
 
     prefs: Prefs,
+    message: Option<Message>,
 }
 
 impl Game {
@@ -191,6 +194,7 @@ impl Game {
             effect: None,
 
             prefs: Prefs::default(),
+            message: None,
         };
         game.restart();
         game
@@ -232,7 +236,8 @@ impl Game {
         for snake in &self.snakes {
             occupied_cells.extend(snake.body.iter().map(|hex| hex.pos));
         }
-        occupied_cells.sort_by_key(|x| x.v * self.dim.h + x.h);
+        occupied_cells.sort_by_key(move |&x| x.v * self.dim.h + x.h);
+        occupied_cells.dedup();
         occupied_cells
     }
 
@@ -487,6 +492,26 @@ impl EventHandler for Game {
         let mesh = &builder.build(ctx)?;
         draw(ctx, mesh, DrawParam::default())?;
 
+        if let Some(Message(ref message, ref mut frames_left)) = self.message {
+            let mut text = Text::new(message as &str);
+            text.set_font(Font::default(), Scale::uniform(20.));
+
+            let offset = 10.;
+            let x = ggez::graphics::drawable_size(ctx).0
+                - text.width(ctx) as f32
+                - offset;
+            let location = Point2 { x , y: offset };
+            let opacity = if *frames_left > 10 { 1. } else { *frames_left as f32 / 10. };
+            let color = Color { r: 1., g: 1., b: 1., a: opacity };
+            draw(ctx, &text, DrawParam::from((location, color)))?;
+
+            if *frames_left == 0 {
+                self.message = None;
+            } else {
+                *frames_left -= 1;
+            }
+        }
+
         thread::yield_now();
         present(ctx)
     }
@@ -500,7 +525,15 @@ impl EventHandler for Game {
                 Playing => self.state = Paused,
                 Paused => self.state = Playing,
             },
-            G => self.prefs.draw_grid = !self.prefs.draw_grid,
+            G => {
+                self.prefs.draw_grid = !self.prefs.draw_grid;
+                let message = if self.prefs.draw_grid {
+                    "Grid on"
+                } else {
+                    "Grid off"
+                };
+                self.message = Some(Message(message.to_string(), 100));
+            },
             k => if self.state == Playing {
                 for snake in &mut self.snakes {
                     snake.key_pressed(k)
@@ -518,11 +551,19 @@ impl EventHandler for Game {
             h: height,
         }).unwrap();
 
-        let dim = Self::wh_to_dim(self.cell_dim, width, height);
-        self.dim = dim;
+        let new_dim = Self::wh_to_dim(self.cell_dim, width, height);
+        self.dim = new_dim;
+
+        // this is only to allow for hacky mid-game resizing
         for snake in &mut self.snakes {
-            snake.game_dim = dim;
+            snake.game_dim = new_dim;
         }
+        // this too
+        self.apples.retain(move |apple| apple.is_in(new_dim));
+        self.spawn_apples();
+
+        let message = format!("{}x{}", new_dim.h, new_dim.v);
+        self.message = Some(Message(message, 100));
         self.grid_mesh = None;
     }
 }
