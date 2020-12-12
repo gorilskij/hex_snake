@@ -136,10 +136,10 @@ impl Snake {
         palette: &Palette,
     ) -> GameResult {
         use SnakeType::*;
-        let (head, tail) = match self.snake_type {
-            SinglePlayer => palette.snake_color,
-            Player1 => palette.snake1_color,
-            Player2 => palette.snake2_color,
+        let snake_palette = match self.snake_type {
+            SinglePlayer => &palette.single_player_snake,
+            Player1 => &palette.player1_snake,
+            Player2 => &palette.player2_snake,
         };
 
         // head to tail
@@ -147,16 +147,7 @@ impl Snake {
             let color = match segment.typ {
                 Crashed => continue,
                 Normal => {
-                    // darkness of the color, range: [0.5, 1]
-                    // let darkness = (1. - i as f32 / self.body.len() as f32) / 2.;
-                    let head_color_ratio = 1. - i as f32 / (self.body.len() - 1) as f32;
-                    let tail_color_ratio = 1. - head_color_ratio;
-                    Color {
-                        r: head_color_ratio * head.r + tail_color_ratio * tail.r,
-                        g: head_color_ratio * head.g + tail_color_ratio * tail.g,
-                        b: head_color_ratio * head.b + tail_color_ratio * tail.b,
-                        a: 1.,
-                    }
+                    snake_palette(i, self.body.len())
                 }
                 Eaten(_) => palette.eaten_color,
             };

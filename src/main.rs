@@ -45,11 +45,11 @@ fn main() {
 
     let players = vec![
         // uncomment for 2-player
-        ctrl! {
-            layout: dvorak,
-            side: left,
-            hand: right,
-        },
+        // ctrl! {
+        //     layout: dvorak,
+        //     side: left,
+        //     hand: right,
+        // },
 
         ctrl! {
             layout: dvorak,
