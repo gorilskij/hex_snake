@@ -15,7 +15,11 @@ pub struct Palette {
     pub background_color: Color, // cell color
     pub foreground_color: Color, // line color
     pub apple_fill_color: Color,
-    pub normal_color: (Color, Color), // (head, tail), the rest is shaded in
+    // (head, tail), the rest is shaded in
+    pub snake_color: (Color, Color), // single player
+    pub snake1_color: (Color, Color), // 2-player
+    pub snake2_color: (Color, Color), // 2-player
+
     pub crash_color: Color,
     pub eaten_color: Color,
     pub teleported_color: Color,
@@ -23,23 +27,44 @@ pub struct Palette {
 
 #[allow(dead_code)]
 impl Palette {
-    pub const LIGHT: Self = Self {
-        background_color: WHITE,
-        foreground_color: BLACK,
-        apple_fill_color: Color { r: 1., g: 0., b: 0., a: 1., },
-        normal_color: (BLACK, gray!(0.5)),
-        crash_color: Color { r: 1., b: 0.5, g: 0., a: 1. },
-        eaten_color: Color { r: 0., g: 1., b: 0.5, a: 1. },
-        teleported_color: Color { r: 0.96, g: 0.75, b: 0.26, a: 1. },
-    };
+    pub fn light() -> Self {
+        Self {
+            background_color: WHITE,
+            foreground_color: BLACK,
+            apple_fill_color: Color::from_rgb(255, 0, 0),
+            snake_color: (BLACK, gray!(0.5)),
+            snake1_color: (
+                Color::from_rgb(0, 192, 0),
+                Color::from_rgb(0, 64, 0),
+            ),
+            snake2_color: (
+                Color::from_rgb(16, 169, 224),
+                Color::from_rgb(12, 129, 171),
+            ),
+            crash_color: Color::from_rgb(255, 0, 128),
+            eaten_color: Color::from_rgb(0, 255, 128),
+            teleported_color: Color::from_rgb(245, 192, 64),
+        }
+    }
 
-    pub const DARK: Self = Self {
-        background_color: BLACK,
-        foreground_color: gray!(0.25),
-        apple_fill_color: Color { r: 1., g: 0., b: 0., a: 1. },
-        normal_color: (gray!(0.75), gray!(0.25)),
-        crash_color: Color { r: 1., b: 0.5, g: 0., a: 1. },
-        eaten_color: Color { r: 0., g: 1., b: 0.5, a: 1. },
-        teleported_color: Color { r: 0.96, g: 0.75, b: 0.26, a: 1. },
-    };
+
+    pub fn dark() -> Self {
+        Self {
+            background_color: BLACK,
+            foreground_color: gray!(0.25),
+            apple_fill_color: Color::from_rgb(255, 0, 0),
+            snake_color: (gray!(0.75), gray!(0.25)),
+            snake1_color: (
+                Color::from_rgb(0, 192, 0),
+                Color::from_rgb(0, 64, 0),
+            ),
+            snake2_color: (
+                Color::from_rgb(16, 169, 224),
+                Color::from_rgb(4, 52, 69),
+            ),
+            crash_color: Color::from_rgb(255, 0, 128),
+            eaten_color: Color::from_rgb(0, 255, 128),
+            teleported_color: Color::from_rgb(245, 192, 64),
+        }
+    }
 }

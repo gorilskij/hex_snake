@@ -29,6 +29,12 @@ impl Neg for Dir {
     }
 }
 
+pub enum SnakeType {
+    SinglePlayer,
+    Player1,
+    Player2,
+}
+
 #[derive(Eq, PartialEq)]
 pub enum SnakeState {
     Living,
@@ -36,6 +42,8 @@ pub enum SnakeState {
 }
 
 pub struct Snake {
+    snake_type: SnakeType,
+
     pub body: Vec<Hex>,
     growing: usize,
     dir: Dir,
@@ -50,14 +58,17 @@ pub struct Snake {
 impl Snake {
     const CTRL_QUEUE_LIMIT: usize = 3;
 
-    pub fn new(dim: HexPos, offset: HexPos, ctrl: Ctrl) -> Self {
-        let center = Hex {
+    pub fn new(snake_type: SnakeType, dim: HexPos, start_pos: HexPos, ctrl: Ctrl) -> Self {
+        let head = Hex {
             typ: Normal,
-            pos: dim / 2 + offset,
+            pos: start_pos,
             teleported: None,
         };
+
         Self {
-            body: vec![center],
+            snake_type,
+
+            body: vec![head],
             growing: 15,
             dir: Dir::U,
             game_dim: dim,
@@ -124,7 +135,12 @@ impl Snake {
         draw_cell: &mut impl FnMut(usize, usize, Color, Option<Dir>) -> GameResult,
         palette: &Palette,
     ) -> GameResult {
-        let (head, tail) = palette.normal_color;
+        use SnakeType::*;
+        let (head, tail) = match self.snake_type {
+            SinglePlayer => palette.snake_color,
+            Player1 => palette.snake1_color,
+            Player2 => palette.snake2_color,
+        };
 
         // head to tail
         for (i, segment) in self.body.iter().enumerate() {

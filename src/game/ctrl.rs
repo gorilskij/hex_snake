@@ -1,6 +1,6 @@
 use ggez::input::keyboard::KeyCode;
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct Ctrl {
     pub u: KeyCode,
     pub d: KeyCode,

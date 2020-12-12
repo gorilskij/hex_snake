@@ -44,19 +44,20 @@ fn main() {
         .unwrap();
 
     let players = vec![
+        // uncomment for 2-player
+        ctrl! {
+            layout: dvorak,
+            side: left,
+            hand: right,
+        },
+
         ctrl! {
             layout: dvorak,
             side: right,
             hand: right,
         },
-        // uncomment for 2-player
-        // ctrl! {
-        //     layout: dvorak,
-        //     side: left,
-        //     hand: left,
-        // },
     ];
-    let mut game = Game::new(10., players, Theme::DEFAULT_DARK, wm);
+    let mut game = Game::new(10., players, Theme::default_dark(), wm);
 
     run(ctx, event_loop, &mut game).expect("crashed")
 }

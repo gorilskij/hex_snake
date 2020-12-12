@@ -16,7 +16,7 @@ use std::{f32::consts::PI, thread};
 use theme::Theme;
 use tuple::Map;
 use crate::game::hex::{Hex, HexType};
-use crate::game::snake::Dir;
+use crate::game::snake::{Dir, SnakeType};
 use ggez::conf::FullscreenType;
 use itertools::Itertools;
 
@@ -205,10 +205,32 @@ impl Game {
         self.snakes.clear();
         self.apples.clear();
 
-        for (ctrl, &h) in self.players.iter().zip([-2, 2].iter()) {
-            self.snakes
-                .push(Snake::new(self.dim, HexPos { h, v: 0 }, ctrl.clone()))
+        match self.players.as_slice() {
+            &[ctrl] => {
+                self.snakes.push(Snake::new(
+                    SnakeType::SinglePlayer,
+                    self.dim,
+                    self.dim / 2,
+                    ctrl,
+                ));
+            }
+            &[ctrl1, ctrl2] => {
+                self.snakes.push(Snake::new(
+                    SnakeType::Player1,
+                    self.dim,
+                    self.dim / 2 + HexPos { h: -2, v: 0 },
+                    ctrl1
+                ));
+                self.snakes.push(Snake::new(
+                    SnakeType::Player2,
+                    self.dim,
+                    self.dim / 2 + HexPos { h: 2, v: 0 },
+                    ctrl2
+                ));
+            }
+            _ => unreachable!(),
         }
+
         self.spawn_apples();
         self.state = GameState::Playing;
     }
@@ -376,8 +398,8 @@ impl EventHandler for Game {
         }
 
         // check apple eating
-        for i in (0..self.apples.len()).rev() {
-            for snake in &mut self.snakes {
+        for snake in &mut self.snakes {
+            for i in (0..self.apples.len()).rev() {
                 if snake.body[0].pos == self.apples[i] {
                     self.apples.remove(i);
                     snake.body[0].typ = Eaten(5);
