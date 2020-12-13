@@ -7,6 +7,7 @@ use ggez::{
     event::run,
     ContextBuilder,
 };
+use crate::game::ctrl::{Ctrl, CtrlLayout, CtrlSide};
 
 mod game;
 
@@ -43,18 +44,20 @@ fn main() {
         .build()
         .unwrap();
 
+    use CtrlLayout::*;
+    use CtrlSide::*;
     let players = vec![
         // uncomment for 2-player
-        // ctrl! {
-        //     layout: dvorak,
-        //     side: left,
-        //     hand: right,
+        // Ctrl {
+        //     layout: Dvorak,
+        //     keyboard_side: LeftSide,
+        //     hand: RightSide,
         // },
 
-        ctrl! {
-            layout: dvorak,
-            side: right,
-            hand: right,
+        Ctrl {
+            layout: Dvorak,
+            keyboard_side: RightSide,
+            hand: RightSide,
         },
     ];
     let mut game = Game::new(10., players, Theme::default_dark(), wm);

@@ -1,5 +1,5 @@
 use super::hex::{Hex, HexPos, HexType::*};
-use crate::game::{ctrl::Ctrl, hex::HexType, theme::Palette};
+use crate::game::{ctrl::Controls, hex::HexType, theme::Palette};
 use ggez::{event::KeyCode, graphics::Color, GameResult};
 use std::{collections::VecDeque, ops::Neg};
 use Dir::*;
@@ -51,14 +51,14 @@ pub struct Snake {
 
     pub state: SnakeState,
 
-    pub ctrl: Ctrl,
+    pub ctrl: Controls,
     ctrl_queue: VecDeque<Dir>,
 }
 
 impl Snake {
     const CTRL_QUEUE_LIMIT: usize = 3;
 
-    pub fn new(snake_type: SnakeType, dim: HexPos, start_pos: HexPos, ctrl: Ctrl) -> Self {
+    pub fn new(snake_type: SnakeType, dim: HexPos, start_pos: HexPos, ctrl: Controls) -> Self {
         let head = Hex {
             typ: Normal,
             pos: start_pos,

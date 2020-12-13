@@ -1,6 +1,10 @@
 use ggez::graphics::{Color, BLACK, WHITE};
 use std::ops::Deref;
 use hsl::HSL;
+use rand::{thread_rng, Rng};
+use rand::prelude::ThreadRng;
+use std::cell::{Cell, RefCell};
+use std::f32::consts::PI;
 
 macro_rules! gray {
     ($lightness:expr) => {
@@ -14,6 +18,7 @@ macro_rules! gray {
 }
 
 type SnakePaletteClosure = dyn Fn(usize, usize) -> Color;
+#[derive(Deref, DerefMut)]
 pub struct SnakePalette(Box<SnakePaletteClosure>);
 
 impl SnakePalette {
@@ -37,13 +42,33 @@ impl SnakePalette {
             Color::from(hsl.to_rgb())
         }))
     }
-}
 
-impl Deref for SnakePalette {
-    type Target = SnakePaletteClosure;
+    fn checker(on_step: usize, off_step: usize) -> Self {
+        Self(Box::new(move |seg, len| {
+            if seg % (on_step + off_step) < on_step || seg == len - 1 {
+                WHITE
+            } else {
+                BLACK
+            }
+        }))
+    }
 
-    fn deref(&self) -> &Self::Target {
-        self.0.as_ref()
+    fn sin(period: usize) -> Self {
+        Self(Box::new(move |seg, len| {
+            let x = seg as f32 * 2. * PI / period as f32;
+            let l = (x.sin() + 1.) / 2.;
+            Color { r: l, g: l, b: l, a: 1. }
+        }))
+    }
+
+    fn rainbow_sin(period: usize) -> Self {
+        Self(Box::new(move |seg, len| {
+            let x = seg as f32 * 2. * PI / period as f32;
+            let l = (x.sin() + 1.) / 2.;
+            let h = (x / (2. * PI)).floor() * 30.;
+            let hsl = HSL { h: h as f64 % 360., s: 1., l: l as f64 / 2. };
+            Color::from(hsl.to_rgb())
+        }))
     }
 }
 
@@ -91,7 +116,9 @@ impl Palette {
             foreground_color: gray!(0.25),
             apple_fill_color: Color::from_rgb(255, 0, 0),
             // single_player_snake: SnakePalette::gradient(gray!(0.75), gray!(0.25)),
-            single_player_snake: SnakePalette::rainbow(),
+            // single_player_snake: SnakePalette::rainbow(),
+            // single_player_snake: SnakePalette::checker(1, 10),
+            single_player_snake: SnakePalette::rainbow_sin(10),
             player1_snake: SnakePalette::gradient(
                 Color::from_rgb(0, 192, 0),
                 Color::from_rgb(0, 64, 0),

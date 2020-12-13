@@ -1,4 +1,4 @@
-use crate::game::{ctrl::Ctrl, snake::SnakeState};
+use crate::game::{ctrl::Controls, snake::SnakeState};
 use effect::Effect;
 use ggez::{
     conf::WindowMode,
@@ -19,6 +19,7 @@ use crate::game::hex::{Hex, HexType};
 use crate::game::snake::{Dir, SnakeType};
 use ggez::conf::FullscreenType;
 use itertools::Itertools;
+use crate::game::ctrl::Ctrl;
 
 mod effect;
 mod hex;
@@ -92,7 +93,7 @@ pub struct Game {
     fpf: FramesPerFrame,
 
     dim: HexPos,
-    players: Vec<Ctrl>,
+    players: Vec<Controls>,
     snakes: Vec<Snake>,
     apples: Vec<HexPos>,
 
@@ -179,7 +180,7 @@ impl Game {
             fpf: FramesPerFrame::new(5),
 
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
-            players,
+            players: players.into_iter().map(Into::into).collect(),
             snakes: vec![],
             apples: vec![],
 
