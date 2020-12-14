@@ -1,22 +1,44 @@
-use crate::app::snake::Snake;
-use crate::app::hex::Hex;
+use crate::app::snake::{Snake, SnakeController};
+use crate::app::hex::{Hex, Dir, HexPos};
 use crate::app::palette::SnakePalette;
 
-pub struct SimSnake {
-    body: Vec<Hex>,
-    palette: SnakePalette,
+pub enum SimMove {
+    Move(Dir),
+    Wait(usize),
 }
 
-impl Snake for SimSnake {
-    fn body(&self) -> &Vec<Hex> {
-        &self.body
-    }
+pub struct DemoController {
+    move_sequence: Vec<SimMove>,
+    next_move_idx: usize,
+    wait: usize,
+}
 
-    fn palette(&self) -> &SnakePalette {
-        &self.palette
+impl DemoController {
+    pub fn new(move_sequence: Vec<SimMove>) -> Self {
+        Self {
+            move_sequence,
+            next_move_idx: 0,
+            wait: 0,
+        }
     }
+}
 
-    fn advance(&mut self) {
-        unimplemented!()
+impl SnakeController for DemoController {
+    fn next_dir(&mut self, dir: Dir) -> Dir {
+        if self.wait > 0 {
+            self.wait -= 1;
+            dir
+        } else {
+            let new_dir = match self.move_sequence[self.next_move_idx] {
+                SimMove::Wait(wait) => {
+                    self.wait = wait;
+                    dir
+                },
+                SimMove::Move(new_dir) => new_dir,
+            };
+            self.next_move_idx += 1;
+            self.next_move_idx %= self.move_sequence.len();
+            new_dir
+        }
     }
 }

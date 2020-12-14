@@ -14,7 +14,7 @@ mod snake;
 pub mod ctrl;
 mod palette;
 
-enum Screen {
+pub enum Screen {
     StartScreen(StartScreen),
     Game(Game),
 }

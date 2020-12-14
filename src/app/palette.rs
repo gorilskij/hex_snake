@@ -1,8 +1,7 @@
 use ggez::graphics::{Color, BLACK, WHITE};
 use std::ops::Deref;
 use hsl::HSL;
-use rand::{thread_rng, Rng};
-use rand::prelude::ThreadRng;
+use rand::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::f32::consts::PI;
 
@@ -18,10 +17,7 @@ macro_rules! gray {
 }
 
 type SnakePaletteClosure = dyn Fn(usize, usize) -> Color;
-#[derive(Deref, DerefMut)]
 pub struct SnakePalette {
-    #[deref]
-    #[deref_mut]
     pub segment_color: Box<SnakePaletteClosure>,
     pub eaten_color: Box<SnakePaletteClosure>,
     pub crashed_color: Color,
@@ -51,6 +47,10 @@ impl SnakePalette {
             crashed_color: *DEFAULT_CRASHED_COLOR,
             portal_color: *DEFAULT_PORTAL_COLOR,
         }
+    }
+
+    pub fn gray_gradient() -> Self {
+        Self::gradient(gray!(0.72), gray!(0.25))
     }
 
     pub fn rainbow() -> Self {

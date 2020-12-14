@@ -14,17 +14,25 @@ use crate::app::palette::{Palette, SnakePalette};
 use itertools::Itertools;
 use num_integer::Integer;
 use tuple::Map;
-use crate::app::snake::player_snake::{PlayerSnakeType, PlayerSnake};
-use crate::app::snake::{SnakeState, Snake};
+use crate::app::snake::player_snake::{PlayerSnakeType, PlayerSnake, PlayerController};
+use crate::app::snake::{SnakeState, Snake, draw_cell};
+use crate::app::snake::SnakeController;
 
 mod effect;
 
 // todo explain this (cos_len < sin_len) (120deg angle was used)
 #[derive(Copy, Clone)]
-struct CellDim {
-    side: f32,
-    sin: f32,
-    cos: f32,
+pub struct CellDim {
+    pub side: f32,
+    pub sin: f32,
+    pub cos: f32,
+}
+
+impl From<f32> for CellDim {
+    fn from(side: f32) -> Self {
+        let (sin, cos) = (1. / 3. * PI).sin_cos().map(|i| i * side);
+        Self { side, sin, cos }
+    }
 }
 
 // TODO: base framerate on time, not ggez, check guarantees
@@ -46,78 +54,21 @@ impl FramesPerFrame {
     }
 }
 
-struct HexagonPoints {
-    full: [Point2<f32>; 6],
-    u: [Point2<f32>; 4],
-    d: [Point2<f32>; 4],
-    ul: [Point2<f32>; 4],
-    ur: [Point2<f32>; 4],
-    dl: [Point2<f32>; 4],
-    dr: [Point2<f32>; 4],
+pub struct HexagonPoints {
+    pub full: [Point2<f32>; 6],
+    pub u: [Point2<f32>; 4],
+    pub d: [Point2<f32>; 4],
+    pub ul: [Point2<f32>; 4],
+    pub ur: [Point2<f32>; 4],
+    pub dl: [Point2<f32>; 4],
+    pub dr: [Point2<f32>; 4],
 }
 
-#[derive(Eq, PartialEq)]
-enum GameState {
-    Playing,
-    Paused,
-    Crashed,
-}
+lazy_static! {
+    pub static ref HEXAGON_POINTS: HexagonPoints = {
+        let CellDim { side, sin, cos } = CellDim::from(10.);
 
-struct Prefs {
-    draw_grid: bool,
-}
-
-impl Default for Prefs {
-    fn default() -> Self {
-        Self {
-            draw_grid: true,
-        }
-    }
-}
-
-struct Message(String, u8);
-
-pub struct Game {
-    state: GameState,
-    fpf: FramesPerFrame,
-
-    dim: HexPos,
-    players: Vec<Controls>,
-    snakes: Vec<PlayerSnake>,
-    apples: Vec<HexPos>,
-
-    cell_dim: CellDim,
-    palette: Palette,
-
-    apple_count: usize,
-
-    rng: ThreadRng,
-    hexagon_points: HexagonPoints,
-    grid_mesh: Option<Mesh>,
-    effect: Option<Effect>,
-
-    prefs: Prefs,
-    message: Option<Message>,
-}
-
-impl Game {
-    fn wh_to_dim(cell_dim: CellDim, width: f32, height: f32) -> HexPos {
-        let CellDim { side, sin, cos } = cell_dim;
-        HexPos {
-            h: (width / (side + cos)) as isize,
-            v: (height / (2. * sin)) as isize - 1,
-        }
-    }
-
-    pub fn new(cell_side_len: f32, players: Vec<Ctrl>, palette: Palette, wm: WindowMode) -> Self {
-        assert!(!players.is_empty(), "No players specified");
-        assert!(players.len() <= 2, "More than 2 players not supported");
-
-        let side = cell_side_len;
-        let (sin, cos) = (1. / 3. * PI).sin_cos().map(|i| i * side);
-        let cell_dim = CellDim { side, sin, cos };
-
-        let hexagon_points = HexagonPoints {
+        HexagonPoints {
             full: [
                 Point2 { x: cos, y: 0. },
                 Point2 { x: side + cos, y: 0. },
@@ -162,7 +113,67 @@ impl Game {
                 Point2 { x: side + cos, y: 2. * sin },
                 Point2 { x: cos, y: 2. * sin },
             ],
-        };
+        }
+    };
+}
+
+#[derive(Eq, PartialEq)]
+enum GameState {
+    Playing,
+    Paused,
+    Crashed,
+}
+
+struct Prefs {
+    draw_grid: bool,
+}
+
+impl Default for Prefs {
+    fn default() -> Self {
+        Self {
+            draw_grid: true,
+        }
+    }
+}
+
+struct Message(String, u8);
+
+pub struct Game {
+    state: GameState,
+    fpf: FramesPerFrame,
+
+    dim: HexPos,
+    players: Vec<Controls>,
+    snakes: Vec<Snake<PlayerController>>,
+    apples: Vec<HexPos>,
+
+    cell_dim: CellDim,
+    palette: Palette,
+
+    apple_count: usize,
+
+    rng: ThreadRng,
+    grid_mesh: Option<Mesh>,
+    effect: Option<Effect>,
+
+    prefs: Prefs,
+    message: Option<Message>,
+}
+
+impl Game {
+    fn wh_to_dim(cell_dim: CellDim, width: f32, height: f32) -> HexPos {
+        let CellDim { side, sin, cos } = cell_dim;
+        HexPos {
+            h: (width / (side + cos)) as isize,
+            v: (height / (2. * sin)) as isize - 1,
+        }
+    }
+
+    pub fn new(cell_side_len: f32, players: Vec<Ctrl>, palette: Palette, wm: WindowMode) -> Self {
+        assert!(!players.is_empty(), "No players specified");
+        assert!(players.len() <= 2, "More than 2 players not supported");
+
+        let cell_dim = CellDim::from(cell_side_len);
 
         let mut game = Self {
             state: GameState::Playing,
@@ -179,7 +190,6 @@ impl Game {
             apple_count: 5,
 
             rng: thread_rng(),
-            hexagon_points,
             grid_mesh: None,
             effect: None,
 
@@ -196,30 +206,33 @@ impl Game {
         self.apples.clear();
 
         match self.players.as_slice() {
-            &[ctrl] => {
-                self.snakes.push(PlayerSnake::new(
-                    PlayerSnakeType::SinglePlayer,
-                    SnakePalette::rainbow(),
-                    self.dim,
+            &[controls] => {
+                self.snakes.push(Snake::from((
                     self.dim / 2,
-                    ctrl,
-                ));
+                    SnakePalette::rainbow(),
+                    Dir::U,
+                    10,
+                    PlayerController::new(controls),
+                    self.dim,
+                )));
             }
-            &[ctrl1, ctrl2] => {
-                self.snakes.push(PlayerSnake::new(
-                    PlayerSnakeType::Player1,
+            &[controls1, controls2] => {
+                self.snakes.push(Snake::from((
+                    self.dim / 2 + HexPos { h: -5, v: 0 },
                     SnakePalette::rainbow(),
+                    Dir::U,
+                    10,
+                    PlayerController::new(controls1),
                     self.dim,
-                    self.dim / 2 + HexPos { h: -2, v: 0 },
-                    ctrl1
-                ));
-                self.snakes.push(PlayerSnake::new(
-                    PlayerSnakeType::Player2,
+                )));
+                self.snakes.push(Snake::from((
+                    self.dim / 2 + HexPos { h: 5, v: 0 },
                     SnakePalette::rainbow(),
+                    Dir::U,
+                    10,
+                    PlayerController::new(controls1),
                     self.dim,
-                    self.dim / 2 + HexPos { h: 2, v: 0 },
-                    ctrl2
-                ));
+                )));
             }
             _ => unreachable!(),
         }
@@ -458,45 +471,19 @@ impl EventHandler for Game {
 
         let mut builder = MeshBuilder::new();
 
-        let mut draw_cell = |h: usize, v: usize, c: Color, dir: Option<Dir>| {
-            let offset_x = h as f32 * (self.cell_dim.side + self.cell_dim.cos);
-            let offset_y =
-                v as f32 * 2. * self.cell_dim.sin + if h % 2 == 0 { 0. } else { self.cell_dim.sin };
-
-            use Dir::*;
-            let points: &[_] = match dir {
-                None => &self.hexagon_points.full,
-                Some(U) => &self.hexagon_points.u,
-                Some(D) => &self.hexagon_points.d,
-                Some(UL) => &self.hexagon_points.ul,
-                Some(UR) => &self.hexagon_points.ur,
-                Some(DL) => &self.hexagon_points.dl,
-                Some(DR) => &self.hexagon_points.dr,
-            };
-
-            let translated_points = points
-                .iter()
-                .map(|Point2 { x, y }| Point2 {
-                    x: x + offset_x,
-                    y: y + offset_y,
-                })
-                .collect::<Vec<_>>();
-            builder
-                .polyline(DrawMode::fill(), &translated_points, c)
-                .map(|_| ())
-        };
+        let mut dc = |h, v, c, dir| draw_cell(&mut builder, h, v, c, dir);
 
         // draw snakes, crashed (collision) points on top
         for snake in &self.snakes {
-            snake.draw_non_crash_points(&mut draw_cell)?;
+            snake.draw_non_crash_points(&mut dc)?;
         }
 
         for snake in &self.snakes {
-            snake.draw_crash_point(&mut draw_cell)?;
+            snake.draw_crash_point(&mut dc)?;
         }
 
         for apple in &self.apples {
-            draw_cell(
+            dc(
                 apple.h as usize,
                 apple.v as usize,
                 self.palette.apple_fill_color,
@@ -551,7 +538,7 @@ impl EventHandler for Game {
             },
             k => if self.state == Playing {
                 for snake in &mut self.snakes {
-                    snake.key_pressed(k)
+                    snake.controller.key_pressed(k)
                 }
             }
         }
