@@ -19,56 +19,94 @@ macro_rules! gray {
 
 type SnakePaletteClosure = dyn Fn(usize, usize) -> Color;
 #[derive(Deref, DerefMut)]
-pub struct SnakePalette(Box<SnakePaletteClosure>);
+pub struct SnakePalette {
+    #[deref]
+    #[deref_mut]
+    pub segment_color: Box<SnakePaletteClosure>,
+    pub eaten_color: Box<SnakePaletteClosure>,
+    pub crashed_color: Color,
+    pub portal_color: Color,
+}
+
+lazy_static! {
+    static ref DEFAULT_EATEN_COLOR: Color = Color::from_rgb(0, 255, 128);
+    static ref DEFAULT_CRASHED_COLOR: Color = Color::from_rgb(255, 0, 128);
+    static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgb(245, 192, 64);
+}
 
 impl SnakePalette {
     pub fn gradient(head: Color, tail: Color) -> Self {
-        Self(Box::new(move |seg, len| {
-            let head_ratio = 1. - seg as f32 / (len - 1) as f32;
-            let tail_ratio = 1. - head_ratio;
-            Color {
-                r: head_ratio * head.r + tail_ratio * tail.r,
-                g: head_ratio * head.g + tail_ratio * tail.g,
-                b: head_ratio * head.b + tail_ratio * tail.b,
-                a: 1.,
-            }
-        }))
+        Self {
+            segment_color: Box::new(move |seg, len| {
+                let head_ratio = 1. - seg as f32 / (len - 1) as f32;
+                let tail_ratio = 1. - head_ratio;
+                Color {
+                    r: head_ratio * head.r + tail_ratio * tail.r,
+                    g: head_ratio * head.g + tail_ratio * tail.g,
+                    b: head_ratio * head.b + tail_ratio * tail.b,
+                    a: 1.,
+                }
+            }),
+            eaten_color: Box::new(move |_, _| *DEFAULT_EATEN_COLOR),
+            crashed_color: *DEFAULT_CRASHED_COLOR,
+            portal_color: *DEFAULT_PORTAL_COLOR,
+        }
     }
 
     pub fn rainbow() -> Self {
-        Self(Box::new(|seg, len| {
-            let hue = 273. * seg as f64 / len as f64;
-            let hsl = HSL { h: hue, s: 1., l: 0.4 };
-            Color::from(hsl.to_rgb())
-        }))
+        Self {
+            segment_color: Box::new(|seg, len| {
+                let hue = 273. * seg as f64 / len as f64;
+                let hsl = HSL { h: hue, s: 1., l: 0.4 };
+                Color::from(hsl.to_rgb())
+            }),
+            eaten_color: Box::new(move |_, _| *DEFAULT_EATEN_COLOR),
+            crashed_color: *DEFAULT_CRASHED_COLOR,
+            portal_color: *DEFAULT_PORTAL_COLOR,
+        }
     }
 
     pub fn checker(on_step: usize, off_step: usize) -> Self {
-        Self(Box::new(move |seg, len| {
-            if seg % (on_step + off_step) < on_step || seg == len - 1 {
-                WHITE
-            } else {
-                BLACK
-            }
-        }))
+        Self {
+            segment_color: Box::new(move |seg, len| {
+                if seg % (on_step + off_step) < on_step || seg == len - 1 {
+                    WHITE
+                } else {
+                    BLACK
+                }
+            }),
+            eaten_color: Box::new(move |_, _| *DEFAULT_EATEN_COLOR),
+            crashed_color: *DEFAULT_CRASHED_COLOR,
+            portal_color: *DEFAULT_PORTAL_COLOR,
+        }
     }
 
     pub fn sin(period: usize) -> Self {
-        Self(Box::new(move |seg, len| {
-            let x = seg as f32 * 2. * PI / period as f32;
-            let l = (x.sin() + 1.) / 2.;
-            Color { r: l, g: l, b: l, a: 1. }
-        }))
+        Self {
+            segment_color: Box::new(move |seg, len| {
+                let x = seg as f32 * 2. * PI / period as f32;
+                let l = (x.sin() + 1.) / 2.;
+                Color { r: l, g: l, b: l, a: 1. }
+            }),
+            eaten_color: Box::new(move |_, _| *DEFAULT_EATEN_COLOR),
+            crashed_color: *DEFAULT_CRASHED_COLOR,
+            portal_color: *DEFAULT_PORTAL_COLOR,
+        }
     }
 
     pub fn rainbow_sin(period: usize) -> Self {
-        Self(Box::new(move |seg, len| {
-            let x = seg as f32 * 2. * PI / period as f32;
-            let l = (x.sin() + 1.) / 2.;
-            let h = (x / (2. * PI)).floor() * 30.;
-            let hsl = HSL { h: h as f64 % 360., s: 1., l: l as f64 / 2. };
-            Color::from(hsl.to_rgb())
-        }))
+        Self {
+            segment_color: Box::new(move |seg, len| {
+                let x = seg as f32 * 2. * PI / period as f32;
+                let l = (x.sin() + 1.) / 2.;
+                let h = (x / (2. * PI)).floor() * 30.;
+                let hsl = HSL { h: h as f64 % 360., s: 1., l: l as f64 / 2. };
+                Color::from(hsl.to_rgb())
+            }),
+            eaten_color: Box::new(move |_, _| *DEFAULT_EATEN_COLOR),
+            crashed_color: *DEFAULT_CRASHED_COLOR,
+            portal_color: *DEFAULT_PORTAL_COLOR,
+        }
     }
 }
 
@@ -82,10 +120,6 @@ pub struct Palette {
     pub single_player_snake: SnakePalette,
     pub player1_snake: SnakePalette,
     pub player2_snake: SnakePalette,
-
-    pub crash_color: Color,
-    pub eaten_color: Color,
-    pub teleported_color: Color,
 }
 
 #[allow(dead_code)]
@@ -138,9 +172,6 @@ impl Palette {
             //     Color::from_rgb(16, 169, 224),
             //     Color::from_rgb(227, 173, 11),
             // ),
-            crash_color: Color::from_rgb(255, 0, 128),
-            eaten_color: Color::from_rgb(0, 255, 128),
-            teleported_color: Color::from_rgb(245, 192, 64),
         }
     }
 }

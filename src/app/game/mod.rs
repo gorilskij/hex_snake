@@ -1,7 +1,6 @@
 use mint::Point2;
 use crate::app::hex::{HexPos, Hex};
 use crate::app::ctrl::{Controls, Ctrl};
-use crate::app::snake::{Snake, SnakeType, SnakeState};
 use rand::prelude::*;
 use ggez::graphics::{Mesh, DrawParam, draw, clear, MeshBuilder, Color, DrawMode, Text, Font, Scale, present, Rect};
 use crate::app::game::effect::Effect;
@@ -11,10 +10,12 @@ use ggez::event::{KeyCode, KeyMods, EventHandler};
 use std::thread;
 use ggez::{Context, GameResult};
 use std::f32::consts::PI;
-use crate::app::palette::Palette;
+use crate::app::palette::{Palette, SnakePalette};
 use itertools::Itertools;
 use num_integer::Integer;
 use tuple::Map;
+use crate::app::snake::player_snake::{PlayerSnakeType, PlayerSnake};
+use crate::app::snake::{SnakeState, Snake};
 
 mod effect;
 
@@ -82,7 +83,7 @@ pub struct Game {
 
     dim: HexPos,
     players: Vec<Controls>,
-    snakes: Vec<Snake>,
+    snakes: Vec<PlayerSnake>,
     apples: Vec<HexPos>,
 
     cell_dim: CellDim,
@@ -196,22 +197,25 @@ impl Game {
 
         match self.players.as_slice() {
             &[ctrl] => {
-                self.snakes.push(Snake::new(
-                    SnakeType::SinglePlayer,
+                self.snakes.push(PlayerSnake::new(
+                    PlayerSnakeType::SinglePlayer,
+                    SnakePalette::rainbow(),
                     self.dim,
                     self.dim / 2,
                     ctrl,
                 ));
             }
             &[ctrl1, ctrl2] => {
-                self.snakes.push(Snake::new(
-                    SnakeType::Player1,
+                self.snakes.push(PlayerSnake::new(
+                    PlayerSnakeType::Player1,
+                    SnakePalette::rainbow(),
                     self.dim,
                     self.dim / 2 + HexPos { h: -2, v: 0 },
                     ctrl1
                 ));
-                self.snakes.push(Snake::new(
-                    SnakeType::Player2,
+                self.snakes.push(PlayerSnake::new(
+                    PlayerSnakeType::Player2,
+                    SnakePalette::rainbow(),
                     self.dim,
                     self.dim / 2 + HexPos { h: 2, v: 0 },
                     ctrl2
@@ -484,11 +488,11 @@ impl EventHandler for Game {
 
         // draw snakes, crashed (collision) points on top
         for snake in &self.snakes {
-            snake.draw_non_crash_points(&mut draw_cell, &self.palette)?;
+            snake.draw_non_crash_points(&mut draw_cell)?;
         }
 
         for snake in &self.snakes {
-            snake.draw_crash_point(&mut draw_cell, &self.palette)?;
+            snake.draw_crash_point(&mut draw_cell)?;
         }
 
         for apple in &self.apples {

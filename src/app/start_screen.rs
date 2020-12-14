@@ -3,6 +3,24 @@ use ggez::{Context, GameResult};
 use super::palette::SnakePalette;
 use ggez::graphics::{clear, present, BLACK};
 use crate::app::Screen;
+use mint::Point2;
+use crate::app::snake::sim_snake::SimSnake;
+
+struct SnakeDemo {
+    top_left: Point2<f32>,
+    palette: SnakePalette,
+    sim_snake: SimSnake,
+}
+
+impl EventHandler for SnakeDemo {
+    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+        unimplemented!()
+    }
+
+    fn draw(&mut self, _ctx: &mut Context) -> GameResult<()> {
+        unimplemented!()
+    }
+}
 
 pub struct StartScreen {
     // options selected
