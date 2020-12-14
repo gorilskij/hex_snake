@@ -22,7 +22,7 @@ type SnakePaletteClosure = dyn Fn(usize, usize) -> Color;
 pub struct SnakePalette(Box<SnakePaletteClosure>);
 
 impl SnakePalette {
-    fn gradient(head: Color, tail: Color) -> Self {
+    pub fn gradient(head: Color, tail: Color) -> Self {
         Self(Box::new(move |seg, len| {
             let head_ratio = 1. - seg as f32 / (len - 1) as f32;
             let tail_ratio = 1. - head_ratio;
@@ -35,7 +35,7 @@ impl SnakePalette {
         }))
     }
 
-    fn rainbow() -> Self {
+    pub fn rainbow() -> Self {
         Self(Box::new(|seg, len| {
             let hue = 273. * seg as f64 / len as f64;
             let hsl = HSL { h: hue, s: 1., l: 0.4 };
@@ -43,7 +43,7 @@ impl SnakePalette {
         }))
     }
 
-    fn checker(on_step: usize, off_step: usize) -> Self {
+    pub fn checker(on_step: usize, off_step: usize) -> Self {
         Self(Box::new(move |seg, len| {
             if seg % (on_step + off_step) < on_step || seg == len - 1 {
                 WHITE
@@ -53,7 +53,7 @@ impl SnakePalette {
         }))
     }
 
-    fn sin(period: usize) -> Self {
+    pub fn sin(period: usize) -> Self {
         Self(Box::new(move |seg, len| {
             let x = seg as f32 * 2. * PI / period as f32;
             let l = (x.sin() + 1.) / 2.;
@@ -61,7 +61,7 @@ impl SnakePalette {
         }))
     }
 
-    fn rainbow_sin(period: usize) -> Self {
+    pub fn rainbow_sin(period: usize) -> Self {
         Self(Box::new(move |seg, len| {
             let x = seg as f32 * 2. * PI / period as f32;
             let l = (x.sin() + 1.) / 2.;
@@ -73,6 +73,8 @@ impl SnakePalette {
 }
 
 pub struct Palette {
+    pub line_thickness: f32,
+
     pub background_color: Color, // cell color
     pub foreground_color: Color, // line color
     pub apple_fill_color: Color,
@@ -91,6 +93,7 @@ impl Palette {
     pub fn light() -> Self {
         todo!()
         // Self {
+        //     line_thickness: 2.,
         //     background_color: WHITE,
         //     foreground_color: BLACK,
         //     apple_fill_color: Color::from_rgb(255, 0, 0),
@@ -112,6 +115,8 @@ impl Palette {
 
     pub fn dark() -> Self {
         Self {
+            line_thickness: 1.,
+
             background_color: BLACK,
             foreground_color: gray!(0.25),
             apple_fill_color: Color::from_rgb(255, 0, 0),

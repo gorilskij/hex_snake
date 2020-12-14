@@ -1,11 +1,40 @@
 pub use hex_pos::HexPos;
+pub use dir::Dir;
 use std::ops::{Deref, DerefMut};
-use crate::game::snake::Dir;
+
+mod dir {
+    use Dir::*;
+    use std::ops::Neg;
+
+    #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+    pub enum Dir {
+        U,
+        D,
+        UL,
+        UR,
+        DL,
+        DR,
+    }
+
+    impl Neg for Dir {
+        type Output = Self;
+
+        fn neg(self) -> Self::Output {
+            match self {
+                U => D,
+                D => U,
+                UL => DR,
+                UR => DL,
+                DL => UR,
+                DR => UL,
+            }
+        }
+    }
+}
 
 mod hex_pos {
-    use crate::game::snake::Dir;
+    use super::dir::Dir;
     use num_integer::Integer;
-    use rand::Rng;
     use std::fmt::{Debug, Error, Formatter};
     use Dir::*;
 

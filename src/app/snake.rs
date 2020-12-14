@@ -1,33 +1,9 @@
-use super::hex::{Hex, HexPos, HexType::*};
-use crate::game::{ctrl::Controls, hex::HexType, theme::Palette};
+use crate::app::hex::{Hex, HexPos, HexType::*, Dir, Dir::*};
 use ggez::{event::KeyCode, graphics::Color, GameResult};
 use std::{collections::VecDeque, ops::Neg};
-use Dir::*;
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum Dir {
-    U,
-    D,
-    UL,
-    UR,
-    DL,
-    DR,
-}
-
-impl Neg for Dir {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        match self {
-            U => D,
-            D => U,
-            UL => DR,
-            UR => DL,
-            DL => UR,
-            DR => UL,
-        }
-    }
-}
+use crate::app::hex::HexType;
+use crate::app::ctrl::Controls;
+use crate::app::palette::Palette;
 
 pub enum SnakeType {
     SinglePlayer,
@@ -130,7 +106,7 @@ impl Snake {
         }
     }
 
-    pub(in crate::game) fn draw_non_crash_points(
+    pub fn draw_non_crash_points(
         &self,
         draw_cell: &mut impl FnMut(usize, usize, Color, Option<Dir>) -> GameResult,
         palette: &Palette,
@@ -164,7 +140,7 @@ impl Snake {
         Ok(())
     }
 
-    pub(in crate::game) fn draw_crash_point(
+    pub fn draw_crash_point(
         &self,
         draw_cell: &mut impl FnMut(usize, usize, Color, Option<Dir>) -> GameResult,
         palette: &Palette,

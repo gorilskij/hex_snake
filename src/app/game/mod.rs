@@ -1,34 +1,22 @@
-use crate::game::{ctrl::Controls, snake::SnakeState};
-use effect::Effect;
-use ggez::{
-    conf::WindowMode,
-    event::{EventHandler, KeyMods},
-    graphics::*,
-    input::keyboard::KeyCode,
-    Context, GameError, GameResult,
-};
-use hex::{HexPos, HexType::*};
-use mint::{Point2, Vector2};
-use num_integer::Integer;
+use mint::Point2;
+use crate::app::hex::{HexPos, Hex};
+use crate::app::ctrl::{Controls, Ctrl};
+use crate::app::snake::{Snake, SnakeType, SnakeState};
 use rand::prelude::*;
-use snake::Snake;
-use std::{f32::consts::PI, thread};
-use theme::Theme;
-use tuple::Map;
-use crate::game::hex::{Hex, HexType};
-use crate::game::snake::{Dir, SnakeType};
-use ggez::conf::FullscreenType;
+use ggez::graphics::{Mesh, DrawParam, draw, clear, MeshBuilder, Color, DrawMode, Text, Font, Scale, present, Rect};
+use crate::app::game::effect::Effect;
+use ggez::conf::WindowMode;
+use crate::app::hex::{Dir, HexType};
+use ggez::event::{KeyCode, KeyMods, EventHandler};
+use std::thread;
+use ggez::{Context, GameResult};
+use std::f32::consts::PI;
+use crate::app::palette::Palette;
 use itertools::Itertools;
-use crate::game::ctrl::Ctrl;
+use num_integer::Integer;
+use tuple::Map;
 
 mod effect;
-mod hex;
-mod snake;
-pub mod theme;
-
-#[macro_use]
-#[allow(dead_code)]
-pub mod ctrl;
 
 // todo explain this (cos_len < sin_len) (120deg angle was used)
 #[derive(Copy, Clone)]
@@ -98,7 +86,7 @@ pub struct Game {
     apples: Vec<HexPos>,
 
     cell_dim: CellDim,
-    theme: Theme,
+    palette: Palette,
 
     apple_count: usize,
 
@@ -120,7 +108,7 @@ impl Game {
         }
     }
 
-    pub fn new(cell_side_len: f32, players: Vec<Ctrl>, theme: Theme, wm: WindowMode) -> Self {
+    pub fn new(cell_side_len: f32, players: Vec<Ctrl>, palette: Palette, wm: WindowMode) -> Self {
         assert!(!players.is_empty(), "No players specified");
         assert!(players.len() <= 2, "More than 2 players not supported");
 
@@ -185,7 +173,7 @@ impl Game {
             apples: vec![],
 
             cell_dim,
-            theme,
+            palette,
 
             apple_count: 5,
 
@@ -305,8 +293,8 @@ impl Game {
 
         let mut builder = MeshBuilder::new();
 
-        let draw_mode = DrawMode::stroke(self.theme.line_thickness);
-        let fg = self.theme.palette.foreground_color;
+        let draw_mode = DrawMode::stroke(self.palette.line_thickness);
+        let fg = self.palette.foreground_color;
         for h in 0..(self.dim.h + 1) / 2 {
             if h == 0 {
                 builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], fg)?;
@@ -358,7 +346,7 @@ impl Game {
 }
 
 impl EventHandler for Game {
-    fn update(&mut self, _ctx: &mut Context) -> Result<(), GameError> {
+    fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
         if self.state != GameState::Playing {
             return Ok(());
         }
@@ -395,7 +383,7 @@ impl EventHandler for Game {
         }
         for i in crashed_snake_indices {
             self.snakes[i].state = SnakeState::Crashed;
-            self.snakes[i].body[0].typ = Crashed;
+            self.snakes[i].body[0].typ = HexType::Crashed;
         }
 
         // check apple eating
@@ -403,7 +391,7 @@ impl EventHandler for Game {
             for i in (0..self.apples.len()).rev() {
                 if snake.body[0].pos == self.apples[i] {
                     self.apples.remove(i);
-                    snake.body[0].typ = Eaten(5);
+                    snake.body[0].typ = HexType::Eaten(5);
                 }
             }
         }
@@ -414,12 +402,12 @@ impl EventHandler for Game {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> Result<(), GameError> {
+    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         // NOTE: could be fun to implement optionally printing as a square grid
         // TODO: implement optional pushing to left-top (hiding part of the hexagon)
         // with 0, 0 the board is touching top-left (nothing hidden)
 
-        clear(ctx, self.theme.palette.background_color);
+        clear(ctx, self.palette.background_color);
 
         if self.prefs.draw_grid {
             // generate grid mesh first time, later reuse
@@ -496,18 +484,18 @@ impl EventHandler for Game {
 
         // draw snakes, crashed (collision) points on top
         for snake in &self.snakes {
-            snake.draw_non_crash_points(&mut draw_cell, &self.theme.palette)?;
+            snake.draw_non_crash_points(&mut draw_cell, &self.palette)?;
         }
 
         for snake in &self.snakes {
-            snake.draw_crash_point(&mut draw_cell, &self.theme.palette)?;
+            snake.draw_crash_point(&mut draw_cell, &self.palette)?;
         }
 
         for apple in &self.apples {
             draw_cell(
                 apple.h as usize,
                 apple.v as usize,
-                self.theme.palette.apple_fill_color,
+                self.palette.apple_fill_color,
                 None,
             )?
         }
