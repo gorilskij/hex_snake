@@ -1,6 +1,6 @@
 use crate::app::hex::{Hex, Dir, HexPos, HexType};
 use crate::app::snake::{SnakeState, Snake, SnakeController};
-use crate::app::ctrl::Controls;
+use crate::app::control::Controls;
 use std::collections::VecDeque;
 use ggez::event::KeyCode;
 use crate::app::palette::SnakePalette;

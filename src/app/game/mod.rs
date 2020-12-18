@@ -1,6 +1,6 @@
 use mint::Point2;
 use crate::app::hex::{HexPos, Hex};
-use crate::app::ctrl::{Controls, Ctrl};
+use crate::app::control::{Controls, ControlSetup};
 use rand::prelude::*;
 use ggez::graphics::{Mesh, DrawParam, draw, clear, MeshBuilder, Color, DrawMode, Text, Font, Scale, present, Rect};
 use crate::app::game::effect::Effect;
@@ -10,7 +10,7 @@ use ggez::event::{KeyCode, KeyMods, EventHandler};
 use std::thread;
 use ggez::{Context, GameResult};
 use std::f32::consts::PI;
-use crate::app::palette::{Palette, SnakePalette};
+use crate::app::palette::{GamePalette, SnakePalette};
 use itertools::Itertools;
 use num_integer::Integer;
 use tuple::Map;
@@ -126,12 +126,14 @@ enum GameState {
 
 struct Prefs {
     draw_grid: bool,
+    cut_on_eat: bool,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
         Self {
             draw_grid: true,
+            cut_on_eat: true,
         }
     }
 }
@@ -148,7 +150,7 @@ pub struct Game {
     apples: Vec<HexPos>,
 
     cell_dim: CellDim,
-    palette: Palette,
+    palette: GamePalette,
 
     apple_count: usize,
 
@@ -169,7 +171,7 @@ impl Game {
         }
     }
 
-    pub fn new(cell_side_len: f32, players: Vec<Ctrl>, palette: Palette, wm: WindowMode) -> Self {
+    pub fn new(cell_side_len: f32, players: Vec<ControlSetup>, palette: GamePalette, wm: WindowMode) -> Self {
         assert!(!players.is_empty(), "No players specified");
         assert!(players.len() <= 2, "More than 2 players not supported");
 
@@ -377,35 +379,57 @@ impl EventHandler for Game {
         }
 
         // check for crashes
+        // [(crashed, into), ...]
         let mut crashed_snake_indices = vec![];
         'outer: for (i, snake) in self.snakes.iter().enumerate() {
             for (j, other) in self.snakes.iter().enumerate() {
                 // check head-head crash
                 if i != j && snake.body[0].pos == other.body[0].pos {
                     // snake j will be added when it's reached by the outer loop
-                    crashed_snake_indices.push(i);
-                    self.state = GameState::Crashed;
+                    crashed_snake_indices.push((i, j));
                     continue 'outer;
                 }
 
                 // check head-body crash (this also checks if a snake crashed with itself)
                 for segment in &other.body[1..] {
                     if snake.body[0].pos == segment.pos {
-                        crashed_snake_indices.push(i);
-                        self.state = GameState::Crashed;
+                        crashed_snake_indices.push((i, j));
                         continue 'outer;
                     }
                 }
             }
         }
-        for i in crashed_snake_indices {
-            self.snakes[i].state = SnakeState::Crashed;
-            self.snakes[i].body[0].typ = HexType::Crashed;
+
+        if self.prefs.cut_on_eat {
+            // TODO: this might do weird things with head-to-head collisions
+            for (i, j) in crashed_snake_indices {
+                let crash_point = self.snakes[i].body[0].pos;
+                let drain_start_idx = self.snakes[j].body[1..]
+                    .iter()
+                    .position(|Hex { pos, .. }| *pos == crash_point)
+                    .unwrap_or_else(|| panic!("point {:?} not found in snake of index {}", crash_point, j));
+                self.snakes[j].body.drain(drain_start_idx + 1 ..);
+                self.snakes[j].grow = 0;
+            }
+        } else {
+            if !crashed_snake_indices.is_empty() {
+                self.state = GameState::Crashed;
+            }
+            for (i, _) in crashed_snake_indices {
+                self.snakes[i].state = SnakeState::Crashed;
+                self.snakes[i].body[0].typ = HexType::Crashed;
+            }
         }
 
+
         // check apple eating
+        let mut k = -1;
         for snake in &mut self.snakes {
+            k += 1;
             for i in (0..self.apples.len()).rev() {
+                if snake.body.is_empty() {
+                    panic!("snake {} is empty", k);
+                }
                 if snake.body[0].pos == self.apples[i] {
                     self.apples.remove(i);
                     snake.body[0].typ = HexType::Eaten(5);
@@ -535,7 +559,16 @@ impl EventHandler for Game {
                     "Grid off"
                 };
                 self.message = Some(Message(message.to_string(), 100));
-            },
+            }
+            C => {
+                self.prefs.cut_on_eat = !self.prefs.cut_on_eat;
+                let message = if self.prefs.cut_on_eat {
+                    "Cut on eat"
+                } else {
+                    "Die on eat"
+                };
+                self.message = Some(Message(message.to_string(), 100));
+            }
             k => if self.state == Playing {
                 for snake in &mut self.snakes {
                     snake.controller.key_pressed(k)
@@ -545,14 +578,7 @@ impl EventHandler for Game {
     }
 
     // TODO: forbid resizing in-game
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        ggez::graphics::set_screen_coordinates(ctx, Rect {
-            x: 0.0,
-            y: 0.0,
-            w: width,
-            h: height,
-        }).unwrap();
-
+    fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
         let new_dim = Self::wh_to_dim(self.cell_dim, width, height);
         self.dim = new_dim;
 

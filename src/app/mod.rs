@@ -1,17 +1,18 @@
-use ggez::event::EventHandler;
+use ggez::event::{EventHandler, KeyMods, KeyCode};
 use crate::app::start_screen::StartScreen;
 use ggez::conf::{WindowMode, WindowSetup, FullscreenType, NumSamples};
 use ggez::{Context, GameResult};
 use crate::app::game::Game;
 use std::ops::{DerefMut, Deref};
+use crate::app::control::{ControlSetup, KeyboardLayout, Side};
+use crate::app::palette::GamePalette;
+use ggez::graphics::Rect;
 
 mod start_screen;
 mod game;
 mod hex;
 mod snake;
-#[macro_use]
-#[allow(dead_code)]
-pub mod ctrl;
+pub mod control;
 mod palette;
 
 pub enum Screen {
@@ -72,8 +73,19 @@ impl App {
         };
 
         Self {
-            screen: Screen::StartScreen(StartScreen::new()),
-            // screen: Box::new(Game::new()),
+            // screen: Screen::StartScreen(StartScreen::new()),
+            screen: Screen::Game(Game::new(10., vec![
+                ControlSetup {
+                    layout: KeyboardLayout::Dvorak,
+                    keyboard_side: Side::RightSide,
+                    hand: Side::RightSide,
+                },
+                // ControlSetup {
+                //     layout: KeyboardLayout::Dvorak,
+                //     keyboard_side: Side::LeftSide,
+                //     hand: Side::RightSide,
+                // },
+            ], GamePalette::dark(), wm.clone())),
             wm,
             ws
         }
@@ -89,7 +101,7 @@ impl App {
 }
 
 impl EventHandler for App {
-    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
         if let Screen::StartScreen(start_screen) = &self.screen {
             if let Some(next_screen) = start_screen.next_screen() {
                 self.screen = next_screen
@@ -98,7 +110,22 @@ impl EventHandler for App {
         self.screen.update(ctx)
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+    fn draw(&mut self, ctx: &mut Context) -> GameResult {
         self.screen.draw(ctx)
+    }
+
+    fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, mods: KeyMods, repeat: bool) {
+        self.screen.key_down_event(ctx, key, mods, repeat)
+    }
+
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
+        ggez::graphics::set_screen_coordinates(ctx, Rect {
+            x: 0.0,
+            y: 0.0,
+            w: width,
+            h: height,
+        }).unwrap();
+
+        self.screen.resize_event(ctx, width, height);
     }
 }

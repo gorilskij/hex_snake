@@ -10,18 +10,18 @@ pub struct Controls {
     pub dr: KeyCode,
 }
 
-pub enum CtrlLayout { Qwerty, Dvorak }
-pub enum CtrlSide { LeftSide, RightSide }
-pub struct Ctrl {
-    pub layout: CtrlLayout,
-    pub keyboard_side: CtrlSide,
-    pub hand: CtrlSide,
+pub enum KeyboardLayout { Qwerty, Dvorak }
+pub enum Side { LeftSide, RightSide }
+pub struct ControlSetup {
+    pub layout: KeyboardLayout,
+    pub keyboard_side: Side,
+    pub hand: Side,
 }
 
-impl Into<Controls> for Ctrl {
+impl Into<Controls> for ControlSetup {
     fn into(self) -> Controls {
-        use CtrlLayout::*;
-        use CtrlSide::*;
+        use KeyboardLayout::*;
+        use Side::*;
         use ggez::input::keyboard::KeyCode::*;
         match (self. layout, self.keyboard_side, self.hand) {
             (Dvorak, RightSide, RightSide) => Controls { ul: H, u: T, ur: N, dl: M, d: W, dr: V },

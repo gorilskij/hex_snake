@@ -110,7 +110,7 @@ impl SnakePalette {
     }
 }
 
-pub struct Palette {
+pub struct GamePalette {
     pub line_thickness: f32,
 
     pub background_color: Color, // cell color
@@ -123,7 +123,7 @@ pub struct Palette {
 }
 
 #[allow(dead_code)]
-impl Palette {
+impl GamePalette {
     pub fn light() -> Self {
         todo!()
         // Self {
