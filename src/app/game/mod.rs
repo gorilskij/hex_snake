@@ -16,9 +16,10 @@ use crate::app::game::effect::Effect;
 use crate::app::hex::{Hex, HexPos};
 use crate::app::hex::{Dir, HexType};
 use crate::app::palette::{GamePalette, SnakePalette};
-use crate::app::snake::{draw_cell, Snake, SnakeState};
+use crate::app::snake::{build_cell, Snake, SnakeState};
 use crate::app::snake::player_controller::PlayerController;
 use crate::app::snake::SnakeController;
+use std::time::{Instant, Duration};
 
 mod effect;
 
@@ -37,86 +38,64 @@ impl From<f32> for CellDim {
     }
 }
 
-// TODO: base framerate on time, not ggez, check guarantees
-// ggez frames per game frame
-struct FramesPerFrame(u8, u8);
+struct FPSControl {
+    frame_duration: Duration,
+    last: Instant,
+    drawn: bool,
+}
 
-impl FramesPerFrame {
-    fn new(fpf: u8) -> Self {
-        Self(fpf, 0)
+impl FPSControl {
+    fn new(fps: u64) -> Self {
+        Self {
+            frame_duration: Duration::from_micros(1_000_000 / fps),
+            last: Instant::now(),
+            drawn: false,
+        }
     }
-    fn advance(&mut self) -> bool {
-        self.1 += 1;
-        if self.1 == self.0 {
-            self.1 = 0;
+
+    fn maybe_update(&mut self) -> bool {
+        if self.last.elapsed() >= self.frame_duration {
+            self.last = Instant::now();
+            self.drawn = false;
             true
         } else {
             false
         }
     }
-}
 
-pub struct HexagonPoints {
-    pub full: [Point2<f32>; 6],
-    pub u: [Point2<f32>; 4],
-    pub d: [Point2<f32>; 4],
-    pub ul: [Point2<f32>; 4],
-    pub ur: [Point2<f32>; 4],
-    pub dl: [Point2<f32>; 4],
-    pub dr: [Point2<f32>; 4],
-}
-
-lazy_static! {
-    pub static ref HEXAGON_POINTS: HexagonPoints = {
-        let CellDim { side, sin, cos } = CellDim::from(10.);
-
-        HexagonPoints {
-            full: [
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: side + cos, y: 2. * sin },
-                Point2 { x: cos, y: 2. * sin },
-                Point2 { x: 0., y: sin },
-            ],
-            u: [
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: 0., y: sin },
-            ],
-            d: [
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: side + cos, y: 2. * sin },
-                Point2 { x: cos, y: 2. * sin },
-                Point2 { x: 0., y: sin },
-            ],
-            ul: [
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: cos, y: 2. * sin },
-                Point2 { x: 0., y: sin },
-            ],
-            ur: [
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: side + cos, y: 2. * sin },
-            ],
-            dl: [
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 2. * sin },
-                Point2 { x: cos, y: 2. * sin },
-                Point2 { x: 0., y: sin },
-            ],
-            dr: [
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: side + cos, y: 2. * sin },
-                Point2 { x: cos, y: 2. * sin },
-            ],
+    fn maybe_draw(&mut self) -> bool {
+        if self.drawn {
+            false
+        } else {
+            self.drawn = true;
+            true
         }
-    };
+    }
+}
+
+type HexagonPoints = [Point2<f32>; 6];
+static mut CACHED_HEXAGON_POINTS: Option<(f32, HexagonPoints)> = None;
+
+pub fn hexagon_points(side: f32) -> HexagonPoints {
+    unsafe {
+        if let Some((cached_side, points)) = CACHED_HEXAGON_POINTS {
+            if side == cached_side {
+                return points;
+            }
+        }
+
+        let CellDim { sin, cos, .. } = CellDim::from(side);
+        let points = [
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + cos, y: 0. },
+            Point2 { x: side + 2. * cos, y: sin },
+            Point2 { x: side + cos, y: 2. * sin },
+            Point2 { x: cos, y: 2. * sin },
+            Point2 { x: 0., y: sin },
+        ];
+        CACHED_HEXAGON_POINTS = Some((side, points));
+        points
+    }
 }
 
 #[derive(Eq, PartialEq)]
@@ -144,7 +123,7 @@ struct Message(String, u8);
 
 pub struct Game {
     state: GameState,
-    fpf: FramesPerFrame,
+    fps: FPSControl,
 
     dim: HexPos,
     players: Vec<Controls>,
@@ -182,7 +161,7 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            fpf: FramesPerFrame::new(5),
+            fps: FPSControl::new(12),
 
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
             players: players.into_iter().map(Into::into).collect(),
@@ -402,7 +381,7 @@ impl EventHandler for Game {
             return Ok(());
         }
 
-        if !self.fpf.advance() {
+        if !self.fps.maybe_update() {
             return Ok(());
         }
 
@@ -480,6 +459,14 @@ impl EventHandler for Game {
         // TODO: implement optional pushing to left-top (hiding part of the hexagon)
         // with 0, 0 the board is touching top-left (nothing hidden)
 
+        if self.state == GameState::Paused {
+            return Ok(());
+        }
+
+        if !self.fps.maybe_draw() {
+            return Ok(());
+        }
+
         clear(ctx, self.palette.background_color);
 
         // generate grid mesh first time, later reuse
@@ -528,26 +515,19 @@ impl EventHandler for Game {
         //     }
         // }
 
-        let mut builder = MeshBuilder::new();
-
-        let mut dc = |h, v, c, dir| draw_cell(&mut builder, h, v, c, dir);
+        let builder = &mut MeshBuilder::new();
 
         // draw snakes, crashed (collision) points on top
         for snake in &mut self.snakes {
-            snake.draw_non_crash_points(&mut dc)?;
+            snake.draw_non_crash_points(builder, self.cell_dim)?;
         }
 
         for snake in &self.snakes {
-            snake.draw_crash_point(&mut dc)?;
+            snake.draw_crash_point(builder, self.cell_dim)?;
         }
 
         for apple in &self.apples {
-            dc(
-                apple.h as usize,
-                apple.v as usize,
-                self.palette.apple_color,
-                None,
-            )?
+            build_cell(builder, *apple, self.palette.apple_color, self.cell_dim)?
         }
 
         let mesh = &builder.build(ctx)?;

@@ -2,7 +2,7 @@ use ggez::{event::KeyCode, GameResult, graphics::Color};
 use ggez::graphics::{DrawMode, MeshBuilder};
 use mint::Point2;
 
-use crate::app::game::{CellDim, HEXAGON_POINTS};
+use crate::app::game::{CellDim, hexagon_points};
 use crate::app::hex::{Dir, Hex, HexPos, HexType::*};
 use crate::app::hex::HexType;
 use crate::app::palette::SnakePalette;
@@ -103,7 +103,8 @@ impl<C: SnakeController> Snake<C> {
 
     pub fn draw_non_crash_points(
         &mut self,
-        draw_cell: &mut impl FnMut(usize, usize, Color, Option<Dir>) -> GameResult,
+        builder: &mut MeshBuilder,
+        cell_dim: CellDim,
     ) -> GameResult {
         let len = self.body.len();
         for (i, segment) in self.body.iter().enumerate() {
@@ -113,13 +114,7 @@ impl<C: SnakeController> Snake<C> {
                 Eaten(_) => self.palette.eaten_color.paint_segment(i, len),
             };
 
-            match segment.teleported {
-                None => draw_cell(segment.h as usize, segment.v as usize, color, None)?,
-                Some(dir) => {
-                    draw_cell(segment.h as usize, segment.v as usize, color, Some(-dir))?;
-                    draw_cell(segment.h as usize, segment.v as usize, self.palette.portal_color, Some(dir))?;
-                },
-            }
+            build_cell(builder, segment.pos, color, cell_dim)?;
         }
 
         Ok(())
@@ -127,46 +122,35 @@ impl<C: SnakeController> Snake<C> {
 
     pub fn draw_crash_point(
         &self,
-        draw_cell: &mut impl FnMut(usize, usize, Color, Option<Dir>) -> GameResult,
+        builder: &mut MeshBuilder,
+        cell_dim: CellDim,
     ) -> GameResult {
         if self.body[0].typ == Crashed {
-            draw_cell(
-                self.body[0].h as usize,
-                self.body[0].v as usize,
-                self.palette.crashed_color,
-                None,
-            )?
+            build_cell(builder, self.body[0].pos, self.palette.crashed_color, cell_dim)?;
         }
         Ok(())
     }
 }
 
-pub fn draw_cell(builder: &mut MeshBuilder, h: usize, v: usize, c: Color, dir: Option<Dir>) -> GameResult {
-    let cell_dim = CellDim::from(10.);
+#[inline(always)]
+pub fn build_cell(
+    builder: &mut MeshBuilder,
+    HexPos { h, v }: HexPos,
+    color: Color,
+    CellDim { side, sin, cos }: CellDim,
+) -> GameResult {
+    let offset_x = h as f32 * (side + cos);
+    let offset_y = v as f32 * 2. * sin + if h % 2 == 0 { 0. } else { sin };
 
-    let offset_x = h as f32 * (cell_dim.side + cell_dim.cos);
-    let offset_y =
-        v as f32 * 2. * cell_dim.sin + if h % 2 == 0 { 0. } else { cell_dim.sin };
-
-    use Dir::*;
-    let points: &[_] = match dir {
-        None => &HEXAGON_POINTS.full,
-        Some(U) => &HEXAGON_POINTS.u,
-        Some(D) => &HEXAGON_POINTS.d,
-        Some(UL) => &HEXAGON_POINTS.ul,
-        Some(UR) => &HEXAGON_POINTS.ur,
-        Some(DL) => &HEXAGON_POINTS.dl,
-        Some(DR) => &HEXAGON_POINTS.dr,
-    };
-
-    let translated_points = points
+    let translated_points = hexagon_points(side)
         .iter()
         .map(|Point2 { x, y }| Point2 {
             x: x + offset_x,
             y: y + offset_y,
         })
         .collect::<Vec<_>>();
+
     builder
-        .polyline(DrawMode::fill(), &translated_points, c)
+        .polygon(DrawMode::fill(), &translated_points, color)
         .map(|_| ())
 }

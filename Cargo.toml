@@ -14,3 +14,6 @@ num-integer = "~0.1"
 itertools = "0.9.0"
 hsl = "0.1.1"
 lazy_static = "1.4.0"
+
+[profile.release]
+debug = true

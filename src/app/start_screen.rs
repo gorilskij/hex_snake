@@ -4,19 +4,21 @@ use ggez::graphics::{BLACK, clear, draw, DrawParam, MeshBuilder, present};
 
 use crate::app::hex::{Dir, Hex, HexPos, HexType};
 use crate::app::Screen;
-use crate::app::snake::{draw_cell, Snake, SnakeState};
+use crate::app::snake::{Snake, SnakeState};
 use crate::app::snake::demo_controller::{DemoController, SimMove};
 
 use super::palette::SnakePalette;
+use crate::app::game::CellDim;
 
 struct SnakeDemo {
     top_left: HexPos,
     palette: SnakePalette,
     snake: Snake<DemoController>,
+    cell_dim: CellDim,
 }
 
 impl SnakeDemo {
-    fn new(top_left: HexPos) -> Self {
+    fn new(top_left: HexPos, cell_dim: CellDim) -> Self {
         let pos = top_left + HexPos { h: 0, v: -5 };
         Self {
             top_left,
@@ -45,6 +47,7 @@ impl SnakeDemo {
                 ]),
                 game_dim: HexPos { h: 20, v: 20 },
             },
+            cell_dim,
         }
     }
 }
@@ -56,11 +59,10 @@ impl EventHandler for SnakeDemo {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        let mut builder = MeshBuilder::new();
-        let mut dc = |h, v, c, dir| draw_cell(&mut builder, h, v, c, dir);
-        self.snake.draw_non_crash_points(&mut dc)?;
-        let mesh = &builder.build(ctx)?;
-        draw(ctx, mesh, DrawParam::default())?;
+        let builder = &mut MeshBuilder::new();
+        self.snake.draw_non_crash_points(builder, self.cell_dim)?;
+        let mesh = builder.build(ctx)?;
+        draw(ctx, &mesh, DrawParam::default())?;
         Ok(())
     }
 }
@@ -88,7 +90,7 @@ impl StartScreen {
             player1_palette_idx: 0,
             player2_palette_idx: 0,
 
-            player1_demo: SnakeDemo::new(HexPos { h: 10, v: 10 }),
+            player1_demo: SnakeDemo::new(HexPos { h: 10, v: 10 }, CellDim::from(10.)),
             player2_demo: None,
         }
     }
