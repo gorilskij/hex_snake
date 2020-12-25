@@ -1,13 +1,13 @@
-use ggez::event::EventHandler;
 use ggez::{Context, GameResult};
-use super::palette::SnakePalette;
-use ggez::graphics::{clear, present, BLACK, Color, DrawMode, MeshBuilder, draw, DrawParam};
+use ggez::event::EventHandler;
+use ggez::graphics::{BLACK, clear, draw, DrawParam, MeshBuilder, present};
+
+use crate::app::hex::{Dir, Hex, HexPos, HexType};
 use crate::app::Screen;
-use mint::Point2;
-use crate::app::snake::sim_snake::{DemoController, SimMove};
-use crate::app::snake::{Snake, SnakeState, draw_cell};
-use crate::app::hex::{HexPos, Dir, Hex, HexType};
-use crate::app::game::{CellDim, HEXAGON_POINTS};
+use crate::app::snake::{draw_cell, Snake, SnakeState};
+use crate::app::snake::demo_controller::{DemoController, SimMove};
+
+use super::palette::SnakePalette;
 
 struct SnakeDemo {
     top_left: HexPos,
@@ -17,7 +17,7 @@ struct SnakeDemo {
 
 impl SnakeDemo {
     fn new(top_left: HexPos) -> Self {
-        let mut pos = top_left + HexPos { h: 0, v: -5 };
+        let pos = top_left + HexPos { h: 0, v: -5 };
         Self {
             top_left,
             palette: SnakePalette::gray_gradient(),
@@ -58,7 +58,7 @@ impl EventHandler for SnakeDemo {
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         let mut builder = MeshBuilder::new();
         let mut dc = |h, v, c, dir| draw_cell(&mut builder, h, v, c, dir);
-        self.snake.draw_non_crash_points(&mut dc);
+        self.snake.draw_non_crash_points(&mut dc)?;
         let mesh = &builder.build(ctx)?;
         draw(ctx, mesh, DrawParam::default())?;
         Ok(())

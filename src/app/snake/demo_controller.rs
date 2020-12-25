@@ -1,6 +1,5 @@
-use crate::app::snake::{Snake, SnakeController};
-use crate::app::hex::{Hex, Dir, HexPos};
-use crate::app::palette::SnakePalette;
+use crate::app::hex::Dir;
+use crate::app::snake::SnakeController;
 
 pub enum SimMove {
     Move(Dir),

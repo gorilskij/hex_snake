@@ -1,15 +1,8 @@
-use crate::app::hex::{Hex, Dir, HexPos, HexType};
-use crate::app::snake::{SnakeState, Snake, SnakeController};
+use crate::app::hex::Dir;
+use crate::app::snake::SnakeController;
 use crate::app::control::Controls;
 use std::collections::VecDeque;
 use ggez::event::KeyCode;
-use crate::app::palette::SnakePalette;
-
-pub enum PlayerSnakeType {
-    SinglePlayer,
-    Player1,
-    Player2,
-}
 
 pub struct PlayerController {
     controls: Controls,
@@ -60,19 +53,4 @@ impl SnakeController for PlayerController {
             self.control_queue.push_back(new_dir)
         }
     }
-}
-
-pub struct PlayerSnake {
-    snake_type: PlayerSnakeType,
-    palette: SnakePalette,
-
-    pub body: Vec<Hex>,
-    growing: usize,
-    dir: Dir,
-    pub game_dim: HexPos,
-
-    pub state: SnakeState,
-
-    pub ctrl: Controls,
-    ctrl_queue: VecDeque<Dir>,
 }

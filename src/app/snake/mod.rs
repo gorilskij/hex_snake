@@ -1,15 +1,14 @@
-use crate::app::hex::{Hex, HexPos, HexType::*, Dir, Dir::*};
-use ggez::{event::KeyCode, graphics::Color, GameResult};
-use std::{collections::VecDeque, ops::Neg};
-use crate::app::hex::HexType;
-use crate::app::control::Controls;
-use crate::app::palette::{GamePalette, SnakePalette};
-use ggez::graphics::{MeshBuilder, DrawMode};
+use ggez::{event::KeyCode, GameResult, graphics::Color};
+use ggez::graphics::{DrawMode, MeshBuilder};
 use mint::Point2;
-use crate::app::game::{CellDim, HEXAGON_POINTS};
 
-pub mod player_snake;
-pub mod sim_snake;
+use crate::app::game::{CellDim, HEXAGON_POINTS};
+use crate::app::hex::{Dir, Hex, HexPos, HexType::*};
+use crate::app::hex::HexType;
+use crate::app::palette::SnakePalette;
+
+pub mod player_controller;
+pub mod demo_controller;
 
 #[derive(Eq, PartialEq)]
 pub enum SnakeState {
@@ -103,15 +102,15 @@ impl<C: SnakeController> Snake<C> {
     }
 
     pub fn draw_non_crash_points(
-        &self,
+        &mut self,
         draw_cell: &mut impl FnMut(usize, usize, Color, Option<Dir>) -> GameResult,
     ) -> GameResult {
         let len = self.body.len();
         for (i, segment) in self.body.iter().enumerate() {
             let color = match segment.typ {
                 Crashed => continue,
-                Normal => self.palette.segment_color.as_ref()(i, len),
-                Eaten(_) => self.palette.eaten_color.as_ref()(i, len),
+                Normal => self.palette.segment_color.paint_segment(i, len),
+                Eaten(_) => self.palette.eaten_color.paint_segment(i, len),
             };
 
             match segment.teleported {

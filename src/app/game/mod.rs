@@ -1,21 +1,23 @@
-use mint::Point2;
-use crate::app::hex::{HexPos, Hex};
-use crate::app::control::{Controls, ControlSetup};
-use rand::prelude::*;
-use ggez::graphics::{Mesh, DrawParam, draw, clear, MeshBuilder, Color, DrawMode, Text, Font, Scale, present, Rect};
-use crate::app::game::effect::Effect;
-use ggez::conf::WindowMode;
-use crate::app::hex::{Dir, HexType};
-use ggez::event::{KeyCode, KeyMods, EventHandler};
-use std::thread;
-use ggez::{Context, GameResult};
 use std::f32::consts::PI;
-use crate::app::palette::{GamePalette, SnakePalette};
+use std::thread;
+
+use ggez::{Context, GameResult};
+use ggez::conf::WindowMode;
+use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::graphics::{clear, Color, draw, DrawMode, DrawParam, Font, Mesh, MeshBuilder, present, Scale, Text};
 use itertools::Itertools;
+use mint::Point2;
 use num_integer::Integer;
+use rand::prelude::*;
 use tuple::Map;
-use crate::app::snake::player_snake::{PlayerSnakeType, PlayerSnake, PlayerController};
-use crate::app::snake::{SnakeState, Snake, draw_cell};
+
+use crate::app::control::{Controls, ControlSetup};
+use crate::app::game::effect::Effect;
+use crate::app::hex::{Hex, HexPos};
+use crate::app::hex::{Dir, HexType};
+use crate::app::palette::{GamePalette, SnakePalette};
+use crate::app::snake::{draw_cell, Snake, SnakeState};
+use crate::app::snake::player_controller::PlayerController;
 use crate::app::snake::SnakeController;
 
 mod effect;
@@ -156,6 +158,7 @@ pub struct Game {
 
     rng: ThreadRng,
     grid_mesh: Option<Mesh>,
+    border_mesh: Option<Mesh>,
     effect: Option<Effect>,
 
     prefs: Prefs,
@@ -193,6 +196,7 @@ impl Game {
 
             rng: thread_rng(),
             grid_mesh: None,
+            border_mesh: None,
             effect: None,
 
             prefs: Prefs::default(),
@@ -211,7 +215,8 @@ impl Game {
             &[controls] => {
                 self.snakes.push(Snake::from((
                     self.dim / 2,
-                    SnakePalette::rainbow(),
+                    SnakePalette::persistent_rainbow(),
+                    // SnakePalette::checker(1, 10),
                     Dir::U,
                     10,
                     PlayerController::new(controls),
@@ -232,7 +237,7 @@ impl Game {
                     SnakePalette::rainbow(),
                     Dir::U,
                     10,
-                    PlayerController::new(controls1),
+                    PlayerController::new(controls2),
                     self.dim,
                 )));
             }
@@ -295,7 +300,7 @@ impl Game {
         }
     }
 
-    fn generate_grid_mesh(&self, ctx: &mut Context) -> GameResult<Mesh> {
+    fn generate_meshes(&self, ctx: &mut Context) -> GameResult<(Mesh, Mesh)> {
         let CellDim { side, sin, cos } = self.cell_dim;
 
         // two kinds of alternating vertical lines
@@ -310,62 +315,89 @@ impl Game {
             vline_b.push(Point2 { x: 2. * cos + side, y: dv + sin });
         }
 
-        let mut builder = MeshBuilder::new();
+        let first_vline_a = vline_a.iter().copied().collect::<Vec<_>>();
+        let mut last_vline_b = vec![];
 
-        let draw_mode = DrawMode::stroke(self.palette.line_thickness);
-        let fg = self.palette.foreground_color;
-        for h in 0..(self.dim.h + 1) / 2 {
-            if h == 0 {
-                builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], fg)?;
-            } else {
-                builder.polyline(draw_mode, &vline_a, fg)?;
-            }
-            if self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1 {
-                builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], fg)?;
-            } else {
-                builder.polyline(draw_mode, &vline_b, fg)?;
-            }
+        let grid_mesh = {
+            let mut builder = MeshBuilder::new();
 
-            let dh = h as f32 * (2. * side + 2. * cos);
+            let draw_mode = DrawMode::stroke(self.palette.grid_thickness);
+            let color = self.palette.grid_color;
+            for h in 0..(self.dim.h + 1) / 2 {
+                if h == 0 {
+                    builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
+                } else {
+                    builder.polyline(draw_mode, &vline_a, color)?;
+                }
+                if self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1 {
+                    builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
+                } else {
+                    builder.polyline(draw_mode, &vline_b, color)?;
+                }
 
-            for v in 0..=self.dim.v {
-                let dv = v as f32 * 2. * sin;
+                if h == (self.dim.h + 1) / 2 - 1 {
+                    if self.dim.h.is_odd() {
+                        last_vline_b = vline_b[..vline_b.len() - 1].iter().copied().collect();
+                    } else {
+                        last_vline_b = vline_b.iter().copied().collect();
+                    }
+                }
 
-                // line between a and b
-                builder.line(
-                    &[
-                        Point2 { x: cos + dh, y: dv },
-                        Point2 { x: cos + side + dh, y: dv },
-                    ], 2., fg,
-                )?;
+                let dh = h as f32 * (2. * side + 2. * cos);
 
-                // line between b and a
-                if !(self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1) {
+                for v in 0..=self.dim.v {
+                    let dv = v as f32 * 2. * sin;
+
+                    // line between a and b
                     builder.line(
                         &[
-                            Point2 { x: 2. * cos + side + dh, y: sin + dv },
-                            Point2 { x: 2. * cos + 2. * side + dh, y: sin + dv },
-                        ], 2., fg,
+                            Point2 { x: cos + dh, y: dv },
+                            Point2 { x: cos + side + dh, y: dv },
+                        ], 2., color,
                     )?;
+
+                    // line between b and a
+                    if !(self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1) {
+                        builder.line(
+                            &[
+                                Point2 { x: 2. * cos + side + dh, y: sin + dv },
+                                Point2 { x: 2. * cos + 2. * side + dh, y: sin + dv },
+                            ], 2., color,
+                        )?;
+                    }
                 }
+
+                // shift the lines right by 2 cells
+                let offset = 2. * (side + cos);
+                vline_a.iter_mut().for_each(|a| a.x += offset);
+                vline_b.iter_mut().for_each(|b| b.x += offset);
+            }
+            if self.dim.h.is_even() {
+                builder.polyline(draw_mode, &vline_a[1..], color)?;
             }
 
-            // shift the lines right by 2 cells
-            for (a, b) in vline_a.iter_mut().zip(&mut vline_b) {
-                a.x += 2. * (side + cos);
-                b.x += 2. * (side + cos);
-            }
-        }
-        if self.dim.h.is_even() {
-            builder.polyline(draw_mode, &vline_a[1..], fg)?;
-        }
+            builder.build(ctx)?
+        };
 
-        builder.build(ctx)
+        assert!(!last_vline_b.is_empty());
+
+        let border_mesh = {
+            let mut builder = MeshBuilder::new();
+
+            let draw_mode = DrawMode::stroke(self.palette.border_thickness);
+            let color = self.palette.border_color;
+            builder.polyline(draw_mode, &first_vline_a[..first_vline_a.len() - 1], color)?;
+            builder.polyline(draw_mode, &last_vline_b, color)?;
+
+            builder.build(ctx)?
+        };
+
+        Ok((grid_mesh, border_mesh))
     }
 }
 
 impl EventHandler for Game {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
+    fn update(&mut self, _ctx: &mut Context) -> GameResult {
         if self.state != GameState::Playing {
             return Ok(());
         }
@@ -408,7 +440,7 @@ impl EventHandler for Game {
                     .iter()
                     .position(|Hex { pos, .. }| *pos == crash_point)
                     .unwrap_or_else(|| panic!("point {:?} not found in snake of index {}", crash_point, j));
-                self.snakes[j].body.drain(drain_start_idx + 1 ..);
+                self.snakes[j].body.drain(drain_start_idx + 1..);
                 self.snakes[j].grow = 0;
             }
         } else {
@@ -443,20 +475,23 @@ impl EventHandler for Game {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+    fn draw(&mut self, ctx: &mut Context) -> GameResult {
         // NOTE: could be fun to implement optionally printing as a square grid
         // TODO: implement optional pushing to left-top (hiding part of the hexagon)
         // with 0, 0 the board is touching top-left (nothing hidden)
 
         clear(ctx, self.palette.background_color);
 
+        // generate grid mesh first time, later reuse
+        if self.grid_mesh.is_none() || self.border_mesh.is_none() {
+            let (gm, bm) = self.generate_meshes(ctx)?;
+            self.grid_mesh = Some(gm);
+            self.border_mesh = Some(bm);
+        }
         if self.prefs.draw_grid {
-            // generate grid mesh first time, later reuse
-            if self.grid_mesh.is_none() {
-                self.grid_mesh = Some(self.generate_grid_mesh(ctx)?);
-            }
             draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
         }
+        // draw(ctx, self.border_mesh.as_ref().unwrap(), DrawParam::default())?;
 
         // TODO: improve effect drawing and move it somewhere else
         // if let Some(Effect::SmallHex {
@@ -498,7 +533,7 @@ impl EventHandler for Game {
         let mut dc = |h, v, c, dir| draw_cell(&mut builder, h, v, c, dir);
 
         // draw snakes, crashed (collision) points on top
-        for snake in &self.snakes {
+        for snake in &mut self.snakes {
             snake.draw_non_crash_points(&mut dc)?;
         }
 
@@ -510,7 +545,7 @@ impl EventHandler for Game {
             dc(
                 apple.h as usize,
                 apple.v as usize,
-                self.palette.apple_fill_color,
+                self.palette.apple_color,
                 None,
             )?
         }
