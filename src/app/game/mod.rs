@@ -12,7 +12,6 @@ use rand::prelude::*;
 use tuple::Map;
 
 use crate::app::control::{Controls, ControlSetup};
-use crate::app::game::effect::Effect;
 use crate::app::hex::{Hex, HexPos};
 use crate::app::hex::{Dir, HexType};
 use crate::app::palette::{GamePalette, SnakePalette};
@@ -21,9 +20,7 @@ use crate::app::snake::player_controller::PlayerController;
 use crate::app::snake::SnakeController;
 use std::time::{Instant, Duration};
 
-mod effect;
-
-// todo explain this (cos_len < sin_len) (120deg angle was used)
+// TODO document
 #[derive(Copy, Clone)]
 pub struct CellDim {
     pub side: f32,
@@ -138,10 +135,11 @@ pub struct Game {
     rng: ThreadRng,
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
-    effect: Option<Effect>,
 
     prefs: Prefs,
     message: Option<Message>,
+
+    force_redraw: usize, // for a number of redraws, even when paused
 }
 
 impl Game {
@@ -176,10 +174,11 @@ impl Game {
             rng: thread_rng(),
             grid_mesh: None,
             border_mesh: None,
-            effect: None,
 
             prefs: Prefs::default(),
             message: None,
+
+            force_redraw: 0,
         };
         game.restart();
         game
@@ -459,12 +458,16 @@ impl EventHandler for Game {
         // TODO: implement optional pushing to left-top (hiding part of the hexagon)
         // with 0, 0 the board is touching top-left (nothing hidden)
 
-        if self.state == GameState::Paused {
-            return Ok(());
-        }
+        if self.force_redraw > 0 {
+            self.force_redraw -= 1;
+        } else {
+            if self.state != GameState::Playing {
+                return Ok(());
+            }
 
-        if !self.fps.maybe_draw() {
-            return Ok(());
+            if !self.fps.maybe_draw() {
+                return Ok(());
+            }
         }
 
         clear(ctx, self.palette.background_color);
@@ -479,41 +482,6 @@ impl EventHandler for Game {
             draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
         }
         // draw(ctx, self.border_mesh.as_ref().unwrap(), DrawParam::default())?;
-
-        // TODO: improve effect drawing and move it somewhere else
-        // if let Some(Effect::SmallHex {
-        //                 min_scale,
-        //                 iterations,
-        //                 passed,
-        //             }) = self.effect
-        // {
-        //     let scale_factor = if passed < iterations / 2 {
-        //         let fraction = passed as f32 / (iterations as f32 / 2.);
-        //         1. - fraction * (1. - min_scale)
-        //     } else {
-        //         let fraction =
-        //             (passed - iterations / 2) as f32 / (iterations - iterations / 2) as f32;
-        //         1. - (1. - fraction) * (1. - min_scale)
-        //     };
-        //
-        //     // scale down and reposition in the middle of the hexagon
-        //     for pt in &mut hexagon_points {
-        //         pt.x *= scale_factor;
-        //         pt.y *= scale_factor;
-        //         // formula is (dimension / 2) * (1 - scale factor) [simplified]
-        //         pt.x += (cos + side / 2.) * (1. - scale_factor);
-        //         pt.y += sin * (1. - scale_factor); // actually 2 * s / 2
-        //     }
-        //
-        //     if passed == iterations {
-        //         self.effect = None;
-        //     } else {
-        //         // always succeeds, only used to unwrap
-        //         if let Some(Effect::SmallHex { passed, .. }) = &mut self.effect {
-        //             *passed += 1
-        //         }
-        //     }
-        // }
 
         let builder = &mut MeshBuilder::new();
 
@@ -593,7 +561,7 @@ impl EventHandler for Game {
     }
 
     // TODO: forbid resizing in-game
-    fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
         let new_dim = Self::wh_to_dim(self.cell_dim, width, height);
         self.dim = new_dim;
 
@@ -608,5 +576,7 @@ impl EventHandler for Game {
         let message = format!("{}x{}", new_dim.h, new_dim.v);
         self.message = Some(Message(message, 100));
         self.grid_mesh = None;
+
+        self.force_redraw = 10; // redraw 10 frames to adjust the grid
     }
 }
