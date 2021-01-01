@@ -1,8 +1,10 @@
+use std::collections::VecDeque;
+
+use ggez::event::KeyCode;
+
+use crate::app::control::Controls;
 use crate::app::hex::Dir;
 use crate::app::snake::SnakeController;
-use crate::app::control::Controls;
-use std::collections::VecDeque;
-use ggez::event::KeyCode;
 
 pub struct PlayerController {
     controls: Controls,

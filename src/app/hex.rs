@@ -1,10 +1,12 @@
-pub use hex_pos::HexPos;
-pub use dir::Dir;
 use std::ops::{Deref, DerefMut};
 
+pub use dir::Dir;
+pub use hex_pos::HexPos;
+
 mod dir {
-    use Dir::*;
     use std::ops::Neg;
+
+    use Dir::*;
 
     #[derive(Copy, Clone, Eq, PartialEq, Debug)]
     pub enum Dir {
@@ -33,10 +35,13 @@ mod dir {
 }
 
 mod hex_pos {
-    use super::dir::Dir;
-    use num_integer::Integer;
     use std::fmt::{Debug, Error, Formatter};
+
+    use num_integer::Integer;
+
     use Dir::*;
+
+    use super::dir::Dir;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
     pub struct HexPos {

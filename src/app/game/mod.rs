@@ -1,5 +1,8 @@
+use std::cmp::min;
 use std::f32::consts::PI;
+use std::io::{stdout, Write};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use ggez::{Context, GameResult};
 use ggez::conf::WindowMode;
@@ -18,7 +21,6 @@ use crate::app::palette::{GamePalette, SnakePalette};
 use crate::app::snake::{build_cell, Snake, SnakeState};
 use crate::app::snake::player_controller::PlayerController;
 use crate::app::snake::SnakeController;
-use std::time::{Instant, Duration};
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -36,44 +38,55 @@ impl From<f32> for CellDim {
 }
 
 struct FPSControl {
-    frame_duration: Duration,
-    last: Instant,
+    frame_duration: Duration, // for update and draw
+    control_duration: Duration, // for key events
+    last_frame: Instant,
+    last_control: Instant,
     drawn: bool,
 }
 
 impl FPSControl {
-    fn new(fps: u64) -> Self {
+    fn new(update_fps: u64, control_fps: u64) -> Self {
         Self {
-            frame_duration: Duration::from_micros(1_000_000 / fps),
-            last: Instant::now(),
+            frame_duration: Duration::from_micros(1_000_000 / update_fps),
+            control_duration: Duration::from_micros(1_000_000 / control_fps),
+            last_frame: Instant::now(),
+            last_control: Instant::now(),
             drawn: false,
         }
     }
 
     fn maybe_update(&mut self) -> bool {
-        if self.last.elapsed() >= self.frame_duration {
-            self.last = Instant::now();
+        let can_update = self.last_frame.elapsed() >= self.frame_duration;
+        if can_update {
+            self.last_frame = Instant::now();
             self.drawn = false;
-            true
-        } else {
-            false
         }
+        can_update
     }
 
     fn maybe_draw(&mut self) -> bool {
-        if self.drawn {
-            false
-        } else {
-            self.drawn = true;
-            true
+        let can_draw = !self.drawn;
+        self.drawn = true;
+        can_draw
+    }
+
+    fn wait(&mut self) {
+        let control_wait = self.control_duration.checked_sub(self.last_control.elapsed());
+        let frame_wait = self.frame_duration.checked_sub(self.last_frame.elapsed());
+        let min_wait = control_wait.and_then(|cw| frame_wait.map(|fw| min(cw, fw)));
+        if let Some(wait) = min_wait {
+            thread::sleep(wait);
         }
+        self.last_control = Instant::now();
     }
 }
 
 type HexagonPoints = [Point2<f32>; 6];
-static mut CACHED_HEXAGON_POINTS: Option<(f32, HexagonPoints)> = None;
 
 pub fn hexagon_points(side: f32) -> HexagonPoints {
+    static mut CACHED_HEXAGON_POINTS: Option<(f32, HexagonPoints)> = None;
+
     unsafe {
         if let Some((cached_side, points)) = CACHED_HEXAGON_POINTS {
             if side == cached_side {
@@ -159,7 +172,7 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            fps: FPSControl::new(12),
+            fps: FPSControl::new(12, 60),
 
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
             players: players.into_iter().map(Into::into).collect(),
@@ -376,11 +389,14 @@ impl Game {
 
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        if self.state != GameState::Playing {
+        // it's important that this if go first to reset the last frame time
+        if !self.fps.maybe_update() {
+            self.fps.wait();
             return Ok(());
         }
 
-        if !self.fps.maybe_update() {
+        if self.state != GameState::Playing {
+            self.fps.wait();
             return Ok(());
         }
 
@@ -401,7 +417,7 @@ impl EventHandler for Game {
                 }
 
                 // check head-body crash (this also checks if a snake crashed with itself)
-                for segment in &other.body[1..] {
+                for segment in other.body.iter().skip(1) {
                     if snake.body[0].pos == segment.pos {
                         crashed_snake_indices.push((i, j));
                         continue 'outer;
@@ -414,11 +430,12 @@ impl EventHandler for Game {
             // TODO: this might do weird things with head-to-head collisions
             for (i, j) in crashed_snake_indices {
                 let crash_point = self.snakes[i].body[0].pos;
-                let drain_start_idx = self.snakes[j].body[1..]
+                let drain_start_idx = self.snakes[j].body
                     .iter()
+                    .skip(1)
                     .position(|Hex { pos, .. }| *pos == crash_point)
                     .unwrap_or_else(|| panic!("point {:?} not found in snake of index {}", crash_point, j));
-                self.snakes[j].body.drain(drain_start_idx + 1..);
+                 let _ = self.snakes[j].body.drain(drain_start_idx + 1..);
                 self.snakes[j].grow = 0;
             }
         } else {
@@ -449,25 +466,36 @@ impl EventHandler for Game {
 
         self.spawn_apples();
 
-        thread::yield_now();
+        // thread::yield_now();
+        // self.fps.wait_for_control_finish();
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        // NOTE: could be fun to implement optionally printing as a square grid
-        // TODO: implement optional pushing to left-top (hiding part of the hexagon)
+        // could be fun to implement optionally printing as a square grid
         // with 0, 0 the board is touching top-left (nothing hidden)
 
         if self.force_redraw > 0 {
             self.force_redraw -= 1;
         } else {
-            if self.state != GameState::Playing {
-                return Ok(());
-            }
-
             if !self.fps.maybe_draw() {
                 return Ok(());
             }
+
+            if self.state != GameState::Playing {
+                return Ok(());
+            }
+        }
+
+        unsafe {
+            static mut T: Option<Instant> = None;
+            if let Some(t) = T {
+                let micros = t.elapsed().as_micros();
+                let fps = 1_000_000 / micros;
+                print!("{} ({}us)\r", fps, micros);
+                stdout().flush().unwrap();
+            }
+            T = Some(Instant::now());
         }
 
         clear(ctx, self.palette.background_color);
@@ -561,7 +589,7 @@ impl EventHandler for Game {
     }
 
     // TODO: forbid resizing in-game
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
+    fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
         let new_dim = Self::wh_to_dim(self.cell_dim, width, height);
         self.dim = new_dim;
 

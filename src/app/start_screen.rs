@@ -1,14 +1,16 @@
+use std::collections::VecDeque;
+
 use ggez::{Context, GameResult};
 use ggez::event::EventHandler;
 use ggez::graphics::{BLACK, clear, draw, DrawParam, MeshBuilder, present};
 
+use crate::app::game::CellDim;
 use crate::app::hex::{Dir, Hex, HexPos, HexType};
 use crate::app::Screen;
 use crate::app::snake::{Snake, SnakeState};
 use crate::app::snake::demo_controller::{DemoController, SimMove};
 
 use super::palette::SnakePalette;
-use crate::app::game::CellDim;
 
 struct SnakeDemo {
     top_left: HexPos,
@@ -20,15 +22,18 @@ struct SnakeDemo {
 impl SnakeDemo {
     fn new(top_left: HexPos, cell_dim: CellDim) -> Self {
         let pos = top_left + HexPos { h: 0, v: -5 };
+        let head = Hex {
+            typ: HexType::Normal,
+            pos,
+            teleported: None,
+        };
+        let mut body = VecDeque::new();
+        body.push_back(head);
         Self {
             top_left,
             palette: SnakePalette::gray_gradient(),
             snake: Snake {
-                body: vec![Hex {
-                    typ: HexType::Normal,
-                    pos,
-                    teleported: None,
-                }],
+                body,
                 palette: SnakePalette::gray_gradient(),
                 state: SnakeState::Living,
                 dir: Dir::U,

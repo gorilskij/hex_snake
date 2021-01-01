@@ -1,12 +1,14 @@
-use ggez::event::{EventHandler, KeyMods, KeyCode};
-use crate::app::start_screen::StartScreen;
-use ggez::conf::{WindowMode, WindowSetup, FullscreenType, NumSamples};
+use std::ops::{Deref, DerefMut};
+
 use ggez::{Context, GameResult};
-use crate::app::game::Game;
-use std::ops::{DerefMut, Deref};
-use crate::app::control::{ControlSetup, KeyboardLayout, Side};
-use crate::app::palette::GamePalette;
+use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
+use ggez::event::{EventHandler, KeyCode, KeyMods};
 use ggez::graphics::Rect;
+
+use control::{ControlSetup, KeyboardLayout, Side};
+use game::Game;
+use palette::GamePalette;
+use start_screen::StartScreen;
 
 mod start_screen;
 mod game;

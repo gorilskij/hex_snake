@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use ggez::{event::KeyCode, GameResult, graphics::Color};
 use ggez::graphics::{DrawMode, MeshBuilder};
 use mint::Point2;
@@ -23,7 +25,7 @@ pub trait SnakeController {
 }
 
 pub struct Snake<C: SnakeController> {
-    pub body: Vec<Hex>,
+    pub body: VecDeque<Hex>,
     pub palette: SnakePalette,
 
     pub state: SnakeState,
@@ -37,12 +39,15 @@ pub struct Snake<C: SnakeController> {
 impl<C: SnakeController> From<(HexPos, SnakePalette, Dir, usize, C, HexPos)> for Snake<C> {
     fn from((pos, palette, dir, grow, controller, game_dim):
             (HexPos, SnakePalette, Dir, usize, C, HexPos)) -> Self {
+        let head = Hex {
+            typ: HexType::Normal,
+            pos,
+            teleported: None,
+        };
+        let mut body = VecDeque::new();
+        body.push_back(head);
         Self {
-            body: vec![Hex {
-                typ: HexType::Normal,
-                pos,
-                teleported: None,
-            }],
+            body,
             palette,
             state: SnakeState::Living,
             dir,
