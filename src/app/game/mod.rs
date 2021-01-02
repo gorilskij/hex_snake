@@ -21,6 +21,7 @@ use crate::app::palette::{GamePalette, SnakePalette};
 use crate::app::snake::{build_cell, Snake, SnakeState};
 use crate::app::snake::player_controller::PlayerController;
 use crate::app::snake::SnakeController;
+use std::collections::VecDeque;
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -39,9 +40,8 @@ impl From<f32> for CellDim {
 
 struct FPSControl {
     frame_duration: Duration, // for update and draw
-    control_duration: Duration, // for key events
-    last_frame: Instant,
-    last_control: Instant,
+    control_duration: Duration, // for key events (more frequent)
+    last_frame: Option<Instant>,
     drawn: bool,
 }
 
@@ -50,16 +50,19 @@ impl FPSControl {
         Self {
             frame_duration: Duration::from_micros(1_000_000 / update_fps),
             control_duration: Duration::from_micros(1_000_000 / control_fps),
-            last_frame: Instant::now(),
-            last_control: Instant::now(),
+            // last_frame: Instant::now(),
+            last_frame: None,
             drawn: false,
         }
     }
 
     fn maybe_update(&mut self) -> bool {
-        let can_update = self.last_frame.elapsed() >= self.frame_duration;
+        // NOTE: this keeps being called when the game is paused
+        // maybe implement a more relaxed control fps for pause
+        let last_frame = self.last_frame.get_or_insert(Instant::now());
+        let can_update = last_frame.elapsed() >= self.frame_duration;
         if can_update {
-            self.last_frame = Instant::now();
+            *last_frame += self.frame_duration;
             self.drawn = false;
         }
         can_update
@@ -72,13 +75,12 @@ impl FPSControl {
     }
 
     fn wait(&mut self) {
-        let control_wait = self.control_duration.checked_sub(self.last_control.elapsed());
-        let frame_wait = self.frame_duration.checked_sub(self.last_frame.elapsed());
-        let min_wait = control_wait.and_then(|cw| frame_wait.map(|fw| min(cw, fw)));
-        if let Some(wait) = min_wait {
-            thread::sleep(wait);
+        let last_frame = self.last_frame.get_or_insert(Instant::now());
+        let frame_wait = self.frame_duration.checked_sub(last_frame.elapsed());
+        let wait = frame_wait.map(|fw| min(fw, self.control_duration));
+        if let Some(w) = wait {
+            thread::sleep(w);
         }
-        self.last_control = Instant::now();
     }
 }
 
@@ -489,11 +491,24 @@ impl EventHandler for Game {
 
         unsafe {
             static mut T: Option<Instant> = None;
+            static mut LAST: Option<VecDeque<f64>> = None;
+
             if let Some(t) = T {
-                let micros = t.elapsed().as_micros();
-                let fps = 1_000_000 / micros;
-                print!("{} ({}us)\r", fps, micros);
-                stdout().flush().unwrap();
+                if let Some(last) = &mut LAST {
+                    let micros = t.elapsed().as_micros();
+                    let fps = 1_000_000.0 / micros as f64;
+                    if last.len() >= 60 {
+                        last.pop_front();
+                    }
+                    last.push_back(fps);
+                    let min = last.iter().copied().fold(0. / 0., f64::min);
+                    let max = last.iter().copied().fold(0. / 0., f64::max);
+                    let avg = last.iter().sum::<f64>() / last.len() as f64;
+                    print!("fps: {:.3} ({:.3} / {:.3}) [{:.3}]      \r", fps, min, max, avg);
+                    stdout().flush().unwrap();
+                } else {
+                    LAST = Some(VecDeque::new());
+                }
             }
             T = Some(Instant::now());
         }
