@@ -10,7 +10,6 @@ pub struct Controls {
     pub dr: KeyCode,
 }
 
-
 #[allow(dead_code)]
 pub enum KeyboardLayout {
     Qwerty,

@@ -24,7 +24,8 @@ use crate::app::{
     hex::{Dir, Hex, HexPos, HexType},
     palette::{GamePalette, SnakePalette},
     snake::{
-        build_cell, player_controller::PlayerController, snake_ai_controller::SnakeAI, Snake, SnakeState,
+        build_cell, player_controller::PlayerController, snake_ai_controller::SnakeAI, Snake,
+        SnakeState,
     },
 };
 use std::collections::VecDeque;
@@ -129,16 +130,24 @@ enum GameState {
     Crashed,
 }
 
+// Mixed is Cut when eating self and Die when eating others
+#[derive(Eq, PartialEq)]
+enum EatBehavior {
+    Cut,
+    Die,
+    Mixed,
+}
+
 struct Prefs {
     draw_grid: bool,
-    cut_on_eat: bool,
+    eat_behavior: EatBehavior,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
         Self {
             draw_grid: true,
-            cut_on_eat: true,
+            eat_behavior: EatBehavior::Mixed,
         }
     }
 }
@@ -237,7 +246,8 @@ impl Game {
 
                 self.snakes.push(Snake::from((
                     self.dim / 2 + HexPos { h: 10, v: 0 },
-                    SnakePalette::gray_gradient(),
+                    // SnakePalette::gray_gradient(),
+                    SnakePalette::pastel_persistent_rainbow(),
                     Dir::D,
                     10,
                     SnakeAI::new(),
@@ -479,31 +489,40 @@ impl EventHandler for Game {
             }
         }
 
-        if self.prefs.cut_on_eat {
+        if self.prefs.eat_behavior == EatBehavior::Cut
+            || self.prefs.eat_behavior == EatBehavior::Mixed
+        {
             // TODO: this might do weird things with head-to-head collisions
-            for (i, j) in crashed_snake_indices {
-                let crash_point = self.snakes[i].body[0].pos;
-                let drain_start_idx = self.snakes[j]
-                    .body
-                    .iter()
-                    .skip(1)
-                    .position(|Hex { pos, .. }| *pos == crash_point)
-                    .unwrap_or_else(|| {
-                        panic!("point {:?} not found in snake of index {}", crash_point, j)
-                    });
-                // this error means that a snake tried to cut another snake from the head
-                // TODO: handle this as a special case
+            for &(i, j) in &crashed_snake_indices {
+                if self.prefs.eat_behavior == EatBehavior::Cut || i == j {
+                    let crash_point = self.snakes[i].body[0].pos;
+                    let drain_start_idx = self.snakes[j]
+                        .body
+                        .iter()
+                        .skip(1)
+                        .position(|Hex { pos, .. }| *pos == crash_point)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "point {:?} not found in snake of index {} (head-to-head collision)",
+                                crash_point, j
+                            )
+                            // TODO: handle this as a special case
+                        });
 
-                let _ = self.snakes[j].body.drain(drain_start_idx + 1..);
-                self.snakes[j].grow = 0;
+                    let _ = self.snakes[j].body.drain(drain_start_idx + 1..);
+                    self.snakes[j].grow = 0;
+                }
             }
-        } else {
-            if !crashed_snake_indices.is_empty() {
-                self.state = GameState::Crashed;
-            }
-            for (i, _) in crashed_snake_indices {
-                self.snakes[i].state = SnakeState::Crashed;
-                self.snakes[i].body[0].typ = HexType::Crashed;
+        }
+
+        if self.prefs.eat_behavior == EatBehavior::Die || self.prefs.eat_behavior == EatBehavior::Mixed {
+            for &(i, j) in &crashed_snake_indices {
+                if self.prefs.eat_behavior == EatBehavior::Die || i != j {
+                    self.snakes[i].state = SnakeState::Crashed;
+                    self.snakes[i].body[0].typ = HexType::Crashed;
+                    self.state = GameState::Crashed;
+                    self.force_redraw = 10;
+                }
             }
         }
 
@@ -653,12 +672,12 @@ impl EventHandler for Game {
                 self.message = Some(Message(message.to_string(), 100));
             }
             C => {
-                self.prefs.cut_on_eat = !self.prefs.cut_on_eat;
-                let message = if self.prefs.cut_on_eat {
-                    "Cut on eat"
-                } else {
-                    "Die on eat"
+                let (new_behavior, message) = match self.prefs.eat_behavior {
+                    EatBehavior::Cut => (EatBehavior::Mixed, "Mixed"),
+                    EatBehavior::Mixed => (EatBehavior::Die, "Die on eat"),
+                    EatBehavior::Die => (EatBehavior::Cut, "Cut on eat"),
                 };
+                self.prefs.eat_behavior = new_behavior;
                 self.message = Some(Message(message.to_string(), 100));
             }
             k => {

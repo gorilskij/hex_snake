@@ -43,9 +43,18 @@ lazy_static! {
     static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgb(245, 192, 64);
 }
 
-#[derive(Default)]
 pub struct PersistentRainbow {
+    lightness: f64,
     max_len: usize,
+}
+
+impl PersistentRainbow {
+    fn new(lightness: f64) -> Self {
+        Self {
+            lightness,
+            max_len: 0,
+        }
+    }
 }
 
 impl SnakePainter for PersistentRainbow {
@@ -57,7 +66,7 @@ impl SnakePainter for PersistentRainbow {
         let hsl = HSL {
             h: hue,
             s: 1.,
-            l: 0.4,
+            l: self.lightness,
         };
         Color::from(hsl.to_rgb())
     }
@@ -128,8 +137,17 @@ impl SnakePalette {
 
     pub fn persistent_rainbow() -> Self {
         Self {
-            segment_color: Box::new(PersistentRainbow::default()),
-            eaten_color: Box::new(InvertRGB(PersistentRainbow::default())),
+            segment_color: Box::new(PersistentRainbow::new(0.4)),
+            eaten_color: Box::new(InvertRGB(PersistentRainbow::new(0.3))),
+            crashed_color: *DEFAULT_CRASHED_COLOR,
+            portal_color: *DEFAULT_PORTAL_COLOR,
+        }
+    }
+
+    pub fn pastel_persistent_rainbow() -> Self {
+        Self {
+            segment_color: Box::new(PersistentRainbow::new(0.75)),
+            eaten_color: Box::new(InvertRGB(PersistentRainbow::new(0.3))),
             crashed_color: *DEFAULT_CRASHED_COLOR,
             portal_color: *DEFAULT_PORTAL_COLOR,
         }
