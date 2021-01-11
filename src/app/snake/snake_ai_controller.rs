@@ -1,18 +1,25 @@
-use crate::app::hex::{Dir, HexPos};
-use crate::app::snake::{SnakeController, Snake, SnakeRepr};
-use rand::{thread_rng, Rng};
+use crate::app::{
+    hex::{Dir, HexPos},
+    snake::{SnakeController, SnakeRepr},
+};
 
 pub struct SnakeAI;
 
 // very basic ai, goes to apples, avoids snakes
 // works pretty well
-impl  SnakeAI {
+impl SnakeAI {
     pub fn new() -> Self {
         Self
     }
 }
 
-fn dir_score(head: HexPos, dir: Dir, board_dim: HexPos, snakes: &Vec<&SnakeRepr>, apples: &[HexPos]) -> usize {
+fn dir_score(
+    head: HexPos,
+    dir: Dir,
+    board_dim: HexPos,
+    snakes: &[&SnakeRepr],
+    apples: &[HexPos],
+) -> usize {
     let mut distance = 0;
     let mut new_head = head;
     while !apples.contains(&new_head) {
@@ -21,7 +28,7 @@ fn dir_score(head: HexPos, dir: Dir, board_dim: HexPos, snakes: &Vec<&SnakeRepr>
 
         for snake in snakes {
             if snake.body.contains(&new_head) {
-                return distance // the higher the distance to a body part, the higher the score
+                return distance; // the higher the distance to a body part, the higher the score
             }
         }
     }
@@ -31,7 +38,13 @@ fn dir_score(head: HexPos, dir: Dir, board_dim: HexPos, snakes: &Vec<&SnakeRepr>
 }
 
 impl SnakeController for SnakeAI {
-    fn next_dir<'a, 'b>(&'a mut self, snake: &'b SnakeRepr, mut other_snakes: Vec<&'b SnakeRepr>, apples: &'b [HexPos], board_dim: HexPos) -> Option<Dir> {
+    fn next_dir<'a, 'b>(
+        &'a mut self,
+        snake: &'b SnakeRepr,
+        mut other_snakes: Vec<&'b SnakeRepr>,
+        apples: &'b [HexPos],
+        board_dim: HexPos,
+    ) -> Option<Dir> {
         use Dir::*;
         let available_directions: Vec<_> = [UL, U, UR, DL, D, DR]
             .iter()

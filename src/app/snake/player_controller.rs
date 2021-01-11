@@ -2,9 +2,11 @@ use std::collections::VecDeque;
 
 use ggez::event::KeyCode;
 
-use crate::app::control::Controls;
-use crate::app::hex::{Dir, HexPos};
-use crate::app::snake::{SnakeController, Snake, SnakeRepr};
+use crate::app::{
+    control::Controls,
+    hex::{Dir, HexPos},
+    snake::{SnakeController, SnakeRepr},
+};
 
 pub struct PlayerController {
     controls: Controls,
@@ -25,7 +27,13 @@ impl PlayerController {
 }
 
 impl SnakeController for PlayerController {
-    fn next_dir(&mut self, snake: &SnakeRepr, _other_snakes: Vec<&SnakeRepr>, _apples: &[HexPos], board_dim: HexPos) -> Option<Dir> {
+    fn next_dir(
+        &mut self,
+        _snake: &SnakeRepr,
+        _other_snakes: Vec<&SnakeRepr>,
+        _apples: &[HexPos],
+        _board_dim: HexPos,
+    ) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = queue_dir;
             Some(queue_dir)
@@ -48,8 +56,8 @@ impl SnakeController for PlayerController {
 
         if self.control_queue.is_empty() && new_dir != -self.dir
             || !self.control_queue.is_empty()
-            && self.control_queue.len() < Self::CTRL_QUEUE_LIMIT
-            && new_dir != -self.control_queue[self.control_queue.len() - 1]
+                && self.control_queue.len() < Self::CTRL_QUEUE_LIMIT
+                && new_dir != -self.control_queue[self.control_queue.len() - 1]
         {
             self.control_queue.push_back(new_dir)
         }

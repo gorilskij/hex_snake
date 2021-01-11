@@ -1,26 +1,32 @@
-use std::cmp::min;
-use std::f32::consts::PI;
-use std::io::{stdout, Write};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::{
+    cmp::min,
+    f32::consts::PI,
+    io::{stdout, Write},
+    thread,
+    time::{Duration, Instant},
+};
 
-use ggez::{Context, GameResult};
-use ggez::conf::WindowMode;
-use ggez::event::{EventHandler, KeyCode, KeyMods};
-use ggez::graphics::{clear, Color, draw, DrawMode, DrawParam, Font, Mesh, MeshBuilder, present, Scale, Text};
+use ggez::{
+    conf::WindowMode,
+    event::{EventHandler, KeyCode, KeyMods},
+    graphics::{
+        clear, draw, present, Color, DrawMode, DrawParam, Font, Mesh, MeshBuilder, Scale, Text,
+    },
+    Context, GameResult,
+};
 use itertools::Itertools;
 use mint::Point2;
 use num_integer::Integer;
 use rand::prelude::*;
 
-use crate::app::control::{Controls, ControlSetup};
-use crate::app::hex::{Hex, HexPos};
-use crate::app::hex::{Dir, HexType};
-use crate::app::palette::{GamePalette, SnakePalette};
-use crate::app::snake::{build_cell, Snake, SnakeState};
-use crate::app::snake::player_controller::PlayerController;
-use crate::app::snake::snake_ai_controller::SnakeAI;
-use crate::app::snake::SnakeController;
+use crate::app::{
+    control::{ControlSetup, Controls},
+    hex::{Dir, Hex, HexPos, HexType},
+    palette::{GamePalette, SnakePalette},
+    snake::{
+        build_cell, player_controller::PlayerController, snake_ai_controller::SnakeAI, Snake, SnakeState,
+    },
+};
 use std::collections::VecDeque;
 
 // TODO document
@@ -43,7 +49,7 @@ impl From<f32> for CellDim {
 }
 
 struct FPSControl {
-    frame_duration: Duration, // for update and draw
+    frame_duration: Duration,   // for update and draw
     control_duration: Duration, // for key events (more frequent)
     last_frame: Option<Instant>,
     drawn: bool,
@@ -95,20 +101,22 @@ pub fn hexagon_points(side: f32) -> HexagonPoints {
 
     unsafe {
         if let Some((cached_side, points)) = CACHED_HEXAGON_POINTS {
-            if side == cached_side {
+            if (side - cached_side).abs() < f32::EPSILON {
                 return points;
             }
         }
 
         let CellDim { sin, cos, .. } = CellDim::from(side);
+        #[rustfmt::skip]
         let points = [
             Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0. },
-            Point2 { x: side + 2. * cos, y: sin },
-            Point2 { x: side + cos, y: 2. * sin },
-            Point2 { x: cos, y: 2. * sin },
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: side + 2. * cos, y: sin, },
+            Point2 { x: side + cos, y: 2. * sin, },
+            Point2 { x: cos, y: 2. * sin, },
             Point2 { x: 0., y: sin },
         ];
+
         CACHED_HEXAGON_POINTS = Some((side, points));
         points
     }
@@ -170,7 +178,12 @@ impl Game {
         }
     }
 
-    pub fn new(cell_side_len: f32, players: Vec<ControlSetup>, palette: GamePalette, wm: WindowMode) -> Self {
+    pub fn new(
+        cell_side_len: f32,
+        players: Vec<ControlSetup>,
+        palette: GamePalette,
+        wm: WindowMode,
+    ) -> Self {
         assert!(!players.is_empty(), "No players specified");
         assert!(players.len() <= 2, "More than 2 players not supported");
 
@@ -180,7 +193,6 @@ impl Game {
             state: GameState::Playing,
             fps: FPSControl::new(12, 60),
             // fps: FPSControl::new(240, 240),
-
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
             players: players.into_iter().map(Into::into).collect(),
             snakes: vec![],
@@ -209,8 +221,8 @@ impl Game {
         self.snakes.clear();
         self.apples.clear();
 
-        match self.players.as_slice() {
-            &[controls] => {
+        match *self.players.as_slice() {
+            [controls] => {
                 self.snakes.push(Snake::from((
                     self.dim / 2,
                     // SnakePalette::tropical(),
@@ -232,7 +244,7 @@ impl Game {
                     self.dim,
                 )))
             }
-            &[controls1, controls2] => {
+            [controls1, controls2] => {
                 self.snakes.push(Snake::from((
                     self.dim / 2 + HexPos { h: -5, v: 0 },
                     SnakePalette::rainbow(),
@@ -289,8 +301,10 @@ impl Game {
         while self.apples.len() < self.apple_count {
             let free_spaces = (self.dim.h * self.dim.v) as usize - self.num_occupied_cells();
             if free_spaces == 0 {
-                println!("warning: no space left for new apples ({} apples will be missing)",
-                         self.apple_count - self.apples.len());
+                println!(
+                    "warning: no space left for new apples ({} apples will be missing)",
+                    self.apple_count - self.apples.len()
+                );
                 return;
             }
             let mut new_idx = self.rng.gen_range(0, free_spaces);
@@ -320,8 +334,14 @@ impl Game {
             vline_a.push(Point2 { x: cos, y: dv });
             vline_a.push(Point2 { x: 0., y: dv + sin });
 
-            vline_b.push(Point2 { x: cos + side, y: dv });
-            vline_b.push(Point2 { x: 2. * cos + side, y: dv + sin });
+            vline_b.push(Point2 {
+                x: cos + side,
+                y: dv,
+            });
+            vline_b.push(Point2 {
+                x: 2. * cos + side,
+                y: dv + sin,
+            });
         }
 
         let first_vline_a = vline_a.iter().copied().collect::<Vec<_>>();
@@ -361,17 +381,30 @@ impl Game {
                     builder.line(
                         &[
                             Point2 { x: cos + dh, y: dv },
-                            Point2 { x: cos + side + dh, y: dv },
-                        ], self.palette.grid_thickness, color,
+                            Point2 {
+                                x: cos + side + dh,
+                                y: dv,
+                            },
+                        ],
+                        self.palette.grid_thickness,
+                        color,
                     )?;
 
                     // line between b and a
                     if !(self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1) {
                         builder.line(
                             &[
-                                Point2 { x: 2. * cos + side + dh, y: sin + dv },
-                                Point2 { x: 2. * cos + 2. * side + dh, y: sin + dv },
-                            ], self.palette.grid_thickness, color,
+                                Point2 {
+                                    x: 2. * cos + side + dh,
+                                    y: sin + dv,
+                                },
+                                Point2 {
+                                    x: 2. * cos + 2. * side + dh,
+                                    y: sin + dv,
+                                },
+                            ],
+                            self.palette.grid_thickness,
+                            color,
                         )?;
                     }
                 }
@@ -450,13 +483,16 @@ impl EventHandler for Game {
             // TODO: this might do weird things with head-to-head collisions
             for (i, j) in crashed_snake_indices {
                 let crash_point = self.snakes[i].body[0].pos;
-                let drain_start_idx = self.snakes[j].body
+                let drain_start_idx = self.snakes[j]
+                    .body
                     .iter()
                     .skip(1)
                     .position(|Hex { pos, .. }| *pos == crash_point)
-                    .unwrap_or_else(|| panic!("point {:?} not found in snake of index {}", crash_point, j));
-                    // this error means that a snake tried to cut another snake from the head
-                    // TODO: handle this as a special case
+                    .unwrap_or_else(|| {
+                        panic!("point {:?} not found in snake of index {}", crash_point, j)
+                    });
+                // this error means that a snake tried to cut another snake from the head
+                // TODO: handle this as a special case
 
                 let _ = self.snakes[j].body.drain(drain_start_idx + 1..);
                 self.snakes[j].grow = 0;
@@ -470,7 +506,6 @@ impl EventHandler for Game {
                 self.snakes[i].body[0].typ = HexType::Crashed;
             }
         }
-
 
         // check apple eating
         let mut k = -1;
@@ -522,10 +557,13 @@ impl EventHandler for Game {
                         last.pop_front();
                     }
                     last.push_back(fps);
-                    let min = last.iter().copied().fold(0. / 0., f64::min);
-                    let max = last.iter().copied().fold(0. / 0., f64::max);
+                    let min = last.iter().copied().fold(f64::NAN, f64::min);
+                    let max = last.iter().copied().fold(f64::NAN, f64::max);
                     let avg = last.iter().sum::<f64>() / last.len() as f64;
-                    print!("fps: {:.3} ({:.3} / {:.3}) [{:.3}]      \r", fps, min, max, avg);
+                    print!(
+                        "fps: {:.3} ({:.3} / {:.3}) [{:.3}]      \r",
+                        fps, min, max, avg
+                    );
                     stdout().flush().unwrap();
                 } else {
                     LAST = Some(VecDeque::new());
@@ -570,12 +608,19 @@ impl EventHandler for Game {
             text.set_font(Font::default(), Scale::uniform(20.));
 
             let offset = 10.;
-            let x = ggez::graphics::drawable_size(ctx).0
-                - text.width(ctx) as f32
-                - offset;
-            let location = Point2 { x , y: offset };
-            let opacity = if *frames_left > 10 { 1. } else { *frames_left as f32 / 10. };
-            let color = Color { r: 1., g: 1., b: 1., a: opacity };
+            let x = ggez::graphics::drawable_size(ctx).0 - text.width(ctx) as f32 - offset;
+            let location = Point2 { x, y: offset };
+            let opacity = if *frames_left > 10 {
+                1.
+            } else {
+                *frames_left as f32 / 10.
+            };
+            let color = Color {
+                r: 1.,
+                g: 1.,
+                b: 1.,
+                a: opacity,
+            };
             draw(ctx, &text, DrawParam::from((location, color)))?;
 
             if *frames_left == 0 {
@@ -616,9 +661,11 @@ impl EventHandler for Game {
                 };
                 self.message = Some(Message(message.to_string(), 100));
             }
-            k => if self.state == Playing {
-                for snake in &mut self.snakes {
-                    snake.controller.key_pressed(k)
+            k => {
+                if self.state == Playing {
+                    for snake in &mut self.snakes {
+                        snake.controller.key_pressed(k)
+                    }
                 }
             }
         }

@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use ggez::graphics::{BLACK, Color, WHITE};
+use ggez::graphics::{Color, BLACK, WHITE};
 use hsl::HSL;
 
 macro_rules! gray {
@@ -54,7 +54,11 @@ impl SnakePainter for PersistentRainbow {
             self.max_len = len;
         }
         let hue = 273. * seg as f64 / self.max_len as f64;
-        let hsl = HSL { h: hue, s: 1., l: 0.4 };
+        let hsl = HSL {
+            h: hue,
+            s: 1.,
+            l: 0.4,
+        };
         Color::from(hsl.to_rgb())
     }
 }
@@ -109,7 +113,11 @@ impl SnakePalette {
         Self {
             segment_color: Box::new(|seg, len| {
                 let hue = 273. * seg as f64 / len as f64;
-                let hsl = HSL { h: hue, s: 1., l: 0.4 };
+                let hsl = HSL {
+                    h: hue,
+                    s: 1.,
+                    l: 0.4,
+                };
                 Color::from(hsl.to_rgb())
             }),
             eaten_color: Box::new(*DEFAULT_EATEN_COLOR),
@@ -147,7 +155,12 @@ impl SnakePalette {
             segment_color: Box::new(move |seg, _| {
                 let x = seg as f32 * 2. * PI / period as f32;
                 let l = (x.sin() + 1.) / 2.;
-                Color { r: l, g: l, b: l, a: 1. }
+                Color {
+                    r: l,
+                    g: l,
+                    b: l,
+                    a: 1.,
+                }
             }),
             eaten_color: Box::new(*DEFAULT_EATEN_COLOR),
             crashed_color: *DEFAULT_CRASHED_COLOR,
@@ -161,7 +174,11 @@ impl SnakePalette {
                 let x = seg as f32 * 2. * PI / period as f32;
                 let l = (x.sin() + 1.) / 2.;
                 let h = (x / (2. * PI)).floor() * 30.;
-                let hsl = HSL { h: h as f64 % 360., s: 1., l: l as f64 / 2. };
+                let hsl = HSL {
+                    h: h as f64 % 360.,
+                    s: 1.,
+                    l: l as f64 / 2.,
+                };
                 Color::from(hsl.to_rgb())
             }),
             eaten_color: Box::new(*DEFAULT_EATEN_COLOR),
@@ -208,7 +225,6 @@ impl GamePalette {
         //     teleported_color: Color::from_rgb(245, 192, 64),
         // }
     }
-
 
     pub fn dark() -> Self {
         Self {

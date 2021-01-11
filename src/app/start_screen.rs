@@ -1,14 +1,20 @@
 use std::collections::VecDeque;
 
-use ggez::{Context, GameResult};
-use ggez::event::EventHandler;
-use ggez::graphics::{BLACK, clear, draw, DrawParam, MeshBuilder, present};
+use ggez::{
+    event::EventHandler,
+    graphics::{clear, draw, present, DrawParam, MeshBuilder, BLACK},
+    Context, GameResult,
+};
 
-use crate::app::game::CellDim;
-use crate::app::hex::{Dir, Hex, HexPos, HexType};
-use crate::app::Screen;
-use crate::app::snake::{Snake, SnakeState};
-use crate::app::snake::demo_controller::{DemoController, SimMove};
+use crate::app::{
+    game::CellDim,
+    hex::{Dir, Hex, HexPos, HexType},
+    snake::{
+        demo_controller::{DemoController, SimMove},
+        Snake, SnakeState,
+    },
+    Screen,
+};
 
 use super::palette::SnakePalette;
 

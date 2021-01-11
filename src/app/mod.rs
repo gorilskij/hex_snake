@@ -1,21 +1,23 @@
 use std::ops::{Deref, DerefMut};
 
-use ggez::{Context, GameResult};
-use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
-use ggez::event::{EventHandler, KeyCode, KeyMods};
-use ggez::graphics::Rect;
+use ggez::{
+    conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
+    event::{EventHandler, KeyCode, KeyMods},
+    graphics::Rect,
+    Context, GameResult,
+};
 
 use control::{ControlSetup, KeyboardLayout, Side};
 use game::Game;
 use palette::GamePalette;
 use start_screen::StartScreen;
 
-mod start_screen;
+pub mod control;
 mod game;
 mod hex;
-mod snake;
-pub mod control;
 mod palette;
+mod snake;
+mod start_screen;
 
 pub enum Screen {
     StartScreen(StartScreen),
@@ -76,25 +78,30 @@ impl App {
 
         Self {
             // screen: Screen::StartScreen(StartScreen::new()),
-            screen: Screen::Game(Game::new(10., vec![
-                ControlSetup {
-                    layout: KeyboardLayout::Dvorak,
-                    keyboard_side: Side::RightSide,
-                    hand: Side::RightSide,
-                },
-                // ControlSetup {
-                //     layout: KeyboardLayout::Dvorak,
-                //     keyboard_side: Side::LeftSide,
-                //     hand: Side::RightSide,
-                // },
-            ], GamePalette::dark(), wm.clone())),
+            screen: Screen::Game(Game::new(
+                10.,
+                vec![
+                    ControlSetup {
+                        layout: KeyboardLayout::Dvorak,
+                        keyboard_side: Side::RightSide,
+                        hand: Side::RightSide,
+                    },
+                    // ControlSetup {
+                    //     layout: KeyboardLayout::Dvorak,
+                    //     keyboard_side: Side::LeftSide,
+                    //     hand: Side::RightSide,
+                    // },
+                ],
+                GamePalette::dark(),
+                wm,
+            )),
             wm,
-            ws
+            ws,
         }
     }
 
     pub fn wm(&self) -> WindowMode {
-        self.wm.clone()
+        self.wm
     }
 
     pub fn ws(&self) -> WindowSetup {
@@ -121,12 +128,16 @@ impl EventHandler for App {
     }
 
     fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        ggez::graphics::set_screen_coordinates(ctx, Rect {
-            x: 0.0,
-            y: 0.0,
-            w: width,
-            h: height,
-        }).unwrap();
+        ggez::graphics::set_screen_coordinates(
+            ctx,
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                w: width,
+                h: height,
+            },
+        )
+        .unwrap();
 
         self.screen.resize_event(ctx, width, height);
     }
