@@ -169,6 +169,10 @@ impl SnakePalette {
             portal_color: *DEFAULT_PORTAL_COLOR,
         }
     }
+
+    pub fn tropical() -> Self {
+        Self::gradient(Color::from_rgb(16, 169, 224), Color::from_rgb(227, 173, 11))
+    }
 }
 
 pub struct GamePalette {
@@ -208,25 +212,13 @@ impl GamePalette {
 
     pub fn dark() -> Self {
         Self {
-            grid_thickness: 1.,
+            grid_thickness: 0.5,
             border_thickness: 3.,
 
             background_color: BLACK,
             grid_color: gray!(0.25),
             border_color: WHITE,
             apple_color: gray!(0.45),
-            // single_player_snake: SnakePalette::gradient(gray!(0.75), gray!(0.25)),
-            // single_player_snake: SnakePalette::rainbow(),
-            // single_player_snake: SnakePalette::checker(1, 10),
-            // player2_snake: SnakePalette::gradient(
-            //     Color::from_rgb(16, 169, 224),
-            //     Color::from_rgb(4, 52, 69),
-            // ),
-            // tropical version
-            // player2_snake: SnakePalette::gradient(
-            //     Color::from_rgb(16, 169, 224),
-            //     Color::from_rgb(227, 173, 11),
-            // ),
         }
     }
 }

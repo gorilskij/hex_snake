@@ -98,6 +98,18 @@ mod hex_pos {
             }
         }
 
+        pub fn step_and_teleport(&mut self, dir: Dir, board_dim: HexPos) {
+            self.translate(dir, 1);
+            if !self.is_in(board_dim) {
+                // find reappearance point
+                self.translate(dir, -1);
+                while self.is_in(board_dim) {
+                    self.translate(dir, -1);
+                }
+                self.translate(dir, 1);
+            }
+        }
+
         // checks if between (0,0) and dim
         pub fn is_in(self, dim: HexPos) -> bool {
             self.h >= 0 && self.h < dim.h && self.v >= 0 && self.v < dim.v

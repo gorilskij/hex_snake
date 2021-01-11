@@ -15,7 +15,7 @@ use super::palette::SnakePalette;
 struct SnakeDemo {
     top_left: HexPos,
     palette: SnakePalette,
-    snake: Snake<DemoController>,
+    snake: Snake,
     cell_dim: CellDim,
 }
 
@@ -38,7 +38,7 @@ impl SnakeDemo {
                 state: SnakeState::Living,
                 dir: Dir::U,
                 grow: 10,
-                controller: DemoController::new(vec![
+                controller: Box::new(DemoController::new(vec![
                     SimMove::Move(Dir::UR),
                     SimMove::Wait(5),
                     SimMove::Move(Dir::DR),
@@ -49,8 +49,8 @@ impl SnakeDemo {
                     SimMove::Wait(5),
                     SimMove::Move(Dir::UL),
                     SimMove::Wait(5),
-                ]),
-                game_dim: HexPos { h: 20, v: 20 },
+                ])),
+                board_dim: HexPos { h: 20, v: 20 },
             },
             cell_dim,
         }
@@ -59,7 +59,7 @@ impl SnakeDemo {
 
 impl EventHandler for SnakeDemo {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        self.snake.advance();
+        self.snake.advance(vec![], &[]);
         Ok(())
     }
 

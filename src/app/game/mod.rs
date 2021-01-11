@@ -12,7 +12,6 @@ use itertools::Itertools;
 use mint::Point2;
 use num_integer::Integer;
 use rand::prelude::*;
-use tuple::Map;
 
 use crate::app::control::{Controls, ControlSetup};
 use crate::app::hex::{Hex, HexPos};
@@ -20,6 +19,7 @@ use crate::app::hex::{Dir, HexType};
 use crate::app::palette::{GamePalette, SnakePalette};
 use crate::app::snake::{build_cell, Snake, SnakeState};
 use crate::app::snake::player_controller::PlayerController;
+use crate::app::snake::snake_ai_controller::SnakeAI;
 use crate::app::snake::SnakeController;
 use std::collections::VecDeque;
 
@@ -33,8 +33,12 @@ pub struct CellDim {
 
 impl From<f32> for CellDim {
     fn from(side: f32) -> Self {
-        let (sin, cos) = (1. / 3. * PI).sin_cos().map(|i| i * side);
-        Self { side, sin, cos }
+        let one_third_pi = 1. / 3. * PI;
+        Self {
+            side,
+            sin: one_third_pi.sin() * side,
+            cos: one_third_pi.cos() * side,
+        }
     }
 }
 
@@ -139,7 +143,7 @@ pub struct Game {
 
     dim: HexPos,
     players: Vec<Controls>,
-    snakes: Vec<Snake<PlayerController>>,
+    snakes: Vec<Snake>,
     apples: Vec<HexPos>,
 
     cell_dim: CellDim,
@@ -175,6 +179,7 @@ impl Game {
         let mut game = Self {
             state: GameState::Playing,
             fps: FPSControl::new(12, 60),
+            // fps: FPSControl::new(240, 240),
 
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
             players: players.into_iter().map(Into::into).collect(),
@@ -208,13 +213,24 @@ impl Game {
             &[controls] => {
                 self.snakes.push(Snake::from((
                     self.dim / 2,
+                    // SnakePalette::tropical(),
                     SnakePalette::persistent_rainbow(),
                     // SnakePalette::checker(1, 10),
                     Dir::U,
                     10,
                     PlayerController::new(controls),
+                    // SnakeAI::new(),
                     self.dim,
                 )));
+
+                self.snakes.push(Snake::from((
+                    self.dim / 2 + HexPos { h: 10, v: 0 },
+                    SnakePalette::gray_gradient(),
+                    Dir::D,
+                    10,
+                    SnakeAI::new(),
+                    self.dim,
+                )))
             }
             &[controls1, controls2] => {
                 self.snakes.push(Snake::from((
@@ -346,7 +362,7 @@ impl Game {
                         &[
                             Point2 { x: cos + dh, y: dv },
                             Point2 { x: cos + side + dh, y: dv },
-                        ], 2., color,
+                        ], self.palette.grid_thickness, color,
                     )?;
 
                     // line between b and a
@@ -355,7 +371,7 @@ impl Game {
                             &[
                                 Point2 { x: 2. * cos + side + dh, y: sin + dv },
                                 Point2 { x: 2. * cos + 2. * side + dh, y: sin + dv },
-                            ], 2., color,
+                            ], self.palette.grid_thickness, color,
                         )?;
                     }
                 }
@@ -402,8 +418,10 @@ impl EventHandler for Game {
             return Ok(());
         }
 
-        for snake in &mut self.snakes {
-            snake.advance()
+        let reprs: Vec<_> = self.snakes.iter().map(Snake::as_repr).collect();
+        for (i, snake) in self.snakes.iter_mut().enumerate() {
+            let other_snakes = reprs[..i].iter().chain(&reprs[i + 1..]).collect();
+            snake.advance(other_snakes, &self.apples)
         }
 
         // check for crashes
@@ -437,7 +455,10 @@ impl EventHandler for Game {
                     .skip(1)
                     .position(|Hex { pos, .. }| *pos == crash_point)
                     .unwrap_or_else(|| panic!("point {:?} not found in snake of index {}", crash_point, j));
-                 let _ = self.snakes[j].body.drain(drain_start_idx + 1..);
+                    // this error means that a snake tried to cut another snake from the head
+                    // TODO: handle this as a special case
+
+                let _ = self.snakes[j].body.drain(drain_start_idx + 1..);
                 self.snakes[j].grow = 0;
             }
         } else {
@@ -610,7 +631,7 @@ impl EventHandler for Game {
 
         // this is only to allow for hacky mid-game resizing
         for snake in &mut self.snakes {
-            snake.game_dim = new_dim;
+            snake.board_dim = new_dim;
         }
         // this too
         self.apples.retain(move |apple| apple.is_in(new_dim));

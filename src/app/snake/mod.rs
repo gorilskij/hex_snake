@@ -11,6 +11,7 @@ use crate::app::palette::SnakePalette;
 
 pub mod player_controller;
 pub mod demo_controller;
+pub mod snake_ai_controller;
 
 #[derive(Eq, PartialEq)]
 pub enum SnakeState {
@@ -19,12 +20,12 @@ pub enum SnakeState {
 }
 
 pub trait SnakeController {
-    fn next_dir(&mut self, dir: Dir) -> Dir;
+    fn next_dir(&mut self, snake: &SnakeRepr, other_snakes: Vec<&SnakeRepr>, apples: &[HexPos], board_dim: HexPos) -> Option<Dir>;
 
     fn key_pressed(&mut self, _key: KeyCode) {}
 }
 
-pub struct Snake<C: SnakeController> {
+pub struct Snake {
     pub body: VecDeque<Hex>,
     pub palette: SnakePalette,
 
@@ -32,13 +33,19 @@ pub struct Snake<C: SnakeController> {
     pub dir: Dir,
     pub grow: usize,
 
-    pub controller: C,
-    pub game_dim: HexPos,
+    pub controller: Box<dyn SnakeController>,
+    pub board_dim: HexPos,
 }
 
-impl<C: SnakeController> From<(HexPos, SnakePalette, Dir, usize, C, HexPos)> for Snake<C> {
-    fn from((pos, palette, dir, grow, controller, game_dim):
-            (HexPos, SnakePalette, Dir, usize, C, HexPos)) -> Self {
+pub struct SnakeRepr {
+    pub body: Vec<HexPos>,
+    pub dir: Dir,
+}
+
+impl<C: SnakeController + 'static> From<(HexPos, SnakePalette, Dir, usize, C, HexPos)> for Snake {
+    fn from(params: (HexPos, SnakePalette, Dir, usize, C, HexPos)) -> Self {
+        let (pos, palette, dir, grow, controller, game_dim) = params;
+
         let head = Hex {
             typ: HexType::Normal,
             pos,
@@ -52,13 +59,25 @@ impl<C: SnakeController> From<(HexPos, SnakePalette, Dir, usize, C, HexPos)> for
             state: SnakeState::Living,
             dir,
             grow,
-            controller,
-            game_dim,
+            controller: Box::new(controller),
+            board_dim: game_dim,
         }
     }
 }
 
-impl<C: SnakeController> Snake<C> {
+impl Snake {
+    pub fn as_repr(&self) -> SnakeRepr {
+        let body = self.body
+            .iter()
+            .map(|Hex { pos, ..}| *pos)
+            .collect::<Vec<_>>();
+
+        SnakeRepr {
+            body,
+            dir: self.dir,
+        }
+    }
+
     fn get_new_head(&self) -> Hex {
         let mut new_head = Hex {
             typ: HexType::Normal,
@@ -69,21 +88,15 @@ impl<C: SnakeController> Snake<C> {
         // todo make O(1)
         //  at the moment this just moves the head back until the last cell that's still in the map
         //  this could be done as a single calculation
-        new_head.translate(self.dir, 1);
-        if !new_head.is_in(self.game_dim) {
-            // find reappearance point
-            new_head.translate(self.dir, -1);
-            while new_head.is_in(self.game_dim) {
-                new_head.translate(self.dir, -1);
-            }
-            new_head.translate(self.dir, 1);
-        }
+        new_head.step_and_teleport(self.dir, self.board_dim);
 
         new_head
     }
 
-    pub fn advance(&mut self) {
-        self.dir = self.controller.next_dir(self.dir);
+    pub fn advance(&mut self, other_snakes: Vec<&SnakeRepr>, apples: &[HexPos]) {
+        if let Some(new_dir) = self.controller.next_dir(&self.as_repr(), other_snakes, apples, self.board_dim) {
+            self.dir = new_dir;
+        }
 
         let new_head = self.get_new_head();
 

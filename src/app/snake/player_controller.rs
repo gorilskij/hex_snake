@@ -3,8 +3,8 @@ use std::collections::VecDeque;
 use ggez::event::KeyCode;
 
 use crate::app::control::Controls;
-use crate::app::hex::Dir;
-use crate::app::snake::SnakeController;
+use crate::app::hex::{Dir, HexPos};
+use crate::app::snake::{SnakeController, Snake, SnakeRepr};
 
 pub struct PlayerController {
     controls: Controls,
@@ -25,14 +25,13 @@ impl PlayerController {
 }
 
 impl SnakeController for PlayerController {
-    fn next_dir(&mut self, dir: Dir) -> Dir {
-        let new_dir = if let Some(queue_dir) = self.control_queue.pop_front() {
-            queue_dir
+    fn next_dir(&mut self, snake: &SnakeRepr, _other_snakes: Vec<&SnakeRepr>, _apples: &[HexPos], board_dim: HexPos) -> Option<Dir> {
+        if let Some(queue_dir) = self.control_queue.pop_front() {
+            self.dir = queue_dir;
+            Some(queue_dir)
         } else {
-            dir
-        };
-        self.dir = new_dir;
-        new_dir
+            None
+        }
     }
 
     fn key_pressed(&mut self, key: KeyCode) {

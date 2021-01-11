@@ -1,5 +1,5 @@
-use crate::app::hex::Dir;
-use crate::app::snake::SnakeController;
+use crate::app::hex::{Dir, HexPos};
+use crate::app::snake::{SnakeController, Snake, SnakeRepr};
 
 pub enum SimMove {
     Move(Dir),
@@ -23,18 +23,19 @@ impl DemoController {
 }
 
 impl SnakeController for DemoController {
-    fn next_dir(&mut self, dir: Dir) -> Dir {
+    fn next_dir(&mut self, _snake: &SnakeRepr, _other_snakes: Vec<&SnakeRepr>, _apples: &[HexPos], board_dim: HexPos) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
-            dir
+            None
         } else {
             let new_dir = match self.move_sequence[self.next_move_idx] {
                 SimMove::Wait(wait) => {
                     self.wait = wait;
-                    dir
+                    None
                 },
-                SimMove::Move(new_dir) => new_dir,
+                SimMove::Move(new_dir) => Some(new_dir),
             };
+
             self.next_move_idx += 1;
             self.next_move_idx %= self.move_sequence.len();
             new_dir
