@@ -7,9 +7,11 @@ use ggez::{
     Context, GameResult,
 };
 
+use crate::app::snake::{controller::SnakeControllerTemplate, palette::SnakePaletteTemplate};
 use control::{ControlSetup, KeyboardLayout, Side};
 use game::Game;
 use palette::GamePalette;
+use snake::SnakeSeed;
 use start_screen::StartScreen;
 
 pub mod control;
@@ -48,13 +50,13 @@ impl DerefMut for Screen {
 
 pub struct App {
     screen: Screen,
-    wm: WindowMode,
-    ws: WindowSetup,
+    window_mode: WindowMode,
+    window_setup: WindowSetup,
 }
 
 impl App {
     pub fn new() -> Self {
-        let wm = WindowMode {
+        let window_mode = WindowMode {
             width: 1000.,
             height: 800.,
             maximized: false,
@@ -68,7 +70,7 @@ impl App {
             resizable: true,
         };
 
-        let ws = WindowSetup {
+        let window_setup = WindowSetup {
             title: "Hex Snake".to_string(),
             samples: NumSamples::Zero,
             vsync: true,
@@ -81,31 +83,33 @@ impl App {
             screen: Screen::Game(Game::new(
                 10.,
                 vec![
-                    ControlSetup {
-                        layout: KeyboardLayout::Dvorak,
-                        keyboard_side: Side::RightSide,
-                        hand: Side::RightSide,
+                    SnakeSeed {
+                        palette: SnakePaletteTemplate::new_persistent_rainbow(),
+                        controller: SnakeControllerTemplate::PlayerController(ControlSetup {
+                            layout: KeyboardLayout::Dvorak,
+                            keyboard_side: Side::RightSide,
+                            hand: Side::RightSide,
+                        }),
                     },
-                    // ControlSetup {
-                    //     layout: KeyboardLayout::Dvorak,
-                    //     keyboard_side: Side::LeftSide,
-                    //     hand: Side::RightSide,
-                    // },
+                    SnakeSeed {
+                        palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
+                        controller: SnakeControllerTemplate::SnakeAI,
+                    },
                 ],
                 GamePalette::dark(),
-                wm,
+                window_mode,
             )),
-            wm,
-            ws,
+            window_mode,
+            window_setup,
         }
     }
 
     pub fn wm(&self) -> WindowMode {
-        self.wm
+        self.window_mode
     }
 
     pub fn ws(&self) -> WindowSetup {
-        self.ws.clone()
+        self.window_setup.clone()
     }
 }
 

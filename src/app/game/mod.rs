@@ -20,13 +20,9 @@ use num_integer::Integer;
 use rand::prelude::*;
 
 use crate::app::{
-    control::{ControlSetup, Controls},
     hex::{Dir, Hex, HexPos, HexType},
-    palette::{GamePalette, SnakePalette},
-    snake::{
-        build_cell, player_controller::PlayerController, snake_ai_controller::SnakeAI, Snake,
-        SnakeState,
-    },
+    palette::GamePalette,
+    snake::{build_cell, Snake, SnakeSeed, SnakeState},
 };
 use std::collections::VecDeque;
 
@@ -159,7 +155,7 @@ pub struct Game {
     fps: FPSControl,
 
     dim: HexPos,
-    players: Vec<Controls>,
+    players: Vec<SnakeSeed>,
     snakes: Vec<Snake>,
     apples: Vec<HexPos>,
 
@@ -189,12 +185,11 @@ impl Game {
 
     pub fn new(
         cell_side_len: f32,
-        players: Vec<ControlSetup>,
+        players: Vec<SnakeSeed>,
         palette: GamePalette,
         wm: WindowMode,
     ) -> Self {
         assert!(!players.is_empty(), "No players specified");
-        assert!(players.len() <= 2, "More than 2 players not supported");
 
         let cell_dim = CellDim::from(cell_side_len);
 
@@ -225,54 +220,38 @@ impl Game {
         game
     }
 
-    // spawn 2 snakes in the middle
     fn restart(&mut self) {
         self.snakes.clear();
         self.apples.clear();
 
-        match *self.players.as_slice() {
-            [controls] => {
-                self.snakes.push(Snake::from((
-                    self.dim / 2,
-                    // SnakePalette::tropical(),
-                    SnakePalette::persistent_rainbow(),
-                    // SnakePalette::checker(1, 10),
-                    Dir::U,
-                    10,
-                    PlayerController::new(controls),
-                    // SnakeAI::new(),
-                    self.dim,
-                )));
+        const DISTANCE_BETWEEN_SNAKES: isize = 10;
 
-                self.snakes.push(Snake::from((
-                    self.dim / 2 + HexPos { h: 10, v: 0 },
-                    // SnakePalette::gray_gradient(),
-                    SnakePalette::pastel_persistent_rainbow(),
-                    Dir::D,
-                    10,
-                    SnakeAI::new(),
-                    self.dim,
-                )))
-            }
-            [controls1, controls2] => {
-                self.snakes.push(Snake::from((
-                    self.dim / 2 + HexPos { h: -5, v: 0 },
-                    SnakePalette::rainbow(),
-                    Dir::U,
-                    10,
-                    PlayerController::new(controls1),
-                    self.dim,
-                )));
-                self.snakes.push(Snake::from((
-                    self.dim / 2 + HexPos { h: 5, v: 0 },
-                    SnakePalette::rainbow(),
-                    Dir::U,
-                    10,
-                    PlayerController::new(controls2),
-                    self.dim,
-                )));
-            }
-            _ => unreachable!(),
+        let total_width = (self.players.len() - 1) as isize * DISTANCE_BETWEEN_SNAKES + 1;
+        assert!(total_width < self.dim.h, "snakes spread too wide");
+
+        let half = total_width / 2;
+        let middle = self.dim.h / 2;
+        let start = middle - half;
+        let end = start + total_width;
+        let mut dir = Dir::U;
+        for (seed, h_pos) in self
+            .players
+            .iter()
+            .zip((start..=end).step_by(DISTANCE_BETWEEN_SNAKES as usize))
+        {
+            self.snakes.push(Snake::from_seed(
+                seed,
+                HexPos {
+                    h: h_pos,
+                    v: self.dim.v / 2,
+                },
+                dir,
+                10,
+                self.dim,
+            ));
+
+            // alternate
+            dir = -dir;
         }
 
         self.spawn_apples();
@@ -461,11 +440,23 @@ impl EventHandler for Game {
             return Ok(());
         }
 
-        let reprs: Vec<_> = self.snakes.iter().map(Snake::as_repr).collect();
-        for (i, snake) in self.snakes.iter_mut().enumerate() {
-            let other_snakes = reprs[..i].iter().chain(&reprs[i + 1..]).collect();
-            snake.advance(other_snakes, &self.apples)
+        for snake_idx in 0..self.snakes.len() {
+            let mut other_bodies = Vec::with_capacity(self.snakes.len() - 1);
+            let mut current_snake = None;
+            for (i, snake) in self.snakes.iter_mut().enumerate() {
+                if i == snake_idx {
+                    current_snake = Some(snake)
+                } else {
+                    other_bodies.push(&snake.body)
+                }
+            }
+            current_snake.unwrap().advance(&other_bodies, &self.apples)
         }
+
+        // for (i, snake) in self.snakes.iter_mut().enumerate() {
+        //     let other_snakes = reprs[..i].iter().chain(&reprs[i + 1..]).collect();
+        //     snake.advance(other_snakes, &self.apples)
+        // }
 
         // check for crashes
         // [(crashed, into), ...]
@@ -515,7 +506,9 @@ impl EventHandler for Game {
             }
         }
 
-        if self.prefs.eat_behavior == EatBehavior::Die || self.prefs.eat_behavior == EatBehavior::Mixed {
+        if self.prefs.eat_behavior == EatBehavior::Die
+            || self.prefs.eat_behavior == EatBehavior::Mixed
+        {
             for &(i, j) in &crashed_snake_indices {
                 if self.prefs.eat_behavior == EatBehavior::Die || i != j {
                     self.snakes[i].state = SnakeState::Crashed;
@@ -611,7 +604,7 @@ impl EventHandler for Game {
             snake.draw_non_crash_points(builder, self.cell_dim)?;
         }
 
-        for snake in &self.snakes {
+        for snake in &mut self.snakes {
             snake.draw_crash_point(builder, self.cell_dim)?;
         }
 

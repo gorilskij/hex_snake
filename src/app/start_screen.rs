@@ -10,17 +10,15 @@ use crate::app::{
     game::CellDim,
     hex::{Dir, Hex, HexPos, HexType},
     snake::{
-        demo_controller::{DemoController, SimMove},
+        controller::{SimMove, SnakeControllerTemplate},
+        palette::SnakePaletteTemplate,
         Snake, SnakeState,
     },
     Screen,
 };
 
-use super::palette::SnakePalette;
-
 struct SnakeDemo {
     top_left: HexPos,
-    palette: SnakePalette,
     snake: Snake,
     cell_dim: CellDim,
 }
@@ -37,14 +35,13 @@ impl SnakeDemo {
         body.push_back(head);
         Self {
             top_left,
-            palette: SnakePalette::gray_gradient(),
             snake: Snake {
                 body,
-                palette: SnakePalette::gray_gradient(),
+                painter: SnakePaletteTemplate::new_gray_gradient().into(),
                 state: SnakeState::Living,
                 dir: Dir::U,
                 grow: 10,
-                controller: Box::new(DemoController::new(vec![
+                controller: SnakeControllerTemplate::DemoController(vec![
                     SimMove::Move(Dir::UR),
                     SimMove::Wait(5),
                     SimMove::Move(Dir::DR),
@@ -55,7 +52,8 @@ impl SnakeDemo {
                     SimMove::Wait(5),
                     SimMove::Move(Dir::UL),
                     SimMove::Wait(5),
-                ])),
+                ])
+                .into(),
                 board_dim: HexPos { h: 20, v: 20 },
             },
             cell_dim,
@@ -65,7 +63,7 @@ impl SnakeDemo {
 
 impl EventHandler for SnakeDemo {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        self.snake.advance(vec![], &[]);
+        self.snake.advance(&[], &[]);
         Ok(())
     }
 
@@ -81,7 +79,7 @@ impl EventHandler for SnakeDemo {
 pub struct StartScreen {
     // options selected
     players: usize,
-    palettes: Vec<SnakePalette>,
+    palettes: Vec<SnakePaletteTemplate>,
     player1_palette_idx: usize,
     player2_palette_idx: usize,
 
@@ -94,9 +92,9 @@ impl StartScreen {
         Self {
             players: 1,
             palettes: vec![
-                SnakePalette::gray_gradient(),
-                SnakePalette::rainbow(),
-                SnakePalette::rainbow_sin(10),
+                SnakePaletteTemplate::new_gray_gradient(),
+                SnakePaletteTemplate::new_rainbow(),
+                // SnakePaletteTemplate::new_rainbow_sin(10),
             ],
             player1_palette_idx: 0,
             player2_palette_idx: 0,

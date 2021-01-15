@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
 use ggez::{
-    event::KeyCode,
     graphics::{Color, DrawMode, MeshBuilder},
     GameResult,
 };
@@ -10,12 +9,14 @@ use mint::Point2;
 use crate::app::{
     game::{hexagon_points, CellDim},
     hex::{Dir, Hex, HexPos, HexType, HexType::*},
-    palette::SnakePalette,
+    snake::{
+        controller::{SnakeController, SnakeControllerTemplate},
+        palette::{SnakePainter, SnakePaletteTemplate},
+    },
 };
 
-pub mod demo_controller;
-pub mod player_controller;
-pub mod snake_ai_controller;
+pub mod controller;
+pub mod palette;
 
 #[derive(Eq, PartialEq)]
 pub enum SnakeState {
@@ -23,21 +24,9 @@ pub enum SnakeState {
     Crashed,
 }
 
-pub trait SnakeController {
-    fn next_dir(
-        &mut self,
-        snake: &SnakeRepr,
-        other_snakes: Vec<&SnakeRepr>,
-        apples: &[HexPos],
-        board_dim: HexPos,
-    ) -> Option<Dir>;
-
-    fn key_pressed(&mut self, _key: KeyCode) {}
-}
-
 pub struct Snake {
     pub body: VecDeque<Hex>,
-    pub palette: SnakePalette,
+    pub painter: Box<dyn SnakePainter>,
 
     pub state: SnakeState,
     pub dir: Dir,
@@ -47,45 +36,42 @@ pub struct Snake {
     pub board_dim: HexPos,
 }
 
-pub struct SnakeRepr {
-    pub body: Vec<HexPos>,
-    pub dir: Dir,
+#[derive(Clone)]
+pub struct SnakeSeed {
+    pub palette: SnakePaletteTemplate,
+    pub controller: SnakeControllerTemplate,
 }
 
-impl<C: SnakeController + 'static> From<(HexPos, SnakePalette, Dir, usize, C, HexPos)> for Snake {
-    fn from(params: (HexPos, SnakePalette, Dir, usize, C, HexPos)) -> Self {
-        let (pos, palette, dir, grow, controller, game_dim) = params;
+impl Snake {
+    pub fn from_seed(
+        seed: &SnakeSeed,
+        pos: HexPos,
+        dir: Dir,
+        grow: usize,
+        board_dim: HexPos,
+    ) -> Self {
+        let SnakeSeed {
+            palette,
+            controller,
+        } = (*seed).clone();
 
         let head = Hex {
             typ: HexType::Normal,
             pos,
             teleported: None,
         };
+
         let mut body = VecDeque::new();
         body.push_back(head);
+
         Self {
             body,
-            palette,
+            painter: palette.into(),
             state: SnakeState::Living,
             dir,
             grow,
-            controller: Box::new(controller),
-            board_dim: game_dim,
-        }
-    }
-}
-
-impl Snake {
-    pub fn as_repr(&self) -> SnakeRepr {
-        let body = self
-            .body
-            .iter()
-            .map(|Hex { pos, .. }| *pos)
-            .collect::<Vec<_>>();
-
-        SnakeRepr {
-            body,
-            dir: self.dir,
+            controller: controller.into(),
+            board_dim,
         }
     }
 
@@ -104,10 +90,10 @@ impl Snake {
         new_head
     }
 
-    pub fn advance(&mut self, other_snakes: Vec<&SnakeRepr>, apples: &[HexPos]) {
+    pub fn advance(&mut self, other_bodies: &[&VecDeque<Hex>], apples: &[HexPos]) {
         if let Some(new_dir) =
             self.controller
-                .next_dir(&self.as_repr(), other_snakes, apples, self.board_dim)
+                .next_dir(&self.body, self.dir, other_bodies, apples, self.board_dim)
         {
             self.dir = new_dir;
         }
@@ -139,25 +125,21 @@ impl Snake {
         cell_dim: CellDim,
     ) -> GameResult {
         let len = self.body.len();
-        for (i, segment) in self.body.iter().enumerate() {
-            let color = match segment.typ {
-                Crashed => continue,
-                Normal => self.palette.segment_color.paint_segment(i, len),
-                Eaten(_) => self.palette.eaten_color.paint_segment(i, len),
-            };
-
-            build_cell(builder, segment.pos, color, cell_dim)?;
+        for (seg_idx, hex) in self.body.iter().enumerate() {
+            let color = self.painter.paint_segment(seg_idx, len, hex);
+            build_cell(builder, hex.pos, color, cell_dim)?;
         }
 
         Ok(())
     }
 
-    pub fn draw_crash_point(&self, builder: &mut MeshBuilder, cell_dim: CellDim) -> GameResult {
+    pub fn draw_crash_point(&mut self, builder: &mut MeshBuilder, cell_dim: CellDim) -> GameResult {
         if self.body[0].typ == Crashed {
             build_cell(
                 builder,
                 self.body[0].pos,
-                self.palette.crashed_color,
+                self.painter
+                    .paint_segment(0, self.body.len(), &self.body[0]),
                 cell_dim,
             )?;
         }
