@@ -206,7 +206,7 @@ pub struct Persistent {
 impl SnakePainter for Persistent {
     fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Hex) -> Color {
         self.max_len = max(len, self.max_len);
-        self.painter.paint_segment(seg_idx, len, hex)
+        self.painter.paint_segment(seg_idx, self.max_len, hex)
     }
 }
 

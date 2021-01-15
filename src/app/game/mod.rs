@@ -258,25 +258,15 @@ impl Game {
         self.state = GameState::Playing;
     }
 
-    pub fn num_occupied_cells(&self) -> usize {
-        let mut num = self.apples.len();
-        let mut crashed_heads = vec![];
-        for snake in &self.snakes {
-            num += snake.body.len();
-            let Hex { typ, pos, .. } = snake.body[0];
-            if typ == HexType::Crashed {
-                crashed_heads.push(pos);
-            }
-        }
-        // apply correction
-        // every crashed head is double-counted because it overlaps with another body segment
-        // unless it overlaps with another head, then only one of them is double-counted
-        num -= crashed_heads.iter().unique().count();
-        num
-    }
-
     pub fn occupied_cells(&self) -> Vec<HexPos> {
-        let mut occupied_cells = Vec::with_capacity(self.num_occupied_cells());
+        // upper bound
+        let max_occupied_cells = self
+            .snakes
+            .iter()
+            .map(|snake| snake.body.len())
+            .sum::<usize>()
+            + self.apples.len();
+        let mut occupied_cells = Vec::with_capacity(max_occupied_cells);
         occupied_cells.extend_from_slice(&self.apples);
         for snake in &self.snakes {
             occupied_cells.extend(snake.body.iter().map(|hex| hex.pos));
@@ -287,8 +277,10 @@ impl Game {
     }
 
     pub fn spawn_apples(&mut self) {
+        let mut occupied_cells = self.occupied_cells();
+
         while self.apples.len() < self.apple_count {
-            let free_spaces = (self.dim.h * self.dim.v) as usize - self.num_occupied_cells();
+            let free_spaces = (self.dim.h * self.dim.v) as usize - occupied_cells.len();
             if free_spaces == 0 {
                 println!(
                     "warning: no space left for new apples ({} apples will be missing)",
@@ -297,7 +289,7 @@ impl Game {
                 return;
             }
             let mut new_idx = self.rng.gen_range(0, free_spaces);
-            for HexPos { h, v } in &self.occupied_cells() {
+            for HexPos { h, v } in &occupied_cells {
                 let idx = (v * self.dim.h + h) as usize;
                 if idx <= new_idx {
                     new_idx += 1;
@@ -308,6 +300,11 @@ impl Game {
                 h: new_idx as isize % self.dim.h,
                 v: new_idx as isize / self.dim.h,
             };
+            // insert at sorted position
+            match occupied_cells.binary_search(&new_apple) {
+                Ok(idx) => panic!("Spawned apple at occupied cell {:?}", occupied_cells[idx]),
+                Err(idx) => occupied_cells.insert(idx, new_apple),
+            }
             self.apples.push(new_apple);
         }
     }

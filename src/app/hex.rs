@@ -42,6 +42,7 @@ mod hex_pos {
     use Dir::*;
 
     use super::dir::Dir;
+    use std::cmp::Ordering;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
     pub struct HexPos {
@@ -52,6 +53,21 @@ mod hex_pos {
     impl Debug for HexPos {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
             write!(f, "<{}, {}>", self.h, self.v)
+        }
+    }
+
+    impl PartialOrd for HexPos {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl Ord for HexPos {
+        fn cmp(&self, other: &Self) -> Ordering {
+            match self.v.cmp(&other.v) {
+                Ordering::Equal => self.h.cmp(&other.h),
+                ord => ord,
+            }
         }
     }
 
