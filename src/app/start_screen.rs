@@ -10,15 +10,16 @@ use crate::app::{
     game::CellDim,
     hex::{Dir, Hex, HexPos, HexType},
     snake::{
-        controller::{SimMove, SnakeControllerTemplate},
+        controller::{OtherBodies, SimMove, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
-        Snake, SnakeState,
+        Snake, SnakeBody, SnakeState,
     },
     Screen,
 };
 
 struct SnakeDemo {
     top_left: HexPos,
+    dim: HexPos,
     snake: Snake,
     cell_dim: CellDim,
 }
@@ -33,14 +34,19 @@ impl SnakeDemo {
         };
         let mut body = VecDeque::new();
         body.push_back(head);
+        let board_dim = HexPos { h: 20, v: 20 };
         Self {
             top_left,
+            dim: board_dim,
             snake: Snake {
-                body,
-                painter: SnakePaletteTemplate::new_gray_gradient().into(),
+                body: SnakeBody {
+                    body,
+                    dir: Dir::U,
+                    grow: 10,
+                },
+
                 state: SnakeState::Living,
-                dir: Dir::U,
-                grow: 10,
+
                 controller: SnakeControllerTemplate::DemoController(vec![
                     SimMove::Move(Dir::UR),
                     SimMove::Wait(5),
@@ -54,7 +60,7 @@ impl SnakeDemo {
                     SimMove::Wait(5),
                 ])
                 .into(),
-                board_dim: HexPos { h: 20, v: 20 },
+                painter: SnakePaletteTemplate::new_gray_gradient().into(),
             },
             cell_dim,
         }
@@ -63,7 +69,7 @@ impl SnakeDemo {
 
 impl EventHandler for SnakeDemo {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        self.snake.advance(&[], &[]);
+        self.snake.advance(OtherBodies(&[], &[]), &[], self.dim);
         Ok(())
     }
 

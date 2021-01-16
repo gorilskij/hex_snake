@@ -115,6 +115,10 @@ mod hex_pos {
         }
 
         pub fn step_and_teleport(&mut self, dir: Dir, board_dim: HexPos) {
+            // todo make O(1)
+            //  at the moment this just moves the head back until the last cell that's still in the map
+            //  this could be done as a single calculation
+
             self.translate(dir, 1);
             if !self.is_in(board_dim) {
                 // find reappearance point

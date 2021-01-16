@@ -10,7 +10,7 @@ use crate::app::{
     game::{hexagon_points, CellDim},
     hex::{Dir, Hex, HexPos, HexType, HexType::*},
     snake::{
-        controller::{SnakeController, SnakeControllerTemplate},
+        controller::{OtherBodies, SnakeController, SnakeControllerTemplate},
         palette::{SnakePainter, SnakePaletteTemplate},
     },
 };
@@ -24,16 +24,19 @@ pub enum SnakeState {
     Crashed,
 }
 
-pub struct Snake {
+pub struct SnakeBody {
     pub body: VecDeque<Hex>,
-    pub painter: Box<dyn SnakePainter>,
-
-    pub state: SnakeState,
     pub dir: Dir,
     pub grow: usize,
+}
+
+pub struct Snake {
+    pub body: SnakeBody,
+
+    pub state: SnakeState,
 
     pub controller: Box<dyn SnakeController>,
-    pub board_dim: HexPos,
+    pub painter: Box<dyn SnakePainter>,
 }
 
 #[derive(Clone)]
@@ -43,13 +46,7 @@ pub struct SnakeSeed {
 }
 
 impl Snake {
-    pub fn from_seed(
-        seed: &SnakeSeed,
-        pos: HexPos,
-        dir: Dir,
-        grow: usize,
-        board_dim: HexPos,
-    ) -> Self {
+    pub fn from_seed(seed: &SnakeSeed, pos: HexPos, dir: Dir, grow: usize) -> Self {
         let SnakeSeed {
             palette,
             controller,
@@ -65,57 +62,61 @@ impl Snake {
         body.push_back(head);
 
         Self {
-            body,
-            painter: palette.into(),
+            body: SnakeBody { body, dir, grow },
+
             state: SnakeState::Living,
-            dir,
-            grow,
+
             controller: controller.into(),
-            board_dim,
+            painter: palette.into(),
         }
     }
 
-    fn get_new_head(&self) -> Hex {
+    pub fn len(&self) -> usize {
+        self.body.body.len()
+    }
+
+    pub fn dir(&self) -> Dir {
+        self.body.dir
+    }
+
+    pub fn head(&self) -> &Hex {
+        &self.body.body[0]
+    }
+
+    pub fn advance(&mut self, other_bodies: OtherBodies, apples: &[HexPos], board_dim: HexPos) {
+        // determine new direction for snake
+        if let Some(new_dir) = self
+            .controller
+            .next_dir(&self.body, other_bodies, apples, board_dim)
+        {
+            self.body.dir = new_dir
+        }
+
+        // create new head for snake
         let mut new_head = Hex {
             typ: HexType::Normal,
-            pos: self.body[0].pos,
+            pos: self.head().pos,
             teleported: None,
         };
 
-        // todo make O(1)
-        //  at the moment this just moves the head back until the last cell that's still in the map
-        //  this could be done as a single calculation
-        new_head.step_and_teleport(self.dir, self.board_dim);
+        new_head.step_and_teleport(self.dir(), board_dim);
 
-        new_head
-    }
-
-    pub fn advance(&mut self, other_bodies: &[&VecDeque<Hex>], apples: &[HexPos]) {
-        if let Some(new_dir) =
-            self.controller
-                .next_dir(&self.body, self.dir, other_bodies, apples, self.board_dim)
-        {
-            self.dir = new_dir;
-        }
-
-        let new_head = self.get_new_head();
-
-        let body_last = self.body.len() - 1;
-        if let HexType::Eaten(amount) = &mut self.body[body_last].typ {
+        let last_idx = self.len() - 1;
+        if let HexType::Eaten(amount) = &mut self.body.body[last_idx].typ {
             if *amount == 0 {
-                self.body[body_last].typ = HexType::Normal;
+                self.body.body[last_idx].typ = HexType::Normal;
             } else {
-                self.grow += 1;
+                self.body.grow += 1;
                 *amount -= 1;
             }
         }
 
-        if self.grow > 0 {
-            self.body.insert(0, new_head);
-            self.grow -= 1;
+        if self.body.grow > 0 {
+            self.body.body.push_front(new_head);
+            self.body.grow -= 1;
         } else {
-            self.body.rotate_right(1);
-            self.body[0] = new_head;
+            self.body.body.rotate_right(1);
+            self.body.body[0] = new_head;
         }
     }
 
@@ -124,8 +125,8 @@ impl Snake {
         builder: &mut MeshBuilder,
         cell_dim: CellDim,
     ) -> GameResult {
-        let len = self.body.len();
-        for (seg_idx, hex) in self.body.iter().enumerate() {
+        let len = self.len();
+        for (seg_idx, hex) in self.body.body.iter().enumerate() {
             let color = self.painter.paint_segment(seg_idx, len, hex);
             build_cell(builder, hex.pos, color, cell_dim)?;
         }
@@ -134,12 +135,12 @@ impl Snake {
     }
 
     pub fn draw_crash_point(&mut self, builder: &mut MeshBuilder, cell_dim: CellDim) -> GameResult {
-        if self.body[0].typ == Crashed {
+        if self.head().typ == Crashed {
             build_cell(
                 builder,
-                self.body[0].pos,
+                self.head().pos,
                 self.painter
-                    .paint_segment(0, self.body.len(), &self.body[0]),
+                    .paint_segment(0, self.len(), &self.body.body[0]),
                 cell_dim,
             )?;
         }

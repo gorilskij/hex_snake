@@ -1,6 +1,7 @@
 use crate::app::{
     control::{ControlSetup, Controls},
     hex::{Dir, Hex, HexPos},
+    snake::{Snake, SnakeBody},
 };
 use ggez::event::KeyCode;
 use std::{collections::VecDeque, iter::once};
@@ -12,12 +13,23 @@ pub enum SnakeControllerTemplate {
     SnakeAI,
 }
 
+#[derive(Copy, Clone)]
+pub struct OtherBodies<'a>(pub &'a [Snake], pub &'a [Snake]);
+
+impl OtherBodies<'_> {
+    pub fn iter(&self) -> impl Iterator<Item = &SnakeBody> {
+        self.0
+            .iter()
+            .chain(self.1.iter())
+            .map(|Snake { body, .. }| body)
+    }
+}
+
 pub trait SnakeController {
     fn next_dir(
         &mut self,
-        body: &VecDeque<Hex>,
-        dir: Dir,
-        other_bodies: &[&VecDeque<Hex>],
+        snake_body: &SnakeBody,
+        other_bodies: OtherBodies,
         apples: &[HexPos],
         board_dim: HexPos,
     ) -> Option<Dir>;
@@ -58,14 +70,7 @@ impl PlayerController {
 }
 
 impl SnakeController for PlayerController {
-    fn next_dir(
-        &mut self,
-        _: &VecDeque<Hex>,
-        _: Dir,
-        _: &[&VecDeque<Hex>],
-        _: &[HexPos],
-        _: HexPos,
-    ) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherBodies, _: &[HexPos], _: HexPos) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = Some(queue_dir);
             self.dir
@@ -113,14 +118,7 @@ pub struct DemoController {
 }
 
 impl SnakeController for DemoController {
-    fn next_dir(
-        &mut self,
-        _: &VecDeque<Hex>,
-        _: Dir,
-        _: &[&VecDeque<Hex>],
-        _: &[HexPos],
-        _: HexPos,
-    ) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherBodies, _: &[HexPos], _: HexPos) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
             None
@@ -151,7 +149,8 @@ fn dir_score(
     head: HexPos,
     dir: Dir,
     board_dim: HexPos,
-    snake_bodies: &[&VecDeque<Hex>],
+    snake_body: &SnakeBody,
+    other_bodies: OtherBodies,
     apples: &[HexPos],
 ) -> usize {
     let mut distance = 0;
@@ -160,8 +159,8 @@ fn dir_score(
         distance += 1;
         new_head.step_and_teleport(dir, board_dim);
 
-        for body in snake_bodies {
-            if body.iter().any(|Hex { pos, .. }| pos == &new_head) {
+        for snake in once(snake_body).chain(other_bodies.iter()) {
+            if snake.body.iter().any(|Hex { pos, .. }| pos == &new_head) {
                 return distance; // the higher the distance to a body part, the higher the score
             }
         }
@@ -172,18 +171,17 @@ fn dir_score(
 }
 
 impl SnakeController for SnakeAI {
-    fn next_dir<'a, 'b>(
-        &'a mut self,
-        body: &'b VecDeque<Hex>,
-        dir: Dir,
-        other_bodies: &'b [&'b VecDeque<Hex>],
-        apples: &'b [HexPos],
+    fn next_dir(
+        &mut self,
+        snake_body: &SnakeBody,
+        other_bodies: OtherBodies,
+        apples: &[HexPos],
         board_dim: HexPos,
     ) -> Option<Dir> {
         use Dir::*;
         let available_directions: Vec<_> = [UL, U, UR, DL, D, DR]
             .iter()
-            .filter(|&&d| d != -dir)
+            .filter(|&&d| d != -snake_body.dir)
             .copied()
             .collect();
 
@@ -197,11 +195,18 @@ impl SnakeController for SnakeAI {
         //     DL => [D, DL, UL],
         // };
 
-        let all_bodies: Vec<_> = once(body).chain(other_bodies.iter().copied()).collect();
-
         let new_dir = available_directions
             .iter()
-            .max_by_key(|&&dir| dir_score(body[0].pos, dir, board_dim, &all_bodies, apples))
+            .max_by_key(|&&dir| {
+                dir_score(
+                    snake_body.body[0].pos,
+                    dir,
+                    board_dim,
+                    &snake_body,
+                    other_bodies,
+                    apples,
+                )
+            })
             .copied();
 
         // if let Some(dir) = new_dir {

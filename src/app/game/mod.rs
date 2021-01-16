@@ -14,7 +14,6 @@ use ggez::{
     },
     Context, GameResult,
 };
-use itertools::Itertools;
 use mint::Point2;
 use num_integer::Integer;
 use rand::prelude::*;
@@ -22,7 +21,7 @@ use rand::prelude::*;
 use crate::app::{
     hex::{Dir, Hex, HexPos, HexType},
     palette::GamePalette,
-    snake::{build_cell, Snake, SnakeSeed, SnakeState},
+    snake::{build_cell, controller::OtherBodies, Snake, SnakeSeed, SnakeState},
 };
 use std::collections::VecDeque;
 
@@ -247,7 +246,6 @@ impl Game {
                 },
                 dir,
                 10,
-                self.dim,
             ));
 
             // alternate
@@ -260,16 +258,12 @@ impl Game {
 
     pub fn occupied_cells(&self) -> Vec<HexPos> {
         // upper bound
-        let max_occupied_cells = self
-            .snakes
-            .iter()
-            .map(|snake| snake.body.len())
-            .sum::<usize>()
-            + self.apples.len();
+        let max_occupied_cells =
+            self.snakes.iter().map(|snake| snake.len()).sum::<usize>() + self.apples.len();
         let mut occupied_cells = Vec::with_capacity(max_occupied_cells);
         occupied_cells.extend_from_slice(&self.apples);
         for snake in &self.snakes {
-            occupied_cells.extend(snake.body.iter().map(|hex| hex.pos));
+            occupied_cells.extend(snake.body.body.iter().map(|hex| hex.pos));
         }
         occupied_cells.sort_by_key(move |&x| x.v * self.dim.h + x.h);
         occupied_cells.dedup();
@@ -306,6 +300,96 @@ impl Game {
                 Err(idx) => occupied_cells.insert(idx, new_apple),
             }
             self.apples.push(new_apple);
+        }
+    }
+
+    fn advance_snakes(&mut self) {
+        for snake_idx in 0..self.snakes.len() {
+            let (other_snakes1, rest) = self.snakes.split_at_mut(snake_idx);
+            let (snake, other_snakes2) = rest.split_at_mut(1);
+            let snake = &mut snake[0];
+            snake.advance(
+                OtherBodies(other_snakes1, other_snakes2),
+                &self.apples,
+                self.dim,
+            );
+        }
+
+        // check for crashes
+        // [(index of snake that crashed, index of snake into which it crashed), ...]
+        let mut crashed_snake_indices = vec![];
+        'outer: for (i, snake) in self.snakes.iter().enumerate() {
+            for (j, other) in self.snakes.iter().enumerate() {
+                // check head-head crash
+                if i != j && snake.head().pos == other.head().pos {
+                    // snake j will be added when it's reached by the outer loop
+                    crashed_snake_indices.push((i, j));
+                    continue 'outer;
+                }
+
+                // check head-body crash (this also checks if a snake crashed with itself)
+                for segment in other.body.body.iter().skip(1) {
+                    if snake.head().pos == segment.pos {
+                        crashed_snake_indices.push((i, j));
+                        continue 'outer;
+                    }
+                }
+            }
+        }
+
+        if self.prefs.eat_behavior == EatBehavior::Cut
+            || self.prefs.eat_behavior == EatBehavior::Mixed
+        {
+            // TODO: this might do weird things with head-to-head collisions
+            for &(i, j) in &crashed_snake_indices {
+                if self.prefs.eat_behavior == EatBehavior::Cut || i == j {
+                    let crash_point = self.snakes[i].head().pos;
+                    let drain_start_idx = self.snakes[j]
+                        .body
+                        .body
+                        .iter()
+                        .skip(1)
+                        .position(|Hex { pos, .. }| *pos == crash_point)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "point {:?} not found in snake of index {} (head-to-head collision)",
+                                crash_point, j
+                            )
+                            // TODO: handle this as a special case
+                        });
+
+                    let _ = self.snakes[j].body.body.drain(drain_start_idx + 1..);
+                    self.snakes[j].body.grow = 0;
+                }
+            }
+        }
+
+        if self.prefs.eat_behavior == EatBehavior::Die
+            || self.prefs.eat_behavior == EatBehavior::Mixed
+        {
+            for &(i, j) in &crashed_snake_indices {
+                if self.prefs.eat_behavior == EatBehavior::Die || i != j {
+                    self.snakes[i].state = SnakeState::Crashed;
+                    self.snakes[i].body.body[0].typ = HexType::Crashed;
+                    self.state = GameState::Crashed;
+                    self.force_redraw = 10;
+                }
+            }
+        }
+
+        // check apple eating
+        let mut k = -1;
+        for snake in &mut self.snakes {
+            k += 1;
+            for i in (0..self.apples.len()).rev() {
+                if snake.len() == 0 {
+                    panic!("snake {} is empty", k);
+                }
+                if snake.head().pos == self.apples[i] {
+                    self.apples.remove(i);
+                    snake.body.body[0].typ = HexType::Eaten(5);
+                }
+            }
         }
     }
 
@@ -437,100 +521,7 @@ impl EventHandler for Game {
             return Ok(());
         }
 
-        for snake_idx in 0..self.snakes.len() {
-            let mut other_bodies = Vec::with_capacity(self.snakes.len() - 1);
-            let mut current_snake = None;
-            for (i, snake) in self.snakes.iter_mut().enumerate() {
-                if i == snake_idx {
-                    current_snake = Some(snake)
-                } else {
-                    other_bodies.push(&snake.body)
-                }
-            }
-            current_snake.unwrap().advance(&other_bodies, &self.apples)
-        }
-
-        // for (i, snake) in self.snakes.iter_mut().enumerate() {
-        //     let other_snakes = reprs[..i].iter().chain(&reprs[i + 1..]).collect();
-        //     snake.advance(other_snakes, &self.apples)
-        // }
-
-        // check for crashes
-        // [(crashed, into), ...]
-        let mut crashed_snake_indices = vec![];
-        'outer: for (i, snake) in self.snakes.iter().enumerate() {
-            for (j, other) in self.snakes.iter().enumerate() {
-                // check head-head crash
-                if i != j && snake.body[0].pos == other.body[0].pos {
-                    // snake j will be added when it's reached by the outer loop
-                    crashed_snake_indices.push((i, j));
-                    continue 'outer;
-                }
-
-                // check head-body crash (this also checks if a snake crashed with itself)
-                for segment in other.body.iter().skip(1) {
-                    if snake.body[0].pos == segment.pos {
-                        crashed_snake_indices.push((i, j));
-                        continue 'outer;
-                    }
-                }
-            }
-        }
-
-        if self.prefs.eat_behavior == EatBehavior::Cut
-            || self.prefs.eat_behavior == EatBehavior::Mixed
-        {
-            // TODO: this might do weird things with head-to-head collisions
-            for &(i, j) in &crashed_snake_indices {
-                if self.prefs.eat_behavior == EatBehavior::Cut || i == j {
-                    let crash_point = self.snakes[i].body[0].pos;
-                    let drain_start_idx = self.snakes[j]
-                        .body
-                        .iter()
-                        .skip(1)
-                        .position(|Hex { pos, .. }| *pos == crash_point)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "point {:?} not found in snake of index {} (head-to-head collision)",
-                                crash_point, j
-                            )
-                            // TODO: handle this as a special case
-                        });
-
-                    let _ = self.snakes[j].body.drain(drain_start_idx + 1..);
-                    self.snakes[j].grow = 0;
-                }
-            }
-        }
-
-        if self.prefs.eat_behavior == EatBehavior::Die
-            || self.prefs.eat_behavior == EatBehavior::Mixed
-        {
-            for &(i, j) in &crashed_snake_indices {
-                if self.prefs.eat_behavior == EatBehavior::Die || i != j {
-                    self.snakes[i].state = SnakeState::Crashed;
-                    self.snakes[i].body[0].typ = HexType::Crashed;
-                    self.state = GameState::Crashed;
-                    self.force_redraw = 10;
-                }
-            }
-        }
-
-        // check apple eating
-        let mut k = -1;
-        for snake in &mut self.snakes {
-            k += 1;
-            for i in (0..self.apples.len()).rev() {
-                if snake.body.is_empty() {
-                    panic!("snake {} is empty", k);
-                }
-                if snake.body[0].pos == self.apples[i] {
-                    self.apples.remove(i);
-                    snake.body[0].typ = HexType::Eaten(5);
-                }
-            }
-        }
-
+        self.advance_snakes();
         self.spawn_apples();
 
         // thread::yield_now();
@@ -685,10 +676,6 @@ impl EventHandler for Game {
         let new_dim = Self::wh_to_dim(self.cell_dim, width, height);
         self.dim = new_dim;
 
-        // this is only to allow for hacky mid-game resizing
-        for snake in &mut self.snakes {
-            snake.board_dim = new_dim;
-        }
         // this too
         self.apples.retain(move |apple| apple.is_in(new_dim));
         self.spawn_apples();
