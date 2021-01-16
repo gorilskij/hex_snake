@@ -83,20 +83,20 @@ impl App {
             screen: Screen::Game(Game::new(
                 10.,
                 vec![
-                    SnakeSeed {
-                        palette: SnakePaletteTemplate::new_persistent_rainbow(),
-                        controller: SnakeControllerTemplate::PlayerController(ControlSetup {
-                            layout: KeyboardLayout::Dvorak,
-                            keyboard_side: Side::RightSide,
-                            hand: Side::RightSide,
-                        }),
-                        life: None,
-                    },
                     // SnakeSeed {
-                    //     palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
-                    //     controller: SnakeControllerTemplate::SnakeAI,
+                    //     palette: SnakePaletteTemplate::new_persistent_rainbow(),
+                    //     controller: SnakeControllerTemplate::PlayerController(ControlSetup {
+                    //         layout: KeyboardLayout::Dvorak,
+                    //         keyboard_side: Side::RightSide,
+                    //         hand: Side::RightSide,
+                    //     }),
                     //     life: None,
                     // },
+                    SnakeSeed {
+                        palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
+                        controller: SnakeControllerTemplate::SnakeAI,
+                        life: None,
+                    },
                 ],
                 GamePalette::dark(),
                 window_mode,

@@ -211,8 +211,8 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            fps: FPSControl::new(12, 60),
-            // fps: FPSControl::new(240, 240),
+            // fps: FPSControl::new(12, 60),
+            fps: FPSControl::new(240, 240),
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
             players: players.into_iter().map(Into::into).collect(),
             snakes: vec![],
@@ -329,13 +329,14 @@ impl Game {
                 Err(idx) => occupied_cells.insert(idx, apple_pos),
             }
 
-            let apple_type = if self.rng.gen::<f32>() < 0.95 {
-                AppleType::Normal(5)
-            } else {
-                AppleType::EvilSnake {
-                    life: self.rng.gen_range(100, 200),
-                }
-            };
+            let apple_type = AppleType::Normal(5);
+            // let apple_type = if self.rng.gen::<f32>() < 0.95 {
+            //     AppleType::Normal(5)
+            // } else {
+            //     AppleType::EvilSnake {
+            //         life: self.rng.gen_range(100, 200),
+            //     }
+            // };
 
             self.apples.push(Apple {
                 pos: apple_pos,
@@ -618,6 +619,13 @@ impl EventHandler for Game {
                 return Ok(());
             }
         }
+
+        // skip frames for faster gameplay
+        // unsafe {
+        //     static mut MG: u64 = 0;
+        //     MG += 1;
+        //     if MG % 5 != 0 { return Ok(()) }
+        // }
 
         unsafe {
             static mut T: Option<Instant> = None;

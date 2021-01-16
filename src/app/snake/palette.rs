@@ -142,21 +142,22 @@ pub struct RGBGradient {
 impl SnakePainter for RGBGradient {
     fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Hex) -> Color {
         if hex.typ == HexType::Crashed {
-            *DEFAULT_CRASHED_COLOR
-        } else {
-            let head_ratio = 1. - seg_idx as f32 / (len - 1) as f32;
-            let tail_ratio = 1. - head_ratio;
-            let normal_color = Color {
-                r: head_ratio * self.head.r + tail_ratio * self.tail.r,
-                g: head_ratio * self.head.g + tail_ratio * self.tail.g,
-                b: head_ratio * self.head.b + tail_ratio * self.tail.b,
-                a: 1.,
-            };
-            match hex.typ {
-                HexType::Normal => normal_color,
-                HexType::Eaten(_) => self.eaten.paint_segment(&normal_color),
-                _ => unreachable!(),
-            }
+            return *DEFAULT_CRASHED_COLOR;
+        }
+
+        let head_ratio = 1. - seg_idx as f32 / (len - 1) as f32;
+        let tail_ratio = 1. - head_ratio;
+        let normal_color = Color {
+            r: head_ratio * self.head.r + tail_ratio * self.tail.r,
+            g: head_ratio * self.head.g + tail_ratio * self.tail.g,
+            b: head_ratio * self.head.b + tail_ratio * self.tail.b,
+            a: 1.,
+        };
+
+        match hex.typ {
+            HexType::Normal => normal_color,
+            HexType::Eaten(_) => self.eaten.paint_segment(&normal_color),
+            _ => unreachable!(),
         }
     }
 }
@@ -172,28 +173,28 @@ pub struct HSLGradient {
 impl SnakePainter for HSLGradient {
     fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Hex) -> Color {
         if hex.typ == HexType::Crashed {
-            *DEFAULT_CRASHED_COLOR
-        } else {
-            let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
-            match hex.typ {
-                HexType::Normal => {
-                    let hsl = HSL {
-                        h: hue,
-                        s: 1.,
-                        l: self.lightness,
-                    };
-                    Color::from(hsl.to_rgb())
-                }
-                HexType::Eaten(_) => {
-                    let hsl = HSL {
-                        h: hue,
-                        s: 1.,
-                        l: 1. - self.eaten_lightness, // will be re-inverted
-                    };
-                    self.eaten.paint_segment(&Color::from(hsl.to_rgb()))
-                }
-                _ => unreachable!(),
+            return *DEFAULT_CRASHED_COLOR;
+        }
+
+        let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
+        match hex.typ {
+            HexType::Normal => {
+                let hsl = HSL {
+                    h: hue,
+                    s: 1.,
+                    l: self.lightness,
+                };
+                Color::from(hsl.to_rgb())
             }
+            HexType::Eaten(_) => {
+                let hsl = HSL {
+                    h: hue,
+                    s: 1.,
+                    l: 1. - self.eaten_lightness, // will be re-inverted
+                };
+                self.eaten.paint_segment(&Color::from(hsl.to_rgb()))
+            }
+            _ => unreachable!(),
         }
     }
 }
