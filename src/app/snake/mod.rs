@@ -7,7 +7,7 @@ use ggez::{
 use mint::Point2;
 
 use crate::app::{
-    game::{hexagon_points, CellDim},
+    game::{hexagon_points, Apple, CellDim},
     hex::{Dir, Hex, HexPos, HexType, HexType::*},
     snake::{
         controller::{OtherBodies, SnakeController, SnakeControllerTemplate},
@@ -37,12 +37,15 @@ pub struct Snake {
 
     pub controller: Box<dyn SnakeController>,
     pub painter: Box<dyn SnakePainter>,
+
+    pub life: Option<u32>,
 }
 
 #[derive(Clone)]
 pub struct SnakeSeed {
     pub palette: SnakePaletteTemplate,
     pub controller: SnakeControllerTemplate,
+    pub life: Option<u32>,
 }
 
 impl Snake {
@@ -50,6 +53,7 @@ impl Snake {
         let SnakeSeed {
             palette,
             controller,
+            life,
         } = (*seed).clone();
 
         let head = Hex {
@@ -68,6 +72,8 @@ impl Snake {
 
             controller: controller.into(),
             painter: palette.into(),
+
+            life,
         }
     }
 
@@ -83,7 +89,7 @@ impl Snake {
         &self.body.body[0]
     }
 
-    pub fn advance(&mut self, other_bodies: OtherBodies, apples: &[HexPos], board_dim: HexPos) {
+    pub fn advance(&mut self, other_bodies: OtherBodies, apples: &[Apple], board_dim: HexPos) {
         // determine new direction for snake
         if let Some(new_dir) = self
             .controller

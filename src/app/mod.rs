@@ -90,11 +90,13 @@ impl App {
                             keyboard_side: Side::RightSide,
                             hand: Side::RightSide,
                         }),
+                        life: None,
                     },
-                    SnakeSeed {
-                        palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
-                        controller: SnakeControllerTemplate::SnakeAI,
-                    },
+                    // SnakeSeed {
+                    //     palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
+                    //     controller: SnakeControllerTemplate::SnakeAI,
+                    //     life: None,
+                    // },
                 ],
                 GamePalette::dark(),
                 window_mode,

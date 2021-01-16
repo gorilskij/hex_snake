@@ -1,5 +1,6 @@
 use crate::app::{
     control::{ControlSetup, Controls},
+    game::Apple,
     hex::{Dir, Hex, HexPos},
     snake::{Snake, SnakeBody},
 };
@@ -30,7 +31,7 @@ pub trait SnakeController {
         &mut self,
         snake_body: &SnakeBody,
         other_bodies: OtherBodies,
-        apples: &[HexPos],
+        apples: &[Apple],
         board_dim: HexPos,
     ) -> Option<Dir>;
 
@@ -70,7 +71,7 @@ impl PlayerController {
 }
 
 impl SnakeController for PlayerController {
-    fn next_dir(&mut self, _: &SnakeBody, _: OtherBodies, _: &[HexPos], _: HexPos) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherBodies, _: &[Apple], _: HexPos) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = Some(queue_dir);
             self.dir
@@ -118,7 +119,7 @@ pub struct DemoController {
 }
 
 impl SnakeController for DemoController {
-    fn next_dir(&mut self, _: &SnakeBody, _: OtherBodies, _: &[HexPos], _: HexPos) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherBodies, _: &[Apple], _: HexPos) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
             None
@@ -151,11 +152,11 @@ fn dir_score(
     board_dim: HexPos,
     snake_body: &SnakeBody,
     other_bodies: OtherBodies,
-    apples: &[HexPos],
+    apples: &[Apple],
 ) -> usize {
     let mut distance = 0;
     let mut new_head = head;
-    while !apples.contains(&new_head) {
+    while !apples.iter().any(|Apple { pos, .. }| pos == &new_head) {
         distance += 1;
         new_head.step_and_teleport(dir, board_dim);
 
@@ -175,7 +176,7 @@ impl SnakeController for SnakeAI {
         &mut self,
         snake_body: &SnakeBody,
         other_bodies: OtherBodies,
-        apples: &[HexPos],
+        apples: &[Apple],
         board_dim: HexPos,
     ) -> Option<Dir> {
         use Dir::*;

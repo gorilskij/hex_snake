@@ -6,6 +6,7 @@ pub use hex_pos::HexPos;
 mod dir {
     use std::ops::Neg;
 
+    use rand::Rng;
     use Dir::*;
 
     #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -29,6 +30,20 @@ mod dir {
                 UR => DL,
                 DL => UR,
                 DR => UL,
+            }
+        }
+    }
+
+    impl Dir {
+        pub fn random(rng: &mut impl Rng) -> Self {
+            match rng.gen_range(0, 6) {
+                0 => U,
+                1 => D,
+                2 => UL,
+                3 => UR,
+                4 => DL,
+                5 => DR,
+                _ => unreachable!(),
             }
         }
     }
@@ -132,7 +147,7 @@ mod hex_pos {
 
         // checks if between (0,0) and dim
         pub fn is_in(self, dim: HexPos) -> bool {
-            self.h >= 0 && self.h < dim.h && self.v >= 0 && self.v < dim.v
+            (0..dim.h).contains(&self.h) && (0..dim.v).contains(&self.v)
         }
     }
 }
@@ -141,7 +156,7 @@ mod hex_pos {
 pub enum HexType {
     Normal,
     Crashed,
-    Eaten(u8),
+    Eaten(u32),
 }
 
 #[derive(Copy, Clone, Debug)]

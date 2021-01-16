@@ -21,7 +21,12 @@ use rand::prelude::*;
 use crate::app::{
     hex::{Dir, Hex, HexPos, HexType},
     palette::GamePalette,
-    snake::{build_cell, controller::OtherBodies, Snake, SnakeSeed, SnakeState},
+    snake::{
+        build_cell,
+        controller::{OtherBodies, SnakeControllerTemplate},
+        palette::SnakePaletteTemplate,
+        Snake, SnakeSeed, SnakeState,
+    },
 };
 use std::collections::VecDeque;
 
@@ -149,6 +154,18 @@ impl Default for Prefs {
 
 struct Message(String, u8);
 
+pub enum AppleType {
+    Normal(u32),
+    EvilSnake {
+        life: u32, // frames
+    },
+}
+
+pub struct Apple {
+    pub pos: HexPos,
+    pub typ: AppleType,
+}
+
 pub struct Game {
     state: GameState,
     fps: FPSControl,
@@ -156,7 +173,7 @@ pub struct Game {
     dim: HexPos,
     players: Vec<SnakeSeed>,
     snakes: Vec<Snake>,
-    apples: Vec<HexPos>,
+    apples: Vec<Apple>,
 
     cell_dim: CellDim,
     palette: GamePalette,
@@ -256,12 +273,12 @@ impl Game {
         self.state = GameState::Playing;
     }
 
-    pub fn occupied_cells(&self) -> Vec<HexPos> {
+    fn occupied_cells(&self) -> Vec<HexPos> {
         // upper bound
         let max_occupied_cells =
             self.snakes.iter().map(|snake| snake.len()).sum::<usize>() + self.apples.len();
         let mut occupied_cells = Vec::with_capacity(max_occupied_cells);
-        occupied_cells.extend_from_slice(&self.apples);
+        occupied_cells.extend(self.apples.iter().map(|Apple { pos, .. }| pos));
         for snake in &self.snakes {
             occupied_cells.extend(snake.body.body.iter().map(|hex| hex.pos));
         }
@@ -270,41 +287,74 @@ impl Game {
         occupied_cells
     }
 
+    fn random_free_spot(&mut self, occupied_cells: &[HexPos]) -> Option<HexPos> {
+        let free_spaces = (self.dim.h * self.dim.v) as usize - occupied_cells.len();
+        if free_spaces == 0 {
+            return None;
+        }
+
+        let mut new_idx = self.rng.gen_range(0, free_spaces);
+        for HexPos { h, v } in occupied_cells {
+            let idx = (v * self.dim.h + h) as usize;
+            if idx <= new_idx {
+                new_idx += 1;
+            }
+        }
+
+        assert!(new_idx < (self.dim.h * self.dim.v) as usize);
+        Some(HexPos {
+            h: new_idx as isize % self.dim.h,
+            v: new_idx as isize / self.dim.h,
+        })
+    }
+
     pub fn spawn_apples(&mut self) {
         let mut occupied_cells = self.occupied_cells();
 
         while self.apples.len() < self.apple_count {
-            let free_spaces = (self.dim.h * self.dim.v) as usize - occupied_cells.len();
-            if free_spaces == 0 {
-                println!(
-                    "warning: no space left for new apples ({} apples will be missing)",
-                    self.apple_count - self.apples.len()
-                );
-                return;
-            }
-            let mut new_idx = self.rng.gen_range(0, free_spaces);
-            for HexPos { h, v } in &occupied_cells {
-                let idx = (v * self.dim.h + h) as usize;
-                if idx <= new_idx {
-                    new_idx += 1;
+            let apple_pos = match self.random_free_spot(&occupied_cells) {
+                Some(pos) => pos,
+                None => {
+                    println!(
+                        "warning: no space left for new apples ({} apples will be missing)",
+                        self.apple_count - self.apples.len()
+                    );
+                    return;
                 }
-            }
-            assert!(new_idx < (self.dim.h * self.dim.v) as usize);
-            let new_apple = HexPos {
-                h: new_idx as isize % self.dim.h,
-                v: new_idx as isize / self.dim.h,
             };
+
             // insert at sorted position
-            match occupied_cells.binary_search(&new_apple) {
+            match occupied_cells.binary_search(&apple_pos) {
                 Ok(idx) => panic!("Spawned apple at occupied cell {:?}", occupied_cells[idx]),
-                Err(idx) => occupied_cells.insert(idx, new_apple),
+                Err(idx) => occupied_cells.insert(idx, apple_pos),
             }
-            self.apples.push(new_apple);
+
+            let apple_type = if self.rng.gen::<f32>() < 0.95 {
+                AppleType::Normal(5)
+            } else {
+                AppleType::EvilSnake {
+                    life: self.rng.gen_range(100, 200),
+                }
+            };
+
+            self.apples.push(Apple {
+                pos: apple_pos,
+                typ: apple_type,
+            });
         }
     }
 
     fn advance_snakes(&mut self) {
+        let mut remove_snakes = vec![];
         for snake_idx in 0..self.snakes.len() {
+            if let Some(life) = &mut self.snakes[snake_idx].life {
+                if *life == 0 {
+                    remove_snakes.push(snake_idx)
+                } else {
+                    *life -= 1
+                }
+            }
+
             let (other_snakes1, rest) = self.snakes.split_at_mut(snake_idx);
             let (snake, other_snakes2) = rest.split_at_mut(1);
             let snake = &mut snake[0];
@@ -313,6 +363,10 @@ impl Game {
                 &self.apples,
                 self.dim,
             );
+        }
+        remove_snakes.sort();
+        for snake_idx in remove_snakes.into_iter().rev() {
+            self.snakes.remove(snake_idx);
         }
 
         // check for crashes
@@ -379,16 +433,36 @@ impl Game {
 
         // check apple eating
         let mut k = -1;
+        let mut spawn_snake = None;
         for snake in &mut self.snakes {
             k += 1;
             for i in (0..self.apples.len()).rev() {
                 if snake.len() == 0 {
                     panic!("snake {} is empty", k);
                 }
-                if snake.head().pos == self.apples[i] {
-                    self.apples.remove(i);
-                    snake.body.body[0].typ = HexType::Eaten(5);
+                if snake.head().pos == self.apples[i].pos {
+                    let Apple { typ, .. } = self.apples.remove(i);
+                    match typ {
+                        AppleType::Normal(food) => snake.body.body[0].typ = HexType::Eaten(food),
+                        AppleType::EvilSnake { life } => {
+                            let seed = SnakeSeed {
+                                palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
+                                controller: SnakeControllerTemplate::SnakeAI,
+                                life: Some(life),
+                            };
+                            spawn_snake = Some(seed);
+                        }
+                    }
                 }
+            }
+        }
+
+        if let Some(seed) = spawn_snake {
+            if let Some(pos) = self.random_free_spot(&self.occupied_cells()) {
+                self.snakes
+                    .push(Snake::from_seed(&seed, pos, Dir::random(&mut self.rng), 10))
+            } else {
+                println!("warning: failed to spawn evil snake, no free spaces left")
             }
         }
     }
@@ -597,7 +671,11 @@ impl EventHandler for Game {
         }
 
         for apple in &self.apples {
-            build_cell(builder, *apple, self.palette.apple_color, self.cell_dim)?
+            let color = match apple.typ {
+                AppleType::Normal(_) => self.palette.apple_color,
+                AppleType::EvilSnake { .. } => Color::from_rgb(245, 123, 66),
+            };
+            build_cell(builder, apple.pos, color, self.cell_dim)?
         }
 
         let mesh = &builder.build(ctx)?;
@@ -677,7 +755,7 @@ impl EventHandler for Game {
         self.dim = new_dim;
 
         // this too
-        self.apples.retain(move |apple| apple.is_in(new_dim));
+        self.apples.retain(move |apple| apple.pos.is_in(new_dim));
         self.spawn_apples();
 
         let message = format!("{}x{}", new_dim.h, new_dim.v);
