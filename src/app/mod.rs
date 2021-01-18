@@ -7,14 +7,21 @@ use ggez::{
     Context, GameResult,
 };
 
-use crate::app::snake::{
-    controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, SnakeType,
-};
+use crate::app::snake::{controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, SnakeType, EatBehavior};
 use control::{ControlSetup, KeyboardLayout, Side};
 use game::Game;
 use palette::GamePalette;
 use snake::SnakeSeed;
 use start_screen::StartScreen;
+use snake::EatMechanics;
+
+macro_rules! hash_map {
+    { $($key:expr => $value:expr),* } => {{
+        let mut map = ::std::collections::HashMap::new();
+        $( m.insert($key, $value); )*
+        map
+    }};
+}
 
 pub mod control;
 mod game;
@@ -89,6 +96,11 @@ impl App {
                 vec![
                     SnakeSeed {
                         snake_type: SnakeType::PlayerSnake,
+                        eat_mechanics: EatMechanics {
+                            eat_self: EatBehavior::Cut,
+                            eat_other: hash_map! {},
+                            default: EatBehavior::Crash,
+                        },
                         palette: SnakePaletteTemplate::new_persistent_rainbow(),
                         controller: SnakeControllerTemplate::PlayerController(ControlSetup {
                             layout: KeyboardLayout::Dvorak,

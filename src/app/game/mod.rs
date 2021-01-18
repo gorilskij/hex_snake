@@ -25,11 +25,13 @@ use crate::app::{
         build_cell,
         controller::{OtherSnakes, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
-        Snake, SnakeSeed, SnakeState, SnakeType,
+        EatBehavior, Snake, SnakeSeed, SnakeState, SnakeType,
     },
 };
 use hsl::HSL;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use crate::app::snake::EatMechanics;
+// use super::hash_map;
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -140,25 +142,13 @@ enum GameState {
     Crashed,
 }
 
-// Mixed is Cut when eating self and Die when eating others
-#[derive(Eq, PartialEq)]
-enum EatBehavior {
-    Cut,
-    Die,
-    Mixed,
-}
-
 struct Prefs {
     draw_grid: bool,
-    eat_behavior: EatBehavior,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self {
-            draw_grid: true,
-            eat_behavior: EatBehavior::Mixed,
-        }
+        Self { draw_grid: true }
     }
 }
 
@@ -348,6 +338,11 @@ impl Game {
                 AppleType::SpawnSnake(SnakeSeed {
                     // snake_type: SnakeType::KillerSnake,
                     snake_type: SnakeType::CompetitorSnake { life: Some(200) },
+                    eat_mechanics: EatMechanics {
+                        eat_self: EatBehavior::Die,
+                        eat_other: hash_map! {},
+                        default: EatBehavior::Die,
+                    },
                     palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
                     // controller: SnakeControllerTemplate::KillerAI,
                     controller: SnakeControllerTemplate::CompetitorAI,
@@ -413,12 +408,22 @@ impl Game {
             }
         }
 
-        if self.prefs.eat_behavior == EatBehavior::Cut
-            || self.prefs.eat_behavior == EatBehavior::Mixed
-        {
-            // TODO: this might do weird things with head-to-head collisions
-            for &(i, j) in &crashed_snake_indices {
-                if self.prefs.eat_behavior == EatBehavior::Cut || i == j {
+        for &(i, j) in &crashed_snake_indices {
+            let mechanics = &self.snakes[i].eat_mechanics;
+            let behavior;
+            if i == j {
+                behavior = mechanics.eat_self;
+            } else {
+                let other_snake_type = &self.snakes[j].snake_type;
+                behavior = mechanics
+                    .eat_other
+                    .get(other_snake_type)
+                    .copied()
+                    .unwrap_or(mechanics.default);
+            }
+
+            match behavior {
+                EatBehavior::Cut => {
                     let crash_point = self.snakes[i].head().pos;
                     let drain_start_idx = self.snakes[j]
                         .body
@@ -431,24 +436,20 @@ impl Game {
                                 "point {:?} not found in snake of index {} (head-to-head collision)",
                                 crash_point, j
                             )
-                            // TODO: handle this as a special case
+                            // TODO: handle cutting head-to-head collisions as a special case
                         });
 
                     let _ = self.snakes[j].body.body.drain(drain_start_idx + 1..);
                     self.snakes[j].body.grow = 0;
                 }
-            }
-        }
-
-        if self.prefs.eat_behavior == EatBehavior::Die
-            || self.prefs.eat_behavior == EatBehavior::Mixed
-        {
-            for &(i, j) in &crashed_snake_indices {
-                if self.prefs.eat_behavior == EatBehavior::Die || i != j {
+                EatBehavior::Crash => {
                     self.snakes[i].state = SnakeState::Crashed;
                     self.snakes[i].body.body[0].typ = HexType::Crashed;
                     self.state = GameState::Crashed;
                     self.force_redraw = 10;
+                }
+                EatBehavior::Die => {
+                    unimplemented!()
                 }
             }
         }
@@ -761,15 +762,15 @@ impl EventHandler for Game {
                 };
                 self.message = Some(Message(message.to_string(), 100));
             }
-            C => {
-                let (new_behavior, message) = match self.prefs.eat_behavior {
-                    EatBehavior::Cut => (EatBehavior::Mixed, "Mixed"),
-                    EatBehavior::Mixed => (EatBehavior::Die, "Die on eat"),
-                    EatBehavior::Die => (EatBehavior::Cut, "Cut on eat"),
-                };
-                self.prefs.eat_behavior = new_behavior;
-                self.message = Some(Message(message.to_string(), 100));
-            }
+            // C => {
+            //     let (new_behavior, message) = match self.prefs.eat_behavior {
+            //         EatBehavior::Cut => (EatBehavior::Mixed, "Mixed"),
+            //         EatBehavior::Mixed => (EatBehavior::Die, "Die on eat"),
+            //         EatBehavior::Die => (EatBehavior::Cut, "Cut on eat"),
+            //     };
+            //     self.prefs.eat_behavior = new_behavior;
+            //     self.message = Some(Message(message.to_string(), 100));
+            // }
             k => {
                 if self.state == Playing {
                     for snake in &mut self.snakes {

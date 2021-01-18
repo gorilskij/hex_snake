@@ -16,6 +16,7 @@ use crate::app::{
     },
     Screen,
 };
+use crate::app::snake::{EatMechanics, EatBehavior};
 
 struct SnakeDemo {
     top_left: HexPos,
@@ -40,12 +41,17 @@ impl SnakeDemo {
             dim: board_dim,
             snake: Snake {
                 snake_type: SnakeType::SimulatedSnake,
+                eat_mechanics: EatMechanics {
+                    eat_self: EatBehavior::Cut,
+                    eat_other: hash_map! {},
+                    default: EatBehavior::Cut
+                },
+
                 body: SnakeBody {
                     body,
                     dir: Dir::U,
                     grow: 10,
                 },
-
                 state: SnakeState::Living,
 
                 controller: SnakeControllerTemplate::DemoController(vec![

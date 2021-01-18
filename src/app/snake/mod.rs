@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use ggez::{
     graphics::{Color, DrawMode, MeshBuilder},
@@ -25,13 +25,27 @@ pub enum SnakeState {
     Crashed,
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum SnakeType {
     PlayerSnake,
     SimulatedSnake,
     // TODO: store life information here
     CompetitorSnake { life: Option<Frames> },
     KillerSnake { life: Option<Frames> },
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum EatBehavior {
+    Cut,   // cut the other snake's tail off
+    Crash, // stop the game
+    Die,   // disappear
+}
+
+#[derive(Clone)]
+pub struct EatMechanics {
+    pub eat_self: EatBehavior,
+    pub eat_other: HashMap<SnakeType, EatBehavior>,
+    pub default: EatBehavior,
 }
 
 pub struct SnakeBody {
@@ -42,8 +56,9 @@ pub struct SnakeBody {
 
 pub struct Snake {
     pub snake_type: SnakeType,
-    pub body: SnakeBody,
+    pub eat_mechanics: EatMechanics,
 
+    pub body: SnakeBody,
     pub state: SnakeState,
 
     pub controller: Box<dyn SnakeController>,
@@ -53,6 +68,7 @@ pub struct Snake {
 #[derive(Clone)]
 pub struct SnakeSeed {
     pub snake_type: SnakeType,
+    pub eat_mechanics: EatMechanics,
     pub palette: SnakePaletteTemplate,
     pub controller: SnakeControllerTemplate,
 }
@@ -61,6 +77,7 @@ impl Snake {
     pub fn from_seed(seed: &SnakeSeed, pos: HexPos, dir: Dir, grow: usize) -> Self {
         let SnakeSeed {
             snake_type,
+            eat_mechanics,
             palette,
             controller,
         } = (*seed).clone();
@@ -76,8 +93,9 @@ impl Snake {
 
         Self {
             snake_type,
-            body: SnakeBody { body, dir, grow },
+            eat_mechanics,
 
+            body: SnakeBody { body, dir, grow },
             state: SnakeState::Living,
 
             controller: controller.into(),
