@@ -347,11 +347,10 @@ impl Game {
                 // }
                 AppleType::SpawnSnake(SnakeSeed {
                     // snake_type: SnakeType::KillerSnake,
-                    snake_type: SnakeType::CompetitorSnake,
+                    snake_type: SnakeType::CompetitorSnake { life: Some(200) },
                     palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
                     // controller: SnakeControllerTemplate::KillerAI,
                     controller: SnakeControllerTemplate::CompetitorAI,
-                    life: Some(200),
                 })
             };
 
@@ -365,12 +364,17 @@ impl Game {
     fn advance_snakes(&mut self) {
         let mut remove_snakes = vec![];
         for snake_idx in 0..self.snakes.len() {
-            if let Some(life) = &mut self.snakes[snake_idx].life {
-                if *life == 0 {
-                    remove_snakes.push(snake_idx)
-                } else {
-                    *life -= 1
+            // remove snake if it ran out of life
+            match &mut self.snakes[snake_idx].snake_type {
+                SnakeType::CompetitorSnake { life: Some(life) }
+                | SnakeType::KillerSnake { life: Some(life) } => {
+                    if *life == 0 {
+                        remove_snakes.push(snake_idx)
+                    } else {
+                        *life -= 1
+                    }
                 }
+                _ => (),
             }
 
             let (other_snakes1, rest) = self.snakes.split_at_mut(snake_idx);

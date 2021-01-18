@@ -23,6 +23,8 @@ mod palette;
 mod snake;
 mod start_screen;
 
+pub type Frames = u32;
+
 pub enum Screen {
     StartScreen(StartScreen),
     Game(Game),
@@ -93,14 +95,12 @@ impl App {
                             keyboard_side: Side::RightSide,
                             hand: Side::RightSide,
                         }),
-                        life: None,
                     },
-                    SnakeSeed {
-                        snake_type: SnakeType::KillerSnake,
-                        palette: SnakePaletteTemplate::new_gray_gradient(),
-                        controller: SnakeControllerTemplate::KillerAI,
-                        life: None,
-                    },
+                    // SnakeSeed {
+                    //     snake_type: SnakeType::KillerSnake,
+                    //     palette: SnakePaletteTemplate::new_gray_gradient(),
+                    //     controller: SnakeControllerTemplate::KillerAI,
+                    // },
                 ],
                 GamePalette::dark(),
                 window_mode,

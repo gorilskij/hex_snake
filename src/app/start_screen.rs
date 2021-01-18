@@ -62,8 +62,6 @@ impl SnakeDemo {
                 ])
                 .into(),
                 painter: SnakePaletteTemplate::new_gray_gradient().into(),
-
-                life: None,
             },
             cell_dim,
         }

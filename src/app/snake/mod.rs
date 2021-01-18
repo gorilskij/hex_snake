@@ -13,6 +13,7 @@ use crate::app::{
         controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
         palette::{SnakePainter, SnakePaletteTemplate},
     },
+    Frames,
 };
 
 pub mod controller;
@@ -29,8 +30,8 @@ pub enum SnakeType {
     PlayerSnake,
     SimulatedSnake,
     // TODO: store life information here
-    CompetitorSnake,
-    KillerSnake,
+    CompetitorSnake { life: Option<Frames> },
+    KillerSnake { life: Option<Frames> },
 }
 
 pub struct SnakeBody {
@@ -47,8 +48,6 @@ pub struct Snake {
 
     pub controller: Box<dyn SnakeController>,
     pub painter: Box<dyn SnakePainter>,
-
-    pub life: Option<u32>,
 }
 
 #[derive(Clone)]
@@ -56,7 +55,6 @@ pub struct SnakeSeed {
     pub snake_type: SnakeType,
     pub palette: SnakePaletteTemplate,
     pub controller: SnakeControllerTemplate,
-    pub life: Option<u32>,
 }
 
 impl Snake {
@@ -65,7 +63,6 @@ impl Snake {
             snake_type,
             palette,
             controller,
-            life,
         } = (*seed).clone();
 
         let head = Hex {
@@ -85,8 +82,6 @@ impl Snake {
 
             controller: controller.into(),
             painter: palette.into(),
-
-            life,
         }
     }
 
