@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 pub use dir::Dir;
-pub use hex_pos::HexPos;
+pub use hex_pos::{HexDim, HexPos};
 
 mod dir {
     use std::ops::Neg;
@@ -64,6 +64,8 @@ mod hex_pos {
         pub h: isize,
         pub v: isize,
     }
+
+    pub type HexDim = HexPos;
 
     impl Debug for HexPos {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
@@ -129,7 +131,7 @@ mod hex_pos {
             }
         }
 
-        pub fn step_and_teleport(&mut self, dir: Dir, board_dim: HexPos) {
+        pub fn step_and_teleport(&mut self, dir: Dir, board_dim: HexDim) {
             // todo make O(1)
             //  at the moment this just moves the head back until the last cell that's still in the map
             //  this could be done as a single calculation
@@ -146,7 +148,7 @@ mod hex_pos {
         }
 
         // checks if between (0,0) and dim
-        pub fn is_in(self, dim: HexPos) -> bool {
+        pub fn is_in(self, dim: HexDim) -> bool {
             (0..dim.h).contains(&self.h) && (0..dim.v).contains(&self.v)
         }
     }

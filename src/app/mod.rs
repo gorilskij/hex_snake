@@ -7,7 +7,9 @@ use ggez::{
     Context, GameResult,
 };
 
-use crate::app::snake::{controller::SnakeControllerTemplate, palette::SnakePaletteTemplate};
+use crate::app::snake::{
+    controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, SnakeType,
+};
 use control::{ControlSetup, KeyboardLayout, Side};
 use game::Game;
 use palette::GamePalette;
@@ -83,18 +85,20 @@ impl App {
             screen: Screen::Game(Game::new(
                 10.,
                 vec![
-                    // SnakeSeed {
-                    //     palette: SnakePaletteTemplate::new_persistent_rainbow(),
-                    //     controller: SnakeControllerTemplate::PlayerController(ControlSetup {
-                    //         layout: KeyboardLayout::Dvorak,
-                    //         keyboard_side: Side::RightSide,
-                    //         hand: Side::RightSide,
-                    //     }),
-                    //     life: None,
-                    // },
                     SnakeSeed {
-                        palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
-                        controller: SnakeControllerTemplate::SnakeAI,
+                        snake_type: SnakeType::PlayerSnake,
+                        palette: SnakePaletteTemplate::new_persistent_rainbow(),
+                        controller: SnakeControllerTemplate::PlayerController(ControlSetup {
+                            layout: KeyboardLayout::Dvorak,
+                            keyboard_side: Side::RightSide,
+                            hand: Side::RightSide,
+                        }),
+                        life: None,
+                    },
+                    SnakeSeed {
+                        snake_type: SnakeType::KillerSnake,
+                        palette: SnakePaletteTemplate::new_gray_gradient(),
+                        controller: SnakeControllerTemplate::KillerAI,
                         life: None,
                     },
                 ],

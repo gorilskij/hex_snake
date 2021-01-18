@@ -8,18 +8,18 @@ use ggez::{
 
 use crate::app::{
     game::CellDim,
-    hex::{Dir, Hex, HexPos, HexType},
+    hex::{Dir, Hex, HexDim, HexPos, HexType},
     snake::{
-        controller::{OtherBodies, SimMove, SnakeControllerTemplate},
+        controller::{OtherSnakes, SimMove, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
-        Snake, SnakeBody, SnakeState,
+        Snake, SnakeBody, SnakeState, SnakeType,
     },
     Screen,
 };
 
 struct SnakeDemo {
     top_left: HexPos,
-    dim: HexPos,
+    dim: HexDim,
     snake: Snake,
     cell_dim: CellDim,
 }
@@ -39,6 +39,7 @@ impl SnakeDemo {
             top_left,
             dim: board_dim,
             snake: Snake {
+                snake_type: SnakeType::SimulatedSnake,
                 body: SnakeBody {
                     body,
                     dir: Dir::U,
@@ -71,7 +72,7 @@ impl SnakeDemo {
 
 impl EventHandler for SnakeDemo {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        self.snake.advance(OtherBodies(&[], &[]), &[], self.dim);
+        self.snake.advance(OtherSnakes(&[], &[]), &[], self.dim);
         Ok(())
     }
 

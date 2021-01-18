@@ -8,9 +8,9 @@ use mint::Point2;
 
 use crate::app::{
     game::{hexagon_points, Apple, CellDim},
-    hex::{Dir, Hex, HexPos, HexType, HexType::*},
+    hex::{Dir, Hex, HexDim, HexPos, HexType, HexType::*},
     snake::{
-        controller::{OtherBodies, SnakeController, SnakeControllerTemplate},
+        controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
         palette::{SnakePainter, SnakePaletteTemplate},
     },
 };
@@ -24,6 +24,15 @@ pub enum SnakeState {
     Crashed,
 }
 
+#[derive(Clone, Eq, PartialEq)]
+pub enum SnakeType {
+    PlayerSnake,
+    SimulatedSnake,
+    // TODO: store life information here
+    CompetitorSnake,
+    KillerSnake,
+}
+
 pub struct SnakeBody {
     pub body: VecDeque<Hex>,
     pub dir: Dir,
@@ -31,6 +40,7 @@ pub struct SnakeBody {
 }
 
 pub struct Snake {
+    pub snake_type: SnakeType,
     pub body: SnakeBody,
 
     pub state: SnakeState,
@@ -43,6 +53,7 @@ pub struct Snake {
 
 #[derive(Clone)]
 pub struct SnakeSeed {
+    pub snake_type: SnakeType,
     pub palette: SnakePaletteTemplate,
     pub controller: SnakeControllerTemplate,
     pub life: Option<u32>,
@@ -51,6 +62,7 @@ pub struct SnakeSeed {
 impl Snake {
     pub fn from_seed(seed: &SnakeSeed, pos: HexPos, dir: Dir, grow: usize) -> Self {
         let SnakeSeed {
+            snake_type,
             palette,
             controller,
             life,
@@ -66,6 +78,7 @@ impl Snake {
         body.push_back(head);
 
         Self {
+            snake_type,
             body: SnakeBody { body, dir, grow },
 
             state: SnakeState::Living,
@@ -89,11 +102,11 @@ impl Snake {
         &self.body.body[0]
     }
 
-    pub fn advance(&mut self, other_bodies: OtherBodies, apples: &[Apple], board_dim: HexPos) {
+    pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
         // determine new direction for snake
         if let Some(new_dir) = self
             .controller
-            .next_dir(&self.body, other_bodies, apples, board_dim)
+            .next_dir(&self.body, other_snakes, apples, board_dim)
         {
             self.body.dir = new_dir
         }

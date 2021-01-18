@@ -1,28 +1,31 @@
 use crate::app::{
     control::{ControlSetup, Controls},
-    game::Apple,
-    hex::{Dir, Hex, HexPos},
-    snake::{Snake, SnakeBody},
+    game::{Apple, CellDim},
+    hex::{Dir, Hex, HexDim, HexPos},
+    snake::{Snake, SnakeBody, SnakeType},
 };
 use ggez::event::KeyCode;
-use std::{collections::VecDeque, iter::once};
+use itertools::Itertools;
+use std::{cmp::Ordering, collections::VecDeque, iter::once};
 
 #[derive(Clone)]
 pub enum SnakeControllerTemplate {
     PlayerController(ControlSetup),
     DemoController(Vec<SimMove>),
-    SnakeAI,
+    CompetitorAI,
+    KillerAI,
 }
 
 #[derive(Copy, Clone)]
-pub struct OtherBodies<'a>(pub &'a [Snake], pub &'a [Snake]);
+pub struct OtherSnakes<'a>(pub &'a [Snake], pub &'a [Snake]);
 
-impl OtherBodies<'_> {
-    pub fn iter(&self) -> impl Iterator<Item = &SnakeBody> {
-        self.0
-            .iter()
-            .chain(self.1.iter())
-            .map(|Snake { body, .. }| body)
+impl OtherSnakes<'_> {
+    pub fn iter_snakes(&self) -> impl Iterator<Item = &Snake> {
+        self.0.iter().chain(self.1.iter())
+    }
+
+    pub fn iter_bodies(&self) -> impl Iterator<Item = &SnakeBody> {
+        self.iter_snakes().map(|Snake { body, .. }| body)
     }
 }
 
@@ -30,9 +33,9 @@ pub trait SnakeController {
     fn next_dir(
         &mut self,
         snake_body: &SnakeBody,
-        other_bodies: OtherBodies,
+        other_snakes: OtherSnakes,
         apples: &[Apple],
-        board_dim: HexPos,
+        board_dim: HexDim,
     ) -> Option<Dir>;
 
     fn reset(&mut self) {}
@@ -55,7 +58,8 @@ impl From<SnakeControllerTemplate> for Box<dyn SnakeController> {
                 next_move_idx: 0,
                 wait: 0,
             }),
-            SnakeControllerTemplate::SnakeAI => Box::new(SnakeAI),
+            SnakeControllerTemplate::CompetitorAI => Box::new(CompetitorAI),
+            SnakeControllerTemplate::KillerAI => Box::new(KillerAI),
         }
     }
 }
@@ -71,7 +75,7 @@ impl PlayerController {
 }
 
 impl SnakeController for PlayerController {
-    fn next_dir(&mut self, _: &SnakeBody, _: OtherBodies, _: &[Apple], _: HexPos) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPos) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = Some(queue_dir);
             self.dir
@@ -119,7 +123,7 @@ pub struct DemoController {
 }
 
 impl SnakeController for DemoController {
-    fn next_dir(&mut self, _: &SnakeBody, _: OtherBodies, _: &[Apple], _: HexPos) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPos) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
             None
@@ -144,14 +148,15 @@ impl SnakeController for DemoController {
     }
 }
 
-pub struct SnakeAI;
+// competes for apples
+pub struct CompetitorAI;
 
 fn dir_score(
     head: HexPos,
     dir: Dir,
-    board_dim: HexPos,
+    board_dim: HexDim,
     snake_body: &SnakeBody,
-    other_bodies: OtherBodies,
+    other_snakes: OtherSnakes,
     apples: &[Apple],
 ) -> usize {
     let mut distance = 0;
@@ -160,8 +165,8 @@ fn dir_score(
         distance += 1;
         new_head.step_and_teleport(dir, board_dim);
 
-        for snake in once(snake_body).chain(other_bodies.iter()) {
-            if snake.body.iter().any(|Hex { pos, .. }| pos == &new_head) {
+        for body in once(snake_body).chain(other_snakes.iter_bodies()) {
+            if body.body.iter().any(|Hex { pos, .. }| pos == &new_head) {
                 return distance; // the higher the distance to a body part, the higher the score
             }
         }
@@ -171,19 +176,19 @@ fn dir_score(
     board_dim.h as usize + board_dim.v as usize - distance
 }
 
-impl SnakeController for SnakeAI {
+impl SnakeController for CompetitorAI {
     fn next_dir(
         &mut self,
         snake_body: &SnakeBody,
-        other_bodies: OtherBodies,
+        other_bodies: OtherSnakes,
         apples: &[Apple],
-        board_dim: HexPos,
+        board_dim: HexDim,
     ) -> Option<Dir> {
         use Dir::*;
         let available_directions: Vec<_> = [UL, U, UR, DL, D, DR]
             .iter()
-            .filter(|&&d| d != -snake_body.dir)
             .copied()
+            .filter(|d| *d != -snake_body.dir)
             .collect();
 
         // no sharp turns
@@ -210,9 +215,113 @@ impl SnakeController for SnakeAI {
             })
             .copied();
 
-        // if let Some(dir) = new_dir {
-        //     println!("new: {:?}", dir)
-        // }
         new_dir
+    }
+}
+
+// tries to kill player
+struct KillerAI;
+
+#[derive(PartialOrd, PartialEq)]
+struct TotalF32(f32);
+
+impl Eq for TotalF32 {}
+
+impl Ord for TotalF32 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+fn distance_to_snake(
+    dir: Dir,
+    snake_body: &SnakeBody,
+    other_snakes: OtherSnakes,
+    board_dim: HexDim,
+) -> usize {
+    let mut distance = 0;
+    let mut new_head = snake_body.body[0].pos;
+    // guaranteed to terminate whenever the head reaches itself again
+    loop {
+        distance += 1;
+        new_head.step_and_teleport(dir, board_dim);
+
+        for body in once(snake_body).chain(other_snakes.iter_bodies()) {
+            if body.body.iter().any(|Hex { pos, .. }| pos == &new_head) {
+                return distance;
+            }
+        }
+    }
+}
+
+// potential alternative to searching for the closest angle
+// would still require searching through a list so not an improvement..
+// fn round_angle_to_closest_dir(angle: f32) -> Dir {
+//     use std::f32::consts::{FRAC_PI_3, FRAC_PI_6};
+//     let rounded_angle = (angle / FRAC_PI_3).floor() * FRAC_PI_3 + FRAC_PI_6;
+// }
+
+fn rough_direction(
+    from: HexPos,
+    to: HexPos,
+    snake_body: &SnakeBody,
+    other_snakes: OtherSnakes,
+    board_dim: HexDim,
+) -> Option<Dir> {
+    use std::f32::consts::PI;
+    use Dir::*;
+
+    const TWO_PI: f32 = 2. * PI;
+
+    // dy is scaled to convert from 'hex' coordinates to approximate cartesian coordinates
+    let CellDim { sin, .. } = CellDim::from(1.);
+    let dx = (to.h - from.h) as f32;
+    let dy = -(to.v - from.v) as f32 / (2. * sin);
+    let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
+
+    const DIR_ANGLES: [(Dir, f32); 6] = [
+        (UR, 1. / 6. * PI),
+        (U, 3. / 6. * PI),
+        (UL, 5. / 6. * PI),
+        (DL, 7. / 6. * PI),
+        (D, 9. / 6. * PI),
+        (DR, 11. / 6. * PI),
+    ];
+
+    // this could probably be done with math
+    DIR_ANGLES
+        .iter()
+        .copied()
+        .filter(|(d, _)| *d != -snake_body.dir)
+        .filter(|(d, _)| distance_to_snake(*d, snake_body, other_snakes, board_dim) > 1)
+        .min_by_key(|(_, a)| TotalF32((a - angle).abs()))
+        .take()
+        .map(|(d, _)| d)
+}
+
+impl SnakeController for KillerAI {
+    fn next_dir(
+        &mut self,
+        snake_body: &SnakeBody,
+        other_snakes: OtherSnakes,
+        _apples: &[Apple],
+        board_dim: HexDim,
+    ) -> Option<Dir> {
+        let player_snake = other_snakes
+            .iter_snakes()
+            .find(|s| s.snake_type == SnakeType::PlayerSnake)
+            .unwrap();
+        let mut target = player_snake.head().pos;
+        // how many cells ahead of the player to target
+        for _ in 0..1 {
+            target.step_and_teleport(player_snake.dir(), board_dim);
+        }
+        rough_direction(
+            snake_body.body[0].pos,
+            target,
+            snake_body,
+            other_snakes,
+            board_dim,
+        )
     }
 }

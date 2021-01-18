@@ -19,15 +19,16 @@ use num_integer::Integer;
 use rand::prelude::*;
 
 use crate::app::{
-    hex::{Dir, Hex, HexPos, HexType},
+    hex::{Dir, Hex, HexDim, HexPos, HexType},
     palette::GamePalette,
     snake::{
         build_cell,
-        controller::{OtherBodies, SnakeControllerTemplate},
+        controller::{OtherSnakes, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
-        Snake, SnakeSeed, SnakeState,
+        Snake, SnakeSeed, SnakeState, SnakeType,
     },
 };
+use hsl::HSL;
 use std::collections::VecDeque;
 
 // TODO document
@@ -50,6 +51,8 @@ impl From<f32> for CellDim {
 }
 
 struct FPSControl {
+    frame: u64,
+
     frame_duration: Duration,   // for update and draw
     control_duration: Duration, // for key events (more frequent)
     last_frame: Option<Instant>,
@@ -59,6 +62,8 @@ struct FPSControl {
 impl FPSControl {
     fn new(update_fps: u64, control_fps: u64) -> Self {
         Self {
+            frame: 0,
+
             frame_duration: Duration::from_micros(1_000_000 / update_fps),
             control_duration: Duration::from_micros(1_000_000 / control_fps),
             // last_frame: Instant::now(),
@@ -67,9 +72,14 @@ impl FPSControl {
         }
     }
 
+    // expected to be called every time the game is updated
+    // for this game logic and graphics frames are the same
     fn maybe_update(&mut self) -> bool {
         // NOTE: this keeps being called when the game is paused
         // maybe implement a more relaxed control fps for pause
+
+        self.frame += 1;
+
         let last_frame = self.last_frame.get_or_insert(Instant::now());
         let can_update = last_frame.elapsed() >= self.frame_duration;
         if can_update {
@@ -156,9 +166,7 @@ struct Message(String, u8);
 
 pub enum AppleType {
     Normal(u32),
-    EvilSnake {
-        life: u32, // frames
-    },
+    SpawnSnake(SnakeSeed),
 }
 
 pub struct Apple {
@@ -170,7 +178,7 @@ pub struct Game {
     state: GameState,
     fps: FPSControl,
 
-    dim: HexPos,
+    dim: HexDim,
     players: Vec<SnakeSeed>,
     snakes: Vec<Snake>,
     apples: Vec<Apple>,
@@ -211,8 +219,8 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            // fps: FPSControl::new(12, 60),
-            fps: FPSControl::new(240, 240),
+            fps: FPSControl::new(12, 60),
+            // fps: FPSControl::new(240, 240),
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
             players: players.into_iter().map(Into::into).collect(),
             snakes: vec![],
@@ -240,7 +248,8 @@ impl Game {
         self.snakes.clear();
         self.apples.clear();
 
-        const DISTANCE_BETWEEN_SNAKES: isize = 10;
+        // const DISTANCE_BETWEEN_SNAKES: isize = 10;
+        const DISTANCE_BETWEEN_SNAKES: isize = 1;
 
         let total_width = (self.players.len() - 1) as isize * DISTANCE_BETWEEN_SNAKES + 1;
         assert!(total_width < self.dim.h, "snakes spread too wide");
@@ -329,14 +338,22 @@ impl Game {
                 Err(idx) => occupied_cells.insert(idx, apple_pos),
             }
 
-            let apple_type = AppleType::Normal(5);
-            // let apple_type = if self.rng.gen::<f32>() < 0.95 {
-            //     AppleType::Normal(5)
-            // } else {
-            //     AppleType::EvilSnake {
-            //         life: self.rng.gen_range(100, 200),
-            //     }
-            // };
+            // let apple_type = AppleType::Normal(5);
+            let apple_type = if self.rng.gen::<f32>() < 0.95 {
+                AppleType::Normal(5)
+            } else {
+                // AppleType::CompetitorSnake {
+                //     life: self.rng.gen_range(100, 200),
+                // }
+                AppleType::SpawnSnake(SnakeSeed {
+                    // snake_type: SnakeType::KillerSnake,
+                    snake_type: SnakeType::CompetitorSnake,
+                    palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
+                    // controller: SnakeControllerTemplate::KillerAI,
+                    controller: SnakeControllerTemplate::CompetitorAI,
+                    life: Some(200),
+                })
+            };
 
             self.apples.push(Apple {
                 pos: apple_pos,
@@ -360,7 +377,7 @@ impl Game {
             let (snake, other_snakes2) = rest.split_at_mut(1);
             let snake = &mut snake[0];
             snake.advance(
-                OtherBodies(other_snakes1, other_snakes2),
+                OtherSnakes(other_snakes1, other_snakes2),
                 &self.apples,
                 self.dim,
             );
@@ -445,14 +462,7 @@ impl Game {
                     let Apple { typ, .. } = self.apples.remove(i);
                     match typ {
                         AppleType::Normal(food) => snake.body.body[0].typ = HexType::Eaten(food),
-                        AppleType::EvilSnake { life } => {
-                            let seed = SnakeSeed {
-                                palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
-                                controller: SnakeControllerTemplate::SnakeAI,
-                                life: Some(life),
-                            };
-                            spawn_snake = Some(seed);
-                        }
+                        AppleType::SpawnSnake(seed) => spawn_snake = Some(seed),
                     }
                 }
             }
@@ -627,32 +637,33 @@ impl EventHandler for Game {
         //     if MG % 5 != 0 { return Ok(()) }
         // }
 
-        unsafe {
-            static mut T: Option<Instant> = None;
-            static mut LAST: Option<VecDeque<f64>> = None;
-
-            if let Some(t) = T {
-                if let Some(last) = &mut LAST {
-                    let micros = t.elapsed().as_micros();
-                    let fps = 1_000_000.0 / micros as f64;
-                    if last.len() >= 60 {
-                        last.pop_front();
-                    }
-                    last.push_back(fps);
-                    let min = last.iter().copied().fold(f64::NAN, f64::min);
-                    let max = last.iter().copied().fold(f64::NAN, f64::max);
-                    let avg = last.iter().sum::<f64>() / last.len() as f64;
-                    print!(
-                        "fps: {:.3} ({:.3} / {:.3}) [{:.3}]      \r",
-                        fps, min, max, avg
-                    );
-                    stdout().flush().unwrap();
-                } else {
-                    LAST = Some(VecDeque::new());
-                }
-            }
-            T = Some(Instant::now());
-        }
+        // log framerate
+        // unsafe {
+        //     static mut T: Option<Instant> = None;
+        //     static mut LAST: Option<VecDeque<f64>> = None;
+        //
+        //     if let Some(t) = T {
+        //         if let Some(last) = &mut LAST {
+        //             let micros = t.elapsed().as_micros();
+        //             let fps = 1_000_000.0 / micros as f64;
+        //             if last.len() >= 60 {
+        //                 last.pop_front();
+        //             }
+        //             last.push_back(fps);
+        //             let min = last.iter().copied().fold(f64::NAN, f64::min);
+        //             let max = last.iter().copied().fold(f64::NAN, f64::max);
+        //             let avg = last.iter().sum::<f64>() / last.len() as f64;
+        //             print!(
+        //                 "fps: {:.3} ({:.3} / {:.3}) [{:.3}]      \r",
+        //                 fps, min, max, avg
+        //             );
+        //             stdout().flush().unwrap();
+        //         } else {
+        //             LAST = Some(VecDeque::new());
+        //         }
+        //     }
+        //     T = Some(Instant::now());
+        // }
 
         clear(ctx, self.palette.background_color);
 
@@ -681,7 +692,15 @@ impl EventHandler for Game {
         for apple in &self.apples {
             let color = match apple.typ {
                 AppleType::Normal(_) => self.palette.apple_color,
-                AppleType::EvilSnake { .. } => Color::from_rgb(245, 123, 66),
+                AppleType::SpawnSnake(_) => {
+                    let hue = 360. * (self.fps.frame % 100) as f64 / 100.;
+                    let hsl = HSL {
+                        h: hue,
+                        s: 1.,
+                        l: 0.3,
+                    };
+                    Color::from(hsl.to_rgb())
+                }
             };
             build_cell(builder, apple.pos, color, self.cell_dim)?
         }
