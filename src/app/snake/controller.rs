@@ -5,7 +5,6 @@ use crate::app::{
     snake::{Snake, SnakeBody, SnakeType},
 };
 use ggez::event::KeyCode;
-use itertools::Itertools;
 use std::{cmp::Ordering, collections::VecDeque, iter::once};
 
 #[derive(Clone)]

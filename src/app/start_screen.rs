@@ -12,11 +12,10 @@ use crate::app::{
     snake::{
         controller::{OtherSnakes, SimMove, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
-        Snake, SnakeBody, SnakeState, SnakeType,
+        EatBehavior, EatMechanics, Snake, SnakeBody, SnakeState, SnakeType,
     },
     Screen,
 };
-use crate::app::snake::{EatMechanics, EatBehavior};
 
 struct SnakeDemo {
     top_left: HexPos,
@@ -44,7 +43,7 @@ impl SnakeDemo {
                 eat_mechanics: EatMechanics {
                     eat_self: EatBehavior::Cut,
                     eat_other: hash_map! {},
-                    default: EatBehavior::Cut
+                    default: EatBehavior::Cut,
                 },
 
                 body: SnakeBody {

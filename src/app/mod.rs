@@ -7,18 +7,22 @@ use ggez::{
     Context, GameResult,
 };
 
-use crate::app::snake::{controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, SnakeType, EatBehavior};
+use crate::app::snake::{
+    controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
+};
 use control::{ControlSetup, KeyboardLayout, Side};
 use game::Game;
 use palette::GamePalette;
-use snake::SnakeSeed;
+use snake::{EatMechanics, SnakeSeed};
 use start_screen::StartScreen;
-use snake::EatMechanics;
 
 macro_rules! hash_map {
-    { $($key:expr => $value:expr),* } => {{
+    {} => {
+        ::std::collections::HashMap::new()
+    };
+    { $($key:expr => $value:expr),+ } => {{
         let mut map = ::std::collections::HashMap::new();
-        $( m.insert($key, $value); )*
+        $( m.insert($key, $value); )+
         map
     }};
 }
@@ -104,8 +108,8 @@ impl App {
                         palette: SnakePaletteTemplate::new_persistent_rainbow(),
                         controller: SnakeControllerTemplate::PlayerController(ControlSetup {
                             layout: KeyboardLayout::Dvorak,
-                            keyboard_side: Side::RightSide,
-                            hand: Side::RightSide,
+                            keyboard_side: Side::Right,
+                            hand: Side::Right,
                         }),
                     },
                     // SnakeSeed {

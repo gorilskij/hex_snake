@@ -1,8 +1,7 @@
 use std::{
     cmp::min,
     f32::consts::PI,
-    io::{stdout, Write},
-    thread,
+    mem, thread,
     time::{Duration, Instant},
 };
 
@@ -19,18 +18,19 @@ use num_integer::Integer;
 use rand::prelude::*;
 
 use crate::app::{
+    control::Side,
     hex::{Dir, Hex, HexDim, HexPos, HexType},
     palette::GamePalette,
     snake::{
         build_cell,
         controller::{OtherSnakes, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
-        EatBehavior, Snake, SnakeSeed, SnakeState, SnakeType,
+        EatBehavior, EatMechanics, Snake, SnakeSeed, SnakeState, SnakeType,
     },
+    Frames,
 };
 use hsl::HSL;
-use std::collections::{HashMap, VecDeque};
-use crate::app::snake::EatMechanics;
+use std::collections::VecDeque;
 // use super::hash_map;
 
 // TODO document
@@ -52,8 +52,39 @@ impl From<f32> for CellDim {
     }
 }
 
+struct FPSCounter {
+    buffer: VecDeque<f64>,
+    last: Instant,
+}
+
+impl FPSCounter {
+    // number of last frames to average
+    const N: usize = 60;
+
+    fn new() -> Self {
+        Self {
+            buffer: VecDeque::with_capacity(Self::N),
+            last: Instant::now(),
+        }
+    }
+
+    fn register_frame(&mut self) {
+        let last = mem::replace(&mut self.last, Instant::now());
+        if self.buffer.len() >= Self::N {
+            self.buffer.pop_front();
+        }
+        let fps = 1_000_000. / last.elapsed().as_micros() as f64;
+        self.buffer.push_back(fps);
+    }
+
+    fn fps(&self) -> f64 {
+        self.buffer.iter().sum::<f64>() / self.buffer.len() as f64
+    }
+}
+
 struct FPSControl {
-    frame: u64,
+    ggez_frames: Frames, // incremented every time ggez calls update()
+    game_frames: Frames, // incremented every time a frame is actually calculated/drawn
 
     frame_duration: Duration,   // for update and draw
     control_duration: Duration, // for key events (more frequent)
@@ -62,9 +93,13 @@ struct FPSControl {
 }
 
 impl FPSControl {
+    // TODO: unify naming
+    //  ggez_frames relates to control_fps and control_duration
+    //  game_frames relates to update_fps and frame_duration
     fn new(update_fps: u64, control_fps: u64) -> Self {
         Self {
-            frame: 0,
+            ggez_frames: 0,
+            game_frames: 0,
 
             frame_duration: Duration::from_micros(1_000_000 / update_fps),
             control_duration: Duration::from_micros(1_000_000 / control_fps),
@@ -80,11 +115,13 @@ impl FPSControl {
         // NOTE: this keeps being called when the game is paused
         // maybe implement a more relaxed control fps for pause
 
-        self.frame += 1;
+        self.ggez_frames += 1;
 
         let last_frame = self.last_frame.get_or_insert(Instant::now());
         let can_update = last_frame.elapsed() >= self.frame_duration;
         if can_update {
+            self.game_frames += 1;
+
             *last_frame += self.frame_duration;
             self.drawn = false;
         }
@@ -144,15 +181,22 @@ enum GameState {
 
 struct Prefs {
     draw_grid: bool,
+    display_fps: bool,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { draw_grid: true }
+        Self {
+            draw_grid: true,
+            display_fps: false,
+        }
     }
 }
 
-struct Message(String, u8);
+struct Message {
+    message: String,
+    life: Option<Frames>,
+}
 
 pub enum AppleType {
     Normal(u32),
@@ -166,7 +210,8 @@ pub struct Apple {
 
 pub struct Game {
     state: GameState,
-    fps: FPSControl,
+    fps_control: FPSControl,
+    graphics_fps: FPSCounter,
 
     dim: HexDim,
     players: Vec<SnakeSeed>,
@@ -183,7 +228,8 @@ pub struct Game {
     border_mesh: Option<Mesh>,
 
     prefs: Prefs,
-    message: Option<Message>,
+    message_top_left: Option<Message>,
+    message_top_right: Option<Message>,
 
     force_redraw: usize, // for a number of redraws, even when paused
 }
@@ -209,8 +255,10 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            fps: FPSControl::new(12, 60),
+            fps_control: FPSControl::new(12, 60),
             // fps: FPSControl::new(240, 240),
+            graphics_fps: FPSCounter::new(),
+
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
             players: players.into_iter().map(Into::into).collect(),
             snakes: vec![],
@@ -226,7 +274,8 @@ impl Game {
             border_mesh: None,
 
             prefs: Prefs::default(),
-            message: None,
+            message_top_left: None,
+            message_top_right: None,
 
             force_redraw: 0,
         };
@@ -596,18 +645,66 @@ impl Game {
 
         Ok((grid_mesh, border_mesh))
     }
+
+    fn draw_message(
+        maybe_message: &mut Option<Message>,
+        side: Side,
+        ctx: &mut Context,
+    ) -> GameResult {
+        if let Some(Message {
+            ref message,
+            ref mut life,
+        }) = maybe_message
+        {
+            let mut text = Text::new(message as &str);
+            text.set_font(Font::default(), Scale::uniform(20.));
+
+            let offset = 10.;
+            let x = match side {
+                Side::Left => 10.,
+                Side::Right => {
+                    ggez::graphics::drawable_size(ctx).0 - text.width(ctx) as f32 - offset
+                }
+            };
+            let location = Point2 { x, y: offset };
+
+            let mut opacity = 1.;
+            if let Some(frames) = life {
+                if *frames < 10 {
+                    opacity = *frames as f32 / 10.
+                }
+            }
+
+            let color = Color {
+                r: 1.,
+                g: 1.,
+                b: 1.,
+                a: opacity,
+            };
+            draw(ctx, &text, DrawParam::from((location, color)))?;
+
+            if let Some(frames) = life {
+                if *frames == 0 {
+                    *maybe_message = None;
+                } else {
+                    *frames -= 1;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         // it's important that this if go first to reset the last frame time
-        if !self.fps.maybe_update() {
-            self.fps.wait();
+        if !self.fps_control.maybe_update() {
+            self.fps_control.wait();
             return Ok(());
         }
 
         if self.state != GameState::Playing {
-            self.fps.wait();
+            self.fps_control.wait();
             return Ok(());
         }
 
@@ -626,7 +723,7 @@ impl EventHandler for Game {
         if self.force_redraw > 0 {
             self.force_redraw -= 1;
         } else {
-            if !self.fps.maybe_draw() {
+            if !self.fps_control.maybe_draw() {
                 return Ok(());
             }
 
@@ -635,39 +732,20 @@ impl EventHandler for Game {
             }
         }
 
+        // objective counting of when graphics frames actually occur
+        self.graphics_fps.register_frame();
+        if self.prefs.display_fps {
+            self.message_top_left = Some(Message {
+                message: format!("{:.2}", self.graphics_fps.fps()),
+                life: None,
+            })
+        }
+
         // skip frames for faster gameplay
         // unsafe {
         //     static mut MG: u64 = 0;
         //     MG += 1;
         //     if MG % 5 != 0 { return Ok(()) }
-        // }
-
-        // log framerate
-        // unsafe {
-        //     static mut T: Option<Instant> = None;
-        //     static mut LAST: Option<VecDeque<f64>> = None;
-        //
-        //     if let Some(t) = T {
-        //         if let Some(last) = &mut LAST {
-        //             let micros = t.elapsed().as_micros();
-        //             let fps = 1_000_000.0 / micros as f64;
-        //             if last.len() >= 60 {
-        //                 last.pop_front();
-        //             }
-        //             last.push_back(fps);
-        //             let min = last.iter().copied().fold(f64::NAN, f64::min);
-        //             let max = last.iter().copied().fold(f64::NAN, f64::max);
-        //             let avg = last.iter().sum::<f64>() / last.len() as f64;
-        //             print!(
-        //                 "fps: {:.3} ({:.3} / {:.3}) [{:.3}]      \r",
-        //                 fps, min, max, avg
-        //             );
-        //             stdout().flush().unwrap();
-        //         } else {
-        //             LAST = Some(VecDeque::new());
-        //         }
-        //     }
-        //     T = Some(Instant::now());
         // }
 
         clear(ctx, self.palette.background_color);
@@ -698,7 +776,7 @@ impl EventHandler for Game {
             let color = match apple.typ {
                 AppleType::Normal(_) => self.palette.apple_color,
                 AppleType::SpawnSnake(_) => {
-                    let hue = 360. * (self.fps.frame % 100) as f64 / 100.;
+                    let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
                     let hsl = HSL {
                         h: hue,
                         s: 1.,
@@ -713,32 +791,8 @@ impl EventHandler for Game {
         let mesh = &builder.build(ctx)?;
         draw(ctx, mesh, DrawParam::default())?;
 
-        if let Some(Message(ref message, ref mut frames_left)) = self.message {
-            let mut text = Text::new(message as &str);
-            text.set_font(Font::default(), Scale::uniform(20.));
-
-            let offset = 10.;
-            let x = ggez::graphics::drawable_size(ctx).0 - text.width(ctx) as f32 - offset;
-            let location = Point2 { x, y: offset };
-            let opacity = if *frames_left > 10 {
-                1.
-            } else {
-                *frames_left as f32 / 10.
-            };
-            let color = Color {
-                r: 1.,
-                g: 1.,
-                b: 1.,
-                a: opacity,
-            };
-            draw(ctx, &text, DrawParam::from((location, color)))?;
-
-            if *frames_left == 0 {
-                self.message = None;
-            } else {
-                *frames_left -= 1;
-            }
-        }
+        Self::draw_message(&mut self.message_top_left, Side::Left, ctx)?;
+        Self::draw_message(&mut self.message_top_right, Side::Right, ctx)?;
 
         thread::yield_now();
         present(ctx)
@@ -747,6 +801,8 @@ impl EventHandler for Game {
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
         use GameState::*;
         use KeyCode::*;
+
+        // TODO: also tie these to a keymap
         match key {
             Space => match self.state {
                 Crashed => self.restart(),
@@ -760,7 +816,16 @@ impl EventHandler for Game {
                 } else {
                     "Grid off"
                 };
-                self.message = Some(Message(message.to_string(), 100));
+                self.message_top_right = Some(Message {
+                    message: message.to_string(),
+                    life: Some(100),
+                });
+            }
+            F => {
+                self.prefs.display_fps = !self.prefs.display_fps;
+                if !self.prefs.display_fps {
+                    self.message_top_left = None;
+                }
             }
             // C => {
             //     let (new_behavior, message) = match self.prefs.eat_behavior {
@@ -791,7 +856,10 @@ impl EventHandler for Game {
         self.spawn_apples();
 
         let message = format!("{}x{}", new_dim.h, new_dim.v);
-        self.message = Some(Message(message, 100));
+        self.message_top_right = Some(Message {
+            message,
+            life: Some(100),
+        });
         self.grid_mesh = None;
 
         self.force_redraw = 10; // redraw 10 frames to adjust the grid
