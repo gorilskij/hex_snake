@@ -827,15 +827,6 @@ impl EventHandler for Game {
                     self.message_top_left = None;
                 }
             }
-            // C => {
-            //     let (new_behavior, message) = match self.prefs.eat_behavior {
-            //         EatBehavior::Cut => (EatBehavior::Mixed, "Mixed"),
-            //         EatBehavior::Mixed => (EatBehavior::Die, "Die on eat"),
-            //         EatBehavior::Die => (EatBehavior::Cut, "Cut on eat"),
-            //     };
-            //     self.prefs.eat_behavior = new_behavior;
-            //     self.message = Some(Message(message.to_string(), 100));
-            // }
             k => {
                 if self.state == Playing {
                     for snake in &mut self.snakes {
@@ -851,9 +842,16 @@ impl EventHandler for Game {
         let new_dim = Self::wh_to_dim(self.cell_dim, width, height);
         self.dim = new_dim;
 
-        // this too
-        self.apples.retain(move |apple| apple.pos.is_in(new_dim));
-        self.spawn_apples();
+        // remove snakes outside of board limits
+        self.snakes.retain(move |snake| snake.head().pos.is_in(new_dim));
+        if !self.snakes.iter().any(|snake| snake.snake_type == SnakeType::PlayerSnake) {
+            println!("player snake outside of board, restarting");
+            self.restart();
+        } else {
+            // remove apples outside of board limits
+            self.apples.retain(move |apple| apple.pos.is_in(new_dim));
+            self.spawn_apples();
+        }
 
         let message = format!("{}x{}", new_dim.h, new_dim.v);
         self.message_top_right = Some(Message {
