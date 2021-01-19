@@ -1,5 +1,6 @@
 use std::{
     cmp::min,
+    collections::VecDeque,
     f32::consts::PI,
     mem, thread,
     time::{Duration, Instant},
@@ -11,27 +12,29 @@ use ggez::{
     graphics::{
         clear, draw, present, Color, DrawMode, DrawParam, Font, Mesh, MeshBuilder, Scale, Text,
     },
+    mint::Point2,
     Context, GameResult,
 };
-use mint::Point2;
+use hsl::HSL;
 use num_integer::Integer;
 use rand::prelude::*;
 
-use crate::app::{
-    control::Side,
-    hex::{Dir, Hex, HexDim, HexPos, HexType},
-    palette::GamePalette,
-    snake::{
-        build_cell,
-        controller::{OtherSnakes, SnakeControllerTemplate},
-        palette::SnakePaletteTemplate,
-        EatBehavior, EatMechanics, Snake, SnakeSeed, SnakeState, SnakeType,
+use crate::{
+    app::{
+        control::Side,
+        hex::{Dir, Hex, HexDim, HexPos, HexType},
+        palette::GamePalette,
+        snake::{
+            controller::{OtherSnakes, SnakeControllerTemplate},
+            palette::SnakePaletteTemplate,
+            EatBehavior, EatMechanics, Snake, SnakeSeed, SnakeState, SnakeType,
+        },
+        Frames,
     },
-    Frames,
+    times::Times,
 };
-use hsl::HSL;
-use std::collections::VecDeque;
-// use super::hash_map;
+use ggez::graphics::{spritebatch::SpriteBatch, Image};
+use itertools::Itertools;
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -43,11 +46,11 @@ pub struct CellDim {
 
 impl From<f32> for CellDim {
     fn from(side: f32) -> Self {
-        let one_third_pi = 1. / 3. * PI;
+        use std::f32::consts::FRAC_PI_3;
         Self {
             side,
-            sin: one_third_pi.sin() * side,
-            cos: one_third_pi.cos() * side,
+            sin: FRAC_PI_3.sin() * side,
+            cos: FRAC_PI_3.cos() * side,
         }
     }
 }
@@ -144,34 +147,6 @@ impl FPSControl {
     }
 }
 
-type HexagonPoints = [Point2<f32>; 6];
-
-pub fn hexagon_points(side: f32) -> HexagonPoints {
-    static mut CACHED_HEXAGON_POINTS: Option<(f32, HexagonPoints)> = None;
-
-    unsafe {
-        if let Some((cached_side, points)) = CACHED_HEXAGON_POINTS {
-            if (side - cached_side).abs() < f32::EPSILON {
-                return points;
-            }
-        }
-
-        let CellDim { sin, cos, .. } = CellDim::from(side);
-        #[rustfmt::skip]
-        let points = [
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ];
-
-        CACHED_HEXAGON_POINTS = Some((side, points));
-        points
-    }
-}
-
 #[derive(Eq, PartialEq)]
 enum GameState {
     Playing,
@@ -255,8 +230,8 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            fps_control: FPSControl::new(12, 60),
-            // fps: FPSControl::new(240, 240),
+            // fps_control: FPSControl::new(12, 60),
+            fps_control: FPSControl::new(240, 240),
             graphics_fps: FPSCounter::new(),
 
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
@@ -695,6 +670,184 @@ impl Game {
     }
 }
 
+// TODO: refactor these out of Game
+type HexagonPoints = [Point2<f32>; 6];
+impl Game {
+    pub fn get_hexagon_points(&self) -> HexagonPoints {
+        let CellDim { side, .. } = self.cell_dim;
+
+        unsafe {
+            static mut CACHED_HEXAGON_POINTS: Option<(f32, HexagonPoints)> = None;
+
+            if let Some((cached_side, points)) = CACHED_HEXAGON_POINTS {
+                if (side - cached_side).abs() < f32::EPSILON {
+                    return points;
+                }
+            }
+
+            let CellDim { sin, cos, .. } = CellDim::from(side);
+            #[rustfmt::skip]
+                let points = [
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0., },
+                Point2 { x: side + 2. * cos, y: sin, },
+                Point2 { x: side + cos, y: 2. * sin, },
+                Point2 { x: cos, y: 2. * sin, },
+                Point2 { x: 0., y: sin },
+            ];
+
+            CACHED_HEXAGON_POINTS = Some((side, points));
+            points
+        }
+    }
+
+    fn draw_snakes_and_apples_tesselation(&mut self, ctx: &mut Context) -> GameResult {
+        let mut builder = MeshBuilder::new();
+        let hexagon_points = self.get_hexagon_points();
+
+        fn translate(points: &[Point2<f32>], dest: Point2<f32>) -> Vec<Point2<f32>> {
+            points
+                .iter()
+                .map(|Point2 { x, y }| Point2 {
+                    x: x + dest.x,
+                    y: y + dest.y,
+                })
+                .collect()
+        }
+
+        for snake in &mut self.snakes {
+            let len = snake.len();
+            for (seg_idx, hex) in snake.body.body.iter().enumerate() {
+                let dest = hex.pos.to_point(self.cell_dim);
+                let color = snake.painter.paint_segment(seg_idx, len, hex);
+                let translated_points = translate(&hexagon_points, dest);
+                builder.polygon(DrawMode::fill(), &translated_points, color)?;
+            }
+        }
+
+        for snake in self
+            .snakes
+            .iter_mut()
+            .filter(|snake| snake.state == SnakeState::Crashed)
+        {
+            let dest = snake.head().pos.to_point(self.cell_dim);
+            let color = snake
+                .painter
+                .paint_segment(0, snake.len(), &snake.body.body[0]);
+            let translated_points = translate(&hexagon_points, dest);
+            builder.polygon(DrawMode::fill(), &translated_points, color)?;
+        }
+
+        for apple in &self.apples {
+            let dest = apple.pos.to_point(self.cell_dim);
+            let color = match apple.typ {
+                AppleType::Normal(_) => self.palette.apple_color,
+                AppleType::SpawnSnake(_) => {
+                    let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
+                    let hsl = HSL {
+                        h: hue,
+                        s: 1.,
+                        l: 0.3,
+                    };
+                    Color::from(hsl.to_rgb())
+                }
+            };
+            let translated_points = translate(&hexagon_points, dest);
+            builder.polygon(DrawMode::fill(), &translated_points, color)?;
+        }
+
+        let mesh = builder.build(ctx)?;
+        draw(ctx, &mesh, DrawParam::default())
+    }
+
+    fn get_hexagon_image(&self, ctx: &mut Context) -> Image {
+        let CellDim { side, sin, cos } = self.cell_dim;
+
+        unsafe {
+            static mut HEXAGON: Option<(f32, Image)> = None;
+
+            if let Some((cached_side, image)) = &HEXAGON {
+                if (*cached_side - side).abs() < f32::EPSILON {
+                    return image.clone();
+                }
+            }
+
+            let width = (2. * cos + side) as u16;
+            let height = (2. * sin) as u16;
+            let overflow = 0.02;
+            let hexagon = (0..height)
+                .cartesian_product(0..width)
+                .map(|(y, x)| {
+                    // check if the point is in bounds of the four relevant hexagon edges
+                    // top and bottom edges can't be violated because the size of the image is already restricted
+                    let x = x as f32;
+                    let y = y as f32;
+                    let top_left = y <= (sin / cos) * x + sin + overflow;
+                    let top_right = y <= -sin / cos * (x - 2. * cos - side) + sin + overflow;
+                    let bottom_left = y >= -sin / cos * x + sin - overflow;
+                    let bottom_right = y >= sin / cos * (x - 2. * cos - side) + sin - overflow;
+                    if top_left && top_right && bottom_left && bottom_right {
+                        // if y < x {
+                        255
+                    } else {
+                        0
+                    }
+                })
+                .times(4)
+                .collect::<Vec<_>>();
+            let image = Image::from_rgba8(ctx, width, height, &hexagon).unwrap();
+            HEXAGON = Some((side, image.clone()));
+            image
+        }
+    }
+
+    fn draw_snakes_and_apples_sprite_batch(&mut self, ctx: &mut Context) -> GameResult {
+        let image = self.get_hexagon_image(ctx);
+        let mut sprite_batch = SpriteBatch::new(image);
+
+        // draw snakes, crashed (collision) points on top
+        for snake in &mut self.snakes {
+            let len = snake.len();
+            for (seg_idx, hex) in snake.body.body.iter().enumerate() {
+                let dest = hex.pos.to_point(self.cell_dim);
+                let color = snake.painter.paint_segment(seg_idx, len, hex);
+                sprite_batch.add(DrawParam::new().dest(dest).color(color));
+            }
+        }
+
+        for snake in self
+            .snakes
+            .iter_mut()
+            .filter(|snake| snake.state == SnakeState::Crashed)
+        {
+            let dest = snake.head().pos.to_point(self.cell_dim);
+            let color = snake
+                .painter
+                .paint_segment(0, snake.len(), &snake.body.body[0]);
+            sprite_batch.add(DrawParam::new().dest(dest).color(color));
+        }
+
+        for apple in &self.apples {
+            let dest = apple.pos.to_point(self.cell_dim);
+            let color = match apple.typ {
+                AppleType::Normal(_) => self.palette.apple_color,
+                AppleType::SpawnSnake(_) => {
+                    let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
+                    let hsl = HSL {
+                        h: hue,
+                        s: 1.,
+                        l: 0.3,
+                    };
+                    Color::from(hsl.to_rgb())
+                }
+            };
+            sprite_batch.add(DrawParam::new().dest(dest).color(color));
+        }
+
+        draw(ctx, &sprite_batch, DrawParam::default())
+    }
+}
+
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         // it's important that this if go first to reset the last frame time
@@ -761,35 +914,8 @@ impl EventHandler for Game {
         }
         // draw(ctx, self.border_mesh.as_ref().unwrap(), DrawParam::default())?;
 
-        let builder = &mut MeshBuilder::new();
-
-        // draw snakes, crashed (collision) points on top
-        for snake in &mut self.snakes {
-            snake.draw_non_crash_points(builder, self.cell_dim)?;
-        }
-
-        for snake in &mut self.snakes {
-            snake.draw_crash_point(builder, self.cell_dim)?;
-        }
-
-        for apple in &self.apples {
-            let color = match apple.typ {
-                AppleType::Normal(_) => self.palette.apple_color,
-                AppleType::SpawnSnake(_) => {
-                    let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
-                    let hsl = HSL {
-                        h: hue,
-                        s: 1.,
-                        l: 0.3,
-                    };
-                    Color::from(hsl.to_rgb())
-                }
-            };
-            build_cell(builder, apple.pos, color, self.cell_dim)?
-        }
-
-        let mesh = &builder.build(ctx)?;
-        draw(ctx, mesh, DrawParam::default())?;
+        // self.draw_snakes_and_apples_sprite_batch(ctx)?;
+        self.draw_snakes_and_apples_tesselation(ctx)?;
 
         Self::draw_message(&mut self.message_top_left, Side::Left, ctx)?;
         Self::draw_message(&mut self.message_top_right, Side::Right, ctx)?;
@@ -843,8 +969,13 @@ impl EventHandler for Game {
         self.dim = new_dim;
 
         // remove snakes outside of board limits
-        self.snakes.retain(move |snake| snake.head().pos.is_in(new_dim));
-        if !self.snakes.iter().any(|snake| snake.snake_type == SnakeType::PlayerSnake) {
+        self.snakes
+            .retain(move |snake| snake.head().pos.is_in(new_dim));
+        if !self
+            .snakes
+            .iter()
+            .any(|snake| snake.snake_type == SnakeType::PlayerSnake)
+        {
             println!("player snake outside of board, restarting");
             self.restart();
         } else {

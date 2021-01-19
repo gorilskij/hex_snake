@@ -50,14 +50,15 @@ mod dir {
 }
 
 mod hex_pos {
-    use std::fmt::{Debug, Error, Formatter};
-
-    use num_integer::Integer;
-
-    use Dir::*;
-
     use super::dir::Dir;
-    use std::cmp::Ordering;
+    use crate::app::game::CellDim;
+    use ggez::mint::Point2;
+    use num_integer::Integer;
+    use std::{
+        cmp::Ordering,
+        fmt::{Debug, Error, Formatter},
+    };
+    use Dir::*;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
     pub struct HexPos {
@@ -66,6 +67,16 @@ mod hex_pos {
     }
 
     pub type HexDim = HexPos;
+
+    impl HexPos {
+        pub fn to_point(self, CellDim { side, sin, cos }: CellDim) -> Point2<f32> {
+            let Self { h, v } = self;
+            Point2 {
+                x: h as f32 * (side + cos),
+                y: v as f32 * 2. * sin + if h % 2 == 0 { 0. } else { sin },
+            }
+        }
+    }
 
     impl Debug for HexPos {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {

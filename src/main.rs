@@ -8,6 +8,7 @@ use ggez::{event::run, ContextBuilder};
 use crate::app::App;
 
 mod app;
+mod times;
 
 // two snakes's heads can pass through each other if iterated at the same time,
 // this seems like a bit of a fundamental problem (can't move 1/2 a cell)
