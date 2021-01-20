@@ -1,7 +1,6 @@
 use std::{
     cmp::min,
     collections::VecDeque,
-    f32::consts::PI,
     mem, thread,
     time::{Duration, Instant},
 };
@@ -21,8 +20,8 @@ use rand::prelude::*;
 
 use crate::{
     app::{
-        control::Side,
         hex::{Dir, Hex, HexDim, HexPos, HexType},
+        keyboard_control::Side,
         palette::GamePalette,
         snake::{
             controller::{OtherSnakes, SnakeControllerTemplate},
@@ -230,8 +229,8 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            // fps_control: FPSControl::new(12, 60),
-            fps_control: FPSControl::new(240, 240),
+            fps_control: FPSControl::new(12, 60),
+            // fps_control: FPSControl::new(240, 240),
             graphics_fps: FPSCounter::new(),
 
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),
@@ -303,7 +302,7 @@ impl Game {
         let mut occupied_cells = Vec::with_capacity(max_occupied_cells);
         occupied_cells.extend(self.apples.iter().map(|Apple { pos, .. }| pos));
         for snake in &self.snakes {
-            occupied_cells.extend(snake.body.body.iter().map(|hex| hex.pos));
+            occupied_cells.extend(snake.body.cell.iter().map(|hex| hex.pos));
         }
         occupied_cells.sort_by_key(move |&x| x.v * self.dim.h + x.h);
         occupied_cells.dedup();
@@ -352,25 +351,20 @@ impl Game {
                 Err(idx) => occupied_cells.insert(idx, apple_pos),
             }
 
-            // let apple_type = AppleType::Normal(5);
-            let apple_type = if self.rng.gen::<f32>() < 0.95 {
-                AppleType::Normal(5)
-            } else {
-                // AppleType::CompetitorSnake {
-                //     life: self.rng.gen_range(100, 200),
-                // }
-                AppleType::SpawnSnake(SnakeSeed {
-                    // snake_type: SnakeType::KillerSnake,
+            let apple_type = match self.rng.gen::<f32>() {
+                x if x < 0.025 => AppleType::SpawnSnake(SnakeSeed {
                     snake_type: SnakeType::CompetitorSnake { life: Some(200) },
-                    eat_mechanics: EatMechanics {
-                        eat_self: EatBehavior::Die,
-                        eat_other: hash_map! {},
-                        default: EatBehavior::Die,
-                    },
+                    eat_mechanics: EatMechanics::always(EatBehavior::Die),
                     palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
-                    // controller: SnakeControllerTemplate::KillerAI,
                     controller: SnakeControllerTemplate::CompetitorAI,
-                })
+                }),
+                x if x < 0.040 => AppleType::SpawnSnake(SnakeSeed {
+                    snake_type: SnakeType::KillerSnake { life: Some(200) },
+                    eat_mechanics: EatMechanics::always(EatBehavior::Die),
+                    palette: SnakePaletteTemplate::new_persistent_dark_rainbow(),
+                    controller: SnakeControllerTemplate::KillerAI,
+                }),
+                _ => AppleType::Normal(1),
             };
 
             self.apples.push(Apple {
@@ -405,7 +399,7 @@ impl Game {
                 self.dim,
             );
         }
-        remove_snakes.sort();
+        remove_snakes.sort_unstable();
         for snake_idx in remove_snakes.into_iter().rev() {
             self.snakes.remove(snake_idx);
         }
@@ -423,7 +417,7 @@ impl Game {
                 }
 
                 // check head-body crash (this also checks if a snake crashed with itself)
-                for segment in other.body.body.iter().skip(1) {
+                for segment in other.body.cell.iter().skip(1) {
                     if snake.head().pos == segment.pos {
                         crashed_snake_indices.push((i, j));
                         continue 'outer;
@@ -451,7 +445,7 @@ impl Game {
                     let crash_point = self.snakes[i].head().pos;
                     let drain_start_idx = self.snakes[j]
                         .body
-                        .body
+                        .cell
                         .iter()
                         .skip(1)
                         .position(|Hex { pos, .. }| *pos == crash_point)
@@ -463,17 +457,17 @@ impl Game {
                             // TODO: handle cutting head-to-head collisions as a special case
                         });
 
-                    let _ = self.snakes[j].body.body.drain(drain_start_idx + 1..);
+                    let _ = self.snakes[j].body.cell.drain(drain_start_idx + 1..);
                     self.snakes[j].body.grow = 0;
                 }
                 EatBehavior::Crash => {
                     self.snakes[i].state = SnakeState::Crashed;
-                    self.snakes[i].body.body[0].typ = HexType::Crashed;
+                    self.snakes[i].body.cell[0].typ = HexType::Crashed;
                     self.state = GameState::Crashed;
                     self.force_redraw = 10;
                 }
                 EatBehavior::Die => {
-                    unimplemented!()
+                    todo!("implement snake death")
                 }
             }
         }
@@ -490,7 +484,7 @@ impl Game {
                 if snake.head().pos == self.apples[i].pos {
                     let Apple { typ, .. } = self.apples.remove(i);
                     match typ {
-                        AppleType::Normal(food) => snake.body.body[0].typ = HexType::Eaten(food),
+                        AppleType::Normal(food) => snake.body.cell[0].typ = HexType::Eaten(food),
                         AppleType::SpawnSnake(seed) => spawn_snake = Some(seed),
                     }
                 }
@@ -701,6 +695,7 @@ impl Game {
         }
     }
 
+    #[allow(dead_code)]
     fn draw_snakes_and_apples_tesselation(&mut self, ctx: &mut Context) -> GameResult {
         let mut builder = MeshBuilder::new();
         let hexagon_points = self.get_hexagon_points();
@@ -717,7 +712,7 @@ impl Game {
 
         for snake in &mut self.snakes {
             let len = snake.len();
-            for (seg_idx, hex) in snake.body.body.iter().enumerate() {
+            for (seg_idx, hex) in snake.body.cell.iter().enumerate() {
                 let dest = hex.pos.to_point(self.cell_dim);
                 let color = snake.painter.paint_segment(seg_idx, len, hex);
                 let translated_points = translate(&hexagon_points, dest);
@@ -733,7 +728,7 @@ impl Game {
             let dest = snake.head().pos.to_point(self.cell_dim);
             let color = snake
                 .painter
-                .paint_segment(0, snake.len(), &snake.body.body[0]);
+                .paint_segment(0, snake.len(), &snake.body.cell[0]);
             let translated_points = translate(&hexagon_points, dest);
             builder.polygon(DrawMode::fill(), &translated_points, color)?;
         }
@@ -801,6 +796,7 @@ impl Game {
         }
     }
 
+    #[allow(dead_code)]
     fn draw_snakes_and_apples_sprite_batch(&mut self, ctx: &mut Context) -> GameResult {
         let image = self.get_hexagon_image(ctx);
         let mut sprite_batch = SpriteBatch::new(image);
@@ -808,7 +804,7 @@ impl Game {
         // draw snakes, crashed (collision) points on top
         for snake in &mut self.snakes {
             let len = snake.len();
-            for (seg_idx, hex) in snake.body.body.iter().enumerate() {
+            for (seg_idx, hex) in snake.body.cell.iter().enumerate() {
                 let dest = hex.pos.to_point(self.cell_dim);
                 let color = snake.painter.paint_segment(seg_idx, len, hex);
                 sprite_batch.add(DrawParam::new().dest(dest).color(color));
@@ -823,7 +819,7 @@ impl Game {
             let dest = snake.head().pos.to_point(self.cell_dim);
             let color = snake
                 .painter
-                .paint_segment(0, snake.len(), &snake.body.body[0]);
+                .paint_segment(0, snake.len(), &snake.body.cell[0]);
             sprite_batch.add(DrawParam::new().dest(dest).color(color));
         }
 
@@ -970,7 +966,7 @@ impl EventHandler for Game {
 
         // remove snakes outside of board limits
         self.snakes
-            .retain(move |snake| snake.head().pos.is_in(new_dim));
+            .retain(move |snake| new_dim.contains(snake.head().pos));
         if !self
             .snakes
             .iter()
@@ -980,7 +976,7 @@ impl EventHandler for Game {
             self.restart();
         } else {
             // remove apples outside of board limits
-            self.apples.retain(move |apple| apple.pos.is_in(new_dim));
+            self.apples.retain(move |apple| new_dim.contains(apple.pos));
             self.spawn_apples();
         }
 

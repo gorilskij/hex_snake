@@ -47,7 +47,7 @@ impl SnakeDemo {
                 },
 
                 body: SnakeBody {
-                    body,
+                    cell: body,
                     dir: Dir::U,
                     grow: 10,
                 },

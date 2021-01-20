@@ -100,6 +100,14 @@ impl SnakePaletteTemplate {
     pub fn new_persistent_pastel_rainbow() -> Self {
         Self::Persistent(Box::new(Self::new_pastel_rainbow()))
     }
+
+    pub fn new_dark_rainbow() -> Self {
+        Self::new_hsl_gradient(0., 273., 0.2, 0.2)
+    }
+
+    pub fn new_persistent_dark_rainbow() -> Self {
+        Self::Persistent(Box::new(Self::new_dark_rainbow()))
+    }
 }
 
 pub trait SnakePainter {

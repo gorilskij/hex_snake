@@ -1,7 +1,7 @@
 use crate::app::{
-    control::{ControlSetup, Controls},
     game::{Apple, CellDim},
     hex::{Dir, Hex, HexDim, HexPos},
+    keyboard_control::{ControlSetup, Controls},
     snake::{Snake, SnakeBody, SnakeType},
 };
 use ggez::event::KeyCode;
@@ -162,10 +162,10 @@ fn dir_score(
     let mut new_head = head;
     while !apples.iter().any(|Apple { pos, .. }| pos == &new_head) {
         distance += 1;
-        new_head.step_and_teleport(dir, board_dim);
+        new_head = new_head.wrapping_translate(dir, 1, board_dim);
 
         for body in once(snake_body).chain(other_snakes.iter_bodies()) {
-            if body.body.iter().any(|Hex { pos, .. }| pos == &new_head) {
+            if body.cell.iter().any(|Hex { pos, .. }| pos == &new_head) {
                 return distance; // the higher the distance to a body part, the higher the score
             }
         }
@@ -204,7 +204,7 @@ impl SnakeController for CompetitorAI {
             .iter()
             .max_by_key(|&&dir| {
                 dir_score(
-                    snake_body.body[0].pos,
+                    snake_body.cell[0].pos,
                     dir,
                     board_dim,
                     &snake_body,
@@ -226,6 +226,7 @@ struct TotalF32(f32);
 
 impl Eq for TotalF32 {}
 
+#[allow(clippy::derive_ord_xor_partial_ord)] // sound because Ord just forwards to PartialOrd
 impl Ord for TotalF32 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
@@ -239,14 +240,14 @@ fn distance_to_snake(
     board_dim: HexDim,
 ) -> usize {
     let mut distance = 0;
-    let mut new_head = snake_body.body[0].pos;
+    let mut new_head = snake_body.cell[0].pos;
     // guaranteed to terminate whenever the head reaches itself again
     loop {
         distance += 1;
-        new_head.step_and_teleport(dir, board_dim);
+        new_head = new_head.wrapping_translate(dir, 1, board_dim);
 
         for body in once(snake_body).chain(other_snakes.iter_bodies()) {
-            if body.body.iter().any(|Hex { pos, .. }| pos == &new_head) {
+            if body.cell.iter().any(|Hex { pos, .. }| pos == &new_head) {
                 return distance;
             }
         }
@@ -308,15 +309,17 @@ impl SnakeController for KillerAI {
     ) -> Option<Dir> {
         let player_snake = other_snakes
             .iter_snakes()
-            .find(|s| s.snake_type == SnakeType::PlayerSnake)
-            .unwrap();
+            .filter(|s| s.snake_type == SnakeType::PlayerSnake)
+            .min_by_key(|s| s.head().pos.distance_to(snake_body.cell[0].pos))
+            .expect("no player snake found");
+
         let mut target = player_snake.head().pos;
         // how many cells ahead of the player to target
         for _ in 0..1 {
-            target.step_and_teleport(player_snake.dir(), board_dim);
+            target = target.wrapping_translate(player_snake.dir(), 1, board_dim);
         }
         rough_direction(
-            snake_body.body[0].pos,
+            snake_body.cell[0].pos,
             target,
             snake_body,
             other_snakes,

@@ -1,25 +1,14 @@
 use std::collections::{HashMap, VecDeque};
 
-use ggez::{
-    graphics::{Color, DrawMode, MeshBuilder},
-    mint::Point2,
-    Context, GameResult,
-};
-
-use crate::{
-    app::{
-        game::{Apple, CellDim},
-        hex::{Dir, Hex, HexDim, HexPos, HexType, HexType::*},
-        snake::{
-            controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
-            palette::{SnakePainter, SnakePaletteTemplate},
-        },
-        Frames,
+use crate::app::{
+    game::Apple,
+    hex::{Dir, Hex, HexDim, HexPos, HexType},
+    snake::{
+        controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
+        palette::{SnakePainter, SnakePaletteTemplate},
     },
-    times::Times,
+    Frames,
 };
-use ggez::graphics::{spritebatch::SpriteBatch, DrawParam, Image};
-use itertools::Itertools;
 
 pub mod controller;
 pub mod palette;
@@ -53,8 +42,18 @@ pub struct EatMechanics {
     pub default: EatBehavior,
 }
 
+impl EatMechanics {
+    pub fn always(behavior: EatBehavior) -> Self {
+        Self {
+            eat_self: behavior,
+            eat_other: hash_map! {},
+            default: behavior,
+        }
+    }
+}
+
 pub struct SnakeBody {
-    pub body: VecDeque<Hex>,
+    pub cell: VecDeque<Hex>,
     pub dir: Dir,
     pub grow: usize,
 }
@@ -100,7 +99,7 @@ impl Snake {
             snake_type,
             eat_mechanics,
 
-            body: SnakeBody { body, dir, grow },
+            body: SnakeBody { cell: body, dir, grow },
             state: SnakeState::Living,
 
             controller: controller.into(),
@@ -109,7 +108,7 @@ impl Snake {
     }
 
     pub fn len(&self) -> usize {
-        self.body.body.len()
+        self.body.cell.len()
     }
 
     pub fn dir(&self) -> Dir {
@@ -117,7 +116,7 @@ impl Snake {
     }
 
     pub fn head(&self) -> &Hex {
-        &self.body.body[0]
+        &self.body.cell[0]
     }
 
     pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
@@ -136,12 +135,12 @@ impl Snake {
             teleported: None,
         };
 
-        new_head.step_and_teleport(self.dir(), board_dim);
+        new_head.pos = new_head.pos.wrapping_translate(self.dir(), 1, board_dim);
 
         let last_idx = self.len() - 1;
-        if let HexType::Eaten(amount) = &mut self.body.body[last_idx].typ {
+        if let HexType::Eaten(amount) = &mut self.body.cell[last_idx].typ {
             if *amount == 0 {
-                self.body.body[last_idx].typ = HexType::Normal;
+                self.body.cell[last_idx].typ = HexType::Normal;
             } else {
                 self.body.grow += 1;
                 *amount -= 1;
@@ -149,11 +148,11 @@ impl Snake {
         }
 
         if self.body.grow > 0 {
-            self.body.body.push_front(new_head);
+            self.body.cell.push_front(new_head);
             self.body.grow -= 1;
         } else {
-            self.body.body.rotate_right(1);
-            self.body.body[0] = new_head;
+            self.body.cell.rotate_right(1);
+            self.body.cell[0] = new_head;
         }
     }
 }

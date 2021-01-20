@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-
 pub use dir::Dir;
 pub use hex_pos::{HexDim, HexPos};
 
@@ -76,6 +74,15 @@ mod hex_pos {
                 y: v as f32 * 2. * sin + if h % 2 == 0 { 0. } else { sin },
             }
         }
+
+        // TODO: replace this with manhattan distance
+        // returns distance in side lengths
+        pub fn distance_to(self, HexPos { h, v }: HexPos) -> usize {
+            let dh = (self.h - h).abs() as f32;
+            let dv = (self.v - v).abs() as f32;
+            let CellDim { side, sin, cos } = CellDim::from(1.);
+            (dh / (side + cos) + dv / (2. * sin)) as usize
+        }
     }
 
     impl Debug for HexPos {
@@ -101,66 +108,76 @@ mod hex_pos {
 
     impl HexPos {
         // translates h/v with special treatment for v
-        pub fn translate(&mut self, dir: Dir, dist: isize) {
+        #[must_use]
+        pub fn translate(self, dir: Dir, dist: isize) -> Self {
             if dist < 0 {
-                self.translate(-dir, -dist);
-                return;
+                return self.translate(-dir, -dist);
             }
 
+            let mut new_pos = self;
             let half = (dist as f64 / 2.).ceil() as isize;
             match dir {
-                U => self.v -= dist,
-                D => self.v += dist,
+                U => new_pos.v -= dist,
+                D => new_pos.v += dist,
                 UL => {
-                    self.h -= dist;
-                    self.v -= half;
-                    if self.h.is_even() {
-                        self.v += 1
+                    new_pos.h -= dist;
+                    new_pos.v -= half;
+                    if new_pos.h.is_even() {
+                        new_pos.v += 1
                     }
                 }
                 UR => {
-                    self.h += dist;
-                    self.v -= half;
-                    if self.h.is_even() {
-                        self.v += 1
+                    new_pos.h += dist;
+                    new_pos.v -= half;
+                    if new_pos.h.is_even() {
+                        new_pos.v += 1
                     }
                 }
                 DL => {
-                    self.h -= dist;
-                    self.v += half;
-                    if self.h.is_odd() {
-                        self.v -= 1
+                    new_pos.h -= dist;
+                    new_pos.v += half;
+                    if new_pos.h.is_odd() {
+                        new_pos.v -= 1
                     }
                 }
                 DR => {
-                    self.h += dist;
-                    self.v += half;
-                    if self.h.is_odd() {
-                        self.v -= 1
+                    new_pos.h += dist;
+                    new_pos.v += half;
+                    if new_pos.h.is_odd() {
+                        new_pos.v -= 1
                     }
                 }
             }
+
+            new_pos
         }
 
-        pub fn step_and_teleport(&mut self, dir: Dir, board_dim: HexDim) {
-            // todo make O(1)
+        // wraps around board edges
+        #[must_use]
+        pub fn wrapping_translate(self, dir: Dir, dist: isize, board_dim: HexDim) -> Self {
+            // TODO: make O(1)
             //  at the moment this just moves the head back until the last cell that's still in the map
             //  this could be done as a single calculation
+            // TODO: generalize to any number of steps
 
-            self.translate(dir, 1);
-            if !self.is_in(board_dim) {
+            let mut new_pos = self.translate(dir, dist);
+            if !board_dim.contains(new_pos) {
                 // find reappearance point
-                self.translate(dir, -1);
-                while self.is_in(board_dim) {
-                    self.translate(dir, -1);
+                while !board_dim.contains(new_pos) {
+                    new_pos = new_pos.translate(dir, -1);
                 }
-                self.translate(dir, 1);
+                while board_dim.contains(new_pos) {
+                    new_pos = new_pos.translate(dir, -1);
+                }
+                new_pos.translate(dir, 1)
+            } else {
+                new_pos
             }
         }
 
         // checks if between (0,0) and dim
-        pub fn is_in(self, dim: HexDim) -> bool {
-            (0..dim.h).contains(&self.h) && (0..dim.v).contains(&self.v)
+        pub fn contains(self, pos: Self) -> bool {
+            (0..self.h).contains(&pos.h) && (0..self.v).contains(&pos.v)
         }
     }
 }
@@ -177,17 +194,4 @@ pub struct Hex {
     pub typ: HexType,
     pub pos: HexPos,
     pub teleported: Option<Dir>,
-}
-
-impl Deref for Hex {
-    type Target = HexPos;
-    fn deref(&self) -> &Self::Target {
-        &self.pos
-    }
-}
-
-impl DerefMut for Hex {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.pos
-    }
 }

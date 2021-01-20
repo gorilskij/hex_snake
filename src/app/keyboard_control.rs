@@ -31,12 +31,12 @@ pub struct ControlSetup {
     pub hand: Side,
 }
 
-impl Into<Controls> for ControlSetup {
-    fn into(self) -> Controls {
+impl From<ControlSetup> for Controls {
+    fn from(setup: ControlSetup) -> Self {
         use ggez::input::keyboard::KeyCode::*;
         use KeyboardLayout::*;
-        match (self.layout, self.keyboard_side, self.hand) {
-            (Dvorak, Side::Right, Side::Right) => Controls {
+        match (setup.layout, setup.keyboard_side, setup.hand) {
+            (Dvorak, Side::Right, Side::Right) => Self {
                 ul: H,
                 u: T,
                 ur: N,
@@ -44,7 +44,7 @@ impl Into<Controls> for ControlSetup {
                 d: W,
                 dr: V,
             },
-            (Dvorak, Side::Right, Side::Left) => Controls {
+            (Dvorak, Side::Right, Side::Left) => Self {
                 ul: H,
                 u: T,
                 ur: N,
@@ -52,7 +52,7 @@ impl Into<Controls> for ControlSetup {
                 d: M,
                 dr: W,
             },
-            (Dvorak, Side::Left, Side::Right) => Controls {
+            (Dvorak, Side::Left, Side::Right) => Self {
                 ul: O,
                 u: E,
                 ur: U,
@@ -60,7 +60,7 @@ impl Into<Controls> for ControlSetup {
                 d: J,
                 dr: K,
             },
-            (Dvorak, Side::Left, Side::Left) => Controls {
+            (Dvorak, Side::Left, Side::Left) => Self {
                 ul: O,
                 u: E,
                 ur: U,
@@ -68,7 +68,7 @@ impl Into<Controls> for ControlSetup {
                 d: Q,
                 dr: J,
             },
-            (Qwerty, Side::Right, Side::Right) => Controls {
+            (Qwerty, Side::Right, Side::Right) => Self {
                 ul: J,
                 u: K,
                 ur: L,
@@ -76,7 +76,7 @@ impl Into<Controls> for ControlSetup {
                 d: Comma,
                 dr: Period,
             },
-            (Qwerty, Side::Right, Side::Left) => Controls {
+            (Qwerty, Side::Right, Side::Left) => Self {
                 ul: J,
                 u: K,
                 ur: L,
@@ -84,7 +84,7 @@ impl Into<Controls> for ControlSetup {
                 d: M,
                 dr: Comma,
             },
-            (Qwerty, Side::Left, Side::Right) => Controls {
+            (Qwerty, Side::Left, Side::Right) => Self {
                 ul: S,
                 u: D,
                 ur: F,
@@ -92,7 +92,7 @@ impl Into<Controls> for ControlSetup {
                 d: C,
                 dr: V,
             },
-            (Qwerty, Side::Left, Side::Left) => Controls {
+            (Qwerty, Side::Left, Side::Left) => Self {
                 ul: S,
                 u: D,
                 ur: F,

@@ -7,10 +7,12 @@ use ggez::{
     Context, GameResult,
 };
 
-use crate::app::snake::{
-    controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
+use crate::app::{
+    keyboard_control::{ControlSetup, KeyboardLayout, Side},
+    snake::{
+        controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
+    },
 };
-use control::{ControlSetup, KeyboardLayout, Side};
 use game::Game;
 use palette::GamePalette;
 use snake::{EatMechanics, SnakeSeed};
@@ -27,9 +29,9 @@ macro_rules! hash_map {
     }};
 }
 
-pub mod control;
 mod game;
 mod hex;
+pub mod keyboard_control;
 mod palette;
 mod snake;
 mod start_screen;
@@ -98,30 +100,30 @@ impl App {
             screen: Screen::Game(Game::new(
                 10.,
                 vec![
-                    // SnakeSeed {
-                    //     snake_type: SnakeType::PlayerSnake,
-                    //     eat_mechanics: EatMechanics {
-                    //         eat_self: EatBehavior::Cut,
-                    //         eat_other: hash_map! {},
-                    //         default: EatBehavior::Crash,
-                    //     },
-                    //     palette: SnakePaletteTemplate::new_persistent_rainbow(),
-                    //     controller: SnakeControllerTemplate::PlayerController(ControlSetup {
-                    //         layout: KeyboardLayout::Dvorak,
-                    //         keyboard_side: Side::Right,
-                    //         hand: Side::Right,
-                    //     }),
-                    // },
                     SnakeSeed {
-                        snake_type: SnakeType::CompetitorSnake { life: None },
+                        snake_type: SnakeType::PlayerSnake,
                         eat_mechanics: EatMechanics {
                             eat_self: EatBehavior::Cut,
                             eat_other: hash_map! {},
-                            default: EatBehavior::Cut,
+                            default: EatBehavior::Crash,
                         },
-                        palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
-                        controller: SnakeControllerTemplate::CompetitorAI,
-                    }; 20
+                        palette: SnakePaletteTemplate::new_persistent_rainbow(),
+                        controller: SnakeControllerTemplate::PlayerController(ControlSetup {
+                            layout: KeyboardLayout::Dvorak,
+                            keyboard_side: Side::Right,
+                            hand: Side::Right,
+                        }),
+                    },
+                    // SnakeSeed {
+                    //     snake_type: SnakeType::CompetitorSnake { life: None },
+                    //     eat_mechanics: EatMechanics {
+                    //         eat_self: EatBehavior::Cut,
+                    //         eat_other: hash_map! {},
+                    //         default: EatBehavior::Cut,
+                    //     },
+                    //     palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
+                    //     controller: SnakeControllerTemplate::CompetitorAI,
+                    // }; 20
                 ],
                 GamePalette::dark(),
                 window_mode,

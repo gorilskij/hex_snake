@@ -1,3 +1,5 @@
+#![deny(unused_must_use)]
+
 #[macro_use]
 extern crate derive_more;
 #[macro_use]
