@@ -16,6 +16,7 @@ pub mod palette;
 #[derive(Eq, PartialEq)]
 pub enum SnakeState {
     Living,
+    Dying,
     Crashed,
 }
 
@@ -23,7 +24,6 @@ pub enum SnakeState {
 pub enum SnakeType {
     PlayerSnake,
     SimulatedSnake,
-    // TODO: store life information here
     CompetitorSnake { life: Option<Frames> },
     KillerSnake { life: Option<Frames> },
 }
@@ -53,7 +53,7 @@ impl EatMechanics {
 }
 
 pub struct SnakeBody {
-    pub cell: VecDeque<Hex>,
+    pub cells: VecDeque<Hex>,
     pub dir: Dir,
     pub grow: usize,
 }
@@ -99,7 +99,11 @@ impl Snake {
             snake_type,
             eat_mechanics,
 
-            body: SnakeBody { cell: body, dir, grow },
+            body: SnakeBody {
+                cells: body,
+                dir,
+                grow,
+            },
             state: SnakeState::Living,
 
             controller: controller.into(),
@@ -108,7 +112,7 @@ impl Snake {
     }
 
     pub fn len(&self) -> usize {
-        self.body.cell.len()
+        self.body.cells.len()
     }
 
     pub fn dir(&self) -> Dir {
@@ -116,43 +120,42 @@ impl Snake {
     }
 
     pub fn head(&self) -> &Hex {
-        &self.body.cell[0]
+        &self.body.cells[0]
     }
 
     pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
-        // determine new direction for snake
-        if let Some(new_dir) = self
-            .controller
-            .next_dir(&self.body, other_snakes, apples, board_dim)
-        {
-            self.body.dir = new_dir
-        }
-
-        // create new head for snake
-        let mut new_head = Hex {
-            typ: HexType::Normal,
-            pos: self.head().pos,
-            teleported: None,
-        };
-
-        new_head.pos = new_head.pos.wrapping_translate(self.dir(), 1, board_dim);
-
         let last_idx = self.len() - 1;
-        if let HexType::Eaten(amount) = &mut self.body.cell[last_idx].typ {
+        if let HexType::Eaten(amount) = &mut self.body.cells[last_idx].typ {
             if *amount == 0 {
-                self.body.cell[last_idx].typ = HexType::Normal;
+                self.body.cells[last_idx].typ = HexType::Normal;
             } else {
                 self.body.grow += 1;
                 *amount -= 1;
             }
         }
 
+        if self.state != SnakeState::Dying {
+            // determine new direction for snake
+            if let Some(new_dir) =
+                self.controller
+                    .next_dir(&self.body, other_snakes, apples, board_dim)
+            {
+                self.body.dir = new_dir
+            }
+
+            // create new head for snake
+            let mut new_head = Hex {
+                typ: HexType::Normal,
+                pos: self.head().pos.wrapping_translate(self.dir(), 1, board_dim),
+                teleported: None,
+            };
+            self.body.cells.push_front(new_head);
+        }
+
         if self.body.grow > 0 {
-            self.body.cell.push_front(new_head);
             self.body.grow -= 1;
         } else {
-            self.body.cell.rotate_right(1);
-            self.body.cell[0] = new_head;
+            self.body.cells.pop_back();
         }
     }
 }

@@ -7,14 +7,16 @@ mod dir {
     use rand::Rng;
     use Dir::*;
 
+    #[repr(u8)]
     #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+    // defined in clockwise order starting at U
     pub enum Dir {
-        U,
-        D,
-        UL,
-        UR,
-        DL,
-        DR,
+        U = 0,
+        UR = 1,
+        DR = 2,
+        D = 3,
+        DL = 4,
+        UL = 5,
     }
 
     impl Neg for Dir {
@@ -29,6 +31,7 @@ mod dir {
                 DL => UR,
                 DR => UL,
             }
+            // hypothetically: ((self as u8 + 3) % 6) as Dir
         }
     }
 
@@ -47,6 +50,7 @@ mod dir {
                 DL => UL,
                 UL => U,
             }
+            // hypothetically: ((self as u8 + 1) % 6) as Dir
         }
 
         pub fn random(rng: &mut impl Rng) -> Self {
@@ -191,7 +195,7 @@ mod hex_pos {
             }
             new_pos
         }
-        
+
         // broken
         // // translates h/v with special treatment for v
         // #[must_use]
@@ -199,7 +203,7 @@ mod hex_pos {
         //     if dist < 0 {
         //         return self.translate(-dir, -dist);
         //     }
-        // 
+        //
         //     let mut new_pos = self;
         //     let half = (dist as f64 / 2.).ceil() as isize;
         //     match dir {
@@ -234,7 +238,7 @@ mod hex_pos {
         //             }
         //         }
         //     }
-        // 
+        //
         //     new_pos
         // }
 
@@ -271,8 +275,9 @@ mod hex_pos {
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum HexType {
     Normal,
-    Crashed,
     Eaten(u32),
+    Crashed,
+    BlackHole, // does not advance, sucks the rest of the snake in
 }
 
 #[derive(Copy, Clone, Debug)]
