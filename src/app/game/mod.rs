@@ -304,7 +304,7 @@ impl Game {
         for snake in &self.snakes {
             occupied_cells.extend(snake.body.cell.iter().map(|hex| hex.pos));
         }
-        occupied_cells.sort_by_key(move |&x| x.v * self.dim.h + x.h);
+        occupied_cells.sort_unstable();
         occupied_cells.dedup();
         occupied_cells
     }
@@ -492,7 +492,18 @@ impl Game {
         }
 
         if let Some(seed) = spawn_snake {
-            if let Some(pos) = self.random_free_spot(&self.occupied_cells()) {
+            // avoid spawning too close to player snake heads
+            const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
+
+            let mut occupied_cells = self.occupied_cells();
+            for snake in self.snakes.iter().filter(|s| s.snake_type == SnakeType::PlayerSnake) {
+                let neighborhood = snake.head().pos.neighborhood(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS);
+                occupied_cells.extend_from_slice(&neighborhood);
+            }
+            occupied_cells.sort_unstable();
+            occupied_cells.dedup();
+
+            if let Some(pos) = self.random_free_spot(&occupied_cells) {
                 self.snakes
                     .push(Snake::from_seed(&seed, pos, Dir::random(&mut self.rng), 10))
             } else {
@@ -712,6 +723,15 @@ impl Game {
 
         for snake in &mut self.snakes {
             let len = snake.len();
+
+            // draw white aura around snake heads (debug)
+            // for pos in snake.head().pos.neighborhood(7) {
+            //     let dest = pos.to_point(self.cell_dim);
+            //     let color = Color::from_rgb(255, 255, 255);
+            //     let translated_points = translate(&hexagon_points, dest);
+            //     builder.polygon(DrawMode::fill(), &translated_points, color)?;
+            // }
+
             for (seg_idx, hex) in snake.body.cell.iter().enumerate() {
                 let dest = hex.pos.to_point(self.cell_dim);
                 let color = snake.painter.paint_segment(seg_idx, len, hex);

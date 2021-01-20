@@ -33,6 +33,22 @@ mod dir {
     }
 
     impl Dir {
+        // clockwise order starting from U
+        pub fn iter() -> impl Iterator<Item = Self> {
+            [U, UR, DR, D, DL, UL].iter().copied()
+        }
+
+        pub fn clockwise(self) -> Self {
+            match self {
+                U => UR,
+                UR => DR,
+                DR => D,
+                D => DL,
+                DL => UL,
+                UL => U,
+            }
+        }
+
         pub fn random(rng: &mut impl Rng) -> Self {
             match rng.gen_range(0, 6) {
                 0 => U,
@@ -76,12 +92,36 @@ mod hex_pos {
         }
 
         // TODO: replace this with manhattan distance
-        // returns distance in side lengths
+        // approximate straight-line distance in units of side length
         pub fn distance_to(self, HexPos { h, v }: HexPos) -> usize {
             let dh = (self.h - h).abs() as f32;
             let dv = (self.v - v).abs() as f32;
             let CellDim { side, sin, cos } = CellDim::from(1.);
             (dh / (side + cos) + dv / (2. * sin)) as usize
+        }
+
+        // all cells within a manhattan distance of radius (including self)
+        // guarantees no duplicates, not sorted
+        pub fn neighborhood(self, radius: usize) -> Vec<Self> {
+            let mut neighborhood = vec![self];
+            for dir in Dir::iter() {
+                for r in 1..radius {
+                    let branch = self.translate(dir, r);
+                    neighborhood.push(branch);
+                    let dir2 = dir.clockwise();
+                    for r2 in 1..(radius - r) {
+                        neighborhood.push(branch.translate(dir2, r2))
+                    }
+                }
+            }
+
+            // check that no duplicates were introduced
+            // let len = neighborhood.len();
+            // neighborhood.sort()
+            // neighborhood.dedup();
+            // assert_eq!(neighborhood.len(), len);
+
+            neighborhood
         }
     }
 
@@ -107,54 +147,100 @@ mod hex_pos {
     }
 
     impl HexPos {
-        // translates h/v with special treatment for v
-        #[must_use]
-        pub fn translate(self, dir: Dir, dist: isize) -> Self {
-            if dist < 0 {
-                return self.translate(-dir, -dist);
-            }
-
-            let mut new_pos = self;
-            let half = (dist as f64 / 2.).ceil() as isize;
+        // TODO: figure out O(1) translation for longer distances
+        fn translate_one_in_place(&mut self, dir: Dir) {
             match dir {
-                U => new_pos.v -= dist,
-                D => new_pos.v += dist,
+                U => self.v -= 1,
+                D => self.v += 1,
                 UL => {
-                    new_pos.h -= dist;
-                    new_pos.v -= half;
-                    if new_pos.h.is_even() {
-                        new_pos.v += 1
+                    self.h -= 1;
+                    self.v -= 1;
+                    if self.h.is_even() {
+                        self.v += 1
                     }
                 }
                 UR => {
-                    new_pos.h += dist;
-                    new_pos.v -= half;
-                    if new_pos.h.is_even() {
-                        new_pos.v += 1
+                    self.h += 1;
+                    self.v -= 1;
+                    if self.h.is_even() {
+                        self.v += 1
                     }
                 }
                 DL => {
-                    new_pos.h -= dist;
-                    new_pos.v += half;
-                    if new_pos.h.is_odd() {
-                        new_pos.v -= 1
+                    self.h -= 1;
+                    self.v += 1;
+                    if self.h.is_odd() {
+                        self.v -= 1
                     }
                 }
                 DR => {
-                    new_pos.h += dist;
-                    new_pos.v += half;
-                    if new_pos.h.is_odd() {
-                        new_pos.v -= 1
+                    self.h += 1;
+                    self.v += 1;
+                    if self.h.is_odd() {
+                        self.v -= 1
                     }
                 }
             }
+        }
 
+        #[must_use]
+        pub fn translate(self, dir: Dir, dist: usize) -> Self {
+            let mut new_pos = self;
+            for _ in 0..dist {
+                new_pos.translate_one_in_place(dir);
+            }
             new_pos
         }
+        
+        // broken
+        // // translates h/v with special treatment for v
+        // #[must_use]
+        // pub fn translate(self, dir: Dir, dist: isize) -> Self {
+        //     if dist < 0 {
+        //         return self.translate(-dir, -dist);
+        //     }
+        // 
+        //     let mut new_pos = self;
+        //     let half = (dist as f64 / 2.).ceil() as isize;
+        //     match dir {
+        //         U => new_pos.v -= dist,
+        //         D => new_pos.v += dist,
+        //         UL => {
+        //             new_pos.h -= dist;
+        //             new_pos.v -= half;
+        //             if new_pos.h.is_even() {
+        //                 new_pos.v += 1
+        //             }
+        //         }
+        //         UR => {
+        //             new_pos.h += dist;
+        //             new_pos.v -= half;
+        //             if new_pos.h.is_even() {
+        //                 new_pos.v += 1
+        //             }
+        //         }
+        //         DL => {
+        //             new_pos.h -= dist;
+        //             new_pos.v += half;
+        //             if new_pos.h.is_odd() {
+        //                 new_pos.v -= 1
+        //             }
+        //         }
+        //         DR => {
+        //             new_pos.h += dist;
+        //             new_pos.v += half;
+        //             if new_pos.h.is_odd() {
+        //                 new_pos.v -= 1
+        //             }
+        //         }
+        //     }
+        // 
+        //     new_pos
+        // }
 
         // wraps around board edges
         #[must_use]
-        pub fn wrapping_translate(self, dir: Dir, dist: isize, board_dim: HexDim) -> Self {
+        pub fn wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> Self {
             // TODO: make O(1)
             //  at the moment this just moves the head back until the last cell that's still in the map
             //  this could be done as a single calculation
@@ -164,10 +250,10 @@ mod hex_pos {
             if !board_dim.contains(new_pos) {
                 // find reappearance point
                 while !board_dim.contains(new_pos) {
-                    new_pos = new_pos.translate(dir, -1);
+                    new_pos = new_pos.translate(-dir, 1);
                 }
                 while board_dim.contains(new_pos) {
-                    new_pos = new_pos.translate(dir, -1);
+                    new_pos = new_pos.translate(-dir, 1);
                 }
                 new_pos.translate(dir, 1)
             } else {
