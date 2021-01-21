@@ -8,8 +8,6 @@ When you hit the wall, where you get teleported depends on the direction you wer
 #### Movement
 
 It's possible to configure which side of the keyboard you're playing on, with which hand, and the keyboard layout.
-This can be done by changing the `players` vector in the main method. Currently supported layouts are
-qwerty and dvorak.
 
 As an example, these are the controls for playing on the right side
 of the keyboard with the right hand on qwerty (default).
@@ -25,17 +23,19 @@ of the keyboard with the right hand on qwerty (default).
 
 - `Space` - Play / Pause
 
-When crashed, press `Space` to restart
+When you die, press `Space` to restart
 
 ## Screenshots
 
-The head of the snake is lighter, the tail is darker
+The head of the snake is red, the tail is purple,
+if you run into yourself, the snake's tail will be
+cut off until you manage to regrow it again.
+![](http://i.snipboard.io/igYhvm.jpg)
 
-![s3](https://i.snipboard.io/sTS10V.jpg)
+Teleportation depends on direction.
+![](http://i.snipboard.io/ONroj6.jpg)
 
-How teleportation is done
-![s4](https://i.snipboard.io/DOATHJ.jpg)
-
-![s1](https://i.snipboard.io/JBYvTF.jpg)
-
-![s2](https://snipboard.io/0DmpCH.jpg)
+Sometimes you will spawn an AI snake that will
+annoyingly compete for your apples (or one that will
+try to kill you).
+![](http://i.snipboard.io/jmZCFe.jpg)

@@ -7,16 +7,21 @@ extern crate lazy_static;
 
 use ggez::{event::run, ContextBuilder};
 
-use crate::app::App;
+use crate::app::{
+    keyboard_control::{ControlSetup, KeyboardLayout, Side},
+    App,
+};
 
 mod app;
 mod times;
 
-// two snakes's heads can pass through each other if iterated at the same time,
-// this seems like a bit of a fundamental problem (can't move 1/2 a cell)
-
 fn main() {
-    let app = &mut App::new();
+    // NOTE: configure number of players and controls here
+    let app = &mut App::new(vec![ControlSetup {
+        layout: KeyboardLayout::Qwerty,
+        keyboard_side: Side::Right,
+        hand: Side::Right,
+    }]);
 
     let (ctx, event_loop) = &mut ContextBuilder::new("hex_snake", "gorilskij")
         .window_mode(app.wm())

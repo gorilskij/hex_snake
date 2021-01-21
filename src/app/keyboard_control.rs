@@ -11,14 +11,14 @@ pub struct Controls {
 }
 
 #[allow(dead_code)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum KeyboardLayout {
     Qwerty,
     Dvorak,
 }
 
 #[allow(dead_code)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Side {
     Left,
     Right,

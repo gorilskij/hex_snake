@@ -30,10 +30,10 @@ use crate::{
         },
         Frames,
     },
-    times::Times,
+    // times::Times,
 };
-use ggez::graphics::{spritebatch::SpriteBatch, Image};
-use itertools::Itertools;
+// use ggez::graphics::{spritebatch::SpriteBatch, Image};
+// use itertools::Itertools;
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -84,6 +84,7 @@ impl FPSCounter {
     }
 }
 
+// used to tie update frames to drawing frames and maintain a reduced framerate
 struct FPSControl {
     ggez_frames: Frames, // incremented every time ggez calls update()
     game_frames: Frames, // incremented every time a frame is actually calculated/drawn
@@ -229,8 +230,8 @@ impl Game {
 
         let mut game = Self {
             state: GameState::Playing,
-            // fps_control: FPSControl::new(12, 60),
-            fps_control: FPSControl::new(240, 240),
+            fps_control: FPSControl::new(12, 60),
+            // fps_control: FPSControl::new(240, 240),
             graphics_fps: FPSCounter::new(),
 
             dim: Self::wh_to_dim(cell_dim, wm.width, wm.height),

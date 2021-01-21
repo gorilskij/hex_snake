@@ -8,12 +8,13 @@ use ggez::{
 };
 
 use crate::app::{
-    keyboard_control::{ControlSetup, KeyboardLayout, Side},
+    keyboard_control::ControlSetup,
     snake::{
         controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
     },
 };
 use game::Game;
+use itertools::Itertools;
 use palette::GamePalette;
 use snake::{EatMechanics, SnakeSeed};
 use start_screen::StartScreen;
@@ -72,7 +73,19 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(players: Vec<ControlSetup>) -> Self {
+        assert_eq!(
+            players.iter().map(|cs| cs.layout).dedup().count(),
+            1,
+            "found different keyboard layouts for different players"
+        );
+
+        assert_eq!(
+            players.iter().map(|cs| cs.keyboard_side).dedup().count(),
+            players.len(),
+            "found multiple players on the same side of the keyboard"
+        );
+
         let window_mode = WindowMode {
             width: 1000.,
             height: 800.,
@@ -95,35 +108,23 @@ impl App {
             srgb: true,
         };
 
+        let seeds = players
+            .into_iter()
+            .map(|cs| SnakeSeed {
+                snake_type: SnakeType::PlayerSnake,
+                eat_mechanics: EatMechanics {
+                    eat_self: EatBehavior::Cut,
+                    eat_other: hash_map! {},
+                    default: EatBehavior::Crash,
+                },
+                palette: SnakePaletteTemplate::new_persistent_rainbow(),
+                controller: SnakeControllerTemplate::PlayerController(cs),
+            })
+            .collect();
+
         Self {
             // screen: Screen::StartScreen(StartScreen::new()),
-            screen: Screen::Game(Game::new(
-                10.,
-                vec![
-                    // SnakeSeed {
-                    //     snake_type: SnakeType::PlayerSnake,
-                    //     eat_mechanics: EatMechanics {
-                    //         eat_self: EatBehavior::Cut,
-                    //         eat_other: hash_map! {},
-                    //         default: EatBehavior::Crash,
-                    //     },
-                    //     palette: SnakePaletteTemplate::new_persistent_rainbow(),
-                    //     controller: SnakeControllerTemplate::PlayerController(ControlSetup {
-                    //         layout: KeyboardLayout::Dvorak,
-                    //         keyboard_side: Side::Right,
-                    //         hand: Side::Right,
-                    //     }),
-                    // },
-                    SnakeSeed {
-                        snake_type: SnakeType::CompetitorSnake { life: None },
-                        eat_mechanics: EatMechanics::always(EatBehavior::Cut),
-                        palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
-                        controller: SnakeControllerTemplate::CompetitorAI,
-                    }; 20
-                ],
-                GamePalette::dark(),
-                window_mode,
-            )),
+            screen: Screen::Game(Game::new(12., seeds, GamePalette::dark(), window_mode)),
             window_mode,
             window_setup,
         }

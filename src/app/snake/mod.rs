@@ -144,7 +144,7 @@ impl Snake {
             }
 
             // create new head for snake
-            let mut new_head = Hex {
+            let new_head = Hex {
                 typ: HexType::Normal,
                 pos: self.head().pos.wrapping_translate(self.dir(), 1, board_dim),
                 teleported: None,

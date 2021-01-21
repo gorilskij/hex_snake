@@ -150,24 +150,48 @@ impl SnakeController for DemoController {
 // competes for apples
 pub struct CompetitorAI;
 
+// old way (might be more efficient for sparse boards, not tested)
+// fn dir_score(
+//     head: HexPos,
+//     dir: Dir,
+//     board_dim: HexDim,
+//     snake_body: &SnakeBody,
+//     other_snakes: OtherSnakes,
+//     apples: &[Apple],
+// ) -> usize {
+//     let mut distance = 0;
+//     let mut new_head = head;
+//     while !apples.iter().any(|Apple { pos, .. }| pos == &new_head) {
+//         distance += 1;
+//         new_head = new_head.wrapping_translate(dir, 1, board_dim);
+//
+//         for body in once(snake_body).chain(other_snakes.iter_bodies()) {
+//             if body.cells.iter().any(|Hex { pos, .. }| pos == &new_head) {
+//                 return distance; // the higher the distance to a body part, the higher the score
+//             }
+//         }
+//     }
+//     // println!("for dir {:?}, dist: {}", dir, distance);
+//     // the lower the distance to an apple, the higher the score
+//     board_dim.h as usize + board_dim.v as usize - distance
+// }
+
 fn dir_score(
     head: HexPos,
     dir: Dir,
     board_dim: HexDim,
-    snake_body: &SnakeBody,
-    other_snakes: OtherSnakes,
-    apples: &[Apple],
+    snake_positions: &[HexPos],
+    apple_positions: &[HexPos],
 ) -> usize {
     let mut distance = 0;
     let mut new_head = head;
-    while !apples.iter().any(|Apple { pos, .. }| pos == &new_head) {
+
+    while !apple_positions.contains(&new_head) {
         distance += 1;
         new_head = new_head.wrapping_translate(dir, 1, board_dim);
 
-        for body in once(snake_body).chain(other_snakes.iter_bodies()) {
-            if body.cells.iter().any(|Hex { pos, .. }| pos == &new_head) {
-                return distance; // the higher the distance to a body part, the higher the score
-            }
+        if snake_positions.contains(&new_head) {
+            return distance; // the higher the distance to a body part, the higher the score
         }
     }
     // println!("for dir {:?}, dist: {}", dir, distance);
@@ -179,7 +203,7 @@ impl SnakeController for CompetitorAI {
     fn next_dir(
         &mut self,
         snake_body: &SnakeBody,
-        other_bodies: OtherSnakes,
+        other_snakes: OtherSnakes,
         apples: &[Apple],
         board_dim: HexDim,
     ) -> Option<Dir> {
@@ -200,6 +224,12 @@ impl SnakeController for CompetitorAI {
         //     DL => [D, DL, UL],
         // };
 
+        let apple_positions: Vec<_> = apples.iter().map(|a| a.pos).collect();
+        let snake_positions: Vec<_> = once(snake_body)
+            .chain(other_snakes.iter_bodies())
+            .flat_map(|b| b.cells.iter().map(|h| h.pos))
+            .collect();
+
         let new_dir = available_directions
             .iter()
             .max_by_key(|&&dir| {
@@ -207,9 +237,8 @@ impl SnakeController for CompetitorAI {
                     snake_body.cells[0].pos,
                     dir,
                     board_dim,
-                    &snake_body,
-                    other_bodies,
-                    apples,
+                    &snake_positions,
+                    &apple_positions,
                 )
             })
             .copied();
