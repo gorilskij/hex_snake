@@ -389,13 +389,13 @@ impl Game {
     fn advance_snakes(&mut self) {
         let mut remove_snakes = vec![];
         for snake_idx in 0..self.snakes.len() {
-            // remove snake if it ran out of life
+            // set snake to die if it ran out of life
             match &mut self.snakes[snake_idx].snake_type {
                 SnakeType::CompetitorSnake { life: Some(life) }
                 | SnakeType::KillerSnake { life: Some(life) } => {
                     if *life == 0 {
-                        remove_snakes.push(snake_idx);
-                        continue;
+                        self.snakes[snake_idx].state = SnakeState::Dying;
+                        self.snakes[snake_idx].body.cells[0].typ = HexType::BlackHole;
                     } else {
                         *life -= 1;
                     }
@@ -403,6 +403,7 @@ impl Game {
                 _ => (),
             }
 
+            // advance the snake
             let (other_snakes1, rest) = self.snakes.split_at_mut(snake_idx);
             let (snake, other_snakes2) = rest.split_at_mut(1);
             let snake = &mut snake[0];
@@ -411,11 +412,13 @@ impl Game {
                 &self.apples,
                 self.dim,
             );
-            // bit of a magic trick
+
+            // remove snake if it ran out of body
             if snake.len() == 0 {
                 remove_snakes.push(snake_idx);
             }
         }
+
         remove_snakes.sort_unstable();
         for snake_idx in remove_snakes.into_iter().rev() {
             self.snakes.remove(snake_idx);

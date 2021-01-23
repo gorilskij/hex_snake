@@ -106,7 +106,7 @@ impl Snake {
             },
             state: SnakeState::Living,
 
-            controller: controller.into(),
+            controller: controller.into_controller(dir),
             painter: palette.into(),
         }
     }

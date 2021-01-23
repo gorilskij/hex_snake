@@ -42,14 +42,14 @@ pub trait SnakeController {
     fn key_pressed(&mut self, _key: KeyCode) {}
 }
 
-impl From<SnakeControllerTemplate> for Box<dyn SnakeController> {
-    fn from(template: SnakeControllerTemplate) -> Self {
-        match template {
+impl SnakeControllerTemplate {
+    pub fn into_controller(self, initial_dir: Dir) -> Box<dyn SnakeController> {
+        match self {
             SnakeControllerTemplate::PlayerController(control_setup) => {
                 Box::new(PlayerController {
                     controls: control_setup.into(),
                     control_queue: VecDeque::with_capacity(PlayerController::CTRL_QUEUE_LIMIT),
-                    dir: None,
+                    dir: initial_dir,
                 })
             }
             SnakeControllerTemplate::DemoController(move_sequence) => Box::new(DemoController {
@@ -66,7 +66,7 @@ impl From<SnakeControllerTemplate> for Box<dyn SnakeController> {
 pub struct PlayerController {
     controls: Controls,
     control_queue: VecDeque<Dir>,
-    dir: Option<Dir>,
+    dir: Dir,
 }
 
 impl PlayerController {
@@ -76,8 +76,8 @@ impl PlayerController {
 impl SnakeController for PlayerController {
     fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPos) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
-            self.dir = Some(queue_dir);
-            self.dir
+            self.dir = queue_dir;
+            Some(self.dir)
         } else {
             None
         }
@@ -99,7 +99,8 @@ impl SnakeController for PlayerController {
             _ => return,
         };
 
-        if self.control_queue.is_empty() && self.dir.map(|dir| new_dir != -dir).unwrap_or(true)
+        // deny 180deg turns
+        if self.control_queue.is_empty() && self.dir != -new_dir
             || !self.control_queue.is_empty()
                 && self.control_queue.len() < Self::CTRL_QUEUE_LIMIT
                 && new_dir != -self.control_queue[self.control_queue.len() - 1]

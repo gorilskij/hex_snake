@@ -35,6 +35,7 @@ impl SnakeDemo {
         let mut body = VecDeque::new();
         body.push_back(head);
         let board_dim = HexPos { h: 20, v: 20 };
+        let dir = Dir::U;
         Self {
             top_left,
             dim: board_dim,
@@ -48,7 +49,7 @@ impl SnakeDemo {
 
                 body: SnakeBody {
                     cells: body,
-                    dir: Dir::U,
+                    dir,
                     grow: 10,
                 },
                 state: SnakeState::Living,
@@ -65,7 +66,7 @@ impl SnakeDemo {
                     SimMove::Move(Dir::UL),
                     SimMove::Wait(5),
                 ])
-                .into(),
+                .into_controller(dir),
                 painter: SnakePaletteTemplate::new_gray_gradient().into(),
             },
             cell_dim,

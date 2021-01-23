@@ -18,7 +18,7 @@ mod times;
 fn main() {
     // NOTE: configure number of players and controls here
     let app = &mut App::new(vec![ControlSetup {
-        layout: KeyboardLayout::Qwerty,
+        layout: KeyboardLayout::Dvorak,
         keyboard_side: Side::Right,
         hand: Side::Right,
     }]);
