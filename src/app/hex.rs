@@ -8,7 +8,7 @@ mod dir {
     use Dir::*;
 
     #[repr(u8)]
-    #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+    #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
     // defined in clockwise order starting at U
     pub enum Dir {
         U = 0,
@@ -77,6 +77,7 @@ mod hex_pos {
         fmt::{Debug, Error, Formatter},
     };
     use Dir::*;
+    use std::collections::HashMap;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
     pub struct HexPos {
@@ -126,6 +127,22 @@ mod hex_pos {
             // assert_eq!(neighborhood.len(), len);
 
             neighborhood
+        }
+
+        // straight-line direction to other, None if the points don't lie on the same line
+        // don't search farther than limit
+        pub fn exact_dir_to(self, other: Self, limit: usize) -> Option<Dir> {
+            if self == other { return None; }
+            let mut dirs: HashMap<_, _> = Dir::iter().map(|dir| (dir, self)).collect();
+            for _ in 0..limit {
+                for (dir, pos) in &mut dirs {
+                    *pos = pos.translate(*dir, 1);
+                    if *pos == other {
+                        return Some(*dir);
+                    }
+                }
+            }
+            None
         }
     }
 

@@ -716,10 +716,41 @@ impl Game {
 }
 
 // TODO: refactor these out of Game
+#[rustfmt::skip]
+fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_dim: CellDim) -> Vec<Point2<f32>> {
+    let CellDim { side, sin, cos } = cell_dim;
+
+    let mut points = if from == Some(Dir::D) && to == Some(Dir::U) {
+        vec![
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: side + cos, y: 2. * sin, },
+            Point2 { x: cos, y: 2. * sin, },
+        ]
+    } else {
+        vec![
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: side + 2. * cos, y: sin, },
+            Point2 { x: side + cos, y: 2. * sin, },
+            Point2 { x: cos, y: 2. * sin, },
+            Point2 { x: 0., y: sin },
+        ]
+    };
+
+    for Point2 { x, y } in &mut points {
+        *x += dest.x;
+        *y += dest.y;
+    }
+
+    points
+}
+
 type HexagonPoints = [Point2<f32>; 6];
 impl Game {
+
     pub fn get_hexagon_points(&self) -> HexagonPoints {
-        let CellDim { side, .. } = self.cell_dim;
+        let CellDim { side, sin, cos } = self.cell_dim;
 
         unsafe {
             static mut CACHED_HEXAGON_POINTS: Option<(f32, HexagonPoints)> = None;
@@ -730,9 +761,8 @@ impl Game {
                 }
             }
 
-            let CellDim { sin, cos, .. } = CellDim::from(side);
             #[rustfmt::skip]
-                let points = [
+            let points = [
                 Point2 { x: cos, y: 0. },
                 Point2 { x: side + cos, y: 0., },
                 Point2 { x: side + 2. * cos, y: sin, },
@@ -749,17 +779,17 @@ impl Game {
     #[allow(dead_code)]
     fn draw_snakes_and_apples_tesselation(&mut self, ctx: &mut Context) -> GameResult {
         let mut builder = MeshBuilder::new();
-        let hexagon_points = self.get_hexagon_points();
+        // let hexagon_points = self.get_hexagon_points();
 
-        fn translate(points: &[Point2<f32>], dest: Point2<f32>) -> Vec<Point2<f32>> {
-            points
-                .iter()
-                .map(|Point2 { x, y }| Point2 {
-                    x: x + dest.x,
-                    y: y + dest.y,
-                })
-                .collect()
-        }
+        // fn translate(points: &[Point2<f32>], dest: Point2<f32>) -> Vec<Point2<f32>> {
+        //     points
+        //         .iter()
+        //         .map(|Point2 { x, y }| Point2 {
+        //             x: x + dest.x,
+        //             y: y + dest.y,
+        //         })
+        //         .collect()
+        // }
 
         for snake in &mut self.snakes {
             let len = snake.len();
@@ -773,43 +803,59 @@ impl Game {
             // }
 
             for (seg_idx, hex) in snake.body.cells.iter().enumerate() {
+                // closer to head
+                let next = if seg_idx == 0 {
+                    None
+                } else {
+                    Some(snake.body.cells[seg_idx - 1].pos)
+                };
+
+                // closer to tail
+                let previous = snake.body.cells.get(seg_idx + 1).map(|h| h.pos);
+
+                let from = previous.and_then(|prev| hex.pos.exact_dir_to(prev, 1));
+                let to = next.and_then(|nxt| hex.pos.exact_dir_to(nxt, 1));
+
+                println!("{:?} / {:?}", from, to);
+
                 let dest = hex.pos.to_point(self.cell_dim);
                 let color = snake.painter.paint_segment(seg_idx, len, hex);
-                let translated_points = translate(&hexagon_points, dest);
-                builder.polygon(DrawMode::fill(), &translated_points, color)?;
+                // let translated_points = translate(&hexagon_points, dest);
+                let points = get_points(dest, from, to, self.cell_dim);
+                builder.polygon(DrawMode::fill(), &points, color)?;
             }
         }
 
-        for snake in self
-            .snakes
-            .iter_mut()
-            .filter(|snake| snake.state == SnakeState::Crashed || snake.state == SnakeState::Dying)
-        {
-            let dest = snake.head().pos.to_point(self.cell_dim);
-            let color = snake
-                .painter
-                .paint_segment(0, snake.len(), &snake.body.cells[0]);
-            let translated_points = translate(&hexagon_points, dest);
-            builder.polygon(DrawMode::fill(), &translated_points, color)?;
-        }
+        // for snake in self
+        //     .snakes
+        //     .iter_mut()
+        //     .filter(|snake| snake.state == SnakeState::Crashed || snake.state == SnakeState::Dying)
+        // {
+        //     let dest = snake.head().pos.to_point(self.cell_dim);
+        //     let color = snake
+        //         .painter
+        //         .paint_segment(0, snake.len(), &snake.body.cells[0]);
+        //     // let translated_points = translate(&hexagon_points, dest);
+        //     builder.polygon(DrawMode::fill(), &translated_points, color)?;
+        // }
 
-        for apple in &self.apples {
-            let dest = apple.pos.to_point(self.cell_dim);
-            let color = match apple.typ {
-                AppleType::Normal(_) => self.palette.apple_color,
-                AppleType::SpawnSnake(_) => {
-                    let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
-                    let hsl = HSL {
-                        h: hue,
-                        s: 1.,
-                        l: 0.3,
-                    };
-                    Color::from(hsl.to_rgb())
-                }
-            };
-            let translated_points = translate(&hexagon_points, dest);
-            builder.polygon(DrawMode::fill(), &translated_points, color)?;
-        }
+        // for apple in &self.apples {
+        //     let dest = apple.pos.to_point(self.cell_dim);
+        //     let color = match apple.typ {
+        //         AppleType::Normal(_) => self.palette.apple_color,
+        //         AppleType::SpawnSnake(_) => {
+        //             let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
+        //             let hsl = HSL {
+        //                 h: hue,
+        //                 s: 1.,
+        //                 l: 0.3,
+        //             };
+        //             Color::from(hsl.to_rgb())
+        //         }
+        //     };
+        //     let translated_points = translate(&hexagon_points, dest);
+        //     builder.polygon(DrawMode::fill(), &translated_points, color)?;
+        // }
 
         let mesh = builder.build(ctx)?;
         draw(ctx, &mesh, DrawParam::default())
