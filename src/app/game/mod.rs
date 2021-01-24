@@ -720,12 +720,26 @@ impl Game {
 fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_dim: CellDim) -> Vec<Point2<f32>> {
     let CellDim { side, sin, cos } = cell_dim;
 
-    let mut points = if from == Some(Dir::D) && to == Some(Dir::U) {
+    let mut points = if from == Some(Dir::D) && to == Some(Dir::U) || from == Some(Dir::U) && to == Some(Dir::D) {
         vec![
             Point2 { x: cos, y: 0. },
             Point2 { x: side + cos, y: 0., },
             Point2 { x: side + cos, y: 2. * sin, },
             Point2 { x: cos, y: 2. * sin, },
+        ]
+    } else if from == Some(Dir::DL) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::DL) {
+        vec![
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: side + 2. * cos, y: sin, },
+            Point2 { x: cos, y: 2. * sin, },
+            Point2 { x: 0., y: sin },
+        ]
+    } else if from == Some(Dir::DR) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::DR) {
+        vec![
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + 2. * cos, y: sin, },
+            Point2 { x: side + cos, y: 2. * sin, },
+            Point2 { x: 0., y: sin },
         ]
     } else {
         vec![
