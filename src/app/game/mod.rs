@@ -741,6 +741,55 @@ fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_dim: C
             Point2 { x: side + cos, y: 2. * sin, },
             Point2 { x: 0., y: sin },
         ]
+    } else if from == Some(Dir::D) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::D) {
+        vec![
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + cos, y: 2. * sin, },
+            Point2 { x: cos, y: 2. * sin, },
+            Point2 { x: 0., y: sin },
+        ]
+    } else if from == Some(Dir::D) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::D) {
+        vec![
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: side + 2. * cos, y: sin, },
+            Point2 { x: side + cos, y: 2. * sin, },
+            Point2 { x: cos, y: 2. * sin, },
+        ]
+    } else if from == Some(Dir::U) && to == Some(Dir::DL) || from == Some(Dir::DL) && to == Some(Dir::U) {
+        vec![
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: cos, y: 2. * sin, },
+            Point2 { x: 0., y: sin },
+        ]
+    } else if from == Some(Dir::U) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::U) {
+        vec![
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: side + 2. * cos, y: sin, },
+            Point2 { x: side + cos, y: 2. * sin, },
+        ]
+    } else if from == Some(Dir::UL) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::UL) {
+        vec![
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: side + 2. * cos, y: sin, },
+            Point2 { x: 0., y: sin },
+        ]
+    } else if from == Some(Dir::DL) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::DL) {
+        vec![
+            Point2 { x: side + 2. * cos, y: sin, },
+            Point2 { x: side + cos, y: 2. * sin, },
+            Point2 { x: cos, y: 2. * sin, },
+            Point2 { x: 0., y: sin },
+        ]
+    } else if from == Some(Dir::U) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::U) {
+        vec![
+            Point2 { x: cos, y: 0. },
+            Point2 { x: side + cos, y: 0., },
+            Point2 { x: side + cos, y: 2. * sin, },
+            Point2 { x: 0., y: sin },
+        ]
     } else {
         vec![
             Point2 { x: cos, y: 0. },
@@ -830,7 +879,7 @@ impl Game {
                 let from = previous.and_then(|prev| hex.pos.exact_dir_to(prev, 1));
                 let to = next.and_then(|nxt| hex.pos.exact_dir_to(nxt, 1));
 
-                println!("{:?} / {:?}", from, to);
+                // println!("{:?} / {:?}", from, to);
 
                 let dest = hex.pos.to_point(self.cell_dim);
                 let color = snake.painter.paint_segment(seg_idx, len, hex);
