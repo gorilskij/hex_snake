@@ -924,36 +924,38 @@ impl Game {
             }
         }
 
-        // for snake in self
-        //     .snakes
-        //     .iter_mut()
-        //     .filter(|snake| snake.state == SnakeState::Crashed || snake.state == SnakeState::Dying)
-        // {
-        //     let dest = snake.head().pos.to_point(self.cell_dim);
-        //     let color = snake
-        //         .painter
-        //         .paint_segment(0, snake.len(), &snake.body.cells[0]);
-        //     // let translated_points = translate(&hexagon_points, dest);
-        //     builder.polygon(DrawMode::fill(), &translated_points, color)?;
-        // }
+        for snake in self
+            .snakes
+            .iter_mut()
+            .filter(|snake| snake.state == SnakeState::Crashed || snake.state == SnakeState::Dying)
+        {
+            let dest = snake.head().pos.to_point(self.cell_dim);
+            let color = snake
+                .painter
+                .paint_segment(0, snake.len(), &snake.body.cells[0]);
+            // let translated_points = translate(&hexagon_points, dest);
+            let points = get_points(dest, None, None, self.cell_dim);
+            builder.polygon(DrawMode::fill(), &points, color)?;
+        }
 
-        // for apple in &self.apples {
-        //     let dest = apple.pos.to_point(self.cell_dim);
-        //     let color = match apple.typ {
-        //         AppleType::Normal(_) => self.palette.apple_color,
-        //         AppleType::SpawnSnake(_) => {
-        //             let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
-        //             let hsl = HSL {
-        //                 h: hue,
-        //                 s: 1.,
-        //                 l: 0.3,
-        //             };
-        //             Color::from(hsl.to_rgb())
-        //         }
-        //     };
-        //     let translated_points = translate(&hexagon_points, dest);
-        //     builder.polygon(DrawMode::fill(), &translated_points, color)?;
-        // }
+        for apple in &self.apples {
+            let dest = apple.pos.to_point(self.cell_dim);
+            let color = match apple.typ {
+                AppleType::Normal(_) => self.palette.apple_color,
+                AppleType::SpawnSnake(_) => {
+                    let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
+                    let hsl = HSL {
+                        h: hue,
+                        s: 1.,
+                        l: 0.3,
+                    };
+                    Color::from(hsl.to_rgb())
+                }
+            };
+            // let translated_points = translate(&hexagon_points, dest);
+            let points = get_points(dest, None, None, self.cell_dim);
+            builder.polygon(DrawMode::fill(), &points, color)?;
+        }
 
         let mesh = builder.build(ctx)?;
         draw(ctx, &mesh, DrawParam::default())
