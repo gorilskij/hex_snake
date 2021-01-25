@@ -12,11 +12,10 @@ use crate::app::{
     snake::{
         controller::{OtherSnakes, SimMove, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
-        EatBehavior, EatMechanics, Snake, SnakeBody, SnakeState, SnakeType,
+        EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeBody, SnakeState, SnakeType,
     },
     Screen,
 };
-use crate::app::snake::{Segment, SegmentType};
 
 struct SnakeDemo {
     top_left: HexPoint,

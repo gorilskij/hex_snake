@@ -1,7 +1,7 @@
+use crate::app::snake::{Segment, SegmentType};
 use ggez::graphics::Color;
 use hsl::HSL;
 use std::cmp::max;
-use crate::app::snake::{SegmentType, Segment};
 macro_rules! gray {
     ($lightness:expr) => {
         Color {

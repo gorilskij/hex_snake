@@ -76,6 +76,40 @@ mod dir {
                 UL => 5. * FRAC_PI_3,
             }
         }
+
+        pub fn blunt_turns(self) -> &'static [Self] {
+            const C_UL: &'static [Dir] = &[DL, U];
+            const C_U: &'static [Dir] = &[UL, UR];
+            const C_UR: &'static [Dir] = &[U, DR];
+            const C_DR: &'static [Dir] = &[UR, D];
+            const C_D: &'static [Dir] = &[DR, DL];
+            const C_DL: &'static [Dir] = &[D, UL];
+            match self {
+                UL => C_UL,
+                U => C_U,
+                UR => C_UR,
+                DR => C_DR,
+                D => C_D,
+                DL => C_DL,
+            }
+        }
+
+        pub fn sharp_turns(self) -> &'static [Self] {
+            const C_UL: &'static [Dir] = &[D, UR];
+            const C_U: &'static [Dir] = &[DL, DR];
+            const C_UR: &'static [Dir] = &[UL, D];
+            const C_DR: &'static [Dir] = &[U, DL];
+            const C_D: &'static [Dir] = &[UR, UL];
+            const C_DL: &'static [Dir] = &[DR, U];
+            match self {
+                UL => C_UL,
+                U => C_U,
+                UR => C_UR,
+                DR => C_DR,
+                D => C_D,
+                DL => C_DL,
+            }
+        }
     }
 }
 

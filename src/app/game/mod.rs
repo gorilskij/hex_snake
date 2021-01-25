@@ -18,18 +18,17 @@ use hsl::HSL;
 use rand::prelude::*;
 
 use crate::app::{
+    drawing::{generate_grid_mesh, get_points},
     hex::{Dir, HexDim, HexPoint},
     keyboard_control::Side,
     palette::GamePalette,
     snake::{
         controller::{OtherSnakes, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
-        EatBehavior, EatMechanics, Snake, SnakeSeed, SnakeState, SnakeType,
+        EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState, SnakeType,
     },
     Frames,
 };
-use crate::app::drawing::{generate_grid_mesh, get_points};
-use crate::app::snake::{SegmentType, Segment};
 // use ggez::graphics::{spritebatch::SpriteBatch, Image};
 // use itertools::Itertools;
 
@@ -161,9 +160,22 @@ enum GameState {
     Crashed,
 }
 
+type Food = u32;
+
+pub enum AppleType {
+    Normal(Food),
+    SpawnSnake(SnakeSeed),
+}
+
+pub struct Apple {
+    pub pos: HexPoint,
+    pub typ: AppleType,
+}
+
 struct Prefs {
     draw_grid: bool,
     display_fps: bool,
+    apple_food: Food,
 }
 
 impl Default for Prefs {
@@ -171,23 +183,14 @@ impl Default for Prefs {
         Self {
             draw_grid: true,
             display_fps: false,
+            apple_food: 1,
         }
     }
 }
 
 struct Message {
     message: String,
-    life: Option<Frames>,
-}
-
-pub enum AppleType {
-    Normal(u32),
-    SpawnSnake(SnakeSeed),
-}
-
-pub struct Apple {
-    pub pos: HexPoint,
-    pub typ: AppleType,
+    duration: Option<Frames>,
 }
 
 pub struct Game {
@@ -383,7 +386,7 @@ impl Game {
                         })
                     }
                 }
-                _ => AppleType::Normal(1),
+                _ => AppleType::Normal(self.prefs.apple_food),
             };
 
             self.apples.push(Apple {
@@ -524,7 +527,9 @@ impl Game {
                 if snake.head().pos == self.apples[i].pos {
                     let Apple { typ, .. } = self.apples.remove(i);
                     match typ {
-                        AppleType::Normal(food) => snake.body.cells[0].typ = SegmentType::Eaten(food),
+                        AppleType::Normal(food) => {
+                            snake.body.cells[0].typ = SegmentType::Eaten(food)
+                        }
                         AppleType::SpawnSnake(seed) => spawn_snake = Some(seed),
                     }
                 }
@@ -566,7 +571,7 @@ impl Game {
     ) -> GameResult {
         if let Some(Message {
             ref message,
-            ref mut life,
+            duration: ref mut life,
         }) = maybe_message
         {
             let mut text = Text::new(message as &str);
@@ -664,8 +669,20 @@ impl Game {
             // }
 
             for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
-                let from = snake.body.cells.get(seg_idx + 1).map(|Segment { next_segment, .. }| -next_segment.unwrap());
-                let to = segment.next_segment;
+                // TODO implement head and tail separately, as half-blocks or rounded blocks or something
+                let to = if seg_idx == 0 {
+                    Some(snake.body.dir) // hacky
+                } else {
+                    segment.next_segment
+                };
+
+                let from = snake
+                    .body
+                    .cells
+                    .get(seg_idx + 1)
+                    .map(|Segment { next_segment, .. }| -next_segment.unwrap())
+                    .unwrap_or(-to.unwrap()); // hacky
+                let from = Some(from);
 
                 let dest = segment.pos.to_point(self.cell_dim);
                 let color = snake.painter.paint_segment(seg_idx, len, segment);
@@ -844,7 +861,7 @@ impl EventHandler for Game {
         if self.prefs.display_fps {
             self.message_top_left = Some(Message {
                 message: format!("{:.2}", self.graphics_fps.fps()),
-                life: None,
+                duration: None,
             })
         }
 
@@ -859,7 +876,12 @@ impl EventHandler for Game {
 
         if self.prefs.draw_grid {
             if self.grid_mesh.is_none() {
-                self.grid_mesh = Some(generate_grid_mesh(ctx, self.dim, &self.palette, self.cell_dim)?);
+                self.grid_mesh = Some(generate_grid_mesh(
+                    ctx,
+                    self.dim,
+                    &self.palette,
+                    self.cell_dim,
+                )?);
             };
             draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
         }
@@ -879,6 +901,8 @@ impl EventHandler for Game {
         use GameState::*;
         use KeyCode::*;
 
+        let numeric_keys = [Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9];
+
         // TODO: also tie these to a keymap
         match key {
             Space => match self.state {
@@ -895,7 +919,7 @@ impl EventHandler for Game {
                 };
                 self.message_top_right = Some(Message {
                     message: message.to_string(),
-                    life: Some(100),
+                    duration: Some(100),
                 });
             }
             F => {
@@ -903,6 +927,20 @@ impl EventHandler for Game {
                 if !self.prefs.display_fps {
                     self.message_top_left = None;
                 }
+            }
+            k if numeric_keys.contains(&k) => {
+                let new_food = numeric_keys.iter().position(|nk| *nk == k).unwrap() as Food + 1;
+                self.prefs.apple_food = new_food;
+                // change existing apples
+                for apple in &mut self.apples {
+                    if let AppleType::Normal(food) = &mut apple.typ {
+                        *food = new_food;
+                    }
+                }
+                self.message_top_right = Some(Message {
+                    message: format!("Apple food: {}", new_food),
+                    duration: Some(100),
+                });
             }
             k => {
                 if self.state == Playing {
@@ -940,7 +978,7 @@ impl EventHandler for Game {
         let message = format!("{}x{}", new_dim.h, new_dim.v);
         self.message_top_right = Some(Message {
             message,
-            life: Some(100),
+            duration: Some(100),
         });
         self.grid_mesh = None;
 

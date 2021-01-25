@@ -1,9 +1,13 @@
-use ggez::{Context, GameResult};
-use crate::app::game::CellDim;
-use ggez::graphics::{Mesh, MeshBuilder, DrawMode};
-use ggez::mint::Point2;
-use crate::app::hex::{HexDim, Dir};
-use crate::app::palette::GamePalette;
+use crate::app::{
+    game::CellDim,
+    hex::{Dir, HexDim},
+    palette::GamePalette,
+};
+use ggez::{
+    graphics::{DrawMode, Mesh, MeshBuilder},
+    mint::Point2,
+    Context, GameResult,
+};
 use num_integer::Integer;
 use std::collections::HashMap;
 

@@ -30,13 +30,13 @@ macro_rules! hash_map {
     }};
 }
 
+mod drawing;
 mod game;
 mod hex;
 pub mod keyboard_control;
 mod palette;
 mod snake;
 mod start_screen;
-mod drawing;
 
 pub type Frames = u32;
 
@@ -122,6 +122,17 @@ impl App {
                 controller: SnakeControllerTemplate::PlayerController(cs),
             })
             .collect();
+
+        // let seeds = vec![SnakeSeed {
+        //     snake_type: SnakeType::CompetitorSnake { life: None },
+        //     eat_mechanics: EatMechanics {
+        //         eat_self: EatBehavior::Cut,
+        //         eat_other: Default::default(),
+        //         default: EatBehavior::Crash,
+        //     },
+        //     palette: SnakePaletteTemplate::new_persistent_rainbow(),
+        //     controller: SnakeControllerTemplate::CompetitorAI,
+        // }];
 
         Self {
             // screen: Screen::StartScreen(StartScreen::new()),

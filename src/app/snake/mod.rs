@@ -172,7 +172,10 @@ impl Snake {
                 teleported: None,
             };
             self.body.cells.push_front(new_head);
-            self.body.cells.get_mut(1).map(|neck| neck.next_segment = Some(dir));
+            self.body
+                .cells
+                .get_mut(1)
+                .map(|neck| neck.next_segment = Some(dir));
         }
 
         if self.body.grow > 0 {
