@@ -26,17 +26,18 @@ struct SnakeDemo {
 
 impl SnakeDemo {
     fn new(top_left: HexPoint, cell_dim: CellDim) -> Self {
+        let dir = Dir::U;
+
         let pos = top_left + HexPoint { h: 0, v: -5 };
         let head = Segment {
             typ: SegmentType::Normal,
             pos,
-            next_segment: None,
+            previous_segment: -dir,
             teleported: None,
         };
         let mut body = VecDeque::new();
         body.push_back(head);
         let board_dim = HexPoint { h: 20, v: 20 };
-        let dir = Dir::U;
         Self {
             top_left,
             dim: board_dim,

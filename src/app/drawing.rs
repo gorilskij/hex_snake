@@ -153,8 +153,12 @@ fn rotate_around_point(
 
 // polygon points to draw a snake segment
 // from and to describe the relative position of the previous and next segments
-#[rustfmt::skip]
-pub fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_dim: CellDim) -> Vec<Point2<f32>> {
+pub fn get_points(
+    dest: Point2<f32>,
+    from: Option<Dir>,
+    to: Option<Dir>,
+    cell_dim: CellDim,
+) -> Vec<Point2<f32>> {
     use Dir::*;
 
     let CellDim { side, sin, cos } = cell_dim;
@@ -168,36 +172,43 @@ pub fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_di
         if (side - CACHED_SIDE).abs() > f32::EPSILON {
             CACHED_SIDE = side;
             // starting from top-baseline/left, going clockwise
-            FULL_HEXAGON = Some(vec![
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: side + cos, y: 2. * sin },
-                Point2 { x: cos, y: 2. * sin },
-                Point2 { x: 0., y: sin },
-            ]);
+            #[rustfmt::skip]
+            let _ = { // purely a trick to avoid 'attributes on expressions are experimental'
+                FULL_HEXAGON = Some(vec![
+                    Point2 { x: cos, y: 0. },
+                    Point2 { x: side + cos, y: 0. },
+                    Point2 { x: side + 2. * cos, y: sin },
+                    Point2 { x: side + cos, y: 2. * sin },
+                    Point2 { x: cos, y: 2. * sin },
+                    Point2 { x: 0., y: sin },
+                ]);
+            };
             CACHED_POINTS = Some(HashMap::new());
 
             let map = CACHED_POINTS.as_mut().unwrap();
 
+            #[rustfmt::skip]
             let straight_segment = vec![
                 Point2 { x: cos, y: 0. },
                 Point2 { x: side + cos, y: 0. },
                 Point2 { x: side + cos, y: 2. * sin },
                 Point2 { x: cos, y: 2. * sin },
             ];
+            #[rustfmt::skip]
             let end_segment = vec![
                 Point2 { x: cos, y: sin },
                 Point2 { x: side + cos, y: sin },
                 Point2 { x: side + cos, y: 2. * sin },
                 Point2 { x: cos, y: 2. * sin },
             ];
+            #[rustfmt::skip]
             let blunt_turn_segment = vec![
                 Point2 { x: cos, y: 0. },
                 Point2 { x: side + cos, y: 0. },
                 Point2 { x: side + 2. * cos, y: sin },
                 Point2 { x: side + cos, y: 2. * sin },
             ];
+            #[rustfmt::skip]
             let sharp_turn_segment = vec![
                 Point2 { x: cos, y: 0. },
                 Point2 { x: side + cos, y: 0. },
@@ -208,34 +219,38 @@ pub fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_di
             let origin = cell_dim.center();
 
             for &dir in &[UL, U, UR] {
-                let straight = rotate_around_point(&straight_segment, dir.clockwise_angle_from_u(), origin);
+                let straight =
+                    rotate_around_point(&straight_segment, dir.clockwise_angle_from_u(), origin);
                 map.insert((Some(dir), Some(-dir)), straight);
             }
 
             for dir in Dir::iter() {
                 let end = rotate_around_point(&end_segment, dir.clockwise_angle_from_u(), origin);
                 map.insert((Some(-dir), None), end.clone());
-                map.insert((None, Some(-dir)), end);
 
-                let blunt = rotate_around_point(&blunt_turn_segment, dir.clockwise_angle_from_u(), origin);
-                map.insert((Some(dir), Some(dir.next_clockwise().next_clockwise())), blunt);
+                let blunt =
+                    rotate_around_point(&blunt_turn_segment, dir.clockwise_angle_from_u(), origin);
+                map.insert(
+                    (Some(dir), Some(dir.next_clockwise().next_clockwise())),
+                    blunt,
+                );
 
-                let sharp = rotate_around_point(&sharp_turn_segment, dir.clockwise_angle_from_u(), origin);
+                let sharp =
+                    rotate_around_point(&sharp_turn_segment, dir.clockwise_angle_from_u(), origin);
                 map.insert((Some(dir), Some(dir.next_clockwise())), sharp);
             }
         }
 
-        let map = CACHED_POINTS
-            .as_mut()
-            .unwrap();
+        let map = CACHED_POINTS.as_mut().unwrap();
 
         let mut points = match map.get(&(from, to)) {
             Some(ps) => ps,
             None => match map.get(&(to, from)) {
                 Some(ps) => ps,
                 None => FULL_HEXAGON.as_ref().unwrap(),
-            }
-        }.clone();
+            },
+        }
+        .clone();
 
         for Point2 { x, y } in &mut points {
             *x += dest.x;
@@ -244,126 +259,4 @@ pub fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_di
 
         points
     }
-    // let mut points = if from == Some(Dir::D) && to == Some(Dir::U) || from == Some(Dir::U) && to == Some(Dir::D) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //     ]
-    // } else if from == Some(Dir::DL) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::DL) {
-    //     vec![
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::DR) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::DR) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::D) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::D) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::D) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::D) {
-    //     vec![
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //     ]
-    // } else if from == Some(Dir::U) && to == Some(Dir::DL) || from == Some(Dir::DL) && to == Some(Dir::U) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::U) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::U) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //     ]
-    // } else if from == Some(Dir::UL) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::UL) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::DL) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::DL) {
-    //     vec![
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::U) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::U) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::U) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::U) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //     ]
-    // } else if from == Some(Dir::D) && to == Some(Dir::DL) || from == Some(Dir::DL) && to == Some(Dir::D) {
-    //     vec![
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::D) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::D) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //     ]
-    // } else if from == Some(Dir::UL) && to == Some(Dir::DL) || from == Some(Dir::DL) && to == Some(Dir::UL) {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else if from == Some(Dir::UR) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::UR) {
-    //     vec![
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // } else {
-    //     vec![
-    //         Point2 { x: cos, y: 0. },
-    //         Point2 { x: side + cos, y: 0., },
-    //         Point2 { x: side + 2. * cos, y: sin, },
-    //         Point2 { x: side + cos, y: 2. * sin, },
-    //         Point2 { x: cos, y: 2. * sin, },
-    //         Point2 { x: 0., y: sin },
-    //     ]
-    // };
-    //
-    // for Point2 { x, y } in &mut points {
-    //     *x += dest.x;
-    //     *y += dest.y;
-    // }
-    //
-    // points
 }

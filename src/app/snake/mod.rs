@@ -40,7 +40,8 @@ pub enum SegmentType {
 pub struct Segment {
     pub typ: SegmentType,
     pub pos: HexPoint,
-    pub next_segment: Option<Dir>,
+    // direction from this segment to the previous one
+    pub previous_segment: Dir,
     pub teleported: Option<Dir>,
 }
 
@@ -105,7 +106,7 @@ impl Snake {
         let head = Segment {
             typ: SegmentType::Normal,
             pos,
-            next_segment: None,
+            previous_segment: -dir,
             teleported: None,
         };
 
@@ -168,14 +169,14 @@ impl Snake {
             let new_head = Segment {
                 typ: SegmentType::Normal,
                 pos: self.head().pos.wrapping_translate(dir, 1, board_dim),
-                next_segment: None,
+                previous_segment: -dir,
                 teleported: None,
             };
             self.body.cells.push_front(new_head);
-            self.body
-                .cells
-                .get_mut(1)
-                .map(|neck| neck.next_segment = Some(dir));
+            // self.body
+            //     .cells
+            //     .get_mut(1)
+            //     .map(|neck| neck.next_segment = Some(dir));
         }
 
         if self.body.grow > 0 {
