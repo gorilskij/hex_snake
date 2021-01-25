@@ -208,8 +208,6 @@ impl SnakeController for CompetitorAI {
         apples: &[Apple],
         board_dim: HexDim,
     ) -> Option<Dir> {
-        use Dir::*;
-
         // all turns
         let available_directions: Vec<_> = once(snake_body.dir)
             .chain(snake_body.dir.blunt_turns().iter().copied())

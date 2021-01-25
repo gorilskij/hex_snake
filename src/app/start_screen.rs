@@ -83,7 +83,7 @@ impl EventHandler for SnakeDemo {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         let builder = &mut MeshBuilder::new();
-        todo!();
+        // todo!();
         // self.snake.draw_non_crash_points(builder, self.cell_dim)?;
         let mesh = builder.build(ctx)?;
         draw(ctx, &mesh, DrawParam::default())?;

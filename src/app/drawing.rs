@@ -83,6 +83,7 @@ pub fn generate_grid_mesh(ctx: &mut Context, dim: HexDim, palette: &GamePalette,
 }
 
 pub fn generate_border_mesh(ctx: &mut Context) -> GameResult<Mesh> {
+    let _ = ctx;
     unimplemented!()
 }
 
@@ -129,6 +130,27 @@ impl<T: Copy> ExceptPositions for &[T] {
     }
 }
 
+fn rotate_around_point(
+    points: &[Point2<f32>],
+    angle: f32,
+    origin: Point2<f32>,
+) -> Vec<Point2<f32>> {
+    let sin = angle.sin();
+    let cos = angle.cos();
+    let Point2 { x: ox, y: oy } = origin;
+    points
+        .iter()
+        .map(|Point2 { x, y }| {
+            let tx = *x - ox;
+            let ty = *y - oy;
+            Point2 {
+                x: tx * cos - ty * sin + ox,
+                y: tx * sin + ty * cos + oy,
+            }
+        })
+        .collect()
+}
+
 // polygon points to draw a snake segment
 // from and to describe the relative position of the previous and next segments
 #[rustfmt::skip]
@@ -147,119 +169,63 @@ pub fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_di
             CACHED_SIDE = side;
             // starting from top-baseline/left, going clockwise
             FULL_HEXAGON = Some(vec![
-                /* 0 */ Point2 { x: cos, y: 0. },
-                /* 1 */ Point2 { x: side + cos, y: 0. },
-                /* 2 */ Point2 { x: side + 2. * cos, y: sin },
-                /* 3 */ Point2 { x: side + cos, y: 2. * sin },
-                /* 4 */ Point2 { x: cos, y: 2. * sin },
-                /* 5 */ Point2 { x: 0., y: sin },
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: side + cos, y: 2. * sin },
+                Point2 { x: cos, y: 2. * sin },
+                Point2 { x: 0., y: sin },
             ]);
             CACHED_POINTS = Some(HashMap::new());
 
-            // origin
-            let Point2 { x: ox, y: oy } = cell_dim.center();
-            let rotate = |points: &mut [Point2<f32>], angle: f32| {
-                let sin = angle.sin();
-                let cos = angle.cos();
-                for Point2 { x, y } in points {
-                    let tx = *x - ox;
-                    let ty = *y - oy;
-                    *x = tx * cos - ty * sin + ox;
-                    *y = tx * sin + ty * cos + oy;
-                }
-            };
-
-            let full_hexagon = FULL_HEXAGON.as_ref().unwrap();
             let map = CACHED_POINTS.as_mut().unwrap();
 
-            // let straight_segment = vec![
-            //     Point2 { x: cos, y: 0. },
-            //     Point2 { x: side + cos, y: 0. },
-            //     Point2 { x: side + cos, y: 2. * sin },
-            //     Point2 { x: cos, y: 2. * sin },
-            // ];
-            // for dir in [Dir::U, Dir::UR, Dir::UL] {
-            //     let mut clone = straight_segment.clone();
-            //     rotate(&mut clone, dir.clockwise_angle_from_u());
-            //     map.insert((Some(-dir), Some(dir)), clone);
-            // }
-            // straight lines
-            map.insert((Some(D), Some(U)), full_hexagon.except_positions(&[2, 5]));
-            map.insert((Some(DL), Some(UR)), full_hexagon.except_positions(&[0, 3]));
-            map.insert((Some(DR), Some(UL)), full_hexagon.except_positions(&[1, 4]));
+            let straight_segment = vec![
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + cos, y: 2. * sin },
+                Point2 { x: cos, y: 2. * sin },
+            ];
+            let blunt_turn_segment = vec![
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: side + cos, y: 2. * sin },
+            ];
+            let sharp_turn_segment = vec![
+                Point2 { x: cos, y: 0. },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: cos, y: 2. * sin },
+            ];
 
-            // blunt turns
-            map.insert((Some(D), Some(UL)), full_hexagon.except_positions(&[1, 2]));
-            map.insert((Some(D), Some(UR)), full_hexagon.except_positions(&[0, 5]));
-            map.insert((Some(U), Some(DL)), full_hexagon.except_positions(&[2, 3]));
-            map.insert((Some(U), Some(DR)), full_hexagon.except_positions(&[4, 5]));
-            map.insert((Some(UL), Some(UR)), full_hexagon.except_positions(&[3, 4]));
-            map.insert((Some(DL), Some(DR)), full_hexagon.except_positions(&[0, 1]));
+            let origin = cell_dim.center();
 
-            // sharp turns
-            map.insert((Some(U), Some(UL)), full_hexagon.except_positions(&[2, 4]));
-            map.insert((Some(U), Some(UR)), full_hexagon.except_positions(&[3, 5]));
-            map.insert((Some(D), Some(DL)), full_hexagon.except_positions(&[0, 2]));
-            map.insert((Some(D), Some(DR)), full_hexagon.except_positions(&[1, 5]));
-            map.insert((Some(UL), Some(DL)), full_hexagon.except_positions(&[1, 3]));
-            map.insert((Some(UR), Some(DR)), full_hexagon.except_positions(&[0, 4]));
+            for &dir in &[UL, U, UR] {
+                let straight = rotate_around_point(&straight_segment, dir.clockwise_angle_from_u(), origin);
+                map.insert((Some(dir), Some(-dir)), straight);
+            }
 
+            for dir in Dir::iter() {
+                let blunt = rotate_around_point(&blunt_turn_segment, dir.clockwise_angle_from_u(), origin);
+                map.insert((Some(dir), Some(dir.next_clockwise().next_clockwise())), blunt);
 
-            // from top-left, clockwise
-            // let a = Point2 { x: cos, y: 0. };
-            // let b = Point2 { x: side + cos, y: 0. };
-            // let c = Point2 { x: side + 2. * cos, y: sin };
-            // let d = Point2 { x: side + cos, y: 2. * sin };
-            // let e = Point2 { x: cos, y: 2. * sin };
-            // let f = Point2 { x: 0., y: sin };
-            //
-            // // endpoint points (smaller hexagon, also clockwise)
-            // // let g = Point2 { }
-            // let g = Point2 { x: side + cos, y: sin };
-            // let h = Point2 { x: cos, y: sin };
-
-            // head
-            // map.insert((Some(Dir::U), None), vec![a, b, g, h]);
-            // map.insert((Some(Dir::D), None), vec![h, g, d, e]);
-            // map.insert((Some(Dir::UL), None), vec![]);
-            // map.insert((Some(Dir::UR), None), vec![
-            //     Point2 { x: cos, y: 0. },
-            //     Point2 { x: side + cos, y: 0. },
-            //     Point2 { x: side + 2. * cos, y: sin },
-            //     Point2 { x: side + cos, y: 2. * sin },
-            //     Point2 { x: cos, y: 2. * sin },
-            //     Point2 { x: 0., y: sin },
-            // ]);
-            // map.insert((Some(Dir::DL), None), vec![
-            //     Point2 { x: cos, y: 0. },
-            //     Point2 { x: side + cos, y: 0. },
-            //     Point2 { x: side + 2. * cos, y: sin },
-            //     Point2 { x: side + cos, y: 2. * sin },
-            //     Point2 { x: cos, y: 2. * sin },
-            //     Point2 { x: 0., y: sin },
-            // ]);
-            // map.insert((Some(Dir::DR), None), vec![
-            //     Point2 { x: cos, y: 0. },
-            //     Point2 { x: side + cos, y: 0. },
-            //     Point2 { x: side + 2. * cos, y: sin },
-            //     Point2 { x: side + cos, y: 2. * sin },
-            //     Point2 { x: cos, y: 2. * sin },
-            //     Point2 { x: 0., y: sin },
-            // ]);
+                let sharp = rotate_around_point(&sharp_turn_segment, dir.clockwise_angle_from_u(), origin);
+                map.insert((Some(dir), Some(dir.next_clockwise())), sharp);
+            }
         }
 
         let map = CACHED_POINTS
             .as_mut()
             .unwrap();
-        let maybe_points = match map.get(&(from, to)) {
-            // if the segment is transitive, the direction doesn't matter
-            None if from.is_some() && to.is_some() => map.get(&(to, from)),
-            opt => opt,
-        };
-        let mut points = maybe_points
-            .unwrap_or(FULL_HEXAGON.as_ref().unwrap())
-            .clone();
-        // println!("{:?}", points);
+
+        let mut points = match map.get(&(from, to)) {
+            Some(ps) => ps,
+            None => match map.get(&(to, from)) {
+                Some(ps) => ps,
+                None => FULL_HEXAGON.as_ref().unwrap(),
+            }
+        }.clone();
 
         for Point2 { x, y } in &mut points {
             *x += dest.x;

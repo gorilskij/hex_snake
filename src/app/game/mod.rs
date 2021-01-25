@@ -29,8 +29,6 @@ use crate::app::{
     },
     Frames,
 };
-// use ggez::graphics::{spritebatch::SpriteBatch, Image};
-// use itertools::Itertools;
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -613,49 +611,10 @@ impl Game {
     }
 }
 
-type HexagonPoints = [Point2<f32>; 6];
 impl Game {
-    pub fn get_hexagon_points(&self) -> HexagonPoints {
-        let CellDim { side, sin, cos } = self.cell_dim;
-
-        unsafe {
-            static mut CACHED_HEXAGON_POINTS: Option<(f32, HexagonPoints)> = None;
-
-            if let Some((cached_side, points)) = CACHED_HEXAGON_POINTS {
-                if (side - cached_side).abs() < f32::EPSILON {
-                    return points;
-                }
-            }
-
-            #[rustfmt::skip]
-            let points = [
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0., },
-                Point2 { x: side + 2. * cos, y: sin, },
-                Point2 { x: side + cos, y: 2. * sin, },
-                Point2 { x: cos, y: 2. * sin, },
-                Point2 { x: 0., y: sin },
-            ];
-
-            CACHED_HEXAGON_POINTS = Some((side, points));
-            points
-        }
-    }
-
     #[allow(dead_code)]
     fn draw_snakes_and_apples_tesselation(&mut self, ctx: &mut Context) -> GameResult {
         let mut builder = MeshBuilder::new();
-        // let hexagon_points = self.get_hexagon_points();
-
-        // fn translate(points: &[Point2<f32>], dest: Point2<f32>) -> Vec<Point2<f32>> {
-        //     points
-        //         .iter()
-        //         .map(|Point2 { x, y }| Point2 {
-        //             x: x + dest.x,
-        //             y: y + dest.y,
-        //         })
-        //         .collect()
-        // }
 
         for snake in &mut self.snakes {
             let len = snake.len();
@@ -728,95 +687,6 @@ impl Game {
         let mesh = builder.build(ctx)?;
         draw(ctx, &mesh, DrawParam::default())
     }
-
-    // outdated
-    // fn get_hexagon_image(&self, ctx: &mut Context) -> Image {
-    //     let CellDim { side, sin, cos } = self.cell_dim;
-    //
-    //     unsafe {
-    //         static mut HEXAGON: Option<(f32, Image)> = None;
-    //
-    //         if let Some((cached_side, image)) = &HEXAGON {
-    //             if (*cached_side - side).abs() < f32::EPSILON {
-    //                 return image.clone();
-    //             }
-    //         }
-    //
-    //         let width = (2. * cos + side) as u16;
-    //         let height = (2. * sin) as u16;
-    //         let overflow = 0.02;
-    //         let hexagon = (0..height)
-    //             .cartesian_product(0..width)
-    //             .map(|(y, x)| {
-    //                 // check if the point is in bounds of the four relevant hexagon edges
-    //                 // top and bottom edges can't be violated because the size of the image is already restricted
-    //                 let x = x as f32;
-    //                 let y = y as f32;
-    //                 let top_left = y <= (sin / cos) * x + sin + overflow;
-    //                 let top_right = y <= -sin / cos * (x - 2. * cos - side) + sin + overflow;
-    //                 let bottom_left = y >= -sin / cos * x + sin - overflow;
-    //                 let bottom_right = y >= sin / cos * (x - 2. * cos - side) + sin - overflow;
-    //                 if top_left && top_right && bottom_left && bottom_right {
-    //                     // if y < x {
-    //                     255
-    //                 } else {
-    //                     0
-    //                 }
-    //             })
-    //             .times(4)
-    //             .collect::<Vec<_>>();
-    //         let image = Image::from_rgba8(ctx, width, height, &hexagon).unwrap();
-    //         HEXAGON = Some((side, image.clone()));
-    //         image
-    //     }
-    // }
-
-    // #[allow(dead_code)]
-    // fn draw_snakes_and_apples_sprite_batch(&mut self, ctx: &mut Context) -> GameResult {
-    //     let image = self.get_hexagon_image(ctx);
-    //     let mut sprite_batch = SpriteBatch::new(image);
-    //
-    //     // draw snakes with collision points on top
-    //     for snake in &mut self.snakes {
-    //         let len = snake.len();
-    //         for (seg_idx, hex) in snake.body.cells.iter().enumerate() {
-    //             let dest = hex.pos.to_point(self.cell_dim);
-    //             let color = snake.painter.paint_segment(seg_idx, len, hex);
-    //             sprite_batch.add(DrawParam::new().dest(dest).color(color));
-    //         }
-    //     }
-    //
-    //     for snake in self
-    //         .snakes
-    //         .iter_mut()
-    //         .filter(|snake| snake.state == SnakeState::Crashed || snake.state == SnakeState::Dying)
-    //     {
-    //         let dest = snake.head().pos.to_point(self.cell_dim);
-    //         let color = snake
-    //             .painter
-    //             .paint_segment(0, snake.len(), &snake.body.cells[0]);
-    //         sprite_batch.add(DrawParam::new().dest(dest).color(color));
-    //     }
-    //
-    //     for apple in &self.apples {
-    //         let dest = apple.pos.to_point(self.cell_dim);
-    //         let color = match apple.typ {
-    //             AppleType::Normal(_) => self.palette.apple_color,
-    //             AppleType::SpawnSnake(_) => {
-    //                 let hue = 360. * (self.fps_control.game_frames % 12) as f64 / 11.;
-    //                 let hsl = HSL {
-    //                     h: hue,
-    //                     s: 1.,
-    //                     l: 0.3,
-    //                 };
-    //                 Color::from(hsl.to_rgb())
-    //             }
-    //         };
-    //         sprite_batch.add(DrawParam::new().dest(dest).color(color));
-    //     }
-    //
-    //     draw(ctx, &sprite_batch, DrawParam::default())
-    // }
 }
 
 impl EventHandler for Game {

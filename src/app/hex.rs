@@ -120,7 +120,6 @@ mod hex_pos {
     use num_integer::Integer;
     use std::{
         cmp::Ordering,
-        collections::HashMap,
         fmt::{Debug, Error, Formatter},
     };
     use Dir::*;
