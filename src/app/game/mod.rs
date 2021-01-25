@@ -630,7 +630,8 @@ impl Game {
             for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
                 // TODO implement head and tail separately, as half-blocks or rounded blocks or something
                 let to = if seg_idx == 0 {
-                    Some(snake.body.dir) // hacky
+                    // Some(snake.body.dir) // hacky
+                    None
                 } else {
                     segment.next_segment
                 };
@@ -640,8 +641,9 @@ impl Game {
                     .cells
                     .get(seg_idx + 1)
                     .map(|Segment { next_segment, .. }| -next_segment.unwrap())
-                    .unwrap_or(-to.unwrap()); // hacky
-                let from = Some(from);
+                    // .unwrap_or(-to.unwrap()); // hacky
+                // let from = Some(from);
+                ;
 
                 let dest = segment.pos.to_point(self.cell_dim);
                 let color = snake.painter.paint_segment(seg_idx, len, segment);

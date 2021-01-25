@@ -186,6 +186,12 @@ pub fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_di
                 Point2 { x: side + cos, y: 2. * sin },
                 Point2 { x: cos, y: 2. * sin },
             ];
+            let end_segment = vec![
+                Point2 { x: cos, y: sin },
+                Point2 { x: side + cos, y: sin },
+                Point2 { x: side + cos, y: 2. * sin },
+                Point2 { x: cos, y: 2. * sin },
+            ];
             let blunt_turn_segment = vec![
                 Point2 { x: cos, y: 0. },
                 Point2 { x: side + cos, y: 0. },
@@ -207,6 +213,10 @@ pub fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_di
             }
 
             for dir in Dir::iter() {
+                let end = rotate_around_point(&end_segment, dir.clockwise_angle_from_u(), origin);
+                map.insert((Some(-dir), None), end.clone());
+                map.insert((None, Some(-dir)), end);
+
                 let blunt = rotate_around_point(&blunt_turn_segment, dir.clockwise_angle_from_u(), origin);
                 map.insert((Some(dir), Some(dir.next_clockwise().next_clockwise())), blunt);
 
