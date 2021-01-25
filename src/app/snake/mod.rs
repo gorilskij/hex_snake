@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::app::{
     game::Apple,
-    hex::{Dir, Hex, HexDim, HexPos, HexType},
+    hex::{Dir, HexDim, HexPoint},
     snake::{
         controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
         palette::{SnakePainter, SnakePaletteTemplate},
@@ -26,6 +26,22 @@ pub enum SnakeType {
     SimulatedSnake,
     CompetitorSnake { life: Option<Frames> },
     KillerSnake { life: Option<Frames> },
+}
+
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+pub enum SegmentType {
+    Normal,
+    Eaten(u32),
+    Crashed,
+    BlackHole, // does not advance, sucks the rest of the snake in
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Segment {
+    pub typ: SegmentType,
+    pub pos: HexPoint,
+    pub next_segment: Option<Dir>,
+    pub teleported: Option<Dir>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -53,7 +69,7 @@ impl EatMechanics {
 }
 
 pub struct SnakeBody {
-    pub cells: VecDeque<Hex>,
+    pub cells: VecDeque<Segment>,
     pub dir: Dir,
     pub grow: usize,
 }
@@ -78,7 +94,7 @@ pub struct SnakeSeed {
 }
 
 impl Snake {
-    pub fn from_seed(seed: &SnakeSeed, pos: HexPos, dir: Dir, grow: usize) -> Self {
+    pub fn from_seed(seed: &SnakeSeed, pos: HexPoint, dir: Dir, grow: usize) -> Self {
         let SnakeSeed {
             snake_type,
             eat_mechanics,
@@ -86,9 +102,10 @@ impl Snake {
             controller,
         } = (*seed).clone();
 
-        let head = Hex {
-            typ: HexType::Normal,
+        let head = Segment {
+            typ: SegmentType::Normal,
             pos,
+            next_segment: None,
             teleported: None,
         };
 
@@ -119,37 +136,43 @@ impl Snake {
         self.body.dir
     }
 
-    pub fn head(&self) -> &Hex {
+    pub fn head(&self) -> &Segment {
         &self.body.cells[0]
     }
 
     pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
         let last_idx = self.len() - 1;
-        if let HexType::Eaten(amount) = &mut self.body.cells[last_idx].typ {
+        if let SegmentType::Eaten(amount) = &mut self.body.cells[last_idx].typ {
             if *amount == 0 {
-                self.body.cells[last_idx].typ = HexType::Normal;
+                self.body.cells[last_idx].typ = SegmentType::Normal;
             } else {
                 self.body.grow += 1;
                 *amount -= 1;
             }
         }
 
+        let dir;
         if self.state != SnakeState::Dying {
             // determine new direction for snake
             if let Some(new_dir) =
                 self.controller
                     .next_dir(&self.body, other_snakes, apples, board_dim)
             {
-                self.body.dir = new_dir
+                self.body.dir = new_dir;
+                dir = new_dir;
+            } else {
+                dir = self.dir();
             }
 
             // create new head for snake
-            let new_head = Hex {
-                typ: HexType::Normal,
-                pos: self.head().pos.wrapping_translate(self.dir(), 1, board_dim),
+            let new_head = Segment {
+                typ: SegmentType::Normal,
+                pos: self.head().pos.wrapping_translate(dir, 1, board_dim),
+                next_segment: None,
                 teleported: None,
             };
             self.body.cells.push_front(new_head);
+            self.body.cells.get_mut(1).map(|neck| neck.next_segment = Some(dir));
         }
 
         if self.body.grow > 0 {

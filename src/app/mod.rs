@@ -36,6 +36,7 @@ pub mod keyboard_control;
 mod palette;
 mod snake;
 mod start_screen;
+mod drawing;
 
 pub type Frames = u32;
 

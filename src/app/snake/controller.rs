@@ -1,11 +1,12 @@
 use crate::app::{
     game::{Apple, CellDim},
-    hex::{Dir, Hex, HexDim, HexPos},
+    hex::{Dir, HexDim, HexPoint},
     keyboard_control::{ControlSetup, Controls},
     snake::{Snake, SnakeBody, SnakeType},
 };
 use ggez::event::KeyCode;
 use std::{cmp::Ordering, collections::VecDeque, iter::once};
+use crate::app::snake::Segment;
 
 #[derive(Clone)]
 pub enum SnakeControllerTemplate {
@@ -74,7 +75,7 @@ impl PlayerController {
 }
 
 impl SnakeController for PlayerController {
-    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPos) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = queue_dir;
             Some(self.dir)
@@ -123,7 +124,7 @@ pub struct DemoController {
 }
 
 impl SnakeController for DemoController {
-    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPos) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
             None
@@ -178,11 +179,11 @@ pub struct CompetitorAI;
 // }
 
 fn dir_score(
-    head: HexPos,
+    head: HexPoint,
     dir: Dir,
     board_dim: HexDim,
-    snake_positions: &[HexPos],
-    apple_positions: &[HexPos],
+    snake_positions: &[HexPoint],
+    apple_positions: &[HexPoint],
 ) -> usize {
     let mut distance = 0;
     let mut new_head = head;
@@ -277,7 +278,7 @@ fn distance_to_snake(
         new_head = new_head.wrapping_translate(dir, 1, board_dim);
 
         for body in once(snake_body).chain(other_snakes.iter_bodies()) {
-            if body.cells.iter().any(|Hex { pos, .. }| pos == &new_head) {
+            if body.cells.iter().any(|Segment { pos, .. }| pos == &new_head) {
                 return distance;
             }
         }
@@ -292,8 +293,8 @@ fn distance_to_snake(
 // }
 
 fn rough_direction(
-    from: HexPos,
-    to: HexPos,
+    from: HexPoint,
+    to: HexPoint,
     snake_body: &SnakeBody,
     other_snakes: OtherSnakes,
     board_dim: HexDim,

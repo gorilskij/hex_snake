@@ -15,23 +15,21 @@ use ggez::{
     Context, GameResult,
 };
 use hsl::HSL;
-use num_integer::Integer;
 use rand::prelude::*;
 
-use crate::{
-    app::{
-        hex::{Dir, Hex, HexDim, HexPos, HexType},
-        keyboard_control::Side,
-        palette::GamePalette,
-        snake::{
-            controller::{OtherSnakes, SnakeControllerTemplate},
-            palette::SnakePaletteTemplate,
-            EatBehavior, EatMechanics, Snake, SnakeSeed, SnakeState, SnakeType,
-        },
-        Frames,
+use crate::app::{
+    hex::{Dir, HexDim, HexPoint},
+    keyboard_control::Side,
+    palette::GamePalette,
+    snake::{
+        controller::{OtherSnakes, SnakeControllerTemplate},
+        palette::SnakePaletteTemplate,
+        EatBehavior, EatMechanics, Snake, SnakeSeed, SnakeState, SnakeType,
     },
-    // times::Times,
+    Frames,
 };
+use crate::app::drawing::{generate_grid_mesh, get_points};
+use crate::app::snake::{SegmentType, Segment};
 // use ggez::graphics::{spritebatch::SpriteBatch, Image};
 // use itertools::Itertools;
 
@@ -50,6 +48,15 @@ impl From<f32> for CellDim {
             side,
             sin: FRAC_PI_3.sin() * side,
             cos: FRAC_PI_3.cos() * side,
+        }
+    }
+}
+
+impl CellDim {
+    pub fn center(self) -> Point2<f32> {
+        Point2 {
+            x: self.cos + self.side / 2.,
+            y: self.sin,
         }
     }
 }
@@ -179,7 +186,7 @@ pub enum AppleType {
 }
 
 pub struct Apple {
-    pub pos: HexPos,
+    pub pos: HexPoint,
     pub typ: AppleType,
 }
 
@@ -210,9 +217,9 @@ pub struct Game {
 }
 
 impl Game {
-    fn wh_to_dim(cell_dim: CellDim, width: f32, height: f32) -> HexPos {
+    fn wh_to_dim(cell_dim: CellDim, width: f32, height: f32) -> HexPoint {
         let CellDim { side, sin, cos } = cell_dim;
-        HexPos {
+        HexPoint {
             h: (width / (side + cos)) as isize,
             v: (height / (2. * sin)) as isize - 1,
         }
@@ -280,7 +287,7 @@ impl Game {
         {
             self.snakes.push(Snake::from_seed(
                 seed,
-                HexPos {
+                HexPoint {
                     h: h_pos,
                     v: self.dim.v / 2,
                 },
@@ -296,7 +303,7 @@ impl Game {
         self.state = GameState::Playing;
     }
 
-    fn occupied_cells(&self) -> Vec<HexPos> {
+    fn occupied_cells(&self) -> Vec<HexPoint> {
         // upper bound
         let max_occupied_cells =
             self.snakes.iter().map(|snake| snake.len()).sum::<usize>() + self.apples.len();
@@ -310,14 +317,14 @@ impl Game {
         occupied_cells
     }
 
-    fn random_free_spot(&mut self, occupied_cells: &[HexPos]) -> Option<HexPos> {
+    fn random_free_spot(&mut self, occupied_cells: &[HexPoint]) -> Option<HexPoint> {
         let free_spaces = (self.dim.h * self.dim.v) as usize - occupied_cells.len();
         if free_spaces == 0 {
             return None;
         }
 
         let mut new_idx = self.rng.gen_range(0, free_spaces);
-        for HexPos { h, v } in occupied_cells {
+        for HexPoint { h, v } in occupied_cells {
             let idx = (v * self.dim.h + h) as usize;
             if idx <= new_idx {
                 new_idx += 1;
@@ -325,7 +332,7 @@ impl Game {
         }
 
         assert!(new_idx < (self.dim.h * self.dim.v) as usize);
-        Some(HexPos {
+        Some(HexPoint {
             h: new_idx as isize % self.dim.h,
             v: new_idx as isize / self.dim.h,
         })
@@ -395,7 +402,7 @@ impl Game {
                 | SnakeType::KillerSnake { life: Some(life) } => {
                     if *life == 0 {
                         self.snakes[snake_idx].state = SnakeState::Dying;
-                        self.snakes[snake_idx].body.cells[0].typ = HexType::BlackHole;
+                        self.snakes[snake_idx].body.cells[0].typ = SegmentType::BlackHole;
                     } else {
                         *life -= 1;
                     }
@@ -474,16 +481,16 @@ impl Game {
                         // special case for a head-to-head collision, can't cut..
                         println!("warning: invoked head-to-head collision special case");
                         self.snakes[i].state = SnakeState::Dying;
-                        self.snakes[i].body.cells[0].typ = HexType::BlackHole;
+                        self.snakes[i].body.cells[0].typ = SegmentType::BlackHole;
                         self.snakes[j].state = SnakeState::Dying;
-                        self.snakes[j].body.cells[0].typ = HexType::BlackHole;
+                        self.snakes[j].body.cells[0].typ = SegmentType::BlackHole;
                     } else {
                         let drain_start_idx = self.snakes[j]
                             .body
                             .cells
                             .iter()
                             .skip(1)
-                            .position(|Hex { pos, .. }| *pos == crash_point)
+                            .position(|Segment { pos, .. }| *pos == crash_point)
                             .unwrap_or_else(|| {
                                 panic!("point {:?} not found in snake of index {}", crash_point, j)
                             });
@@ -494,13 +501,13 @@ impl Game {
                 }
                 EatBehavior::Crash => {
                     self.snakes[i].state = SnakeState::Crashed;
-                    self.snakes[i].body.cells[0].typ = HexType::Crashed;
+                    self.snakes[i].body.cells[0].typ = SegmentType::Crashed;
                     self.state = GameState::Crashed;
                     self.force_redraw = 10;
                 }
                 EatBehavior::Die => {
                     self.snakes[i].state = SnakeState::Dying;
-                    self.snakes[i].body.cells[0].typ = HexType::BlackHole;
+                    self.snakes[i].body.cells[0].typ = SegmentType::BlackHole;
                 }
             }
         }
@@ -517,7 +524,7 @@ impl Game {
                 if snake.head().pos == self.apples[i].pos {
                     let Apple { typ, .. } = self.apples.remove(i);
                     match typ {
-                        AppleType::Normal(food) => snake.body.cells[0].typ = HexType::Eaten(food),
+                        AppleType::Normal(food) => snake.body.cells[0].typ = SegmentType::Eaten(food),
                         AppleType::SpawnSnake(seed) => spawn_snake = Some(seed),
                     }
                 }
@@ -550,120 +557,6 @@ impl Game {
                 println!("warning: failed to spawn evil snake, no free spaces left")
             }
         }
-    }
-
-    fn generate_meshes(&self, ctx: &mut Context) -> GameResult<(Mesh, Mesh)> {
-        let CellDim { side, sin, cos } = self.cell_dim;
-
-        // two kinds of alternating vertical lines
-        let mut vline_a = vec![];
-        let mut vline_b = vec![];
-
-        for dv in (0..=self.dim.v).map(|v| v as f32 * 2. * sin) {
-            vline_a.push(Point2 { x: cos, y: dv });
-            vline_a.push(Point2 { x: 0., y: dv + sin });
-
-            vline_b.push(Point2 {
-                x: cos + side,
-                y: dv,
-            });
-            vline_b.push(Point2 {
-                x: 2. * cos + side,
-                y: dv + sin,
-            });
-        }
-
-        let first_vline_a = vline_a.iter().copied().collect::<Vec<_>>();
-        let mut last_vline_b = vec![];
-
-        let grid_mesh = {
-            let mut builder = MeshBuilder::new();
-
-            let draw_mode = DrawMode::stroke(self.palette.grid_thickness);
-            let color = self.palette.grid_color;
-            for h in 0..(self.dim.h + 1) / 2 {
-                if h == 0 {
-                    builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
-                } else {
-                    builder.polyline(draw_mode, &vline_a, color)?;
-                }
-                if self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1 {
-                    builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
-                } else {
-                    builder.polyline(draw_mode, &vline_b, color)?;
-                }
-
-                if h == (self.dim.h + 1) / 2 - 1 {
-                    if self.dim.h.is_odd() {
-                        last_vline_b = vline_b[..vline_b.len() - 1].iter().copied().collect();
-                    } else {
-                        last_vline_b = vline_b.iter().copied().collect();
-                    }
-                }
-
-                let dh = h as f32 * (2. * side + 2. * cos);
-
-                for v in 0..=self.dim.v {
-                    let dv = v as f32 * 2. * sin;
-
-                    // line between a and b
-                    builder.line(
-                        &[
-                            Point2 { x: cos + dh, y: dv },
-                            Point2 {
-                                x: cos + side + dh,
-                                y: dv,
-                            },
-                        ],
-                        self.palette.grid_thickness,
-                        color,
-                    )?;
-
-                    // line between b and a
-                    if !(self.dim.h.is_odd() && h == (self.dim.h + 1) / 2 - 1) {
-                        builder.line(
-                            &[
-                                Point2 {
-                                    x: 2. * cos + side + dh,
-                                    y: sin + dv,
-                                },
-                                Point2 {
-                                    x: 2. * cos + 2. * side + dh,
-                                    y: sin + dv,
-                                },
-                            ],
-                            self.palette.grid_thickness,
-                            color,
-                        )?;
-                    }
-                }
-
-                // shift the lines right by 2 cells
-                let offset = 2. * (side + cos);
-                vline_a.iter_mut().for_each(|a| a.x += offset);
-                vline_b.iter_mut().for_each(|b| b.x += offset);
-            }
-            if self.dim.h.is_even() {
-                builder.polyline(draw_mode, &vline_a[1..], color)?;
-            }
-
-            builder.build(ctx)?
-        };
-
-        assert!(!last_vline_b.is_empty());
-
-        let border_mesh = {
-            let mut builder = MeshBuilder::new();
-
-            let draw_mode = DrawMode::stroke(self.palette.border_thickness);
-            let color = self.palette.border_color;
-            builder.polyline(draw_mode, &first_vline_a[..first_vline_a.len() - 1], color)?;
-            builder.polyline(draw_mode, &last_vline_b, color)?;
-
-            builder.build(ctx)?
-        };
-
-        Ok((grid_mesh, border_mesh))
     }
 
     fn draw_message(
@@ -715,138 +608,8 @@ impl Game {
     }
 }
 
-// TODO: refactor these out of Game
-#[rustfmt::skip]
-fn get_points(dest: Point2<f32>, from: Option<Dir>, to: Option<Dir>, cell_dim: CellDim) -> Vec<Point2<f32>> {
-    let CellDim { side, sin, cos } = cell_dim;
-
-    let mut points = if from == Some(Dir::D) && to == Some(Dir::U) || from == Some(Dir::U) && to == Some(Dir::D) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: cos, y: 2. * sin, },
-        ]
-    } else if from == Some(Dir::DL) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::DL) {
-        vec![
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::DR) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::DR) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::D) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::D) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::D) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::D) {
-        vec![
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: cos, y: 2. * sin, },
-        ]
-    } else if from == Some(Dir::U) && to == Some(Dir::DL) || from == Some(Dir::DL) && to == Some(Dir::U) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::U) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::U) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: side + cos, y: 2. * sin, },
-        ]
-    } else if from == Some(Dir::UL) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::UL) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::DL) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::DL) {
-        vec![
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::U) && to == Some(Dir::UL) || from == Some(Dir::UL) && to == Some(Dir::U) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::U) && to == Some(Dir::UR) || from == Some(Dir::UR) && to == Some(Dir::U) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: cos, y: 2. * sin, },
-        ]
-    } else if from == Some(Dir::D) && to == Some(Dir::DL) || from == Some(Dir::DL) && to == Some(Dir::D) {
-        vec![
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::D) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::D) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: cos, y: 2. * sin, },
-        ]
-    } else if from == Some(Dir::UL) && to == Some(Dir::DL) || from == Some(Dir::DL) && to == Some(Dir::UL) {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else if from == Some(Dir::UR) && to == Some(Dir::DR) || from == Some(Dir::DR) && to == Some(Dir::UR) {
-        vec![
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    } else {
-        vec![
-            Point2 { x: cos, y: 0. },
-            Point2 { x: side + cos, y: 0., },
-            Point2 { x: side + 2. * cos, y: sin, },
-            Point2 { x: side + cos, y: 2. * sin, },
-            Point2 { x: cos, y: 2. * sin, },
-            Point2 { x: 0., y: sin },
-        ]
-    };
-
-    for Point2 { x, y } in &mut points {
-        *x += dest.x;
-        *y += dest.y;
-    }
-
-    points
-}
-
 type HexagonPoints = [Point2<f32>; 6];
 impl Game {
-
     pub fn get_hexagon_points(&self) -> HexagonPoints {
         let CellDim { side, sin, cos } = self.cell_dim;
 
@@ -900,24 +663,12 @@ impl Game {
             //     builder.polygon(DrawMode::fill(), &translated_points, color)?;
             // }
 
-            for (seg_idx, hex) in snake.body.cells.iter().enumerate() {
-                // closer to head
-                let next = if seg_idx == 0 {
-                    None
-                } else {
-                    Some(snake.body.cells[seg_idx - 1].pos)
-                };
+            for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
+                let from = snake.body.cells.get(seg_idx + 1).map(|Segment { next_segment, .. }| -next_segment.unwrap());
+                let to = segment.next_segment;
 
-                // closer to tail
-                let previous = snake.body.cells.get(seg_idx + 1).map(|h| h.pos);
-
-                let from = previous.and_then(|prev| hex.pos.exact_dir_to(prev, 1));
-                let to = next.and_then(|nxt| hex.pos.exact_dir_to(nxt, 1));
-
-                // println!("{:?} / {:?}", from, to);
-
-                let dest = hex.pos.to_point(self.cell_dim);
-                let color = snake.painter.paint_segment(seg_idx, len, hex);
+                let dest = segment.pos.to_point(self.cell_dim);
+                let color = snake.painter.paint_segment(seg_idx, len, segment);
                 // let translated_points = translate(&hexagon_points, dest);
                 let points = get_points(dest, from, to, self.cell_dim);
                 builder.polygon(DrawMode::fill(), &points, color)?;
@@ -1106,13 +857,10 @@ impl EventHandler for Game {
 
         clear(ctx, self.palette.background_color);
 
-        // generate grid mesh first time, later reuse
-        if self.grid_mesh.is_none() || self.border_mesh.is_none() {
-            let (gm, bm) = self.generate_meshes(ctx)?;
-            self.grid_mesh = Some(gm);
-            self.border_mesh = Some(bm);
-        }
         if self.prefs.draw_grid {
+            if self.grid_mesh.is_none() {
+                self.grid_mesh = Some(generate_grid_mesh(ctx, self.dim, &self.palette, self.cell_dim)?);
+            };
             draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
         }
         // draw(ctx, self.border_mesh.as_ref().unwrap(), DrawParam::default())?;

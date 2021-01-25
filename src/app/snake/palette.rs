@@ -1,7 +1,7 @@
-use crate::app::hex::{Hex, HexType};
 use ggez::graphics::Color;
 use hsl::HSL;
 use std::cmp::max;
+use crate::app::snake::{SegmentType, Segment};
 macro_rules! gray {
     ($lightness:expr) => {
         Color {
@@ -112,7 +112,7 @@ impl SnakePaletteTemplate {
 }
 
 pub trait SnakePainter {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Hex) -> Color;
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Segment) -> Color;
 }
 
 impl From<SnakePaletteTemplate> for Box<dyn SnakePainter> {
@@ -149,8 +149,8 @@ pub struct RGBGradient {
 }
 
 impl SnakePainter for RGBGradient {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Hex) -> Color {
-        if hex.typ == HexType::Crashed {
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Segment) -> Color {
+        if hex.typ == SegmentType::Crashed {
             return *DEFAULT_CRASHED_COLOR;
         }
 
@@ -164,10 +164,10 @@ impl SnakePainter for RGBGradient {
         };
 
         match hex.typ {
-            HexType::Normal => normal_color,
-            HexType::Eaten(_) => self.eaten.paint_segment(&normal_color),
-            HexType::Crashed => *DEFAULT_CRASHED_COLOR,
-            HexType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
+            SegmentType::Normal => normal_color,
+            SegmentType::Eaten(_) => self.eaten.paint_segment(&normal_color),
+            SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
+            SegmentType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
         }
     }
 }
@@ -181,14 +181,14 @@ pub struct HSLGradient {
 }
 
 impl SnakePainter for HSLGradient {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Hex) -> Color {
-        if hex.typ == HexType::Crashed {
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Segment) -> Color {
+        if hex.typ == SegmentType::Crashed {
             return *DEFAULT_CRASHED_COLOR;
         }
 
         let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
         match hex.typ {
-            HexType::Normal => {
+            SegmentType::Normal => {
                 let hsl = HSL {
                     h: hue,
                     s: 1.,
@@ -196,7 +196,7 @@ impl SnakePainter for HSLGradient {
                 };
                 Color::from(hsl.to_rgb())
             }
-            HexType::Eaten(_) => {
+            SegmentType::Eaten(_) => {
                 let hsl = HSL {
                     h: hue,
                     s: 1.,
@@ -204,8 +204,8 @@ impl SnakePainter for HSLGradient {
                 };
                 self.eaten.paint_segment(&Color::from(hsl.to_rgb()))
             }
-            HexType::Crashed => *DEFAULT_CRASHED_COLOR,
-            HexType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
+            SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
+            SegmentType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
         }
     }
 }
@@ -216,7 +216,7 @@ pub struct Persistent {
 }
 
 impl SnakePainter for Persistent {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Hex) -> Color {
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Segment) -> Color {
         self.max_len = max(len, self.max_len);
         self.painter.paint_segment(seg_idx, self.max_len, hex)
     }

@@ -1,5 +1,5 @@
 pub use dir::Dir;
-pub use hex_pos::{HexDim, HexPos};
+pub use hex_pos::{HexDim, HexPoint};
 
 mod dir {
     use std::ops::Neg;
@@ -41,7 +41,7 @@ mod dir {
             [U, UR, DR, D, DL, UL].iter().copied()
         }
 
-        pub fn clockwise(self) -> Self {
+        pub fn next_clockwise(self) -> Self {
             match self {
                 U => UR,
                 UR => DR,
@@ -64,6 +64,18 @@ mod dir {
                 _ => unreachable!(),
             }
         }
+
+        pub fn clockwise_angle_from_u(self) -> f32 {
+            use std::f32::consts::*;
+            match self {
+                U => 0.,
+                UR => FRAC_PI_3,
+                DR => 2. * FRAC_PI_3,
+                D => 3. * FRAC_PI_3,
+                DL => 4. * FRAC_PI_3,
+                UL => 5. * FRAC_PI_3,
+            }
+        }
     }
 }
 
@@ -74,20 +86,20 @@ mod hex_pos {
     use num_integer::Integer;
     use std::{
         cmp::Ordering,
+        collections::HashMap,
         fmt::{Debug, Error, Formatter},
     };
     use Dir::*;
-    use std::collections::HashMap;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
-    pub struct HexPos {
+    pub struct HexPoint {
         pub h: isize,
         pub v: isize,
     }
 
-    pub type HexDim = HexPos;
+    pub type HexDim = HexPoint;
 
-    impl HexPos {
+    impl HexPoint {
         pub fn to_point(self, CellDim { side, sin, cos }: CellDim) -> Point2<f32> {
             let Self { h, v } = self;
             Point2 {
@@ -98,7 +110,7 @@ mod hex_pos {
 
         // TODO: replace this with manhattan distance
         // approximate straight-line distance in units of side length
-        pub fn distance_to(self, HexPos { h, v }: HexPos) -> usize {
+        pub fn distance_to(self, HexPoint { h, v }: HexPoint) -> usize {
             let dh = (self.h - h).abs() as f32;
             let dv = (self.v - v).abs() as f32;
             let CellDim { side, sin, cos } = CellDim::from(1.);
@@ -113,7 +125,7 @@ mod hex_pos {
                 for r in 1..radius {
                     let branch = self.translate(dir, r);
                     neighborhood.push(branch);
-                    let dir2 = dir.clockwise();
+                    let dir2 = dir.next_clockwise();
                     for r2 in 1..(radius - r) {
                         neighborhood.push(branch.translate(dir2, r2))
                     }
@@ -128,37 +140,21 @@ mod hex_pos {
 
             neighborhood
         }
-
-        // straight-line direction to other, None if the points don't lie on the same line
-        // don't search farther than limit
-        pub fn exact_dir_to(self, other: Self, limit: usize) -> Option<Dir> {
-            if self == other { return None; }
-            let mut dirs: HashMap<_, _> = Dir::iter().map(|dir| (dir, self)).collect();
-            for _ in 0..limit {
-                for (dir, pos) in &mut dirs {
-                    *pos = pos.translate(*dir, 1);
-                    if *pos == other {
-                        return Some(*dir);
-                    }
-                }
-            }
-            None
-        }
     }
 
-    impl Debug for HexPos {
+    impl Debug for HexPoint {
         fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
             write!(f, "<{}, {}>", self.h, self.v)
         }
     }
 
-    impl PartialOrd for HexPos {
+    impl PartialOrd for HexPoint {
         fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
             Some(self.cmp(other))
         }
     }
 
-    impl Ord for HexPos {
+    impl Ord for HexPoint {
         fn cmp(&self, other: &Self) -> Ordering {
             match self.v.cmp(&other.v) {
                 Ordering::Equal => self.h.cmp(&other.h),
@@ -167,7 +163,7 @@ mod hex_pos {
         }
     }
 
-    impl HexPos {
+    impl HexPoint {
         // TODO: figure out O(1) translation for longer distances
         fn translate_one_in_place(&mut self, dir: Dir) {
             match dir {
@@ -287,19 +283,4 @@ mod hex_pos {
             (0..self.h).contains(&pos.h) && (0..self.v).contains(&pos.v)
         }
     }
-}
-
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
-pub enum HexType {
-    Normal,
-    Eaten(u32),
-    Crashed,
-    BlackHole, // does not advance, sucks the rest of the snake in
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Hex {
-    pub typ: HexType,
-    pub pos: HexPos,
-    pub teleported: Option<Dir>,
 }

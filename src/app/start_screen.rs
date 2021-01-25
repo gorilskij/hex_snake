@@ -8,7 +8,7 @@ use ggez::{
 
 use crate::app::{
     game::CellDim,
-    hex::{Dir, Hex, HexDim, HexPos, HexType},
+    hex::{Dir, HexDim, HexPoint},
     snake::{
         controller::{OtherSnakes, SimMove, SnakeControllerTemplate},
         palette::SnakePaletteTemplate,
@@ -16,25 +16,27 @@ use crate::app::{
     },
     Screen,
 };
+use crate::app::snake::{Segment, SegmentType};
 
 struct SnakeDemo {
-    top_left: HexPos,
+    top_left: HexPoint,
     dim: HexDim,
     snake: Snake,
     cell_dim: CellDim,
 }
 
 impl SnakeDemo {
-    fn new(top_left: HexPos, cell_dim: CellDim) -> Self {
-        let pos = top_left + HexPos { h: 0, v: -5 };
-        let head = Hex {
-            typ: HexType::Normal,
+    fn new(top_left: HexPoint, cell_dim: CellDim) -> Self {
+        let pos = top_left + HexPoint { h: 0, v: -5 };
+        let head = Segment {
+            typ: SegmentType::Normal,
             pos,
+            next_segment: None,
             teleported: None,
         };
         let mut body = VecDeque::new();
         body.push_back(head);
-        let board_dim = HexPos { h: 20, v: 20 };
+        let board_dim = HexPoint { h: 20, v: 20 };
         let dir = Dir::U;
         Self {
             top_left,
@@ -113,7 +115,7 @@ impl StartScreen {
             player1_palette_idx: 0,
             player2_palette_idx: 0,
 
-            player1_demo: SnakeDemo::new(HexPos { h: 10, v: 10 }, CellDim::from(10.)),
+            player1_demo: SnakeDemo::new(HexPoint { h: 10, v: 10 }, CellDim::from(10.)),
             player2_demo: None,
         }
     }
