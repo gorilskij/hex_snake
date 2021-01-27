@@ -180,25 +180,12 @@ pub fn get_points(
             CACHED_SIDE = side;
 
             // starting from top-baseline/left, going clockwise
-            #[rustfmt::skip]
-            FULL_HEXAGON = Some(vec![
+            FULL_HEXAGON = #[rustfmt::skip] Some(vec![
                 Point2 { x: cos, y: 0. },
-                Point2 {
-                    x: side + cos,
-                    y: 0.,
-                },
-                Point2 {
-                    x: side + 2. * cos,
-                    y: sin,
-                },
-                Point2 {
-                    x: side + cos,
-                    y: 2. * sin,
-                },
-                Point2 {
-                    x: cos,
-                    y: 2. * sin,
-                },
+                Point2 { x: side + cos, y: 0. },
+                Point2 { x: side + 2. * cos, y: sin },
+                Point2 { x: side + cos, y: 2. * sin },
+                Point2 { x: cos, y: 2. * sin },
                 Point2 { x: 0., y: sin },
             ]);
 

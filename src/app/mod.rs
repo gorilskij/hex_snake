@@ -120,6 +120,7 @@ impl App {
                 },
                 palette: SnakePaletteTemplate::new_persistent_rainbow(),
                 controller: SnakeControllerTemplate::PlayerController(cs),
+                // controller: SnakeControllerTemplate::PlayerController12,
             })
             .collect();
 

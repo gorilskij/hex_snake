@@ -10,6 +10,7 @@ use std::{cmp::Ordering, collections::VecDeque, iter::once};
 #[derive(Clone)]
 pub enum SnakeControllerTemplate {
     PlayerController(ControlSetup),
+    PlayerController12,
     DemoController(Vec<SimMove>),
     CompetitorAI,
     KillerAI,
@@ -52,6 +53,11 @@ impl SnakeControllerTemplate {
                     dir: initial_dir,
                 })
             }
+            SnakeControllerTemplate::PlayerController12 => Box::new(PlayerController12 {
+                dir: Dir12::Single(initial_dir),
+                alternation: false,
+                next_dir: None,
+            }),
             SnakeControllerTemplate::DemoController(move_sequence) => Box::new(DemoController {
                 move_sequence,
                 next_move_idx: 0,
@@ -107,6 +113,98 @@ impl SnakeController for PlayerController {
         {
             self.control_queue.push_back(new_dir)
         }
+    }
+}
+
+// with 6 simulated directions between the 6 normal ones
+#[derive(Copy, Clone)]
+enum Dir12 {
+    Single(Dir),
+    Combined(Dir, Dir),
+}
+
+impl Dir12 {
+    const ORDER: &'static [Dir12] = &[
+        Dir12::Single(Dir::U),
+        Dir12::Combined(Dir::U, Dir::UR),
+        Dir12::Single(Dir::UR),
+        Dir12::Combined(Dir::UR, Dir::DR),
+        Dir12::Single(Dir::DR),
+        Dir12::Combined(Dir::DR, Dir::D),
+        Dir12::Single(Dir::D),
+        Dir12::Combined(Dir::D, Dir::DL),
+        Dir12::Single(Dir::DL),
+        Dir12::Combined(Dir::DL, Dir::UL),
+        Dir12::Single(Dir::UL),
+        Dir12::Combined(Dir::UL, Dir::U),
+    ];
+}
+
+impl PartialEq for Dir12 {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Single(d1), Self::Single(d2)) => d1 == d2,
+            (Self::Combined(a1, b1), Self::Combined(a2, b2)) => {
+                // order of a and b is irrelevant
+                a1 == a2 && b1 == b2 || a1 == b2 && a2 == b1
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Dir12 {}
+
+// fairly hacky, doesn't interact well with teleportation
+pub struct PlayerController12 {
+    dir: Dir12,
+    alternation: bool,
+    next_dir: Option<Dir12>,
+}
+
+impl SnakeController for PlayerController12 {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
+        if let Some(new_dir) = self.next_dir.take() {
+            self.dir = new_dir;
+            self.alternation = false;
+        }
+        match &mut self.dir {
+            Dir12::Single(dir) => Some(*dir),
+            Dir12::Combined(a, b) => {
+                self.alternation = !self.alternation;
+                match self.alternation {
+                    true => Some(*a),
+                    false => Some(*b),
+                }
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        self.next_dir = None;
+    }
+
+    fn key_pressed(&mut self, key: KeyCode) {
+        use Dir::*;
+        let new_dir = match key {
+            KeyCode::Left => {
+                let mut current_idx = Dir12::ORDER
+                    .iter()
+                    .position(|d12| *d12 == self.dir)
+                    .unwrap();
+                current_idx = (current_idx + 12 - 1) % 12;
+                self.dir = Dir12::ORDER[current_idx];
+            }
+            KeyCode::Right => {
+                let mut current_idx = Dir12::ORDER
+                    .iter()
+                    .position(|d12| *d12 == self.dir)
+                    .unwrap();
+                current_idx = (current_idx + 1) % 12;
+                self.dir = Dir12::ORDER[current_idx];
+            }
+            _ => (),
+        };
     }
 }
 
