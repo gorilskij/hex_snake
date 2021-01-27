@@ -16,7 +16,7 @@ macro_rules! gray {
 lazy_static! {
     static ref DEFAULT_EATEN_COLOR: Color = Color::from_rgb(0, 255, 128);
     static ref DEFAULT_CRASHED_COLOR: Color = Color::from_rgb(255, 0, 128);
-    static ref DEFAULT_BLACK_HOLE_COLOR: Color = Color::from_rgb(255, 255, 255);
+    static ref DEFAULT_BLACK_HOLE_COLOR: Color = Color::from_rgb(245, 197, 66);
     // static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgb(245, 192, 64);
 }
 

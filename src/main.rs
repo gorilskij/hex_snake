@@ -1,4 +1,5 @@
 #![deny(unused_must_use)]
+#![feature(stmt_expr_attributes)] // for rustfmt::skip on expressions
 
 #[macro_use]
 extern crate derive_more;

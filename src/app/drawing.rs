@@ -11,14 +11,19 @@ use ggez::{
 use num_integer::Integer;
 use std::collections::HashMap;
 
-#[rustfmt::skip]
-pub fn generate_grid_mesh(ctx: &mut Context, dim: HexDim, palette: &GamePalette, cell_dim: CellDim) -> GameResult<Mesh> {
+pub fn generate_grid_mesh(
+    ctx: &mut Context,
+    dim: HexDim,
+    palette: &GamePalette,
+    cell_dim: CellDim,
+) -> GameResult<Mesh> {
     let CellDim { side, sin, cos } = cell_dim;
 
     // two kinds of alternating vertical lines
     let mut vline_a = vec![];
     let mut vline_b = vec![];
 
+    #[rustfmt::skip]
     for dv in (0..=dim.v).map(|v| v as f32 * 2. * sin) {
         vline_a.push(Point2 { x: cos, y: dv });
         vline_a.push(Point2 { x: 0., y: dv + sin });
@@ -48,6 +53,7 @@ pub fn generate_grid_mesh(ctx: &mut Context, dim: HexDim, palette: &GamePalette,
             let dv = v as f32 * 2. * sin;
 
             // line between a and b
+            #[rustfmt::skip]
             builder.line(
                 &[
                     Point2 { x: cos + dh, y: dv },
@@ -59,6 +65,7 @@ pub fn generate_grid_mesh(ctx: &mut Context, dim: HexDim, palette: &GamePalette,
 
             // line between b and a
             if !(dim.h.is_odd() && h == (dim.h + 1) / 2 - 1) {
+                #[rustfmt::skip]
                 builder.line(
                     &[
                         Point2 { x: 2. * cos + side + dh, y: sin + dv },
@@ -171,18 +178,30 @@ pub fn get_points(
     unsafe {
         if (side - CACHED_SIDE).abs() > f32::EPSILON {
             CACHED_SIDE = side;
+
             // starting from top-baseline/left, going clockwise
             #[rustfmt::skip]
-            let _ = { // purely a trick to avoid 'attributes on expressions are experimental'
-                FULL_HEXAGON = Some(vec![
-                    Point2 { x: cos, y: 0. },
-                    Point2 { x: side + cos, y: 0. },
-                    Point2 { x: side + 2. * cos, y: sin },
-                    Point2 { x: side + cos, y: 2. * sin },
-                    Point2 { x: cos, y: 2. * sin },
-                    Point2 { x: 0., y: sin },
-                ]);
-            };
+            FULL_HEXAGON = Some(vec![
+                Point2 { x: cos, y: 0. },
+                Point2 {
+                    x: side + cos,
+                    y: 0.,
+                },
+                Point2 {
+                    x: side + 2. * cos,
+                    y: sin,
+                },
+                Point2 {
+                    x: side + cos,
+                    y: 2. * sin,
+                },
+                Point2 {
+                    x: cos,
+                    y: 2. * sin,
+                },
+                Point2 { x: 0., y: sin },
+            ]);
+
             CACHED_POINTS = Some(HashMap::new());
 
             let map = CACHED_POINTS.as_mut().unwrap();
