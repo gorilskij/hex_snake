@@ -98,6 +98,7 @@ impl FPSCounter {
 
 // TODO: maybe roll up game state into this struct as well
 //  and implement paused elapsed counting
+// TODO: allow update fps to exceed draw fps
 struct FPSLimiter {
     frame_duration: Duration,
     next_frame: Option<Instant>,
@@ -216,47 +217,6 @@ pub struct Game {
 }
 
 impl Game {
-    fn update_dim(&mut self) {
-        let Point {
-            x: width,
-            y: height,
-        } = self.window_dim.into();
-        let CellDim { side, sin, cos } = self.cell_dim;
-        let new_dim = HexDim {
-            h: (width / (side + cos)) as isize,
-            v: (height / (2. * sin)) as isize - 1,
-        };
-
-        if self.dim != new_dim {
-            self.dim = new_dim;
-
-            // restart if player snake head has left board limits
-            if self
-                .snakes
-                .iter()
-                .any(|s| s.snake_type == SnakeType::PlayerSnake && !new_dim.contains(s.head().pos))
-            {
-                println!("warning: player snake outside of board, restarting");
-                self.restart();
-            } else {
-                // remove snakes outside of board limits
-                self.snakes
-                    .retain(move |snake| new_dim.contains(snake.head().pos));
-
-                // remove apples outside of board limits
-                self.apples.retain(move |apple| new_dim.contains(apple.pos));
-                self.spawn_apples();
-            }
-
-            // invalidate
-            self.grid_mesh = None;
-            self.border_mesh = None;
-
-            // redraw 10 frames to adjust the grid
-            self.force_redraw = 10;
-        }
-    }
-
     pub fn new(
         cell_side_len: f32,
         players: Vec<SnakeSeed>,
@@ -303,6 +263,47 @@ impl Game {
         game.update_dim();
         game.restart();
         game
+    }
+
+    fn update_dim(&mut self) {
+        let Point {
+            x: width,
+            y: height,
+        } = self.window_dim.into();
+        let CellDim { side, sin, cos } = self.cell_dim;
+        let new_dim = HexDim {
+            h: (width / (side + cos)) as isize,
+            v: (height / (2. * sin)) as isize - 1,
+        };
+
+        if self.dim != new_dim {
+            self.dim = new_dim;
+
+            // restart if player snake head has left board limits
+            if self
+                .snakes
+                .iter()
+                .any(|s| s.snake_type == SnakeType::PlayerSnake && !new_dim.contains(s.head().pos))
+            {
+                println!("warning: player snake outside of board, restarting");
+                self.restart();
+            } else {
+                // remove snakes outside of board limits
+                self.snakes
+                    .retain(move |snake| new_dim.contains(snake.head().pos));
+
+                // remove apples outside of board limits
+                self.apples.retain(move |apple| new_dim.contains(apple.pos));
+                self.spawn_apples();
+            }
+
+            // invalidate
+            self.grid_mesh = None;
+            self.border_mesh = None;
+
+            // redraw 10 frames to adjust the grid
+            self.force_redraw = 10;
+        }
     }
 
     fn restart(&mut self) {

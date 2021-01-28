@@ -109,7 +109,7 @@ impl App {
             srgb: true,
         };
 
-        let seeds = players
+        let seeds: Vec<_> = players
             .into_iter()
             .map(|cs| SnakeSeed {
                 snake_type: SnakeType::PlayerSnake,
