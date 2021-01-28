@@ -1,7 +1,6 @@
 use std::{
     collections::VecDeque,
     mem, thread,
-    time::{Duration, Instant},
 };
 
 use ggez::{
@@ -31,11 +30,15 @@ use crate::{
     },
     point::Point,
 };
+use crate::app::game::game_control::{GameState, GameControl};
+use std::time::Instant;
 
-// TODO document
 #[derive(Copy, Clone)]
 pub struct CellDim {
     pub side: f32,
+    // sin is longer than cos
+    // they describe the height and width of the diagonal segments of
+    // a hexagon with its flat segments horizontal on the top and bottom
     pub sin: f32,
     pub cos: f32,
 }
@@ -90,61 +93,87 @@ impl FPSCounter {
     }
 }
 
-// TODO: maybe roll up game state into this struct as well
-//  and implement paused elapsed counting
-// TODO: allow update fps to exceed draw fps
-struct FPSLimiter {
-    frame_duration: Duration,
-    next_frame: Option<Instant>,
-    frame_num: usize,
-}
+mod game_control {
+    use std::time::{Duration, Instant};
 
-impl FPSLimiter {
-    fn new(fps: u64) -> Self {
-        Self {
-            frame_duration: Duration::from_micros(1_000_000 / fps),
-            next_frame: None,
-            frame_num: 0,
+    #[derive(Copy, Clone, Eq, PartialEq)]
+    pub enum GameState {
+        Playing,
+        Paused,
+        GameOver,
+    }
+
+    // TODO: allow update fps to exceed draw fps
+    // combines fps with game state management
+    pub struct GameControl {
+        frame_duration: Duration,
+        next_frame: Option<Instant>,
+        frame_num: usize,
+
+        game_state: GameState,
+    }
+
+    impl GameControl {
+        pub fn new(fps: u64) -> Self {
+            Self {
+                frame_duration: Duration::from_micros(1_000_000 / fps),
+                next_frame: None,
+                frame_num: 0,
+
+                game_state: GameState::Playing,
+            }
+        }
+
+        pub fn can_update(&mut self) -> bool {
+            let next_frame = self.next_frame.get_or_insert(Instant::now());
+            if Instant::now() >= *next_frame {
+                *next_frame += self.frame_duration;
+                self.frame_num += 1;
+                true
+            } else {
+                false
+            }
+        }
+
+        pub fn state(&self) -> GameState {
+            self.game_state
+        }
+
+        pub fn play(&mut self) {
+            self.game_state = GameState::Playing;
+            self.next_frame = Some(Instant::now());
+        }
+
+        pub fn pause(&mut self) {
+            self.game_state = GameState::Paused;
+            self.next_frame = None;
+        }
+
+        pub fn game_over(&mut self) {
+            self.game_state = GameState::GameOver;
+            self.next_frame = None;
+        }
+
+        pub fn frame_num(&self) -> usize {
+            self.frame_num
+        }
+
+        // max(elapsed, frame_duration)
+        pub fn elapsed(&self) -> Duration {
+            let now = Instant::now();
+            match self.next_frame {
+                Some(inst) if inst >= now => self.frame_duration - (inst - now),
+                _ => self.frame_duration,
+            }
+        }
+
+        // fraction of the current game frame that has elapsed
+        pub fn frame_fraction(&self) -> f32 {
+            let f = self.elapsed().as_secs_f32() / self.frame_duration.as_secs_f32();
+            assert!((0. ..=1.).contains(&f), "f: {}", f);
+            f
         }
     }
-
-    fn can_update(&mut self) -> bool {
-        let next_frame = self.next_frame.get_or_insert(Instant::now());
-        if Instant::now() >= *next_frame {
-            *next_frame += self.frame_duration;
-            self.frame_num += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn pause(&mut self) {
-        self.next_frame = None;
-    }
-
-    // max(elapsed, frame_duration)
-    fn elapsed(&self) -> Duration {
-        let now = Instant::now();
-        match self.next_frame {
-            Some(inst) if inst >= now => self.frame_duration - (inst - now),
-            _ => self.frame_duration,
-        }
-    }
-
-    // fraction of the current game frame that has elapsed
-    fn frame_fraction(&self) -> f32 {
-        let f = self.elapsed().as_secs_f32() / self.frame_duration.as_secs_f32();
-        assert!((0. ..=1.).contains(&f), "f: {}", f);
-        f
-    }
-}
-
-#[derive(Eq, PartialEq)]
-enum GameState {
-    Playing,
-    Paused,
-    GameOver,
 }
 
 type Food = u32;
@@ -181,9 +210,7 @@ struct Message {
 }
 
 pub struct Game {
-    state: GameState,
-
-    fps_limiter: FPSLimiter,
+    control: GameControl,
     update_fps: FPSCounter,
     graphics_fps: FPSCounter,
 
@@ -220,9 +247,7 @@ impl Game {
         let cell_dim = CellDim::from(cell_side_len);
 
         let mut game = Self {
-            state: GameState::Playing,
-
-            fps_limiter: FPSLimiter::new(12),
+            control: GameControl::new(12),
             update_fps: FPSCounter::new(),
             graphics_fps: FPSCounter::new(),
 
@@ -328,7 +353,6 @@ impl Game {
         }
 
         self.spawn_apples();
-        self.state = GameState::Playing;
     }
 
     fn occupied_cells(&self) -> Vec<HexPoint> {
@@ -475,8 +499,7 @@ impl Game {
         }
 
         if self.snakes.is_empty() {
-            self.state = GameState::GameOver;
-            self.fps_limiter.pause();
+            self.control.game_over();
             return;
         }
 
@@ -548,7 +571,7 @@ impl Game {
                 }
                 EatBehavior::Crash => {
                     self.snakes[i].crash();
-                    self.state = GameState::GameOver;
+                    self.control.game_over();
                 }
                 EatBehavior::Die => {
                     self.snakes[i].die();
@@ -661,13 +684,13 @@ impl Game {
         // to be drawn later (potentially on top of body segments)
         let mut heads = vec![];
 
-        let frame_frac = if self.state == GameState::Paused {
+        let frame_frac = if self.control.state() == GameState::Paused {
             // let x = self.fps_limiter.elapsed().as_secs_f32() % 2.;
             // if x > 1. { 2. - x } else { x }
             // TODO: implement some paused animation
             0.5
         } else {
-            self.fps_limiter.frame_fraction()
+            self.control.frame_fraction()
         };
 
         for (snake_idx, snake) in self.snakes.iter_mut().enumerate() {
@@ -787,7 +810,7 @@ impl Game {
             let color = match apple.typ {
                 AppleType::Normal(_) => self.palette.apple_color,
                 AppleType::SpawnSnake(_) => {
-                    let hue = 360. * (self.fps_limiter.frame_num % 12) as f64 / 11.;
+                    let hue = 360. * (self.control.frame_num() % 12) as f64 / 11.;
                     let hsl = HSL {
                         h: hue,
                         s: 1.,
@@ -817,11 +840,11 @@ impl EventHandler for Game {
         //     return Ok(());
         // }
 
-        if self.state == GameState::Paused || self.state == GameState::GameOver {
+        if matches!(self.control.state(), GameState::Paused | GameState::GameOver) {
             return Ok(());
         }
 
-        if self.fps_limiter.can_update() {
+        if self.control.can_update() {
             self.update_fps.register_frame();
 
             self.advance_snakes();
@@ -877,20 +900,19 @@ impl EventHandler for Game {
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
-        use GameState::*;
         use KeyCode::*;
 
         let numeric_keys = [Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9];
 
         // TODO: also tie these to a keymap
         match key {
-            Space => match self.state {
-                GameOver => self.restart(),
-                Playing => {
-                    self.state = Paused;
-                    self.fps_limiter.pause();
-                }
-                Paused => self.state = Playing,
+            Space => match self.control.state() {
+                GameState::GameOver => {
+                    self.restart();
+                    self.control.play();
+                },
+                GameState::Playing => self.control.pause(),
+                GameState::Paused => self.control.play(),
             },
             G => {
                 self.prefs.draw_grid = !self.prefs.draw_grid;
@@ -943,7 +965,7 @@ impl EventHandler for Game {
                 });
             }
             k => {
-                if self.state == Playing {
+                if self.control.state() == GameState::Playing {
                     for snake in &mut self.snakes {
                         snake.controller.key_pressed(k)
                     }
