@@ -1,5 +1,3 @@
-use std::{collections::VecDeque, mem, thread};
-
 use ggez::{
     conf::WindowMode,
     event::{EventHandler, KeyCode, KeyMods},
@@ -19,7 +17,7 @@ use crate::{
         keyboard_control::{ControlSetup, KeyboardLayout, Side},
         palette::GamePalette,
         snake::{
-            controller::{OtherSnakes, SnakeControllerTemplate},
+            controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
             palette::SnakePaletteTemplate,
             EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeBody, SnakeSeed,
             SnakeState, SnakeType,
@@ -28,7 +26,6 @@ use crate::{
     },
     point::Point,
 };
-use std::time::Instant;
 
 #[derive(Copy, Clone)]
 pub struct CellDim {
@@ -60,39 +57,54 @@ impl CellDim {
     }
 }
 
-struct FPSCounter {
-    buffer: VecDeque<Instant>,
-}
-
-impl FPSCounter {
-    // number of last frames to average
-    const N: usize = 60;
-
-    fn new() -> Self {
-        Self {
-            buffer: VecDeque::with_capacity(Self::N),
-        }
-    }
-
-    fn register_frame(&mut self) {
-        if self.buffer.len() >= Self::N {
-            self.buffer.pop_front();
-        }
-        self.buffer.push_back(Instant::now());
-    }
-
-    fn fps(&self) -> f64 {
-        if self.buffer.len() >= 2 {
-            self.buffer.len() as f64
-                / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
-        } else {
-            0.
-        }
-    }
-}
-
 mod game_control {
-    use std::time::{Duration, Instant};
+    use std::{
+        collections::VecDeque,
+        time::{Duration, Instant},
+    };
+    use std::cmp::max;
+
+    struct FPSCounter {
+        len: usize,
+        buffer: VecDeque<Instant>,
+    }
+
+    impl FPSCounter {
+        fn new(fps: u64) -> Self {
+            // TODO: calculate required len in a way that makes sense
+            //  maybe also register every n frames for higher fps to avoid wasting space
+            let len = max(60, fps as usize);
+            Self {
+                len,
+                buffer: VecDeque::with_capacity(len),
+            }
+        }
+
+        fn set_fps(&mut self, fps: u64) {
+            self.len = max(60, fps as usize);
+            self.reset();
+        }
+
+        fn register_frame(&mut self) {
+            if self.buffer.len() >= self.len {
+                self.buffer.pop_front();
+            }
+            self.buffer.push_back(Instant::now());
+        }
+
+        fn reset(&mut self) {
+            self.buffer.clear();
+        }
+
+        fn fps(&self) -> f64 {
+            if self.buffer.len() >= 2 {
+                self.buffer.len() as f64
+                    / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
+            } else {
+                0.
+            }
+        }
+    }
 
     #[derive(Copy, Clone, Eq, PartialEq)]
     pub enum GameState {
@@ -111,6 +123,9 @@ mod game_control {
         next_graphics_frame: Option<Instant>,
         frame_num: usize,
 
+        measured_game_fps: FPSCounter,
+        measured_graphics_fps: FPSCounter,
+
         game_state: GameState,
     }
 
@@ -124,6 +139,9 @@ mod game_control {
                 next_graphics_frame: None,
                 frame_num: 0,
 
+                measured_game_fps: FPSCounter::new(fps),
+                measured_graphics_fps: FPSCounter::new(60),
+
                 game_state: GameState::Playing,
             }
         }
@@ -136,6 +154,7 @@ mod game_control {
             self.game_fps = fps;
             self.game_frame_duration = Duration::from_micros(1_000_000 / fps);
             self.next_game_frame = Some(Instant::now() + self.game_frame_duration);
+            self.measured_game_fps.set_fps(fps);
         }
 
         // call in update() as while loop condition
@@ -148,6 +167,7 @@ mod game_control {
                     .map(|ngf| now < ngf)
                     .unwrap_or(true)
             {
+                self.measured_game_fps.register_frame();
                 *next_frame += self.game_frame_duration;
                 self.frame_num += 1;
                 true
@@ -158,6 +178,7 @@ mod game_control {
 
         // call in draw()
         pub fn graphics_frame(&mut self) {
+            self.measured_graphics_fps.register_frame();
             self.next_graphics_frame = Some(Instant::now() + self.graphics_frame_duration);
         }
 
@@ -168,6 +189,7 @@ mod game_control {
         pub fn play(&mut self) {
             self.game_state = GameState::Playing;
             self.next_game_frame = Some(Instant::now());
+            self.measured_game_fps.reset();
         }
 
         pub fn pause(&mut self) {
@@ -198,6 +220,14 @@ mod game_control {
             let f = self.elapsed().as_secs_f32() / self.game_frame_duration.as_secs_f32();
             assert!((0. ..=1.).contains(&f), "f: {}", f);
             f
+        }
+
+        pub fn measured_game_fps(&self) -> f64 {
+            self.measured_game_fps.fps()
+        }
+
+        pub fn measured_graphics_fps(&self) -> f64 {
+            self.measured_graphics_fps.fps()
         }
     }
 }
@@ -237,8 +267,6 @@ struct Message {
 
 pub struct Game {
     control: GameControl,
-    game_fps: FPSCounter,
-    graphics_fps: FPSCounter,
 
     window_dim: Point,
 
@@ -259,8 +287,6 @@ pub struct Game {
     prefs: Prefs,
     message_top_left: Option<Message>,
     message_top_right: Option<Message>,
-
-    autopilot: bool, // only works with 1 player snake
 }
 
 impl Game {
@@ -276,8 +302,6 @@ impl Game {
 
         let mut game = Self {
             control: GameControl::new(12),
-            game_fps: FPSCounter::new(),
-            graphics_fps: FPSCounter::new(),
 
             window_dim: Point {
                 x: wm.width,
@@ -301,8 +325,6 @@ impl Game {
             prefs: Prefs::default(),
             message_top_left: None,
             message_top_right: None,
-
-            autopilot: false,
         };
         // warning: this spawns apples before there are any snakes
         game.update_dim();
@@ -726,7 +748,9 @@ impl Game {
         for (snake_idx, snake) in self.snakes.iter_mut().enumerate() {
             let len = snake.len();
 
-            // assert!(len > 1, "snakes of length <= 1 will interact weirdly with animation");
+            if len < 2 {
+                println!("warning: snakes of length <= 1 interact weirdly with animation ")
+            }
 
             // draw white aura around snake heads (debug)
             // for pos in snake.head().pos.neighborhood(7) {
@@ -878,8 +902,6 @@ impl EventHandler for Game {
         }
 
         while self.control.can_update() {
-            self.game_fps.register_frame();
-
             self.advance_snakes();
             self.spawn_apples();
         }
@@ -889,25 +911,17 @@ impl EventHandler for Game {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         self.control.graphics_frame();
-        self.graphics_fps.register_frame();
 
         if self.prefs.display_fps {
             self.message_top_left = Some(Message {
                 message: format!(
                     "u: {:.2} g: {:.2}",
-                    self.game_fps.fps(),
-                    self.graphics_fps.fps()
+                    self.control.measured_game_fps(),
+                    self.control.measured_graphics_fps(),
                 ),
                 duration: None,
             })
         }
-
-        // skip frames for faster gameplay
-        // unsafe {
-        //     static mut MG: u64 = 0;
-        //     MG += 1;
-        //     if MG % 5 != 0 { return Ok(()) }
-        // }
 
         clear(ctx, self.palette.background_color);
 
@@ -929,7 +943,7 @@ impl EventHandler for Game {
         Self::draw_message(&mut self.message_top_left, Side::Left, ctx)?;
         Self::draw_message(&mut self.message_top_right, Side::Right, ctx)?;
 
-        thread::yield_now();
+        // thread::yield_now();
         present(ctx)
     }
 
@@ -969,38 +983,36 @@ impl EventHandler for Game {
             A => {
                 // only apply if there is exactly one player snake
                 if self.players.len() == 1 {
-                    self.autopilot = !self.autopilot;
-                    for Snake {
-                        body: SnakeBody { dir, .. },
-                        snake_type,
-                        controller,
-                        ..
-                    } in &mut self.snakes
-                    {
-                        if *snake_type == SnakeType::PlayerSnake {
-                            if self.autopilot {
-                                *controller =
-                                    SnakeControllerTemplate::CompetitorAI.into_controller(*dir);
-                                self.message_top_right = Some(Message {
-                                    message: "Autopilot on".to_string(),
-                                    duration: Some(100),
-                                });
-                            } else {
-                                // hacky
-                                *controller =
-                                    SnakeControllerTemplate::PlayerController(ControlSetup {
-                                        layout: KeyboardLayout::Dvorak,
-                                        keyboard_side: Side::Right,
-                                        hand: Side::Right,
-                                    })
-                                    .into_controller(*dir);
-                                self.message_top_right = Some(Message {
-                                    message: "Autopilot off".to_string(),
-                                    duration: Some(100),
-                                });
+                    // hacky
+                    unsafe {
+                        static mut STASHED_CONTROLLER: Option<Box<dyn SnakeController>> = None;
+
+                        let player_snake = self
+                            .snakes
+                            .iter_mut()
+                            .find(|snake| snake.snake_type == SnakeType::PlayerSnake)
+                            .unwrap();
+
+                        let message;
+                        match &STASHED_CONTROLLER {
+                            None => {
+                                STASHED_CONTROLLER = Some(std::mem::replace(
+                                    &mut player_snake.controller,
+                                    SnakeControllerTemplate::CompetitorAI
+                                        .into_controller(player_snake.body.dir),
+                                ));
+                                message = "Autopilot on";
                             }
-                            break;
+                            Some(_) => {
+                                player_snake.controller = STASHED_CONTROLLER.take().unwrap();
+                                message = "Autopilot off"
+                            }
                         }
+
+                        self.message_top_right = Some(Message {
+                            message: message.to_string(),
+                            duration: Some(100),
+                        })
                     }
                 }
             }

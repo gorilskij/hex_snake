@@ -129,9 +129,9 @@ impl App {
         //     eat_mechanics: EatMechanics {
         //         eat_self: EatBehavior::Cut,
         //         eat_other: Default::default(),
-        //         default: EatBehavior::Crash,
+        //         default: EatBehavior::Cut,
         //     },
-        //     palette: SnakePaletteTemplate::new_persistent_rainbow(),
+        //     palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
         //     controller: SnakeControllerTemplate::CompetitorAI,
         // }];
 
