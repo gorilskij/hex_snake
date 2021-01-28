@@ -16,7 +16,8 @@ pub mod palette;
 #[derive(Eq, PartialEq)]
 pub enum SnakeState {
     Living,
-    Dying,
+    // counts how many segments have already been removed
+    Dying(usize),
     Crashed,
 }
 
@@ -40,8 +41,8 @@ pub enum SegmentType {
 pub struct Segment {
     pub typ: SegmentType,
     pub pos: HexPoint,
-    // direction from this segment to the previous one
-    pub previous_segment: Dir,
+    // direction from this segment to the next one (towards the tail)
+    pub next_segment: Dir,
     pub teleported: Option<Dir>,
 }
 
@@ -106,7 +107,7 @@ impl Snake {
         let head = Segment {
             typ: SegmentType::Normal,
             pos,
-            previous_segment: -dir,
+            next_segment: -dir,
             teleported: None,
         };
 
@@ -153,7 +154,9 @@ impl Snake {
         }
 
         let dir;
-        if self.state != SnakeState::Dying {
+        if let SnakeState::Dying(removed) = &mut self.state {
+            *removed += 1;
+        } else {
             // determine new direction for snake
             if let Some(new_dir) =
                 self.controller
@@ -169,7 +172,7 @@ impl Snake {
             let new_head = Segment {
                 typ: SegmentType::Normal,
                 pos: self.head().pos.wrapping_translate(dir, 1, board_dim),
-                previous_segment: -dir,
+                next_segment: -dir,
                 teleported: None,
             };
             self.body.cells.push_front(new_head);
@@ -179,6 +182,20 @@ impl Snake {
             self.body.grow -= 1;
         } else {
             self.body.cells.pop_back();
+        }
+    }
+
+    pub fn crash(&mut self) {
+        if !matches!(self.state, SnakeState::Crashed) {
+            self.state = SnakeState::Crashed;
+            self.body.cells[0].typ = SegmentType::Crashed;
+        }
+    }
+
+    pub fn die(&mut self) {
+        if !matches!(self.state, SnakeState::Dying(_)) {
+            self.state = SnakeState::Dying(0);
+            self.body.cells[0].typ = SegmentType::BlackHole;
         }
     }
 }

@@ -1,6 +1,7 @@
 use std::{
     cmp::min,
     collections::VecDeque,
+    iter::once,
     mem, thread,
     time::{Duration, Instant},
 };
@@ -16,19 +17,26 @@ use ggez::{
 use hsl::HSL;
 use rand::prelude::*;
 
-use crate::app::{
-    drawing::{generate_grid_mesh, get_points},
-    hex::{Dir, HexDim, HexPoint},
-    keyboard_control::Side,
-    palette::GamePalette,
-    snake::{
-        controller::{OtherSnakes, SnakeControllerTemplate},
-        palette::SnakePaletteTemplate,
-        EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState, SnakeType,
+use crate::{
+    app::{
+        drawing::{
+            generate_grid_mesh, get_full_hexagon, get_head_points, get_points_animated,
+            SegmentFraction,
+        },
+        hex::{Dir, HexDim, HexPoint},
+        keyboard_control::Side,
+        palette::GamePalette,
+        snake::{
+            controller::{OtherSnakes, SnakeControllerTemplate},
+            palette::SnakePaletteTemplate,
+            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
+            SnakeType,
+        },
+        Frames,
     },
-    Frames,
+    point::Point,
 };
-use crate::point::Point;
+use std::cmp::max;
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -196,6 +204,10 @@ pub struct Game {
     fps_control: FPSControl,
     graphics_fps: FPSCounter,
 
+    // TODO: factor out and replace FPSControl
+    frame_duration: Duration,
+    last_frame: Instant,
+
     window_dim: Point,
 
     dim: HexDim,
@@ -221,7 +233,10 @@ pub struct Game {
 
 impl Game {
     fn update_dim(&mut self) {
-        let Point { x: width, y: height } = self.window_dim.into();
+        let Point {
+            x: width,
+            y: height,
+        } = self.window_dim.into();
         let CellDim { side, sin, cos } = self.cell_dim;
         let new_dim = HexDim {
             h: (width / (side + cos)) as isize,
@@ -273,6 +288,9 @@ impl Game {
             fps_control: FPSControl::new(12, 60),
             // fps_control: FPSControl::new(240, 240),
             graphics_fps: FPSCounter::new(),
+
+            frame_duration: Duration::from_micros(1_000_000 / 12),
+            last_frame: Instant::now(),
 
             window_dim: Point {
                 x: wm.width,
@@ -441,8 +459,7 @@ impl Game {
                 SnakeType::CompetitorSnake { life: Some(life) }
                 | SnakeType::KillerSnake { life: Some(life) } => {
                     if *life == 0 {
-                        self.snakes[snake_idx].state = SnakeState::Dying;
-                        self.snakes[snake_idx].body.cells[0].typ = SegmentType::BlackHole;
+                        self.snakes[snake_idx].die();
                     } else {
                         *life -= 1;
                     }
@@ -471,6 +488,24 @@ impl Game {
             self.snakes.remove(snake_idx);
         }
 
+        // if only ephemeral AIs are left, kill all other snakes
+        if self.snakes.iter().all(
+            |Snake {
+                 snake_type, state, ..
+             }| {
+                matches!(state, SnakeState::Dying(_))
+                    || matches!(
+                        snake_type,
+                        SnakeType::CompetitorSnake { life: Some(_) }
+                            | SnakeType::KillerSnake { life: Some(_) }
+                    )
+            },
+        ) {
+            for snake in &mut self.snakes {
+                snake.die();
+            }
+        }
+
         if self.snakes.is_empty() {
             self.state = GameState::GameOver;
             return;
@@ -485,7 +520,7 @@ impl Game {
             .snakes
             .iter()
             .enumerate()
-            .filter(|(_, s)| s.state != SnakeState::Crashed && s.state != SnakeState::Dying)
+            .filter(|(_, s)| !matches!(s.state, SnakeState::Crashed | SnakeState::Dying(_)))
         {
             for (j, other) in self.snakes.iter().enumerate() {
                 // check head-head crash
@@ -525,10 +560,8 @@ impl Game {
                     if i != j && crash_point == self.snakes[j].head().pos {
                         // special case for a head-to-head collision, can't cut..
                         println!("warning: invoked head-to-head collision special case");
-                        self.snakes[i].state = SnakeState::Dying;
-                        self.snakes[i].body.cells[0].typ = SegmentType::BlackHole;
-                        self.snakes[j].state = SnakeState::Dying;
-                        self.snakes[j].body.cells[0].typ = SegmentType::BlackHole;
+                        self.snakes[i].die();
+                        self.snakes[j].die();
                     } else {
                         let drain_start_idx = self.snakes[j]
                             .body
@@ -545,14 +578,12 @@ impl Game {
                     }
                 }
                 EatBehavior::Crash => {
-                    self.snakes[i].state = SnakeState::Crashed;
-                    self.snakes[i].body.cells[0].typ = SegmentType::Crashed;
+                    self.snakes[i].crash();
                     self.state = GameState::GameOver;
                     self.force_redraw = 10;
                 }
                 EatBehavior::Die => {
-                    self.snakes[i].state = SnakeState::Dying;
-                    self.snakes[i].body.cells[0].typ = SegmentType::BlackHole;
+                    self.snakes[i].die();
                 }
             }
         }
@@ -656,11 +687,27 @@ impl Game {
 }
 
 impl Game {
+    // fraction of the current game frame that has elapsed
+    fn frame_fraction(&self) -> f32 {
+        self.last_frame.elapsed().as_secs_f32() / self.frame_duration.as_secs_f32()
+    }
+
     fn draw_snakes_and_apples(&mut self, ctx: &mut Context) -> GameResult {
         let mut builder = MeshBuilder::new();
 
-        for snake in &mut self.snakes {
+        // to be drawn later (potentially on top of body segments)
+        let mut heads = vec![];
+
+        let frame_frac = if self.state == GameState::Paused {
+            (self.last_frame.elapsed().as_secs_f32() % 2.).floor()
+        } else {
+            self.frame_fraction()
+        };
+
+        for (snake_idx, snake) in self.snakes.iter_mut().enumerate() {
             let len = snake.len();
+
+            // assert!(len > 1, "snakes of length <= 1 will interact weirdly with animation");
 
             // draw white aura around snake heads (debug)
             // for pos in snake.head().pos.neighborhood(7) {
@@ -670,45 +717,91 @@ impl Game {
             //     builder.polygon(DrawMode::fill(), &translated_points, color)?;
             // }
 
-            for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
-                // from -> to nomenclature is intended as tail -> head
-                let from = Some(segment.previous_segment);
-                let to = seg_idx
-                    .checked_sub(1)
-                    .map(|prev_idx| -snake.body.cells[prev_idx].previous_segment);
+            // TODO: this is weird
+            if snake.state == SnakeState::Crashed && snake.head().typ != SegmentType::Crashed {
+                panic!("crashed snake with head: {:?}", snake.head().typ)
+            }
 
+            let draw_head_separately =
+                matches!(snake.state, SnakeState::Crashed | SnakeState::Dying(_));
+            let color_offset = match snake.state {
+                SnakeState::Dying(offset) => offset,
+                _ => 0,
+            };
+
+            for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
+                let previous = seg_idx
+                    .checked_sub(1)
+                    .map(|prev_idx| -snake.body.cells[prev_idx].next_segment)
+                    .unwrap_or(snake.dir());
+
+                let next = segment.next_segment;
+
+                if draw_head_separately && seg_idx == 0 {
+                    heads.push((
+                        snake_idx,
+                        *segment,
+                        previous,
+                        next,
+                        color_offset,
+                    ));
+                    continue;
+                }
+
+                // previous = towards head
+                // next = towards tail
+
+                let points;
                 let dest = segment.pos.to_point(self.cell_dim);
-                let color = snake.painter.paint_segment(seg_idx, len, segment);
-                let points = get_points(dest, from, to, self.cell_dim);
+                let color = snake
+                    .painter
+                    .paint_segment(seg_idx + color_offset, len, segment);
+
+                // TODO: if tail has eaten, animate it more slowly
+                let fraction = match seg_idx {
+                    0 => SegmentFraction::Appearing(frame_frac),
+                    i if i == len - 1
+                        && snake.body.grow == 0
+                        && !matches!(segment.typ, SegmentType::Eaten(food) if food > 0) =>
+                    {
+                        SegmentFraction::Disappearing(frame_frac)
+                    }
+                    _ => SegmentFraction::Solid,
+                };
+
+                points = get_points_animated(dest, previous, next, self.cell_dim, fraction);
+
                 builder.polygon(DrawMode::fill(), &points, color)?;
             }
         }
 
-        for snake in self
-            .snakes
-            .iter_mut()
-            .filter(|snake| snake.state == SnakeState::Crashed || snake.state == SnakeState::Dying)
-        {
+        for (snake_idx, segment, previous, next, color_offset) in heads {
             let Segment {
                 pos,
                 typ,
-                previous_segment: from,
+                next_segment: from,
                 ..
-            } = *snake.head();
+            } = segment;
+
             let dest = pos.to_point(self.cell_dim);
+
+            let snake = &mut self.snakes[snake_idx];
 
             match typ {
                 SegmentType::BlackHole => {
-                    // TODO remove hackiness, also fix
-                    //  make the snake's colors go into the hole, head doesn't stay red..
-                    // TODO implement black hole for multiple snakes going in at once
-                    // hacky
-                    // let hexagon_color = Color::from_rgb(214, 151, 24);
-                    // let segment_color = Color::from_rgb(255, 0, 0);
                     let hexagon_color = Color::from_rgb(255, 255, 255);
-                    let segment_color = Color::from_rgb(255, 0, 0);
-                    let hexagon_points = get_points(dest, None, None, self.cell_dim);
-                    let segment_points = get_points(dest, Some(from), None, self.cell_dim);
+                    let segment_color =
+                        snake
+                            .painter
+                            .paint_segment(color_offset, snake.len() + color_offset, &segment);
+                    let hexagon_points = get_full_hexagon(dest, self.cell_dim);
+                    let segment_points = get_points_animated(
+                        dest,
+                        previous,
+                        next,
+                        self.cell_dim,
+                        SegmentFraction::Appearing(0.5),
+                    );
                     builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
                     builder.polygon(DrawMode::fill(), &segment_points, segment_color)?;
                 }
@@ -716,10 +809,19 @@ impl Game {
                     let color = snake
                         .painter
                         .paint_segment(0, snake.len(), &snake.body.cells[0]);
-                    let points = get_points(dest, None, None, self.cell_dim);
+                    let points = get_points_animated(
+                        dest,
+                        previous,
+                        next,
+                        self.cell_dim,
+                        SegmentFraction::Appearing(0.5),
+                    );
                     builder.polygon(DrawMode::fill(), &points, color)?;
                 }
-                _ => unreachable!(),
+                _ => unreachable!(
+                    "head segment of type {:?} should not have been queued to be drawn separately",
+                    typ
+                ),
             }
         }
 
@@ -748,34 +850,42 @@ impl Game {
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         // it's important that this if go first to reset the last frame time
-        if !self.fps_control.maybe_update() {
-            self.fps_control.wait();
+        // if !self.fps_control.maybe_update() {
+        //     // self.fps_control.wait();
+        //     return Ok(());
+        // }
+
+        // if self.state != GameState::Playing {
+        //     self.fps_control.wait();
+        //     return Ok(());
+        // }
+
+        if self.state == GameState::Paused {
             return Ok(());
         }
 
-        if self.state != GameState::Playing {
-            self.fps_control.wait();
-            return Ok(());
-        }
+        if self.last_frame.elapsed() >= self.frame_duration {
+            self.last_frame = Instant::now();
 
-        self.advance_snakes();
-        self.spawn_apples();
+            self.advance_snakes();
+            self.spawn_apples();
+        }
 
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        if self.force_redraw > 0 {
-            self.force_redraw -= 1;
-        } else {
-            if !self.fps_control.maybe_draw() {
-                return Ok(());
-            }
-
-            if self.state != GameState::Playing {
-                return Ok(());
-            }
-        }
+        // if self.force_redraw > 0 {
+        //     self.force_redraw -= 1;
+        // } else {
+        //     if !self.fps_control.maybe_draw() {
+        //         return Ok(());
+        //     }
+        //
+        //     if self.state != GameState::Playing {
+        //         return Ok(());
+        //     }
+        // }
 
         // objective counting of when graphics frames actually occur
         self.graphics_fps.register_frame();
@@ -826,9 +936,15 @@ impl EventHandler for Game {
         // TODO: also tie these to a keymap
         match key {
             Space => match self.state {
-                GameOver => self.restart(),
+                GameOver => {
+                    self.restart();
+                    self.last_frame = Instant::now();
+                }
                 Playing => self.state = Paused,
-                Paused => self.state = Playing,
+                Paused => {
+                    self.state = Playing;
+                    self.last_frame = Instant::now();
+                }
             },
             G => {
                 self.prefs.draw_grid = !self.prefs.draw_grid;

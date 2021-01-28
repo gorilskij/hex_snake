@@ -114,7 +114,7 @@ impl App {
             .map(|cs| SnakeSeed {
                 snake_type: SnakeType::PlayerSnake,
                 eat_mechanics: EatMechanics {
-                    eat_self: EatBehavior::Cut,
+                    eat_self: EatBehavior::Crash,
                     eat_other: hash_map! {},
                     default: EatBehavior::Crash,
                 },

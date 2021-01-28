@@ -32,7 +32,7 @@ impl SnakeDemo {
         let head = Segment {
             typ: SegmentType::Normal,
             pos,
-            previous_segment: -dir,
+            next_segment: -dir,
             teleported: None,
         };
         let mut body = VecDeque::new();

@@ -1,7 +1,10 @@
-use crate::app::{
-    game::CellDim,
-    hex::{Dir, HexDim},
-    palette::GamePalette,
+use crate::{
+    app::{
+        game::CellDim,
+        hex::{Dir, HexDim, TurnDirection, TurnType},
+        palette::GamePalette,
+    },
+    point::Point,
 };
 use ggez::{
     graphics::{DrawMode, Mesh, MeshBuilder},
@@ -9,7 +12,6 @@ use ggez::{
 };
 use num_integer::Integer;
 use std::collections::HashMap;
-use crate::point::Point;
 
 pub fn generate_grid_mesh(
     ctx: &mut Context,
@@ -137,11 +139,7 @@ impl<T: Copy> ExceptPositions for &[T] {
     }
 }
 
-fn rotate_around_point(
-    points: &[Point],
-    angle: f32,
-    origin: Point,
-) -> Vec<Point> {
+fn rotate_around_point(points: &[Point], angle: f32, origin: Point) -> Vec<Point> {
     let sin = angle.sin();
     let cos = angle.cos();
     points
@@ -156,110 +154,133 @@ fn rotate_around_point(
         .collect()
 }
 
-// polygon points to draw a snake segment
-// from and to describe the relative position of the previous and next segments
-pub fn get_points(
+pub fn get_head_points(dest: Point, from: Dir, cell_dim: CellDim, fraction: f32) -> Vec<Point> {
+    let CellDim { side, sin, cos } = cell_dim;
+
+    let end_segment = vec![
+        Point {
+            x: cos,
+            y: 2. * sin * (1. - fraction),
+        },
+        Point {
+            x: side + cos,
+            y: 2. * sin * (1. - fraction),
+        },
+        Point {
+            x: side + cos,
+            y: 2. * sin,
+        },
+        Point {
+            x: cos,
+            y: 2. * sin,
+        },
+    ];
+
+    let mut points = rotate_around_point(
+        &end_segment,
+        (-from).clockwise_angle_from_u(),
+        cell_dim.center(),
+    );
+    for point in &mut points {
+        *point += dest;
+    }
+    points
+}
+
+fn translate(points: &mut [Point], dest: Point) {
+    for point in points {
+        *point += dest;
+    }
+}
+
+pub enum SegmentFraction {
+    Appearing(f32),
+    Disappearing(f32),
+    Solid,
+}
+
+pub fn get_full_hexagon(dest: Point, cell_dim: CellDim) -> Vec<Point> {
+    let CellDim { side, sin, cos } = cell_dim;
+
+    let mut points = #[rustfmt::skip] vec![
+        Point { x: cos, y: 0. },
+        Point { x: side + cos, y: 0. },
+        Point { x: side + 2. * cos, y: sin },
+        Point { x: side + cos, y: 2. * sin },
+        Point { x: cos, y: 2. * sin },
+        Point { x: 0., y: sin },
+    ];
+
+    translate(&mut points, dest);
+    points
+}
+
+pub fn get_points_animated(
     dest: Point,
-    from: Option<Dir>,
-    to: Option<Dir>,
+    previous: Dir,
+    next: Dir,
     cell_dim: CellDim,
+    fraction: SegmentFraction,
 ) -> Vec<Point> {
-    use Dir::*;
+    // higher appear => more revealed of front
+    // higher disappear => more revealed of back
+    // if both are 1, segment  is fully revealed
+    let (appear, disappear) = match fraction {
+        SegmentFraction::Appearing(f) => (f, 1.),
+        SegmentFraction::Disappearing(f) => (1., 1. - f),
+        SegmentFraction::Solid => (1., 1.),
+    };
 
     let CellDim { side, sin, cos } = cell_dim;
 
-    type FromTo = (Option<Dir>, Option<Dir>);
-    static mut CACHED_SIDE: f32 = 0.;
-    static mut FULL_HEXAGON: Option<Vec<Point>> = None;
-    static mut CACHED_POINTS: Option<HashMap<FromTo, Vec<Point>>> = None;
-
-    unsafe {
-        if (side - CACHED_SIDE).abs() > f32::EPSILON {
-            CACHED_SIDE = side;
-
-            // starting from top-baseline/left, going clockwise
-            FULL_HEXAGON = #[rustfmt::skip] Some(vec![
-                Point { x: cos, y: 0. },
-                Point { x: side + cos, y: 0. },
-                Point { x: side + 2. * cos, y: sin },
-                Point { x: side + cos, y: 2. * sin },
-                Point { x: cos, y: 2. * sin },
-                Point { x: 0., y: sin },
-            ]);
-
-            CACHED_POINTS = Some(HashMap::new());
-
-            let map = CACHED_POINTS.as_mut().unwrap();
-
-            #[rustfmt::skip]
-            let straight_segment = vec![
-                Point { x: cos, y: 0. },
-                Point { x: side + cos, y: 0. },
-                Point { x: side + cos, y: 2. * sin },
-                Point { x: cos, y: 2. * sin },
+    let mut points;
+    match previous.turn_type(next) {
+        TurnType::Straight => {
+            // D => U
+            points = #[rustfmt::skip] vec![
+                Point { x: cos, y: 2. * sin * (1. - appear) },
+                Point { x: side + cos, y: 2. * sin * (1. - appear) },
+                Point { x: side + cos, y: 2. * sin * disappear },
+                Point { x: cos, y: 2. * sin * disappear },
             ];
-            #[rustfmt::skip]
-            let end_segment = vec![
-                Point { x: cos, y: sin },
-                Point { x: side + cos, y: sin },
-                Point { x: side + cos, y: 2. * sin },
-                Point { x: cos, y: 2. * sin },
-            ];
-            #[rustfmt::skip]
-            let blunt_turn_segment = vec![
+
+            points = rotate_around_point(
+                &points,
+                previous.clockwise_angle_from_u(),
+                cell_dim.center(),
+            );
+        }
+        TurnType::Blunt(turn_direction) => {
+            // DR => U
+            points = #[rustfmt::skip] vec![
                 Point { x: cos, y: 0. },
                 Point { x: side + cos, y: 0. },
                 Point { x: side + 2. * cos, y: sin },
                 Point { x: side + cos, y: 2. * sin },
             ];
-            #[rustfmt::skip]
-            let sharp_turn_segment = vec![
+
+            let angle = match turn_direction {
+                TurnDirection::Clockwise => previous.clockwise_angle_from_u(),
+                TurnDirection::CounterClockwise => next.clockwise_angle_from_u(),
+            };
+            points = rotate_around_point(&points, angle, cell_dim.center());
+        }
+        TurnType::Sharp(turn_direction) => {
+            // UR => U
+            points = #[rustfmt::skip] vec![
                 Point { x: cos, y: 0. },
                 Point { x: side + cos, y: 0. },
                 Point { x: side + 2. * cos, y: sin },
                 Point { x: cos, y: 2. * sin },
             ];
 
-            let origin = cell_dim.center();
-
-            for &dir in &[UL, U, UR] {
-                let straight =
-                    rotate_around_point(&straight_segment, dir.clockwise_angle_from_u(), origin);
-                map.insert((Some(dir), Some(-dir)), straight);
-            }
-
-            for dir in Dir::iter() {
-                let end = rotate_around_point(&end_segment, dir.clockwise_angle_from_u(), origin);
-                map.insert((Some(-dir), None), end.clone());
-
-                let blunt =
-                    rotate_around_point(&blunt_turn_segment, dir.clockwise_angle_from_u(), origin);
-                map.insert(
-                    (Some(dir), Some(dir.next_clockwise().next_clockwise())),
-                    blunt,
-                );
-
-                let sharp =
-                    rotate_around_point(&sharp_turn_segment, dir.clockwise_angle_from_u(), origin);
-                map.insert((Some(dir), Some(dir.next_clockwise())), sharp);
-            }
+            let angle = match turn_direction {
+                TurnDirection::Clockwise => previous.clockwise_angle_from_u(),
+                TurnDirection::CounterClockwise => next.clockwise_angle_from_u(),
+            };
+            points = rotate_around_point(&points, angle, cell_dim.center());
         }
-
-        let map = CACHED_POINTS.as_mut().unwrap();
-
-        let mut points = match map.get(&(from, to)) {
-            Some(ps) => ps,
-            None => match map.get(&(to, from)) {
-                Some(ps) => ps,
-                None => FULL_HEXAGON.as_ref().unwrap(),
-            },
-        }
-        .clone();
-
-        for point in &mut points {
-            *point += dest;
-        }
-
-        points
     }
+    translate(&mut points, dest);
+    points
 }

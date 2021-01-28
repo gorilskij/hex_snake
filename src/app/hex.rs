@@ -1,4 +1,4 @@
-pub use dir::Dir;
+pub use dir::{Dir, TurnDirection, TurnType};
 pub use hex_pos::{HexDim, HexPoint};
 
 mod dir {
@@ -35,6 +35,19 @@ mod dir {
         }
     }
 
+    #[derive(Copy, Clone, Eq, PartialEq)]
+    pub enum TurnDirection {
+        Clockwise,
+        CounterClockwise,
+    }
+
+    #[derive(Copy, Clone, Eq, PartialEq)]
+    pub enum TurnType {
+        Straight,
+        Blunt(TurnDirection),
+        Sharp(TurnDirection),
+    }
+
     impl Dir {
         // clockwise order starting from U
         pub fn iter() -> impl Iterator<Item = Self> {
@@ -51,6 +64,28 @@ mod dir {
                 UL => U,
             }
             // hypothetically: ((self as u8 + 1) % 6) as Dir
+        }
+
+        // turn: self => other
+        pub fn turn_type(self, other: Self) -> TurnType {
+            use TurnDirection::*;
+            use TurnType::*;
+
+            let mut dir = self;
+            let mut clockwise_distance = 0;
+            while dir != other {
+                clockwise_distance += 1;
+                dir = dir.next_clockwise();
+            }
+
+            match clockwise_distance {
+                1 => Sharp(Clockwise),
+                5 => Sharp(CounterClockwise),
+                2 => Blunt(Clockwise),
+                4 => Blunt(CounterClockwise),
+                3 => Straight,
+                _ => panic!("impossible turn {:?} => {:?}", self, other),
+            }
         }
 
         pub fn random(rng: &mut impl Rng) -> Self {
@@ -115,14 +150,13 @@ mod dir {
 
 mod hex_pos {
     use super::dir::Dir;
-    use crate::app::game::CellDim;
+    use crate::{app::game::CellDim, point::Point};
     use num_integer::Integer;
     use std::{
         cmp::Ordering,
         fmt::{Debug, Error, Formatter},
     };
     use Dir::*;
-    use crate::point::Point;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
     pub struct HexPoint {

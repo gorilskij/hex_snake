@@ -112,7 +112,7 @@ impl SnakePaletteTemplate {
 }
 
 pub trait SnakePainter {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Segment) -> Color;
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color;
 }
 
 impl From<SnakePaletteTemplate> for Box<dyn SnakePainter> {
@@ -149,8 +149,8 @@ pub struct RGBGradient {
 }
 
 impl SnakePainter for RGBGradient {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Segment) -> Color {
-        if hex.typ == SegmentType::Crashed {
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
+        if segment.typ == SegmentType::Crashed {
             return *DEFAULT_CRASHED_COLOR;
         }
 
@@ -163,7 +163,7 @@ impl SnakePainter for RGBGradient {
             a: 1.,
         };
 
-        match hex.typ {
+        match segment.typ {
             SegmentType::Normal => normal_color,
             SegmentType::Eaten(_) => self.eaten.paint_segment(&normal_color),
             SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
@@ -181,13 +181,13 @@ pub struct HSLGradient {
 }
 
 impl SnakePainter for HSLGradient {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Segment) -> Color {
-        if hex.typ == SegmentType::Crashed {
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
+        if segment.typ == SegmentType::Crashed {
             return *DEFAULT_CRASHED_COLOR;
         }
 
         let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
-        match hex.typ {
+        match segment.typ {
             SegmentType::Normal => {
                 let hsl = HSL {
                     h: hue,
@@ -216,9 +216,9 @@ pub struct Persistent {
 }
 
 impl SnakePainter for Persistent {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, hex: &Segment) -> Color {
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
         self.max_len = max(len, self.max_len);
-        self.painter.paint_segment(seg_idx, self.max_len, hex)
+        self.painter.paint_segment(seg_idx, self.max_len, segment)
     }
 }
 

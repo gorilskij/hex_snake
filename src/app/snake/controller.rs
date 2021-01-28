@@ -430,6 +430,8 @@ fn rough_direction(
 }
 
 impl SnakeController for KillerAI {
+    // TODO: this gets called when the snake should be dying
+    //  e.g. when the last player dies
     fn next_dir(
         &mut self,
         snake_body: &SnakeBody,
