@@ -61,8 +61,7 @@ impl CellDim {
 }
 
 struct FPSCounter {
-    buffer: VecDeque<f64>,
-    last: Instant,
+    buffer: VecDeque<Instant>,
 }
 
 impl FPSCounter {
@@ -72,21 +71,23 @@ impl FPSCounter {
     fn new() -> Self {
         Self {
             buffer: VecDeque::with_capacity(Self::N),
-            last: Instant::now(),
         }
     }
 
     fn register_frame(&mut self) {
-        let last = mem::replace(&mut self.last, Instant::now());
         if self.buffer.len() >= Self::N {
             self.buffer.pop_front();
         }
-        let fps = 1_000_000. / last.elapsed().as_micros() as f64;
-        self.buffer.push_back(fps);
+        self.buffer.push_back(Instant::now());
     }
 
     fn fps(&self) -> f64 {
-        self.buffer.iter().sum::<f64>() / self.buffer.len() as f64
+        if self.buffer.len() >= 2 {
+            self.buffer.len() as f64
+                / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
+        } else {
+            0.
+        }
     }
 }
 
@@ -103,9 +104,12 @@ mod game_control {
     // TODO: allow update fps to exceed draw fps
     // combines fps with game state management
     pub struct GameControl {
-        fps: u64,
-        frame_duration: Duration,
-        next_frame: Option<Instant>,
+        game_fps: u64,
+        // graphics fps assumed to be 60
+        game_frame_duration: Duration,
+        graphics_frame_duration: Duration,
+        next_game_frame: Option<Instant>,
+        next_graphics_frame: Option<Instant>,
         frame_num: usize,
 
         game_state: GameState,
@@ -114,9 +118,11 @@ mod game_control {
     impl GameControl {
         pub fn new(fps: u64) -> Self {
             Self {
-                fps,
-                frame_duration: Duration::from_micros(1_000_000 / fps),
-                next_frame: None,
+                game_fps: fps,
+                game_frame_duration: Duration::from_micros(1_000_000 / fps),
+                graphics_frame_duration: Duration::from_micros(1_000_000 / 60),
+                next_game_frame: None,
+                next_graphics_frame: None,
                 frame_num: 0,
 
                 game_state: GameState::Playing,
@@ -124,24 +130,36 @@ mod game_control {
         }
 
         pub fn fps(&self) -> u64 {
-            self.fps
+            self.game_fps
         }
 
         pub fn set_fps(&mut self, fps: u64) {
-            self.fps = fps;
-            self.frame_duration = Duration::from_micros(1_000_000 / fps);
-            self.next_frame = Some(Instant::now() + self.frame_duration);
+            self.game_fps = fps;
+            self.game_frame_duration = Duration::from_micros(1_000_000 / fps);
+            self.next_game_frame = Some(Instant::now() + self.game_frame_duration);
         }
 
+        // call in update() as while loop contidion
         pub fn can_update(&mut self) -> bool {
-            let next_frame = self.next_frame.get_or_insert(Instant::now());
-            if Instant::now() >= *next_frame {
-                *next_frame += self.frame_duration;
+            let now = Instant::now();
+            let next_frame = self.next_game_frame.get_or_insert(now);
+            if now >= *next_frame
+                && self
+                    .next_graphics_frame
+                    .map(|ngf| now < ngf)
+                    .unwrap_or(true)
+            {
+                *next_frame += self.game_frame_duration;
                 self.frame_num += 1;
                 true
             } else {
                 false
             }
+        }
+
+        // call in draw()
+        pub fn graphics_frame(&mut self) {
+            self.next_graphics_frame = Some(Instant::now() + self.graphics_frame_duration);
         }
 
         pub fn state(&self) -> GameState {
@@ -150,17 +168,17 @@ mod game_control {
 
         pub fn play(&mut self) {
             self.game_state = GameState::Playing;
-            self.next_frame = Some(Instant::now());
+            self.next_game_frame = Some(Instant::now());
         }
 
         pub fn pause(&mut self) {
             self.game_state = GameState::Paused;
-            self.next_frame = None;
+            self.next_game_frame = None;
         }
 
         pub fn game_over(&mut self) {
             self.game_state = GameState::GameOver;
-            self.next_frame = None;
+            self.next_game_frame = None;
         }
 
         pub fn frame_num(&self) -> usize {
@@ -170,15 +188,15 @@ mod game_control {
         // max(elapsed, frame_duration)
         pub fn elapsed(&self) -> Duration {
             let now = Instant::now();
-            match self.next_frame {
-                Some(inst) if inst >= now => self.frame_duration - (inst - now),
-                _ => self.frame_duration,
+            match self.next_game_frame {
+                Some(inst) if inst >= now => self.game_frame_duration - (inst - now),
+                _ => self.game_frame_duration,
             }
         }
 
         // fraction of the current game frame that has elapsed
         pub fn frame_fraction(&self) -> f32 {
-            let f = self.elapsed().as_secs_f32() / self.frame_duration.as_secs_f32();
+            let f = self.elapsed().as_secs_f32() / self.game_frame_duration.as_secs_f32();
             assert!((0. ..=1.).contains(&f), "f: {}", f);
             f
         }
@@ -220,7 +238,7 @@ struct Message {
 
 pub struct Game {
     control: GameControl,
-    update_fps: FPSCounter,
+    game_fps: FPSCounter,
     graphics_fps: FPSCounter,
 
     window_dim: Point,
@@ -259,7 +277,7 @@ impl Game {
 
         let mut game = Self {
             control: GameControl::new(12),
-            update_fps: FPSCounter::new(),
+            game_fps: FPSCounter::new(),
             graphics_fps: FPSCounter::new(),
 
             window_dim: Point {
@@ -860,8 +878,8 @@ impl EventHandler for Game {
             return Ok(());
         }
 
-        if self.control.can_update() {
-            self.update_fps.register_frame();
+        while self.control.can_update() {
+            self.game_fps.register_frame();
 
             self.advance_snakes();
             self.spawn_apples();
@@ -871,13 +889,14 @@ impl EventHandler for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        // objective counting of when graphics frames actually occur
+        self.control.graphics_frame();
         self.graphics_fps.register_frame();
+
         if self.prefs.display_fps {
             self.message_top_left = Some(Message {
                 message: format!(
                     "u: {:.2} g: {:.2}",
-                    self.update_fps.fps(),
+                    self.game_fps.fps(),
                     self.graphics_fps.fps()
                 ),
                 duration: None,
