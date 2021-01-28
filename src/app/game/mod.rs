@@ -657,8 +657,7 @@ impl Game {
 }
 
 impl Game {
-    #[allow(dead_code)]
-    fn draw_snakes_and_apples_tesselation(&mut self, ctx: &mut Context) -> GameResult {
+    fn draw_snakes_and_apples(&mut self, ctx: &mut Context) -> GameResult {
         let mut builder = MeshBuilder::new();
 
         for snake in &mut self.snakes {
@@ -703,6 +702,7 @@ impl Game {
                 SegmentType::BlackHole => {
                     // TODO remove hackiness, also fix
                     //  make the snake's colors go into the hole, head doesn't stay red..
+                    // TODO implement black hole for multiple snakes going in at once
                     // hacky
                     // let hexagon_color = Color::from_rgb(214, 151, 24);
                     // let segment_color = Color::from_rgb(255, 0, 0);
@@ -725,7 +725,10 @@ impl Game {
         }
 
         for apple in &self.apples {
-            let dest = apple.pos.to_point(self.cell_dim);
+            let center = self.cell_dim.center();
+            let mut dest = apple.pos.to_point(self.cell_dim);
+            dest.x += center.x;
+            dest.y += center.y;
             let color = match apple.typ {
                 AppleType::Normal(_) => self.palette.apple_color,
                 AppleType::SpawnSnake(_) => {
@@ -739,8 +742,9 @@ impl Game {
                 }
             };
             // let translated_points = translate(&hexagon_points, dest);
-            let points = get_points(dest, None, None, self.cell_dim);
-            builder.polygon(DrawMode::fill(), &points, color)?;
+            // let points = get_points(dest, None, None, self.cell_dim);
+            // builder.polygon(DrawMode::fill(), &points, color)?;
+            builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 2., 0.1, color);
         }
 
         let mesh = builder.build(ctx)?;
@@ -770,9 +774,6 @@ impl EventHandler for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        // could be fun to implement optionally printing as a square grid
-        // with 0, 0 the board is touching top-left (nothing hidden)
-
         if self.force_redraw > 0 {
             self.force_redraw -= 1;
         } else {
@@ -816,8 +817,7 @@ impl EventHandler for Game {
         }
         // draw(ctx, self.border_mesh.as_ref().unwrap(), DrawParam::default())?;
 
-        // self.draw_snakes_and_apples_sprite_batch(ctx)?;
-        self.draw_snakes_and_apples_tesselation(ctx)?;
+        self.draw_snakes_and_apples(ctx)?;
 
         Self::draw_message(&mut self.message_top_left, Side::Left, ctx)?;
         Self::draw_message(&mut self.message_top_right, Side::Right, ctx)?;

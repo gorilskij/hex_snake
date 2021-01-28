@@ -185,8 +185,7 @@ impl SnakeController for PlayerController12 {
     }
 
     fn key_pressed(&mut self, key: KeyCode) {
-        use Dir::*;
-        let new_dir = match key {
+        match key {
             KeyCode::Left => {
                 let mut current_idx = Dir12::ORDER
                     .iter()
@@ -204,7 +203,7 @@ impl SnakeController for PlayerController12 {
                 self.dir = Dir12::ORDER[current_idx];
             }
             _ => (),
-        };
+        }
     }
 }
 
