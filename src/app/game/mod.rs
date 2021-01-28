@@ -101,7 +101,6 @@ mod game_control {
         GameOver,
     }
 
-    // TODO: allow update fps to exceed draw fps
     // combines fps with game state management
     pub struct GameControl {
         game_fps: u64,
@@ -139,7 +138,7 @@ mod game_control {
             self.next_game_frame = Some(Instant::now() + self.game_frame_duration);
         }
 
-        // call in update() as while loop contidion
+        // call in update() as while loop condition
         pub fn can_update(&mut self) -> bool {
             let now = Instant::now();
             let next_frame = self.next_game_frame.get_or_insert(now);
