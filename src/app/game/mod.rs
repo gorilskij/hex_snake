@@ -14,13 +14,13 @@ use crate::{
         drawing::{generate_grid_mesh, get_full_hexagon, get_points_animated, SegmentFraction},
         game::game_control::{GameControl, GameState},
         hex::{Dir, HexDim, HexPoint},
-        keyboard_control::{ControlSetup, KeyboardLayout, Side},
+        keyboard_control::Side,
         palette::GamePalette,
         snake::{
             controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
             palette::SnakePaletteTemplate,
-            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeBody, SnakeSeed,
-            SnakeState, SnakeType,
+            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
+            SnakeType,
         },
         Frames,
     },
@@ -59,10 +59,10 @@ impl CellDim {
 
 mod game_control {
     use std::{
+        cmp::max,
         collections::VecDeque,
         time::{Duration, Instant},
     };
-    use std::cmp::max;
 
     struct FPSCounter {
         len: usize,
@@ -736,10 +736,13 @@ impl Game {
         // to be drawn later (potentially on top of body segments)
         let mut heads = vec![];
 
-        let frame_frac = if self.control.state() == GameState::Paused {
+        let frame_frac = if matches!(
+            self.control.state(),
+            GameState::Paused | GameState::GameOver
+        ) {
+            // TODO: implement some paused animation
             // let x = self.fps_limiter.elapsed().as_secs_f32() % 2.;
             // if x > 1. { 2. - x } else { x }
-            // TODO: implement some paused animation
             0.5
         } else {
             self.control.frame_fraction()
@@ -894,14 +897,12 @@ impl EventHandler for Game {
         //     return Ok(());
         // }
 
-        if matches!(
-            self.control.state(),
-            GameState::Paused | GameState::GameOver
-        ) {
-            return Ok(());
-        }
-
-        while self.control.can_update() {
+        while self.control.can_update()
+            && !matches!(
+                self.control.state(),
+                GameState::Paused | GameState::GameOver
+            )
+        {
             self.advance_snakes();
             self.spawn_apples();
         }
