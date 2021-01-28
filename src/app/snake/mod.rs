@@ -157,16 +157,15 @@ impl Snake {
             SnakeState::Dying(removed) => *removed += 1,
             SnakeState::Living => {
                 // determine new direction for snake
-                let dir =
-                    if let Some(new_dir) =
+                let dir = if let Some(new_dir) =
                     self.controller
                         .next_dir(&self.body, other_snakes, apples, board_dim)
-                    {
-                        self.body.dir = new_dir;
-                        new_dir
-                    } else {
-                        self.dir()
-                    };
+                {
+                    self.body.dir = new_dir;
+                    new_dir
+                } else {
+                    self.dir()
+                };
 
                 // create new head for snake
                 let new_head = Segment {
@@ -183,7 +182,7 @@ impl Snake {
         if self.body.grow > 0 {
             self.body.grow -= 1;
         } else {
-           self.body.cells.pop_back();
+            self.body.cells.pop_back();
         }
     }
 

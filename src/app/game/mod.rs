@@ -1,7 +1,4 @@
-use std::{
-    collections::VecDeque,
-    mem, thread,
-};
+use std::{collections::VecDeque, mem, thread};
 
 use ggez::{
     conf::WindowMode,
@@ -17,20 +14,20 @@ use rand::prelude::*;
 use crate::{
     app::{
         drawing::{generate_grid_mesh, get_full_hexagon, get_points_animated, SegmentFraction},
+        game::game_control::{GameControl, GameState},
         hex::{Dir, HexDim, HexPoint},
-        keyboard_control::Side,
+        keyboard_control::{ControlSetup, KeyboardLayout, Side},
         palette::GamePalette,
         snake::{
             controller::{OtherSnakes, SnakeControllerTemplate},
             palette::SnakePaletteTemplate,
-            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
-            SnakeType,
+            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeBody, SnakeSeed,
+            SnakeState, SnakeType,
         },
         Frames,
     },
     point::Point,
 };
-use crate::app::game::game_control::{GameState, GameControl};
 use std::time::Instant;
 
 #[derive(Copy, Clone)]
@@ -106,6 +103,7 @@ mod game_control {
     // TODO: allow update fps to exceed draw fps
     // combines fps with game state management
     pub struct GameControl {
+        fps: u64,
         frame_duration: Duration,
         next_frame: Option<Instant>,
         frame_num: usize,
@@ -116,12 +114,23 @@ mod game_control {
     impl GameControl {
         pub fn new(fps: u64) -> Self {
             Self {
+                fps,
                 frame_duration: Duration::from_micros(1_000_000 / fps),
                 next_frame: None,
                 frame_num: 0,
 
                 game_state: GameState::Playing,
             }
+        }
+
+        pub fn fps(&self) -> u64 {
+            self.fps
+        }
+
+        pub fn set_fps(&mut self, fps: u64) {
+            self.fps = fps;
+            self.frame_duration = Duration::from_micros(1_000_000 / fps);
+            self.next_frame = Some(Instant::now() + self.frame_duration);
         }
 
         pub fn can_update(&mut self) -> bool {
@@ -233,6 +242,8 @@ pub struct Game {
     prefs: Prefs,
     message_top_left: Option<Message>,
     message_top_right: Option<Message>,
+
+    autopilot: bool, // only works with 1 player snake
 }
 
 impl Game {
@@ -273,6 +284,8 @@ impl Game {
             prefs: Prefs::default(),
             message_top_left: None,
             message_top_right: None,
+
+            autopilot: false,
         };
         // warning: this spawns apples before there are any snakes
         game.update_dim();
@@ -840,7 +853,10 @@ impl EventHandler for Game {
         //     return Ok(());
         // }
 
-        if matches!(self.control.state(), GameState::Paused | GameState::GameOver) {
+        if matches!(
+            self.control.state(),
+            GameState::Paused | GameState::GameOver
+        ) {
             return Ok(());
         }
 
@@ -910,7 +926,7 @@ impl EventHandler for Game {
                 GameState::GameOver => {
                     self.restart();
                     self.control.play();
-                },
+                }
                 GameState::Playing => self.control.pause(),
                 GameState::Paused => self.control.play(),
             },
@@ -930,6 +946,64 @@ impl EventHandler for Game {
                 self.prefs.display_fps = !self.prefs.display_fps;
                 if !self.prefs.display_fps {
                     self.message_top_left = None;
+                }
+            }
+            A => {
+                // only apply if there is exactly one player snake
+                if self.players.len() == 1 {
+                    self.autopilot = !self.autopilot;
+                    for Snake {
+                        body: SnakeBody { dir, .. },
+                        snake_type,
+                        controller,
+                        ..
+                    } in &mut self.snakes
+                    {
+                        if *snake_type == SnakeType::PlayerSnake {
+                            if self.autopilot {
+                                *controller =
+                                    SnakeControllerTemplate::CompetitorAI.into_controller(*dir);
+                                self.message_top_right = Some(Message {
+                                    message: "Autopilot on".to_string(),
+                                    duration: Some(100),
+                                });
+                            } else {
+                                // hacky
+                                *controller =
+                                    SnakeControllerTemplate::PlayerController(ControlSetup {
+                                        layout: KeyboardLayout::Dvorak,
+                                        keyboard_side: Side::Right,
+                                        hand: Side::Right,
+                                    })
+                                    .into_controller(*dir);
+                                self.message_top_right = Some(Message {
+                                    message: "Autopilot off".to_string(),
+                                    duration: Some(100),
+                                });
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            LBracket => {
+                let new_fps = self.control.fps() - 1;
+                if new_fps >= 1 {
+                    self.control.set_fps(new_fps);
+                    self.message_top_right = Some(Message {
+                        message: format!("fps: {}", new_fps),
+                        duration: Some(100),
+                    })
+                }
+            }
+            RBracket => {
+                let new_fps = self.control.fps() + 1;
+                if new_fps <= 240 {
+                    self.control.set_fps(new_fps);
+                    self.message_top_right = Some(Message {
+                        message: format!("fps: {}", new_fps),
+                        duration: Some(100),
+                    })
                 }
             }
             k if numeric_keys.contains(&k) => {
