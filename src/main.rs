@@ -14,7 +14,7 @@ use crate::app::{
 };
 
 mod app;
-mod times;
+mod point;
 
 fn main() {
     // NOTE: configure number of players and controls here

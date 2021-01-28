@@ -5,11 +5,11 @@ use crate::app::{
 };
 use ggez::{
     graphics::{DrawMode, Mesh, MeshBuilder},
-    mint::Point2,
     Context, GameResult,
 };
 use num_integer::Integer;
 use std::collections::HashMap;
+use crate::point::Point;
 
 pub fn generate_grid_mesh(
     ctx: &mut Context,
@@ -25,10 +25,10 @@ pub fn generate_grid_mesh(
 
     #[rustfmt::skip]
     for dv in (0..=dim.v).map(|v| v as f32 * 2. * sin) {
-        vline_a.push(Point2 { x: cos, y: dv });
-        vline_a.push(Point2 { x: 0., y: dv + sin });
-        vline_b.push(Point2 { x: cos + side, y: dv });
-        vline_b.push(Point2 { x: 2. * cos + side, y: dv + sin });
+        vline_a.push(Point { x: cos, y: dv });
+        vline_a.push(Point { x: 0., y: dv + sin });
+        vline_b.push(Point { x: cos + side, y: dv });
+        vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
     }
 
     let mut builder = MeshBuilder::new();
@@ -56,8 +56,8 @@ pub fn generate_grid_mesh(
             #[rustfmt::skip]
             builder.line(
                 &[
-                    Point2 { x: cos + dh, y: dv },
-                    Point2 { x: cos + side + dh, y: dv },
+                    Point { x: cos + dh, y: dv },
+                    Point { x: cos + side + dh, y: dv },
                 ],
                 palette.grid_thickness,
                 color,
@@ -68,8 +68,8 @@ pub fn generate_grid_mesh(
                 #[rustfmt::skip]
                 builder.line(
                     &[
-                        Point2 { x: 2. * cos + side + dh, y: sin + dv },
-                        Point2 { x: 2. * cos + 2. * side + dh, y: sin + dv },
+                        Point { x: 2. * cos + side + dh, y: sin + dv },
+                        Point { x: 2. * cos + 2. * side + dh, y: sin + dv },
                     ],
                     palette.grid_thickness,
                     color,
@@ -138,22 +138,20 @@ impl<T: Copy> ExceptPositions for &[T] {
 }
 
 fn rotate_around_point(
-    points: &[Point2<f32>],
+    points: &[Point],
     angle: f32,
-    origin: Point2<f32>,
-) -> Vec<Point2<f32>> {
+    origin: Point,
+) -> Vec<Point> {
     let sin = angle.sin();
     let cos = angle.cos();
-    let Point2 { x: ox, y: oy } = origin;
     points
         .iter()
-        .map(|Point2 { x, y }| {
-            let tx = *x - ox;
-            let ty = *y - oy;
-            Point2 {
-                x: tx * cos - ty * sin + ox,
-                y: tx * sin + ty * cos + oy,
-            }
+        .map(|point| {
+            let Point { x, y } = *point - origin;
+            Point {
+                x: x * cos - y * sin,
+                y: x * sin + y * cos,
+            } + origin
         })
         .collect()
 }
@@ -161,19 +159,19 @@ fn rotate_around_point(
 // polygon points to draw a snake segment
 // from and to describe the relative position of the previous and next segments
 pub fn get_points(
-    dest: Point2<f32>,
+    dest: Point,
     from: Option<Dir>,
     to: Option<Dir>,
     cell_dim: CellDim,
-) -> Vec<Point2<f32>> {
+) -> Vec<Point> {
     use Dir::*;
 
     let CellDim { side, sin, cos } = cell_dim;
 
     type FromTo = (Option<Dir>, Option<Dir>);
     static mut CACHED_SIDE: f32 = 0.;
-    static mut FULL_HEXAGON: Option<Vec<Point2<f32>>> = None;
-    static mut CACHED_POINTS: Option<HashMap<FromTo, Vec<Point2<f32>>>> = None;
+    static mut FULL_HEXAGON: Option<Vec<Point>> = None;
+    static mut CACHED_POINTS: Option<HashMap<FromTo, Vec<Point>>> = None;
 
     unsafe {
         if (side - CACHED_SIDE).abs() > f32::EPSILON {
@@ -181,12 +179,12 @@ pub fn get_points(
 
             // starting from top-baseline/left, going clockwise
             FULL_HEXAGON = #[rustfmt::skip] Some(vec![
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: side + cos, y: 2. * sin },
-                Point2 { x: cos, y: 2. * sin },
-                Point2 { x: 0., y: sin },
+                Point { x: cos, y: 0. },
+                Point { x: side + cos, y: 0. },
+                Point { x: side + 2. * cos, y: sin },
+                Point { x: side + cos, y: 2. * sin },
+                Point { x: cos, y: 2. * sin },
+                Point { x: 0., y: sin },
             ]);
 
             CACHED_POINTS = Some(HashMap::new());
@@ -195,31 +193,31 @@ pub fn get_points(
 
             #[rustfmt::skip]
             let straight_segment = vec![
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + cos, y: 2. * sin },
-                Point2 { x: cos, y: 2. * sin },
+                Point { x: cos, y: 0. },
+                Point { x: side + cos, y: 0. },
+                Point { x: side + cos, y: 2. * sin },
+                Point { x: cos, y: 2. * sin },
             ];
             #[rustfmt::skip]
             let end_segment = vec![
-                Point2 { x: cos, y: sin },
-                Point2 { x: side + cos, y: sin },
-                Point2 { x: side + cos, y: 2. * sin },
-                Point2 { x: cos, y: 2. * sin },
+                Point { x: cos, y: sin },
+                Point { x: side + cos, y: sin },
+                Point { x: side + cos, y: 2. * sin },
+                Point { x: cos, y: 2. * sin },
             ];
             #[rustfmt::skip]
             let blunt_turn_segment = vec![
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: side + cos, y: 2. * sin },
+                Point { x: cos, y: 0. },
+                Point { x: side + cos, y: 0. },
+                Point { x: side + 2. * cos, y: sin },
+                Point { x: side + cos, y: 2. * sin },
             ];
             #[rustfmt::skip]
             let sharp_turn_segment = vec![
-                Point2 { x: cos, y: 0. },
-                Point2 { x: side + cos, y: 0. },
-                Point2 { x: side + 2. * cos, y: sin },
-                Point2 { x: cos, y: 2. * sin },
+                Point { x: cos, y: 0. },
+                Point { x: side + cos, y: 0. },
+                Point { x: side + 2. * cos, y: sin },
+                Point { x: cos, y: 2. * sin },
             ];
 
             let origin = cell_dim.center();
@@ -258,9 +256,8 @@ pub fn get_points(
         }
         .clone();
 
-        for Point2 { x, y } in &mut points {
-            *x += dest.x;
-            *y += dest.y;
+        for point in &mut points {
+            *point += dest;
         }
 
         points

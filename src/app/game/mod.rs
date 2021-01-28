@@ -11,7 +11,6 @@ use ggez::{
     graphics::{
         clear, draw, present, Color, DrawMode, DrawParam, Font, Mesh, MeshBuilder, Scale, Text,
     },
-    mint::Point2,
     Context, GameResult,
 };
 use hsl::HSL;
@@ -29,6 +28,7 @@ use crate::app::{
     },
     Frames,
 };
+use crate::point::Point;
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -50,8 +50,8 @@ impl From<f32> for CellDim {
 }
 
 impl CellDim {
-    pub fn center(self) -> Point2<f32> {
-        Point2 {
+    pub fn center(self) -> Point {
+        Point {
             x: self.cos + self.side / 2.,
             y: self.sin,
         }
@@ -196,7 +196,7 @@ pub struct Game {
     fps_control: FPSControl,
     graphics_fps: FPSCounter,
 
-    window_dim: Point2<f32>,
+    window_dim: Point,
 
     dim: HexDim,
     players: Vec<SnakeSeed>,
@@ -221,15 +221,13 @@ pub struct Game {
 
 impl Game {
     fn update_dim(&mut self) {
-        let Point2 {
-            x: width,
-            y: height,
-        } = self.window_dim;
+        let Point { x: width, y: height } = self.window_dim.into();
         let CellDim { side, sin, cos } = self.cell_dim;
         let new_dim = HexDim {
             h: (width / (side + cos)) as isize,
             v: (height / (2. * sin)) as isize - 1,
         };
+
         if self.dim != new_dim {
             self.dim = new_dim;
 
@@ -276,7 +274,7 @@ impl Game {
             // fps_control: FPSControl::new(240, 240),
             graphics_fps: FPSCounter::new(),
 
-            window_dim: Point2 {
+            window_dim: Point {
                 x: wm.width,
                 y: wm.height,
             },
@@ -627,7 +625,7 @@ impl Game {
                     ggez::graphics::drawable_size(ctx).0 - text.width(ctx) as f32 - offset
                 }
             };
-            let location = Point2 { x, y: offset };
+            let location = Point { x, y: offset };
 
             let mut opacity = 1.;
             if let Some(frames) = life {
@@ -725,10 +723,7 @@ impl Game {
         }
 
         for apple in &self.apples {
-            let center = self.cell_dim.center();
-            let mut dest = apple.pos.to_point(self.cell_dim);
-            dest.x += center.x;
-            dest.y += center.y;
+            let dest = apple.pos.to_point(self.cell_dim) + self.cell_dim.center();
             let color = match apple.typ {
                 AppleType::Normal(_) => self.palette.apple_color,
                 AppleType::SpawnSnake(_) => {
@@ -901,7 +896,7 @@ impl EventHandler for Game {
 
     // TODO: forbid resizing in-game
     fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
-        self.window_dim = Point2 {
+        self.window_dim = Point {
             x: width,
             y: height,
         };

@@ -116,13 +116,13 @@ mod dir {
 mod hex_pos {
     use super::dir::Dir;
     use crate::app::game::CellDim;
-    use ggez::mint::Point2;
     use num_integer::Integer;
     use std::{
         cmp::Ordering,
         fmt::{Debug, Error, Formatter},
     };
     use Dir::*;
+    use crate::point::Point;
 
     #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
     pub struct HexPoint {
@@ -133,9 +133,9 @@ mod hex_pos {
     pub type HexDim = HexPoint;
 
     impl HexPoint {
-        pub fn to_point(self, CellDim { side, sin, cos }: CellDim) -> Point2<f32> {
+        pub fn to_point(self, CellDim { side, sin, cos }: CellDim) -> Point {
             let Self { h, v } = self;
-            Point2 {
+            Point {
                 x: h as f32 * (side + cos),
                 y: v as f32 * 2. * sin + if h % 2 == 0 { 0. } else { sin },
             }
