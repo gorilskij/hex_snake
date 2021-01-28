@@ -1,6 +1,6 @@
 use ggez::mint::Point2;
 
-#[derive(Copy, Clone, Debug, Add, AddAssign, Sub)]
+#[derive(Copy, Clone, Debug, Add, AddAssign, Sub, SubAssign)]
 pub struct Point {
     pub x: f32,
     pub y: f32,

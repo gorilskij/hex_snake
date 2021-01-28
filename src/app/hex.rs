@@ -113,12 +113,12 @@ mod dir {
         }
 
         pub fn blunt_turns(self) -> &'static [Self] {
-            const C_UL: &'static [Dir] = &[DL, U];
-            const C_U: &'static [Dir] = &[UL, UR];
-            const C_UR: &'static [Dir] = &[U, DR];
-            const C_DR: &'static [Dir] = &[UR, D];
-            const C_D: &'static [Dir] = &[DR, DL];
-            const C_DL: &'static [Dir] = &[D, UL];
+            const C_UL: &[Dir] = &[DL, U];
+            const C_U: &[Dir] = &[UL, UR];
+            const C_UR: &[Dir] = &[U, DR];
+            const C_DR: &[Dir] = &[UR, D];
+            const C_D: &[Dir] = &[DR, DL];
+            const C_DL: &[Dir] = &[D, UL];
             match self {
                 UL => C_UL,
                 U => C_U,
@@ -130,12 +130,12 @@ mod dir {
         }
 
         pub fn sharp_turns(self) -> &'static [Self] {
-            const C_UL: &'static [Dir] = &[D, UR];
-            const C_U: &'static [Dir] = &[DL, DR];
-            const C_UR: &'static [Dir] = &[UL, D];
-            const C_DR: &'static [Dir] = &[U, DL];
-            const C_D: &'static [Dir] = &[UR, UL];
-            const C_DL: &'static [Dir] = &[DR, U];
+            const C_UL: &[Dir] = &[D, UR];
+            const C_U: &[Dir] = &[DL, DR];
+            const C_UR: &[Dir] = &[UL, D];
+            const C_DR: &[Dir] = &[U, DL];
+            const C_D: &[Dir] = &[UR, UL];
+            const C_DL: &[Dir] = &[DR, U];
             match self {
                 UL => C_UL,
                 U => C_U,

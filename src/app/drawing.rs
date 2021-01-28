@@ -11,7 +11,6 @@ use ggez::{
     Context, GameResult,
 };
 use num_integer::Integer;
-use std::collections::HashMap;
 
 pub fn generate_grid_mesh(
     ctx: &mut Context,
@@ -139,52 +138,18 @@ impl<T: Copy> ExceptPositions for &[T] {
     }
 }
 
-fn rotate_around_point(points: &[Point], angle: f32, origin: Point) -> Vec<Point> {
+fn rotate(points: &mut [Point], angle: f32, origin: Point) {
     let sin = angle.sin();
     let cos = angle.cos();
-    points
-        .iter()
-        .map(|point| {
-            let Point { x, y } = *point - origin;
-            Point {
-                x: x * cos - y * sin,
-                y: x * sin + y * cos,
-            } + origin
-        })
-        .collect()
-}
 
-pub fn get_head_points(dest: Point, from: Dir, cell_dim: CellDim, fraction: f32) -> Vec<Point> {
-    let CellDim { side, sin, cos } = cell_dim;
-
-    let end_segment = vec![
-        Point {
-            x: cos,
-            y: 2. * sin * (1. - fraction),
-        },
-        Point {
-            x: side + cos,
-            y: 2. * sin * (1. - fraction),
-        },
-        Point {
-            x: side + cos,
-            y: 2. * sin,
-        },
-        Point {
-            x: cos,
-            y: 2. * sin,
-        },
-    ];
-
-    let mut points = rotate_around_point(
-        &end_segment,
-        (-from).clockwise_angle_from_u(),
-        cell_dim.center(),
-    );
-    for point in &mut points {
-        *point += dest;
+    for point in points.iter_mut() {
+        *point -= origin;
+        *point = Point {
+            x: point.x * cos - point.y * sin,
+            y: point.x * sin + point.y * cos,
+        };
+        *point += origin;
     }
-    points
 }
 
 fn translate(points: &mut [Point], dest: Point) {
@@ -244,8 +209,8 @@ pub fn get_points_animated(
                 Point { x: cos, y: 2. * sin * disappear },
             ];
 
-            points = rotate_around_point(
-                &points,
+            rotate(
+                &mut points,
                 previous.clockwise_angle_from_u(),
                 cell_dim.center(),
             );
@@ -263,7 +228,7 @@ pub fn get_points_animated(
                 TurnDirection::Clockwise => previous.clockwise_angle_from_u(),
                 TurnDirection::CounterClockwise => next.clockwise_angle_from_u(),
             };
-            points = rotate_around_point(&points, angle, cell_dim.center());
+            rotate(&mut points, angle, cell_dim.center());
         }
         TurnType::Sharp(turn_direction) => {
             // UR => U
@@ -278,7 +243,7 @@ pub fn get_points_animated(
                 TurnDirection::Clockwise => previous.clockwise_angle_from_u(),
                 TurnDirection::CounterClockwise => next.clockwise_angle_from_u(),
             };
-            points = rotate_around_point(&points, angle, cell_dim.center());
+            rotate(&mut points, angle, cell_dim.center());
         }
     }
     translate(&mut points, dest);

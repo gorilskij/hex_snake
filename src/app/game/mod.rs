@@ -1,7 +1,5 @@
 use std::{
-    cmp::min,
     collections::VecDeque,
-    iter::once,
     mem, thread,
     time::{Duration, Instant},
 };
@@ -19,10 +17,7 @@ use rand::prelude::*;
 
 use crate::{
     app::{
-        drawing::{
-            generate_grid_mesh, get_full_hexagon, get_head_points, get_points_animated,
-            SegmentFraction,
-        },
+        drawing::{generate_grid_mesh, get_full_hexagon, get_points_animated, SegmentFraction},
         hex::{Dir, HexDim, HexPoint},
         keyboard_control::Side,
         palette::GamePalette,
@@ -36,7 +31,6 @@ use crate::{
     },
     point::Point,
 };
-use std::cmp::max;
 
 // TODO document
 #[derive(Copy, Clone)]
@@ -141,7 +135,7 @@ impl FPSLimiter {
     // fraction of the current game frame that has elapsed
     fn frame_fraction(&self) -> f32 {
         let f = self.elapsed().as_secs_f32() / self.frame_duration.as_secs_f32();
-        assert!(0. <= f && f <= 1., "f: {}", f);
+        assert!((0. ..=1.).contains(&f), "f: {}", f);
         f
     }
 }
@@ -269,7 +263,7 @@ impl Game {
         let Point {
             x: width,
             y: height,
-        } = self.window_dim.into();
+        } = self.window_dim;
         let CellDim { side, sin, cos } = self.cell_dim;
         let new_dim = HexDim {
             h: (width / (side + cos)) as isize,
@@ -472,18 +466,15 @@ impl Game {
         }
 
         // if only ephemeral AIs are left, kill all other snakes
-        if self.snakes.iter().all(
-            |Snake {
-                 snake_type, state, ..
-             }| {
-                matches!(state, SnakeState::Dying(_))
-                    || matches!(
-                        snake_type,
-                        SnakeType::CompetitorSnake { life: Some(_) }
-                            | SnakeType::KillerSnake { life: Some(_) }
-                    )
-            },
-        ) {
+        let dying_or_ephemeral = |snake: &Snake| {
+            matches!(snake.state, SnakeState::Dying(_))
+                || matches!(
+                    snake.snake_type,
+                    SnakeType::CompetitorSnake { life: Some(_) }
+                        | SnakeType::KillerSnake { life: Some(_) }
+                )
+        };
+        if self.snakes.iter().all(dying_or_ephemeral) {
             for snake in &mut self.snakes {
                 snake.die();
             }
@@ -719,13 +710,7 @@ impl Game {
                 let next = segment.next_segment;
 
                 if draw_head_separately && seg_idx == 0 {
-                    heads.push((
-                        snake_idx,
-                        *segment,
-                        previous,
-                        next,
-                        color_offset,
-                    ));
+                    heads.push((snake_idx, *segment, previous, next, color_offset));
                     continue;
                 }
 
@@ -757,12 +742,7 @@ impl Game {
         }
 
         for (snake_idx, segment, previous, next, color_offset) in heads {
-            let Segment {
-                pos,
-                typ,
-                next_segment: from,
-                ..
-            } = segment;
+            let Segment { pos, typ, .. } = segment;
 
             let dest = pos.to_point(self.cell_dim);
 
@@ -771,10 +751,11 @@ impl Game {
             match typ {
                 SegmentType::BlackHole => {
                     let hexagon_color = Color::from_rgb(255, 255, 255);
-                    let segment_color =
-                        snake
-                            .painter
-                            .paint_segment(color_offset, snake.len() + color_offset, &segment);
+                    let segment_color = snake.painter.paint_segment(
+                        color_offset,
+                        snake.len() + color_offset,
+                        &segment,
+                    );
                     let hexagon_points = get_full_hexagon(dest, self.cell_dim);
                     let segment_points = get_points_animated(
                         dest,
@@ -872,7 +853,11 @@ impl EventHandler for Game {
         self.graphics_fps.register_frame();
         if self.prefs.display_fps {
             self.message_top_left = Some(Message {
-                message: format!("u: {:.2} g: {:.2}", self.update_fps.fps(), self.graphics_fps.fps()),
+                message: format!(
+                    "u: {:.2} g: {:.2}",
+                    self.update_fps.fps(),
+                    self.graphics_fps.fps()
+                ),
                 duration: None,
             })
         }
@@ -921,7 +906,7 @@ impl EventHandler for Game {
                 Playing => {
                     self.state = Paused;
                     self.fps_limiter.pause();
-                },
+                }
                 Paused => self.state = Playing,
             },
             G => {
