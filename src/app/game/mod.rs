@@ -1017,24 +1017,34 @@ impl EventHandler for Game {
                 }
             }
             LBracket => {
-                let new_fps = self.control.fps() - 1;
-                if new_fps >= 1 {
-                    self.control.set_fps(new_fps);
-                    self.message_top_right = Some(Message {
-                        message: format!("fps: {}", new_fps),
-                        duration: Some(100),
-                    })
-                }
+                let new_fps = match self.control.fps() {
+                    f if f <= 1 => 1,
+                    f if f <= 50 => f - 1,
+                    f if f <= 100 => f - 5,
+                    f if f <= 250 => f - 10,
+                    f if f <= 500 => f - 50,
+                    f => f - 100,
+                };
+                self.control.set_fps(new_fps);
+                self.message_top_right = Some(Message {
+                    message: format!("fps: {}", new_fps),
+                    duration: Some(100),
+                })
             }
             RBracket => {
-                let new_fps = self.control.fps() + 1;
-                if new_fps <= 240 {
-                    self.control.set_fps(new_fps);
-                    self.message_top_right = Some(Message {
-                        message: format!("fps: {}", new_fps),
-                        duration: Some(100),
-                    })
-                }
+                let new_fps = match self.control.fps() {
+                    f if f < 1 => 1,
+                    f if f < 50 => f + 1,
+                    f if f < 100 => f + 5,
+                    f if f < 250 => f + 10,
+                    f if f <= 450 => f + 50,
+                    f => f + 100,
+                };
+                self.control.set_fps(new_fps);
+                self.message_top_right = Some(Message {
+                    message: format!("fps: {}", new_fps),
+                    duration: Some(100),
+                })
             }
             k if numeric_keys.contains(&k) => {
                 let new_food = numeric_keys.iter().position(|nk| *nk == k).unwrap() as Food + 1;

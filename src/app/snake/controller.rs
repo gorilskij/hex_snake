@@ -248,32 +248,9 @@ impl SnakeController for DemoController {
 // competes for apples
 pub struct CompetitorAI;
 
-// old way (might be more efficient for sparse boards, not tested)
-// fn dir_score(
-//     head: HexPos,
-//     dir: Dir,
-//     board_dim: HexDim,
-//     snake_body: &SnakeBody,
-//     other_snakes: OtherSnakes,
-//     apples: &[Apple],
-// ) -> usize {
-//     let mut distance = 0;
-//     let mut new_head = head;
-//     while !apples.iter().any(|Apple { pos, .. }| pos == &new_head) {
-//         distance += 1;
-//         new_head = new_head.wrapping_translate(dir, 1, board_dim);
-//
-//         for body in once(snake_body).chain(other_snakes.iter_bodies()) {
-//             if body.cells.iter().any(|Hex { pos, .. }| pos == &new_head) {
-//                 return distance; // the higher the distance to a body part, the higher the score
-//             }
-//         }
-//     }
-//     // println!("for dir {:?}, dist: {}", dir, distance);
-//     // the lower the distance to an apple, the higher the score
-//     board_dim.h as usize + board_dim.v as usize - distance
-// }
-
+// TODO: this could be made faster by checking for each apple and snake segment
+//  whether it is in a straight line from the head and calculating the
+//  distance only for those
 fn dir_score(
     head: HexPoint,
     dir: Dir,
@@ -292,7 +269,7 @@ fn dir_score(
             return distance; // the higher the distance to a body part, the higher the score
         }
     }
-    // println!("for dir {:?}, dist: {}", dir, distance);
+
     // the lower the distance to an apple, the higher the score
     board_dim.h as usize + board_dim.v as usize - distance
 }
