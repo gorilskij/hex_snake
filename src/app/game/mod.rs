@@ -299,6 +299,7 @@ impl Game {
 
             force_redraw: 0,
         };
+        // warning: this spawns apples before there are any snakes
         game.update_dim();
         game.restart();
         game
@@ -736,10 +737,7 @@ impl Game {
                     Color::from(hsl.to_rgb())
                 }
             };
-            // let translated_points = translate(&hexagon_points, dest);
-            // let points = get_points(dest, None, None, self.cell_dim);
-            // builder.polygon(DrawMode::fill(), &points, color)?;
-            builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 2., 0.1, color);
+            builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 1.5, 0.1, color);
         }
 
         let mesh = builder.build(ctx)?;
@@ -763,8 +761,6 @@ impl EventHandler for Game {
         self.advance_snakes();
         self.spawn_apples();
 
-        // thread::yield_now();
-        // self.fps.wait_for_control_finish();
         Ok(())
     }
 
