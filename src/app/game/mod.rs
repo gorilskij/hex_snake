@@ -206,8 +206,6 @@ pub struct Game {
     prefs: Prefs,
     message_top_left: Option<Message>,
     message_top_right: Option<Message>,
-
-    force_redraw: usize, // for a number of redraws, even when paused
 }
 
 impl Game {
@@ -250,8 +248,6 @@ impl Game {
             prefs: Prefs::default(),
             message_top_left: None,
             message_top_right: None,
-
-            force_redraw: 0,
         };
         // warning: this spawns apples before there are any snakes
         game.update_dim();
@@ -294,9 +290,6 @@ impl Game {
             // invalidate
             self.grid_mesh = None;
             self.border_mesh = None;
-
-            // redraw 10 frames to adjust the grid
-            self.force_redraw = 10;
         }
     }
 
@@ -448,6 +441,7 @@ impl Game {
             let (other_snakes1, rest) = self.snakes.split_at_mut(snake_idx);
             let (snake, other_snakes2) = rest.split_at_mut(1);
             let snake = &mut snake[0];
+
             snake.advance(
                 OtherSnakes(other_snakes1, other_snakes2),
                 &self.apples,
@@ -482,6 +476,7 @@ impl Game {
 
         if self.snakes.is_empty() {
             self.state = GameState::GameOver;
+            self.fps_limiter.pause();
             return;
         }
 
@@ -554,7 +549,6 @@ impl Game {
                 EatBehavior::Crash => {
                     self.snakes[i].crash();
                     self.state = GameState::GameOver;
-                    self.force_redraw = 10;
                 }
                 EatBehavior::Die => {
                     self.snakes[i].die();
@@ -691,6 +685,7 @@ impl Game {
 
             // TODO: this is weird
             if snake.state == SnakeState::Crashed && snake.head().typ != SegmentType::Crashed {
+                println!("idx: {}, len: {}", snake_idx, len);
                 panic!("crashed snake with head: {:?}", snake.head().typ)
             }
 
@@ -822,7 +817,7 @@ impl EventHandler for Game {
         //     return Ok(());
         // }
 
-        if self.state == GameState::Paused {
+        if self.state == GameState::Paused || self.state == GameState::GameOver {
             return Ok(());
         }
 
@@ -837,18 +832,6 @@ impl EventHandler for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        // if self.force_redraw > 0 {
-        //     self.force_redraw -= 1;
-        // } else {
-        //     if !self.fps_control.maybe_draw() {
-        //         return Ok(());
-        //     }
-        //
-        //     if self.state != GameState::Playing {
-        //         return Ok(());
-        //     }
-        // }
-
         // objective counting of when graphics frames actually occur
         self.graphics_fps.register_frame();
         if self.prefs.display_fps {
