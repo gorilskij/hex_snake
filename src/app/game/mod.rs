@@ -844,7 +844,9 @@ impl EventHandler for Game {
                                 message = "Autopilot on";
                             }
                             Some(_) => {
-                                player_snake.controller = STASHED_CONTROLLER.take().unwrap();
+                                let mut controller = STASHED_CONTROLLER.take().unwrap();
+                                controller.reset(player_snake.body.dir);
+                                player_snake.controller = controller;
                                 message = "Autopilot off"
                             }
                         }

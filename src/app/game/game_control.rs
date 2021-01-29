@@ -7,38 +7,52 @@ use std::{
 struct FPSCounter {
     len: usize,
     buffer: VecDeque<Instant>,
+    n: usize,
 }
 
 impl FPSCounter {
+    const N: usize = 5; // frame times measured in blocks of N
+
+    fn calculate_len(fps: u64) -> usize {
+        let len = max(60 / Self::N, 3 * fps as usize / Self::N);
+        println!("FPSCounter: fps = {}, len = {} (* {} = {})", fps, len, Self::N, len * Self::N);
+        len
+    }
+
     fn new(fps: u64) -> Self {
-        // TODO: calculate required len in a way that makes sense
-        //  maybe also register every n frames for higher fps to avoid wasting space
-        let len = max(60, fps as usize);
+        let len = Self::calculate_len(fps);
         Self {
             len,
             buffer: VecDeque::with_capacity(len),
+            n: 0,
         }
     }
 
     fn set_fps(&mut self, fps: u64) {
-        self.len = max(60, fps as usize);
+        self.len = Self::calculate_len(fps);
         self.reset();
     }
 
     fn register_frame(&mut self) {
-        if self.buffer.len() >= self.len {
-            self.buffer.pop_front();
+        if self.n == 0 {
+            if self.buffer.len() >= self.len {
+                self.buffer.pop_front();
+            }
+            self.buffer.push_back(Instant::now());
+            self.n = Self::N - 1;
+        } else {
+            self.n -= 1;
         }
-        self.buffer.push_back(Instant::now());
     }
 
     fn reset(&mut self) {
         self.buffer.clear();
+        self.n = 0;
     }
 
     fn fps(&self) -> f64 {
         if self.buffer.len() >= 2 {
-            (self.buffer.len() - 1) as f64
+            ((self.buffer.len() - 1) * Self::N) as f64
                 / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
         } else {
             0.
@@ -138,8 +152,13 @@ impl GameControl {
         match self.frozen_frame_fraction.take() {
             None => (),
             Some(frac) => {
-                let elapsed = (frac - self.surplus as f32) * self.game_frame_duration.as_secs_f32();
-                assert!(elapsed >= 0., "elapsed: {}s", elapsed);
+                let mut elapsed = (frac - self.surplus as f32) * self.game_frame_duration.as_secs_f32();
+                // slight tolerance
+                if (-0.01..0.).contains(&elapsed) {
+                    elapsed = 0.;
+                } else {
+                    assert!(elapsed >= 0., "elapsed: {}s", elapsed);
+                }
                 self.last_update = Instant::now() - Duration::from_secs_f32(elapsed);
             }
         }

@@ -38,7 +38,7 @@ pub trait SnakeController {
         board_dim: HexDim,
     ) -> Option<Dir>;
 
-    fn reset(&mut self) {}
+    fn reset(&mut self, _dir: Dir) {}
 
     fn key_pressed(&mut self, _key: KeyCode) {}
 }
@@ -89,8 +89,9 @@ impl SnakeController for PlayerController {
         }
     }
 
-    fn reset(&mut self) {
-        self.control_queue.clear()
+    fn reset(&mut self, dir: Dir) {
+        self.control_queue.clear();
+        self.dir = dir;
     }
 
     fn key_pressed(&mut self, key: KeyCode) {
@@ -180,8 +181,9 @@ impl SnakeController for PlayerController12 {
         }
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, dir: Dir) {
         self.next_dir = None;
+        self.dir = Dir12::Single(dir);
     }
 
     fn key_pressed(&mut self, key: KeyCode) {
@@ -239,7 +241,7 @@ impl SnakeController for DemoController {
         }
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, _: Dir) {
         self.next_move_idx = 0;
         self.wait = 0;
     }
