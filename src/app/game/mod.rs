@@ -747,13 +747,16 @@ impl EventHandler for Game {
             let game_fps = self.control.measured_game_fps();
             let graphics_fps = self.control.measured_graphics_fps();
 
-            let game_fps_undershoot = self.control.fps() as f64 - game_fps;
-            let graphics_fps_undershoot = 60. - graphics_fps;
-            let color = if game_fps_undershoot > 10. || graphics_fps_undershoot > 10. {
+            let game_fps_undershoot = (self.control.fps() as f64 - game_fps) / game_fps;
+            let graphics_fps_undershoot = (60. - graphics_fps) / graphics_fps;
+            let color = if game_fps_undershoot > 0.05 || graphics_fps_undershoot > 0.05 {
+                // > 5% undershoot: red
                 Color::from_rgb(200, 0, 0)
-            } else if game_fps_undershoot > 2. || graphics_fps_undershoot > 2. {
+            } else if game_fps_undershoot > 0.02 || graphics_fps_undershoot > 0.02 {
+                // > 2% undershoot: orange
                 Color::from_rgb(235, 168, 52)
             } else {
+                // at or overshoot: white
                 WHITE
             };
 
