@@ -146,9 +146,12 @@ impl Snake {
     //  manhattan distance if including teleportation, this is due to the way
     //  neighborhood is calculated, a correct calculation might be very involved
     pub fn head_neighborhood(&self, radius: usize, board_dim: HexDim) -> Vec<HexPoint> {
-        self.head().pos.neighborhood(radius).into_iter().filter_map(|point|
-            point.wrap_around(board_dim, self.dir().axis())
-        ).collect()
+        self.head()
+            .pos
+            .neighborhood(radius)
+            .into_iter()
+            .filter_map(|point| point.wrap_around(board_dim, self.dir().axis()))
+            .collect()
     }
 
     pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {

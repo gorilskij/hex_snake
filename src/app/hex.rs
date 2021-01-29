@@ -7,9 +7,9 @@ mod dir {
     use rand::Rng;
     use Dir::*;
 
+    // defined in clockwise order starting at U
     #[repr(u8)]
     #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-    // defined in clockwise order starting at U
     pub enum Dir {
         U = 0,
         UR = 1,
@@ -36,7 +36,7 @@ mod dir {
     }
 
     pub enum Axis {
-        UD, // |
+        UD,   // |
         ULDR, // \
         URDL, // /
     }
@@ -289,7 +289,6 @@ mod hex_pos {
                     new_pos.v -= adjustment;
                 }
                 DR => {
-                    
                     // number of even columns in range (excluding arrival column)
                     let adjustment = if new_pos.h.is_even() {
                         (dist + 1) / 2
@@ -305,7 +304,8 @@ mod hex_pos {
             new_pos
         }
 
-        // basically mod width, mod height, if the point is n cells out of bounds, it will be n cells from the edge
+        // basically mod width, mod height
+        // if the point is n cells out of bounds, it will be n cells from the edge
         // TODO: improve efficiency
         #[must_use]
         pub fn wrap_around(mut self, board_dim: HexDim, axis: Axis) -> Option<Self> {
@@ -314,28 +314,32 @@ mod hex_pos {
             if !board_dim.contains(self) {
                 // opposite of adjustment direction
                 // (direction snake was going)
+                #[rustfmt::skip]
                 let dir = match axis {
                     UD => if self.v < 0 { U } else { D },
                     ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
                     URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
                 };
 
-                fn problems(point: HexPoint, board_dim: HexDim) -> (bool, bool, bool, bool) {
-                    (
-                        point.v < 0,
-                        point.v >= board_dim.v,
-                        point.h < 0,
-                        point.h >= board_dim.h,
-                    )
-                }
-
-                let mut x = self;
-                let probs = problems(x, board_dim);
-                while !board_dim.contains(x) {
-                    if problems(x, board_dim) != probs {
-                        return None;
+                // check if the point is salvageable, otherwise return None
+                {
+                    fn problems(point: HexPoint, board_dim: HexDim) -> (bool, bool, bool, bool) {
+                        (
+                            point.v < 0,
+                            point.v >= board_dim.v,
+                            point.h < 0,
+                            point.h >= board_dim.h,
+                        )
                     }
-                    x = x.translate(-dir, 1);
+
+                    let mut x = self;
+                    let probs = problems(x, board_dim);
+                    while !board_dim.contains(x) {
+                        if problems(x, board_dim) != probs {
+                            return None;
+                        }
+                        x = x.translate(-dir, 1);
+                    }
                 }
 
                 // the board size on that axis at that location
@@ -354,13 +358,13 @@ mod hex_pos {
                 };
 
                 while !board_dim.contains(self) {
-                    let d2 = match axis {
-                        UD => if self.v < 0 { U } else { D },
-                        ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
-                        URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
-                    };
-                    assert_eq!(dir, d2);
-                    
+                    // let d2 = match axis {
+                    //     UD => if self.v < 0 { U } else { D },
+                    //     ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
+                    //     URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
+                    // };
+                    // assert_eq!(dir, d2);
+
                     self = self.translate(-dir, axis_board_size);
                 }
             }
@@ -371,10 +375,11 @@ mod hex_pos {
         // wraps around board edges
         #[must_use]
         pub fn wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> Self {
-            self.translate(dir, dist).wrap_around(board_dim, dir.axis()).unwrap()
+            self.translate(dir, dist)
+                .wrap_around(board_dim, dir.axis())
+                .unwrap()
         }
 
-        // checks if between (0,0) and dim
         pub fn contains(self, pos: Self) -> bool {
             (0..self.h).contains(&pos.h) && (0..self.v).contains(&pos.v)
         }
