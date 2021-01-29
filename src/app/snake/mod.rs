@@ -142,6 +142,14 @@ impl Snake {
         &self.body.cells[0]
     }
 
+    pub fn head_neighborhood(&self, radius: usize, board_dim: HexDim) -> Vec<HexPoint> {
+        let mut neighborhood = self.head().pos.neighborhood(radius);
+        for point in &mut neighborhood {
+            *point = point.wrap_around(board_dim, self.dir().axis());
+        }
+        neighborhood
+    }
+
     pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
         let last_idx = self.len() - 1;
         if let SegmentType::Eaten(amount) = &mut self.body.cells[last_idx].typ {

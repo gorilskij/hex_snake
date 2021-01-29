@@ -35,6 +35,12 @@ mod dir {
         }
     }
 
+    pub enum Axis {
+        UD, // |
+        ULDR, // \
+        URDL, // /
+    }
+
     #[derive(Copy, Clone, Eq, PartialEq)]
     pub enum TurnDirection {
         Clockwise,
@@ -52,6 +58,16 @@ mod dir {
         // clockwise order starting from U
         pub fn iter() -> impl Iterator<Item = Self> {
             [U, UR, DR, D, DL, UL].iter().copied()
+        }
+
+        pub fn axis(self) -> Axis {
+            use Axis::*;
+
+            match self {
+                U | D => UD,
+                UL | DR => ULDR,
+                UR | DL => URDL,
+            }
         }
 
         pub fn next_clockwise(self) -> Self {
@@ -149,7 +165,7 @@ mod dir {
 }
 
 mod hex_pos {
-    use super::dir::Dir;
+    use super::dir::{Axis, Dir};
     use crate::{app::game::CellDim, point::Point};
     use num_integer::Integer;
     use std::{
@@ -231,118 +247,132 @@ mod hex_pos {
     }
 
     impl HexPoint {
-        // TODO: figure out O(1) translation for longer distances
-        fn translate_one_in_place(&mut self, dir: Dir) {
-            match dir {
-                U => self.v -= 1,
-                D => self.v += 1,
-                UL => {
-                    self.h -= 1;
-                    self.v -= 1;
-                    if self.h.is_even() {
-                        self.v += 1
-                    }
-                }
-                UR => {
-                    self.h += 1;
-                    self.v -= 1;
-                    if self.h.is_even() {
-                        self.v += 1
-                    }
-                }
-                DL => {
-                    self.h -= 1;
-                    self.v += 1;
-                    if self.h.is_odd() {
-                        self.v -= 1
-                    }
-                }
-                DR => {
-                    self.h += 1;
-                    self.v += 1;
-                    if self.h.is_odd() {
-                        self.v -= 1
-                    }
-                }
-            }
-        }
-
         #[must_use]
         pub fn translate(self, dir: Dir, dist: usize) -> Self {
+            let dist = dist as isize;
             let mut new_pos = self;
-            for _ in 0..dist {
-                new_pos.translate_one_in_place(dir);
+            match dir {
+                U => new_pos.v -= dist,
+                D => new_pos.v += dist,
+                // positive adjustment going up, negative adjustment going down
+                UL => {
+                    // number of odd columns in range (excluding arrival column)
+                    let adjustment = if new_pos.h.is_odd() {
+                        (dist + 1) / 2
+                    } else {
+                        dist / 2
+                    };
+                    new_pos.h -= dist;
+                    new_pos.v -= dist;
+                    new_pos.v += adjustment;
+                }
+                UR => {
+                    // number of odd columns in range (excluding arrival column)
+                    let adjustment = if new_pos.h.is_odd() {
+                        (dist + 1) / 2
+                    } else {
+                        dist / 2
+                    };
+                    new_pos.h += dist;
+                    new_pos.v -= dist;
+                    new_pos.v += adjustment;
+                }
+                DL => {
+                    // number of even columns in range (excluding arrival column)
+                    let adjustment = if new_pos.h.is_even() {
+                        (dist + 1) / 2
+                    } else {
+                        dist / 2
+                    };
+                    new_pos.h -= dist;
+                    new_pos.v += dist;
+                    new_pos.v -= adjustment;
+                }
+                DR => {
+                    
+                    // number of even columns in range (excluding arrival column)
+                    let adjustment = if new_pos.h.is_even() {
+                        (dist + 1) / 2
+                    } else {
+                        dist / 2
+                    };
+                    new_pos.h += dist;
+                    new_pos.v += dist;
+                    new_pos.v -= adjustment;
+                }
             }
+
             new_pos
         }
 
-        // broken
-        // // translates h/v with special treatment for v
-        // #[must_use]
-        // pub fn translate(self, dir: Dir, dist: isize) -> Self {
-        //     if dist < 0 {
-        //         return self.translate(-dir, -dist);
-        //     }
-        //
-        //     let mut new_pos = self;
-        //     let half = (dist as f64 / 2.).ceil() as isize;
-        //     match dir {
-        //         U => new_pos.v -= dist,
-        //         D => new_pos.v += dist,
-        //         UL => {
-        //             new_pos.h -= dist;
-        //             new_pos.v -= half;
-        //             if new_pos.h.is_even() {
-        //                 new_pos.v += 1
-        //             }
-        //         }
-        //         UR => {
-        //             new_pos.h += dist;
-        //             new_pos.v -= half;
-        //             if new_pos.h.is_even() {
-        //                 new_pos.v += 1
-        //             }
-        //         }
-        //         DL => {
-        //             new_pos.h -= dist;
-        //             new_pos.v += half;
-        //             if new_pos.h.is_odd() {
-        //                 new_pos.v -= 1
-        //             }
-        //         }
-        //         DR => {
-        //             new_pos.h += dist;
-        //             new_pos.v += half;
-        //             if new_pos.h.is_odd() {
-        //                 new_pos.v -= 1
-        //             }
-        //         }
-        //     }
-        //
-        //     new_pos
-        // }
+        // basically mod width, mod height, if the point is n cells out of bounds, it will be n cells from the edge
+        #[must_use]
+        pub fn wrap_around(mut self, board_dim: HexDim, axis: Axis) -> Option<Self> {
+            todo!();
+            use Axis::*;
+
+            // TODO: make O(1)
+            //  at the moment this just moves the head back until the last cell that's still in the map
+            //  this could be done as a single calculation
+            // if !board_dim.contains(self) {
+            //     println!("rescuing: {:?}", self);
+            //     // find reappearance point
+            //     while !board_dim.contains(self) {
+            //         self = self.translate(-dir, 1);
+            //     }
+            //     while board_dim.contains(self) {
+            //         self = self.translate(-dir, 1);
+            //     }
+            //     self = self.translate(dir, 1);
+            //     println!("done, got to: {:?}", self);
+            //     self
+            // } else {
+            //     self
+            // }
+
+            if !board_dim.contains(self) {
+                // opposite of adjustment direction
+                // (direction snake was going)
+                let dir = match axis {
+                    UD => if self.v < 0 { U } else { D },
+                    ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
+                    URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
+                };
+
+                // the board size on that axis at that location
+                // e.g. small in corners, constant for U/D, etc.
+                let axis_board_size = {
+                    let mut x = self;
+                    let mut size = 0;
+                    while !board_dim.contains(x) {
+                        x = x.translate(-dir, 1);
+                    }
+                    while board_dim.contains(x) {
+                        x = x.translate(-dir, 1);
+                        size += 1;
+                    }
+                    size
+                };
+
+                while !board_dim.contains(self) {
+                    let d2 = match axis {
+                        UD => if self.v < 0 { U } else { D },
+                        ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
+                        URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
+                    };
+                    assert_eq!(dir, d2);
+                    
+                    self = self.translate(-dir, axis_board_size);
+                }
+            }
+
+            self
+        }
 
         // wraps around board edges
         #[must_use]
         pub fn wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> Self {
-            // TODO: make O(1)
-            //  at the moment this just moves the head back until the last cell that's still in the map
-            //  this could be done as a single calculation
-            // TODO: generalize to any number of steps
-
-            let mut new_pos = self.translate(dir, dist);
-            if !board_dim.contains(new_pos) {
-                // find reappearance point
-                while !board_dim.contains(new_pos) {
-                    new_pos = new_pos.translate(-dir, 1);
-                }
-                while board_dim.contains(new_pos) {
-                    new_pos = new_pos.translate(-dir, 1);
-                }
-                new_pos.translate(dir, 1)
-            } else {
-                new_pos
-            }
+            self.translate(dir, dist).wrap_around(board_dim, dir.axis())
         }
 
         // checks if between (0,0) and dim
