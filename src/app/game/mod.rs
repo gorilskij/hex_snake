@@ -517,9 +517,7 @@ impl Game {
                 .filter(|s| s.snake_type == SnakeType::PlayerSnake)
             {
                 let neighborhood = snake
-                    .head()
-                    .pos
-                    .neighborhood(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS);
+                    .head_neighborhood(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.dim);
                 occupied_cells.extend_from_slice(&neighborhood);
             }
             occupied_cells.sort_unstable();
@@ -596,12 +594,11 @@ impl Game {
             }
 
             // draw white aura around snake heads (debug)
-            // for pos in snake.head().pos.neighborhood(7) {
-            //     let dest = pos.to_point(self.cell_dim);
-            //     let color = Color::from_rgb(255, 255, 255);
-            //     let translated_points = translate(&hexagon_points, dest);
-            //     builder.polygon(DrawMode::fill(), &translated_points, color)?;
-            // }
+            for pos in snake.head_neighborhood(7, self.dim) {
+                let dest = pos.to_point(self.cell_dim);
+                let points = get_full_hexagon(dest, self.cell_dim);
+                builder.polygon(DrawMode::fill(), &points, WHITE)?;
+            }
 
             // TODO: this is weird
             if snake.state == SnakeState::Crashed && snake.head().typ != SegmentType::Crashed {
