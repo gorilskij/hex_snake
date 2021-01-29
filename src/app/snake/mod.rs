@@ -32,7 +32,7 @@ pub enum SnakeType {
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SegmentType {
     Normal,
-    Eaten(u32),
+    Eaten { original_food: u32, food_left: u32 },
     Crashed,
     BlackHole, // does not advance, sucks the rest of the snake in
 }
@@ -144,12 +144,12 @@ impl Snake {
 
     pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
         let last_idx = self.len() - 1;
-        if let SegmentType::Eaten(amount) = &mut self.body.cells[last_idx].typ {
-            if *amount == 0 {
+        if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].typ {
+            if *food_left == 0 {
                 self.body.cells[last_idx].typ = SegmentType::Normal;
             } else {
                 self.body.grow += 1;
-                *amount -= 1;
+                *food_left -= 1;
             }
         }
 

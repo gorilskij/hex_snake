@@ -165,7 +165,7 @@ impl SnakePainter for RGBGradient {
 
         match segment.typ {
             SegmentType::Normal => normal_color,
-            SegmentType::Eaten(_) => self.eaten.paint_segment(&normal_color),
+            SegmentType::Eaten { .. } => self.eaten.paint_segment(&normal_color),
             SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
             SegmentType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
         }
@@ -196,7 +196,7 @@ impl SnakePainter for HSLGradient {
                 };
                 Color::from(hsl.to_rgb())
             }
-            SegmentType::Eaten(_) => {
+            SegmentType::Eaten { .. } => {
                 let hsl = HSL {
                     h: hue,
                     s: 1.,

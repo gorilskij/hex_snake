@@ -665,7 +665,10 @@ impl Game {
                     let Apple { typ, .. } = self.apples.remove(i);
                     match typ {
                         AppleType::Normal(food) => {
-                            snake.body.cells[0].typ = SegmentType::Eaten(food)
+                            snake.body.cells[0].typ = SegmentType::Eaten {
+                                original_food: food,
+                                food_left: food,
+                            }
                         }
                         AppleType::SpawnSnake(seed) => spawn_snake = Some(seed),
                     }
@@ -815,14 +818,20 @@ impl Game {
                     .painter
                     .paint_segment(seg_idx + color_offset, len, segment);
 
-                // TODO: if tail has eaten, animate it more slowly
                 let fraction = match seg_idx {
                     0 => SegmentFraction::Appearing(frame_frac),
-                    i if i == len - 1
-                        && snake.body.grow == 0
-                        && !matches!(segment.typ, SegmentType::Eaten(food) if food > 0) =>
-                    {
-                        SegmentFraction::Disappearing(frame_frac)
+                    i if i == len - 1 => {
+                        if let SegmentType::Eaten {
+                            original_food,
+                            food_left,
+                        } = segment.typ
+                        {
+                            let frac = ((original_food - food_left) as f32 + frame_frac)
+                                / (original_food + 1) as f32;
+                            SegmentFraction::Disappearing(frac)
+                        } else {
+                            SegmentFraction::Disappearing(frame_frac)
+                        }
                     }
                     _ => SegmentFraction::Solid,
                 };
