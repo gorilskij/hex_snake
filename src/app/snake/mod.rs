@@ -176,6 +176,7 @@ impl Snake {
                 };
                 self.body.cells.push_front(new_head);
             }
+            // TODO: this still occasionally happens
             SnakeState::Crashed => panic!("called advance() on a crashed snake"),
         }
 

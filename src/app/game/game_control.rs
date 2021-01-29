@@ -5,41 +5,43 @@ use std::{
 };
 
 struct FPSCounter {
-    len: usize,
-    buffer: VecDeque<Instant>,
+    step: usize, // record once every 'step' frames
     n: usize,
+    buffer: VecDeque<Instant>,
 }
 
 impl FPSCounter {
-    const N: usize = 5; // frame times measured in blocks of N
-
-    fn calculate_len(fps: u64) -> usize {
-        let len = max(60 / Self::N, 3 * fps as usize / Self::N);
-        println!("FPSCounter: fps = {}, len = {} (* {} = {})", fps, len, Self::N, len * Self::N);
-        len
-    }
+    const LEN: usize = 10; // number of frame batches to store
 
     fn new(fps: u64) -> Self {
-        let len = Self::calculate_len(fps);
-        Self {
-            len,
-            buffer: VecDeque::with_capacity(len),
+        let mut counter = Self {
+            step: 0,
             n: 0,
-        }
+            buffer: VecDeque::with_capacity(Self::LEN),
+        };
+        counter.set_fps(fps);
+        counter
     }
 
     fn set_fps(&mut self, fps: u64) {
-        self.len = Self::calculate_len(fps);
+        self.step = max(1, 3 * fps as usize / Self::LEN);
+        println!(
+            "FPSCounter: fps = {}, step = {}, len = {}, frames = {}",
+            fps,
+            self.step,
+            Self::LEN,
+            self.step * Self::LEN
+        );
         self.reset();
     }
 
     fn register_frame(&mut self) {
         if self.n == 0 {
-            if self.buffer.len() >= self.len {
+            if self.buffer.len() >= Self::LEN {
                 self.buffer.pop_front();
             }
             self.buffer.push_back(Instant::now());
-            self.n = Self::N - 1;
+            self.n = self.step - 1;
         } else {
             self.n -= 1;
         }
@@ -52,7 +54,7 @@ impl FPSCounter {
 
     fn fps(&self) -> f64 {
         if self.buffer.len() >= 2 {
-            ((self.buffer.len() - 1) * Self::N) as f64
+            ((self.buffer.len() - 1) * self.step) as f64
                 / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
         } else {
             0.
@@ -152,7 +154,8 @@ impl GameControl {
         match self.frozen_frame_fraction.take() {
             None => (),
             Some(frac) => {
-                let mut elapsed = (frac - self.surplus as f32) * self.game_frame_duration.as_secs_f32();
+                let mut elapsed =
+                    (frac - self.surplus as f32) * self.game_frame_duration.as_secs_f32();
                 // slight tolerance
                 if (-0.01..0.).contains(&elapsed) {
                     elapsed = 0.;
