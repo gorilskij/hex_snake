@@ -98,7 +98,7 @@ mod game_control {
 
         fn fps(&self) -> f64 {
             if self.buffer.len() >= 2 {
-                self.buffer.len() as f64
+                (self.buffer.len() - 1) as f64
                     / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
             } else {
                 0.
@@ -116,8 +116,9 @@ mod game_control {
     // combines fps with game state management
     pub struct GameControl {
         game_fps: u64,
-        game_frames_per_graphics_frame: f64,
-        game_frames_to_do: f64,
+        game_frame_duration: Duration,
+        last_update: Instant,
+        surplus: f64, // secs
 
         frame_num: usize,
 
@@ -131,8 +132,9 @@ mod game_control {
         pub fn new(fps: u64) -> Self {
             Self {
                 game_fps: fps,
-                game_frames_per_graphics_frame: fps as f64 / 60.,
-                game_frames_to_do: 0.,
+                game_frame_duration: Duration::from_nanos(1_000_000_000 / fps),
+                last_update: Instant::now(),
+                surplus: 0.,
 
                 frame_num: 0,
 
@@ -149,16 +151,21 @@ mod game_control {
 
         pub fn set_fps(&mut self, fps: u64) {
             self.game_fps = fps;
-            self.game_frames_per_graphics_frame = fps as f64 / 60.;
-            self.game_frames_to_do = 0.;
+            self.game_frame_duration = Duration::from_nanos(1_000_000_000 / fps);
             self.measured_game_fps.set_fps(fps);
         }
 
+        // WARNING this will perform as many updates as the framerate requires
+        //  this can cause strong lag a high framerates
+        // TODO lower game framerate to keep up graphics framerate
+        // call in update(), run update code this many times
         pub fn num_updates(&mut self) -> usize {
-            let updates = self.game_frames_to_do as usize;
+            let game_frames = self.last_update.elapsed().as_secs_f64() / self.game_frame_duration.as_secs_f64() + self.surplus;
+            let updates = game_frames as usize;
 
             if updates > 0 {
-                self.game_frames_to_do %= 1.;
+                self.surplus = game_frames % 1.;
+                self.last_update = Instant::now();
                 self.frame_num = self.frame_num.wrapping_add(updates);
             }
 
@@ -175,13 +182,6 @@ mod game_control {
         // call in draw()
         pub fn graphics_frame(&mut self) {
             self.measured_graphics_fps.register_frame();
-            self.game_frames_to_do += self.game_frames_per_graphics_frame;
-
-            // adjust
-            // let graphics_fps = self.measured_graphics_fps.fps();
-            // if graphics_fps > 0. {
-            //     self.game_frames_per_graphics_frame = self.game_fps as f64 / graphics_fps;
-            // }
         }
 
         pub fn state(&self) -> GameState {
@@ -207,8 +207,8 @@ mod game_control {
 
         // fraction of the current game frame that has elapsed
         pub fn frame_fraction(&self) -> f32 {
-            let frac = self.game_frames_to_do as f32;
-            if frac > 1. { 1. } else { frac }
+            let game_frames = self.last_update.elapsed().as_secs_f32() / self.game_frame_duration.as_secs_f32() + self.surplus as f32;
+            if game_frames > 1. { 1. } else { game_frames }
         }
 
         pub fn measured_game_fps(&self) -> f64 {
