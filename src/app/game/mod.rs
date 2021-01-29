@@ -26,6 +26,7 @@ use crate::{
     },
     point::Point,
 };
+use ggez::graphics::WHITE;
 
 #[derive(Copy, Clone)]
 pub struct CellDim {
@@ -160,7 +161,9 @@ mod game_control {
         // TODO lower game framerate to keep up graphics framerate
         // call in update(), run update code this many times
         pub fn num_updates(&mut self) -> usize {
-            let game_frames = self.last_update.elapsed().as_secs_f64() / self.game_frame_duration.as_secs_f64() + self.surplus;
+            let game_frames = self.last_update.elapsed().as_secs_f64()
+                / self.game_frame_duration.as_secs_f64()
+                + self.surplus;
             let updates = game_frames as usize;
 
             if updates > 0 {
@@ -207,8 +210,14 @@ mod game_control {
 
         // fraction of the current game frame that has elapsed
         pub fn frame_fraction(&self) -> f32 {
-            let game_frames = self.last_update.elapsed().as_secs_f32() / self.game_frame_duration.as_secs_f32() + self.surplus as f32;
-            if game_frames > 1. { 1. } else { game_frames }
+            let game_frames = self.last_update.elapsed().as_secs_f32()
+                / self.game_frame_duration.as_secs_f32()
+                + self.surplus as f32;
+            if game_frames > 1. {
+                1.
+            } else {
+                game_frames
+            }
         }
 
         pub fn measured_game_fps(&self) -> f64 {
@@ -237,14 +246,16 @@ struct Prefs {
     draw_grid: bool,
     display_fps: bool,
     apple_food: Food,
+    message_duration: Frames,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
         Self {
-            draw_grid: true,
+            draw_grid: false,
             display_fps: false,
             apple_food: 1,
+            message_duration: 100,
         }
     }
 }
@@ -252,6 +263,27 @@ impl Default for Prefs {
 struct Message {
     message: String,
     duration: Option<Frames>,
+    color: Color,
+}
+
+impl From<(String, Frames)> for Message {
+    fn from((message, life): (String, u32)) -> Self {
+        Self {
+            message,
+            duration: Some(life),
+            color: WHITE,
+        }
+    }
+}
+
+impl From<(String, Color)> for Message {
+    fn from((message, color): (String, Color)) -> Self {
+        Self {
+            message,
+            duration: None,
+            color,
+        }
+    }
 }
 
 pub struct Game {
@@ -677,6 +709,7 @@ impl Game {
         if let Some(Message {
             ref message,
             duration: ref mut life,
+            color,
         }) = maybe_message
         {
             let mut text = Text::new(message as &str);
@@ -691,19 +724,14 @@ impl Game {
             };
             let location = Point { x, y: offset };
 
-            let mut opacity = 1.;
+            let mut color = *color;
+            // fade out
             if let Some(frames) = life {
                 if *frames < 10 {
-                    opacity = *frames as f32 / 10.
+                    color.a = *frames as f32 / 10.
                 }
             }
 
-            let color = Color {
-                r: 1.,
-                g: 1.,
-                b: 1.,
-                a: opacity,
-            };
             draw(ctx, &text, DrawParam::from((location, color)))?;
 
             if let Some(frames) = life {
@@ -875,19 +903,6 @@ impl Game {
 
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        // it's important that this if go first to reset the last frame time
-        // if !self.fps_control.maybe_update() {
-        //     // self.fps_control.wait();
-        //     return Ok(());
-        // }
-
-        // if self.state != GameState::Playing {
-        //     self.fps_control.wait();
-        //     return Ok(());
-        // }
-
-        // while self.control.can_update() {
-        //     count += 1;
         for _ in 0..self.control.num_updates() {
             self.advance_snakes();
             self.spawn_apples();
@@ -900,14 +915,23 @@ impl EventHandler for Game {
         self.control.graphics_frame();
 
         if self.prefs.display_fps {
-            self.message_top_left = Some(Message {
-                message: format!(
-                    "u: {:.2} g: {:.2}",
-                    self.control.measured_game_fps(),
-                    self.control.measured_graphics_fps(),
-                ),
-                duration: None,
-            })
+            let game_fps = self.control.measured_game_fps();
+            let graphics_fps = self.control.measured_graphics_fps();
+
+            let game_fps_undershoot = self.control.fps() as f64 - game_fps;
+            let graphics_fps_undershoot = 60. - graphics_fps;
+            let color = if game_fps_undershoot > 10. || graphics_fps_undershoot > 10. {
+                Color::from_rgb(200, 0, 0)
+            } else if game_fps_undershoot > 2. || graphics_fps_undershoot > 2. {
+                Color::from_rgb(235, 168, 52)
+            } else {
+                WHITE
+            };
+
+            self.message_top_left = Some(Message::from((
+                format!("u: {:.2} g: {:.2}", game_fps, graphics_fps),
+                color,
+            )));
         }
 
         clear(ctx, self.palette.background_color);
@@ -939,7 +963,7 @@ impl EventHandler for Game {
 
         let numeric_keys = [Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9];
 
-        // TODO: also tie these to a keymap
+        // TODO: also tie these to a keymap (dvorak-centric for now)
         match key {
             Space => match self.control.state() {
                 GameState::GameOver => {
@@ -956,10 +980,10 @@ impl EventHandler for Game {
                 } else {
                     "Grid off"
                 };
-                self.message_top_right = Some(Message {
-                    message: message.to_string(),
-                    duration: Some(100),
-                });
+                self.message_top_right = Some(Message::from((
+                    message.to_string(),
+                    self.prefs.message_duration,
+                )));
             }
             F => {
                 self.prefs.display_fps = !self.prefs.display_fps;
@@ -996,10 +1020,10 @@ impl EventHandler for Game {
                             }
                         }
 
-                        self.message_top_right = Some(Message {
-                            message: message.to_string(),
-                            duration: Some(100),
-                        })
+                        self.message_top_right = Some(Message::from((
+                            message.to_string(),
+                            self.prefs.message_duration,
+                        )));
                     }
                 }
             }
@@ -1013,10 +1037,10 @@ impl EventHandler for Game {
                     f => f - 100,
                 };
                 self.control.set_fps(new_fps);
-                self.message_top_right = Some(Message {
-                    message: format!("fps: {}", new_fps),
-                    duration: Some(100),
-                })
+                self.message_top_right = Some(Message::from((
+                    format!("fps: {}", new_fps),
+                    self.prefs.message_duration,
+                )));
             }
             RBracket => {
                 let new_fps = match self.control.fps() {
@@ -1028,10 +1052,10 @@ impl EventHandler for Game {
                     f => f + 100,
                 };
                 self.control.set_fps(new_fps);
-                self.message_top_right = Some(Message {
-                    message: format!("fps: {}", new_fps),
-                    duration: Some(100),
-                })
+                self.message_top_right = Some(Message::from((
+                    format!("fps: {}", new_fps),
+                    self.prefs.message_duration,
+                )));
             }
             k if numeric_keys.contains(&k) => {
                 let new_food = numeric_keys.iter().position(|nk| *nk == k).unwrap() as Food + 1;
@@ -1042,10 +1066,10 @@ impl EventHandler for Game {
                         *food = new_food;
                     }
                 }
-                self.message_top_right = Some(Message {
-                    message: format!("Apple food: {}", new_food),
-                    duration: Some(100),
-                });
+                self.message_top_right = Some(Message::from((
+                    format!("Apple food: {}", new_food),
+                    self.prefs.message_duration,
+                )));
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
@@ -1060,10 +1084,10 @@ impl EventHandler for Game {
 
                 self.update_dim();
 
-                self.message_top_right = Some(Message {
-                    message: format!("Cell side: {}", new_side),
-                    duration: Some(100),
-                });
+                self.message_top_right = Some(Message::from((
+                    format!("Cell side: {}", new_side),
+                    self.prefs.message_duration,
+                )));
             }
             k => {
                 if self.control.state() == GameState::Playing {
@@ -1083,9 +1107,9 @@ impl EventHandler for Game {
         };
         self.update_dim();
         let HexDim { h, v } = self.dim;
-        self.message_top_right = Some(Message {
-            message: format!("{}x{}", h, v),
-            duration: Some(100),
-        });
+        self.message_top_right = Some(Message::from((
+            format!("{}x{}", h, v),
+            self.prefs.message_duration,
+        )));
     }
 }
