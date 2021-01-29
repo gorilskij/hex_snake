@@ -306,29 +306,10 @@ mod hex_pos {
         }
 
         // basically mod width, mod height, if the point is n cells out of bounds, it will be n cells from the edge
+        // TODO: improve efficiency
         #[must_use]
         pub fn wrap_around(mut self, board_dim: HexDim, axis: Axis) -> Option<Self> {
-            todo!();
             use Axis::*;
-
-            // TODO: make O(1)
-            //  at the moment this just moves the head back until the last cell that's still in the map
-            //  this could be done as a single calculation
-            // if !board_dim.contains(self) {
-            //     println!("rescuing: {:?}", self);
-            //     // find reappearance point
-            //     while !board_dim.contains(self) {
-            //         self = self.translate(-dir, 1);
-            //     }
-            //     while board_dim.contains(self) {
-            //         self = self.translate(-dir, 1);
-            //     }
-            //     self = self.translate(dir, 1);
-            //     println!("done, got to: {:?}", self);
-            //     self
-            // } else {
-            //     self
-            // }
 
             if !board_dim.contains(self) {
                 // opposite of adjustment direction
@@ -338,6 +319,24 @@ mod hex_pos {
                     ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
                     URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
                 };
+
+                fn problems(point: HexPoint, board_dim: HexDim) -> (bool, bool, bool, bool) {
+                    (
+                        point.v < 0,
+                        point.v >= board_dim.v,
+                        point.h < 0,
+                        point.h >= board_dim.h,
+                    )
+                }
+
+                let mut x = self;
+                let probs = problems(x, board_dim);
+                while !board_dim.contains(x) {
+                    if problems(x, board_dim) != probs {
+                        return None;
+                    }
+                    x = x.translate(-dir, 1);
+                }
 
                 // the board size on that axis at that location
                 // e.g. small in corners, constant for U/D, etc.
@@ -366,13 +365,13 @@ mod hex_pos {
                 }
             }
 
-            self
+            Some(self)
         }
 
         // wraps around board edges
         #[must_use]
         pub fn wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> Self {
-            self.translate(dir, dist).wrap_around(board_dim, dir.axis())
+            self.translate(dir, dist).wrap_around(board_dim, dir.axis()).unwrap()
         }
 
         // checks if between (0,0) and dim
