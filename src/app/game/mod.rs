@@ -820,7 +820,7 @@ impl Game {
 
                 let fraction = match seg_idx {
                     0 => SegmentFraction::Appearing(frame_frac),
-                    i if i == len - 1 => {
+                    i if i == len - 1 && snake.body.grow == 0 => {
                         if let SegmentType::Eaten {
                             original_food,
                             food_left,
