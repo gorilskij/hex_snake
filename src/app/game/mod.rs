@@ -797,6 +797,9 @@ impl Game {
             };
 
             for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
+                // previous = towards head
+                // next = towards tail
+
                 let previous = seg_idx
                     .checked_sub(1)
                     .map(|prev_idx| -snake.body.cells[prev_idx].next_segment)
@@ -808,9 +811,6 @@ impl Game {
                     heads.push((snake_idx, *segment, previous, next, color_offset));
                     continue;
                 }
-
-                // previous = towards head
-                // next = towards tail
 
                 let points;
                 let dest = segment.pos.to_point(self.cell_dim);

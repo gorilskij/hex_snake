@@ -95,49 +95,6 @@ pub fn generate_border_mesh(ctx: &mut Context) -> GameResult<Mesh> {
     unimplemented!()
 }
 
-// positions stored in reverse order
-struct ExceptPositionsIter<T, I: Iterator<Item = T>>(I, Vec<usize>, usize);
-
-impl<T, I: Iterator<Item = T>> ExceptPositionsIter<T, I> {
-    fn new(iter: I, positions: &[usize]) -> Self {
-        let mut vec = positions.to_vec();
-        vec.sort_by_key(|p| -(*p as isize));
-        Self(iter, vec, 0)
-    }
-}
-
-impl<T, I: Iterator<Item = T>> Iterator for ExceptPositionsIter<T, I> {
-    type Item = T;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let Self(iter, positions, pos) = self;
-
-        while positions.last().map(|p| p == pos).unwrap_or(false) {
-            let _ = iter.next()?;
-            positions.pop();
-            *pos += 1;
-        }
-
-        let next = iter.next()?;
-        *pos += 1;
-        Some(next)
-    }
-}
-
-trait ExceptPositions {
-    type Out;
-
-    fn except_positions(self, positions: &[usize]) -> Self::Out;
-}
-
-impl<T: Copy> ExceptPositions for &[T] {
-    type Out = Vec<T>;
-
-    fn except_positions(self, positions: &[usize]) -> Self::Out {
-        ExceptPositionsIter::new(self.iter().copied(), positions).collect()
-    }
-}
-
 fn rotate(points: &mut [Point], angle: f32, origin: Point) {
     let sin = angle.sin();
     let cos = angle.cos();
