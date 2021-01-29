@@ -69,7 +69,7 @@ impl SnakeDemo {
                     SimMove::Wait(5),
                 ])
                 .into_controller(dir),
-                painter: SnakePaletteTemplate::new_gray_gradient().into(),
+                painter: SnakePaletteTemplate::gray_gradient().into(),
             },
             cell_dim,
         }
@@ -108,8 +108,8 @@ impl StartScreen {
         Self {
             players: 1,
             palettes: vec![
-                SnakePaletteTemplate::new_gray_gradient(),
-                SnakePaletteTemplate::new_rainbow(),
+                SnakePaletteTemplate::gray_gradient(),
+                SnakePaletteTemplate::rainbow(),
                 // SnakePaletteTemplate::new_rainbow_sin(10),
             ],
             player1_palette_idx: 0,

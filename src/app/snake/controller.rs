@@ -7,6 +7,24 @@ use crate::app::{
 use ggez::event::KeyCode;
 use std::{cmp::Ordering, collections::VecDeque, iter::once};
 
+// because Iterator::min_by_key requires Ord
+#[derive(PartialEq)]
+struct TotalF32(f32);
+
+impl Eq for TotalF32 {}
+
+impl PartialOrd for TotalF32 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl Ord for TotalF32 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
 #[derive(Clone)]
 pub enum SnakeControllerTemplate {
     PlayerController(ControlSetup),
@@ -26,6 +44,17 @@ impl OtherSnakes<'_> {
 
     pub fn iter_bodies(&self) -> impl Iterator<Item = &SnakeBody> {
         self.iter_snakes().map(|Snake { body, .. }| body)
+    }
+
+    pub fn iter_segments(&self) -> impl Iterator<Item = &Segment> {
+        self.iter_bodies().flat_map(|body| body.cells.iter())
+    }
+
+    pub fn contains(&self, point: HexPoint) -> bool {
+        self.0
+            .iter()
+            .chain(self.1.iter())
+            .any(|snake| snake.body.cells.iter().any(|segment| segment.pos == point))
     }
 }
 
@@ -69,7 +98,7 @@ impl SnakeControllerTemplate {
     }
 }
 
-pub struct PlayerController {
+struct PlayerController {
     controls: Controls,
     control_queue: VecDeque<Dir>,
     dir: Dir,
@@ -157,7 +186,7 @@ impl PartialEq for Dir12 {
 impl Eq for Dir12 {}
 
 // fairly hacky, doesn't interact well with teleportation
-pub struct PlayerController12 {
+struct PlayerController12 {
     dir: Dir12,
     alternation: bool,
     next_dir: Option<Dir12>,
@@ -215,7 +244,7 @@ pub enum SimMove {
     Wait(usize),
 }
 
-pub struct DemoController {
+struct DemoController {
     move_sequence: Vec<SimMove>,
     next_move_idx: usize,
     wait: usize,
@@ -248,7 +277,7 @@ impl SnakeController for DemoController {
 }
 
 // competes for apples
-pub struct CompetitorAI;
+struct CompetitorAI;
 
 // TODO: this could be made faster by checking for each apple and snake segment
 //  whether it is in a straight line from the head and calculating the
@@ -323,20 +352,73 @@ impl SnakeController for CompetitorAI {
     }
 }
 
-// tries to kill player
-struct KillerAI;
+struct CompetitorAI2;
 
-#[derive(PartialOrd, PartialEq)]
-struct TotalF32(f32);
+fn approximate_dir(from: HexPoint, to: HexPoint, filter: impl Fn(Dir) -> bool) -> Option<Dir> {
+    use std::f32::consts::PI;
+    use Dir::*;
 
-impl Eq for TotalF32 {}
+    const TWO_PI: f32 = 2. * PI;
+    let CellDim { side, sin, cos, .. } = CellDim::from(1.);
 
-#[allow(clippy::derive_ord_xor_partial_ord)] // sound because Ord just forwards to PartialOrd
-impl Ord for TotalF32 {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+    let x_step = side + cos;
+    let y_step = 2. * sin;
+
+    let dh = to.h - from.h;
+    let dv = to.v - from.v;
+
+    let dx = dh as f32 / x_step;
+    let dy = -dv as f32 / y_step; // convert to y going up
+    let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
+
+    const DIR_ANGLES: [(Dir, f32); 6] = [
+        (UR, 1. / 6. * PI),
+        (U, 3. / 6. * PI),
+        (UL, 5. / 6. * PI),
+        (DL, 7. / 6. * PI),
+        (D, 9. / 6. * PI),
+        (DR, 11. / 6. * PI),
+    ];
+
+    // this could probably be done with math
+    DIR_ANGLES
+        .iter()
+        .copied()
+        .filter(|(d, _)| filter(*d))
+        .min_by_key(|(_, a)| TotalF32((a - angle).abs()))
+        .map(|(d, _)| d)
+}
+
+impl SnakeController for CompetitorAI2 {
+    fn next_dir(
+        &mut self,
+        snake_body: &SnakeBody,
+        other_snakes: OtherSnakes,
+        apples: &[Apple],
+        board_dim: HexDim,
+    ) -> Option<Dir> {
+        // untested
+        // let closest_apple = apples
+        //     .iter()
+        //     .min_by_key(|apple| snake_body.cells[0].pos.manhattan_distance_to(apple.pos))
+        //     .unwrap()
+        //     .pos;
+        //
+        // let head_pos = snake_body.cells[0].pos;
+        // let snake_dir = snake_body.dir;
+        // approximate_dir(head_pos, closest_apple, |dir| {
+        //     dir != -snake_dir
+        //         && !other_snakes.iter_segments().any(|segment| {
+        //             head_pos.translate(dir, 1) == segment.pos
+        //                 || head_pos.translate(dir, 2) == segment.pos
+        //         })
+        // })
+        None
     }
 }
+
+// tries to kill player
+struct KillerAI;
 
 fn distance_to_snake(
     dir: Dir,

@@ -318,7 +318,7 @@ impl Game {
                 x if x < 0.025 => AppleType::SpawnSnake(SnakeSeed {
                     snake_type: SnakeType::CompetitorSnake { life: Some(200) },
                     eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                    palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
+                    palette: SnakePaletteTemplate::pastel_rainbow().persistent(),
                     controller: SnakeControllerTemplate::CompetitorAI,
                 }),
                 x if x < 0.040 => {
@@ -333,7 +333,7 @@ impl Game {
                         AppleType::SpawnSnake(SnakeSeed {
                             snake_type: SnakeType::KillerSnake { life: Some(200) },
                             eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                            palette: SnakePaletteTemplate::new_persistent_dark_rainbow(),
+                            palette: SnakePaletteTemplate::dark_blue_to_red(),
                             controller: SnakeControllerTemplate::KillerAI,
                         })
                     }
@@ -729,7 +729,7 @@ impl Game {
 
 impl EventHandler for Game {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        for _ in 0..self.control.num_updates() {
+        while self.control.can_update() {
             self.advance_snakes();
             self.spawn_apples();
         }

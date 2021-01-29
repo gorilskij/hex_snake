@@ -1,4 +1,7 @@
-use crate::app::snake::{Segment, SegmentType};
+use crate::{
+    app::snake::{Segment, SegmentType},
+    oklab::OkLab,
+};
 use ggez::graphics::Color;
 use hsl::HSL;
 use std::cmp::max;
@@ -27,6 +30,10 @@ pub enum EatenColor {
     // HSLInverted, // 180deg rotation?
 }
 
+fn invert_rgb(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
+    (255 - rgb.0, 255 - rgb.1, 255 - rgb.2)
+}
+
 impl EatenColor {
     fn paint_segment(&self, normal_color: &Color) -> Color {
         match self {
@@ -51,7 +58,12 @@ pub enum SnakePaletteTemplate {
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
-        eaten: EatenColor,
+    },
+    OkLabGradient {
+        head_hue: f64,
+        tail_hue: f64,
+        lightness: f64,
+        eaten_lightness: f64,
     },
     // keeps track of the longest length achieved
     Persistent(Box<SnakePaletteTemplate>),
@@ -59,7 +71,7 @@ pub enum SnakePaletteTemplate {
 
 #[allow(dead_code)]
 impl SnakePaletteTemplate {
-    pub fn new_rgb_gradient(head: Color, tail: Color, eaten: Option<Color>) -> Self {
+    pub fn rgb_gradient(head: Color, tail: Color, eaten: Option<Color>) -> Self {
         Self::RGBGradient {
             head,
             tail,
@@ -67,11 +79,11 @@ impl SnakePaletteTemplate {
         }
     }
 
-    pub fn new_gray_gradient() -> Self {
-        Self::new_rgb_gradient(gray!(0.72), gray!(0.25), None)
+    pub fn gray_gradient() -> Self {
+        Self::rgb_gradient(gray!(0.72), gray!(0.25), None)
     }
 
-    pub fn new_hsl_gradient(
+    pub fn hsl_gradient(
         head_hue: f64,
         tail_hue: f64,
         lightness: f64,
@@ -82,32 +94,54 @@ impl SnakePaletteTemplate {
             tail_hue,
             lightness,
             eaten_lightness,
-            eaten: EatenColor::RGBInverted,
         }
     }
 
-    pub fn new_rainbow() -> Self {
-        Self::new_hsl_gradient(0., 273., 0.4, 0.7)
+    pub fn oklab_gradient(
+        head_hue: f64,
+        tail_hue: f64,
+        lightness: f64,
+        eaten_lightness: f64,
+    ) -> Self {
+        Self::OkLabGradient {
+            head_hue,
+            tail_hue,
+            lightness,
+            eaten_lightness,
+        }
     }
 
-    pub fn new_persistent_rainbow() -> Self {
-        Self::Persistent(Box::new(Self::new_rainbow()))
+    // red -> purple
+    const HSL_RAINBOW: (f64, f64) = (0., 273.);
+
+    // green -> red (yellows are very ugly in oklab)
+    const OKLAB_RAINBOW: (f64, f64) = (147.3, 428.);
+
+    pub fn persistent(self) -> Self {
+        match self {
+            Self::Persistent(_) => self,
+            template => Self::Persistent(Box::new(template)),
+        }
     }
 
-    pub fn new_pastel_rainbow() -> Self {
-        Self::new_hsl_gradient(0., 273., 0.75, 0.7)
+    pub fn rainbow() -> Self {
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.4, 0.7)
     }
 
-    pub fn new_persistent_pastel_rainbow() -> Self {
-        Self::Persistent(Box::new(Self::new_pastel_rainbow()))
+    pub fn pastel_rainbow() -> Self {
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.75, 0.7)
     }
 
-    pub fn new_dark_rainbow() -> Self {
-        Self::new_hsl_gradient(0., 273., 0.2, 0.2)
+    pub fn dark_rainbow() -> Self {
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.2, 0.2)
     }
 
-    pub fn new_persistent_dark_rainbow() -> Self {
-        Self::Persistent(Box::new(Self::new_dark_rainbow()))
+    pub fn green_to_red() -> Self {
+        Self::oklab_gradient(Self::OKLAB_RAINBOW.0, Self::OKLAB_RAINBOW.1, 0.6, 0.7)
+    }
+
+    pub fn dark_blue_to_red() -> Self {
+        Self::oklab_gradient(250., Self::OKLAB_RAINBOW.1, 0.3, 0.3)
     }
 }
 
@@ -126,13 +160,22 @@ impl From<SnakePaletteTemplate> for Box<dyn SnakePainter> {
                 tail_hue,
                 lightness,
                 eaten_lightness,
-                eaten,
             } => Box::new(HSLGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
-                eaten,
+            }),
+            SnakePaletteTemplate::OkLabGradient {
+                head_hue,
+                tail_hue,
+                lightness,
+                eaten_lightness,
+            } => Box::new(OkLabGradient {
+                head_hue,
+                tail_hue,
+                lightness,
+                eaten_lightness,
             }),
             SnakePaletteTemplate::Persistent(palette) => Box::new(Persistent {
                 painter: (*palette).into(),
@@ -177,7 +220,6 @@ pub struct HSLGradient {
     tail_hue: f64,
     lightness: f64,
     eaten_lightness: f64,
-    eaten: EatenColor,
 }
 
 impl SnakePainter for HSLGradient {
@@ -197,12 +239,43 @@ impl SnakePainter for HSLGradient {
                 Color::from(hsl.to_rgb())
             }
             SegmentType::Eaten { .. } => {
+                // invert lightness twice
                 let hsl = HSL {
                     h: hue,
                     s: 1.,
-                    l: 1. - self.eaten_lightness, // will be re-inverted
+                    l: 1. - self.eaten_lightness,
                 };
-                self.eaten.paint_segment(&Color::from(hsl.to_rgb()))
+                Color::from(invert_rgb(hsl.to_rgb()))
+            }
+            SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
+            SegmentType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
+        }
+    }
+}
+
+pub struct OkLabGradient {
+    head_hue: f64,
+    tail_hue: f64,
+    lightness: f64,
+    eaten_lightness: f64,
+}
+
+impl SnakePainter for OkLabGradient {
+    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
+        if segment.typ == SegmentType::Crashed {
+            return *DEFAULT_CRASHED_COLOR;
+        }
+
+        let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
+        match segment.typ {
+            SegmentType::Normal => {
+                let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
+                Color::from(oklab.to_rgb())
+            }
+            SegmentType::Eaten { .. } => {
+                // invert lightness twice
+                let oklab = OkLab::from_lch(1. - self.eaten_lightness, 0.5, hue);
+                Color::from(invert_rgb(oklab.to_rgb()))
             }
             SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
             SegmentType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,

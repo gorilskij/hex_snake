@@ -13,7 +13,7 @@ use crate::app::{
 pub mod controller;
 pub mod palette;
 
-#[derive(Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SnakeState {
     Living,
     // counts how many segments have already been removed
@@ -188,7 +188,6 @@ impl Snake {
                 };
                 self.body.cells.push_front(new_head);
             }
-            // TODO: this still occasionally happens
             SnakeState::Crashed => panic!("called advance() on a crashed snake"),
         }
 

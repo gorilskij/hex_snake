@@ -62,7 +62,7 @@ impl FPSCounter {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum GameState {
     Playing,
     Paused,
@@ -75,6 +75,9 @@ pub struct GameControl {
     game_frame_duration: Duration,
     last_update: Instant,
     surplus: f64, // secs
+
+    // counting down for the while loop in update()
+    queued_updates: Option<usize>,
 
     graphics_frame_num: usize,
 
@@ -92,6 +95,8 @@ impl GameControl {
             game_frame_duration: Duration::from_nanos(1_000_000_000 / fps),
             last_update: Instant::now(),
             surplus: 0.,
+
+            queued_updates: None,
 
             graphics_frame_num: 0,
 
@@ -117,24 +122,42 @@ impl GameControl {
     //  this can cause strong lag a high framerates
     // TODO lower game framerate to keep up graphics framerate
     // call in update(), run update code this many times
-    pub fn num_updates(&mut self) -> usize {
-        let game_frames = self.last_update.elapsed().as_secs_f64()
-            / self.game_frame_duration.as_secs_f64()
-            + self.surplus;
-        let updates = game_frames as usize;
-
-        if updates > 0 {
-            self.surplus = game_frames % 1.;
-            self.last_update = Instant::now();
+    pub fn can_update(&mut self) -> bool {
+        if self.game_state != GameState::Playing {
+            return false;
         }
 
-        if self.game_state == GameState::Playing {
-            for _ in 0..updates {
-                self.measured_game_fps.register_frame();
+        match &mut self.queued_updates {
+            Some(0) => {
+                self.queued_updates = None;
+                false
             }
-            updates
-        } else {
-            0
+            Some(n) => {
+                *n -= 1;
+                true
+            }
+            None => {
+                let game_frames = self.last_update.elapsed().as_secs_f64()
+                    / self.game_frame_duration.as_secs_f64()
+                    + self.surplus;
+                let updates = game_frames as usize;
+
+                if updates > 0 {
+                    self.surplus = game_frames % 1.;
+                    self.last_update = Instant::now();
+
+                    self.queued_updates = Some(updates - 1);
+
+                    // TODO: O(1)ize
+                    for _ in 0..updates {
+                        self.measured_game_fps.register_frame();
+                    }
+
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 

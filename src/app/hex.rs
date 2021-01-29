@@ -169,7 +169,7 @@ mod hex_pos {
     use crate::{app::game::CellDim, point::Point};
     use num_integer::Integer;
     use std::{
-        cmp::Ordering,
+        cmp::{max, Ordering},
         fmt::{Debug, Error, Formatter},
     };
     use Dir::*;
@@ -193,12 +193,51 @@ mod hex_pos {
 
         // TODO: replace this with manhattan distance
         // approximate straight-line distance in units of side length
-        pub fn distance_to(self, HexPoint { h, v }: HexPoint) -> usize {
-            let dh = (self.h - h).abs() as f32;
-            let dv = (self.v - v).abs() as f32;
+        pub fn distance_to(self, other: Self) -> usize {
+            let dh = (self.h - other.h).abs() as f32;
+            let dv = (self.v - other.v).abs() as f32;
             let CellDim { side, sin, cos } = CellDim::from(1.);
             (dh / (side + cos) + dv / (2. * sin)) as usize
         }
+
+        // untested
+        // None if the two points are not on the same line
+        // pub fn dir_to(self, other: Self) -> Option<Dir> {
+        //     if self.h == other.h {
+        //         return Some(if self.v > other.v { U } else { D });
+        //     } else {
+        //         let dh = (self.h - other.h).abs();
+        //         if self.v > other.v {
+        //             // going up
+        //             let dv = dh - (dh + self.h % 2) / 2;
+        //             if other.v == self.v - dv {
+        //                 return if self.h > other.h { Some(UL) } else { Some(UR) };
+        //             }
+        //         } else if self.v < other.v {
+        //             // going down
+        //             let dv = dh - (dh + (self.h + 1) % 2) / 2;
+        //             let expected_v = self.v + dv;
+        //             if expected_v == other.v {
+        //                 return if self.h > other.h { Some(DL) } else { Some(DR) };
+        //             }
+        //         }
+        //     }
+        //
+        //     None
+        // }
+
+        // untested
+        // pub fn manhattan_distance_to(self, other: Self) -> usize {
+        //     let dh = (self.h - other.h).abs();
+        //     let max_dv = if self.v > other.v {
+        //         dh - (dh + self.h % 2) / 2
+        //     } else {
+        //         dh - (dh + (self.h + 1) % 2) / 2
+        //     };
+        //     let dv = (self.v - other.v).abs();
+        //     let dv_overflow = max(0, dv - max_dv);
+        //     (dh + dv_overflow) as usize
+        // }
 
         // all cells within a manhattan distance of radius (including self)
         // guarantees no duplicates, not sorted
@@ -248,56 +287,43 @@ mod hex_pos {
 
     impl HexPoint {
         #[must_use]
-        pub fn translate(self, dir: Dir, dist: usize) -> Self {
-            let dist = dist as isize;
+        pub fn translate(self, dir: Dir, dh: usize) -> Self {
+            let dh = dh as isize;
             let mut new_pos = self;
+
+            // adjustment:
+            //  going from an even column left or right UP means decrementing v
+            //  going from an even column left or right DOWN means keeping v as it is
+            //   (the next column is already shifted down)
+            //  the opposite holds starting at an odd column
+            // important: (-1) % 2 == -1
+            // that's why .abs()
             match dir {
-                U => new_pos.v -= dist,
-                D => new_pos.v += dist,
-                // positive adjustment going up, negative adjustment going down
+                U => new_pos.v -= dh,
+                D => new_pos.v += dh,
                 UL => {
-                    // number of odd columns in range (excluding arrival column)
-                    let adjustment = if new_pos.h.is_odd() {
-                        (dist + 1) / 2
-                    } else {
-                        dist / 2
-                    };
-                    new_pos.h -= dist;
-                    new_pos.v -= dist;
-                    new_pos.v += adjustment;
+                    let adjustment = (dh + (self.h % 2).abs()) / 2;
+                    let dv = dh - adjustment;
+                    new_pos.h -= dh;
+                    new_pos.v -= dv;
                 }
                 UR => {
-                    // number of odd columns in range (excluding arrival column)
-                    let adjustment = if new_pos.h.is_odd() {
-                        (dist + 1) / 2
-                    } else {
-                        dist / 2
-                    };
-                    new_pos.h += dist;
-                    new_pos.v -= dist;
-                    new_pos.v += adjustment;
+                    let adjustment = (dh + (self.h % 2).abs()) / 2;
+                    let dv = dh - adjustment;
+                    new_pos.h += dh;
+                    new_pos.v -= dv;
                 }
                 DL => {
-                    // number of even columns in range (excluding arrival column)
-                    let adjustment = if new_pos.h.is_even() {
-                        (dist + 1) / 2
-                    } else {
-                        dist / 2
-                    };
-                    new_pos.h -= dist;
-                    new_pos.v += dist;
-                    new_pos.v -= adjustment;
+                    let adjustment = (dh + 1 - (self.h % 2).abs()) / 2;
+                    let dv = dh - adjustment;
+                    new_pos.h -= dh;
+                    new_pos.v += dv;
                 }
                 DR => {
-                    // number of even columns in range (excluding arrival column)
-                    let adjustment = if new_pos.h.is_even() {
-                        (dist + 1) / 2
-                    } else {
-                        dist / 2
-                    };
-                    new_pos.h += dist;
-                    new_pos.v += dist;
-                    new_pos.v -= adjustment;
+                    let adjustment = (dh + 1 - (self.h % 2).abs()) / 2;
+                    let dv = dh - adjustment;
+                    new_pos.h += dh;
+                    new_pos.v += dv;
                 }
             }
 
@@ -336,6 +362,13 @@ mod hex_pos {
                     let probs = problems(x, board_dim);
                     while !board_dim.contains(x) {
                         if problems(x, board_dim) != probs {
+                            // println!(
+                            //     "problems was {:?} for {:?}, is {:?} for {:?}",
+                            //     probs,
+                            //     self,
+                            //     problems(x, board_dim),
+                            //     x
+                            // );
                             return None;
                         }
                         x = x.translate(-dir, 1);
@@ -375,9 +408,15 @@ mod hex_pos {
         // wraps around board edges
         #[must_use]
         pub fn wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> Self {
-            self.translate(dir, dist)
+            let translated = self.translate(dir, dist);
+            translated
                 .wrap_around(board_dim, dir.axis())
-                .unwrap()
+                .unwrap_or_else(|| {
+                    panic!(
+                        "failed to wrap pos: {:?}, translated: {:?} (board_dim: {:?}, dir: {:?})",
+                        self, translated, board_dim, dir
+                    )
+                })
         }
 
         pub fn contains(self, pos: Self) -> bool {

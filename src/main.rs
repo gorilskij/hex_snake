@@ -14,6 +14,7 @@ use crate::app::{
 };
 
 mod app;
+mod oklab;
 mod point;
 
 fn main() {

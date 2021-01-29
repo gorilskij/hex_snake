@@ -118,7 +118,7 @@ impl App {
                     eat_other: hash_map! {},
                     default: EatBehavior::Crash,
                 },
-                palette: SnakePaletteTemplate::new_persistent_rainbow(),
+                palette: SnakePaletteTemplate::rainbow().persistent(),
                 controller: SnakeControllerTemplate::PlayerController(cs),
                 // controller: SnakeControllerTemplate::PlayerController12,
             })
