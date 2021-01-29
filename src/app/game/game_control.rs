@@ -60,12 +60,13 @@ pub struct GameControl {
     last_update: Instant,
     surplus: f64, // secs
 
-    frame_num: usize,
+    graphics_frame_num: usize,
 
     measured_game_fps: FPSCounter,
     measured_graphics_fps: FPSCounter,
 
     game_state: GameState,
+    frozen_frame_fraction: Option<f32>,
 }
 
 impl GameControl {
@@ -76,12 +77,13 @@ impl GameControl {
             last_update: Instant::now(),
             surplus: 0.,
 
-            frame_num: 0,
+            graphics_frame_num: 0,
 
             measured_game_fps: FPSCounter::new(fps),
             measured_graphics_fps: FPSCounter::new(60),
 
             game_state: GameState::Playing,
+            frozen_frame_fraction: None,
         }
     }
 
@@ -108,7 +110,6 @@ impl GameControl {
         if updates > 0 {
             self.surplus = game_frames % 1.;
             self.last_update = Instant::now();
-            self.frame_num = self.frame_num.wrapping_add(updates);
         }
 
         if self.game_state == GameState::Playing {
@@ -124,6 +125,7 @@ impl GameControl {
     // call in draw()
     pub fn graphics_frame(&mut self) {
         self.measured_graphics_fps.register_frame();
+        self.graphics_frame_num += 1;
     }
 
     pub fn state(&self) -> GameState {
@@ -133,29 +135,44 @@ impl GameControl {
     pub fn play(&mut self) {
         self.game_state = GameState::Playing;
         self.measured_game_fps.reset();
+        match self.frozen_frame_fraction.take() {
+            None => (),
+            Some(frac) => {
+                let elapsed = (frac - self.surplus as f32) * self.game_frame_duration.as_secs_f32();
+                assert!(elapsed >= 0., "elapsed: {}s", elapsed);
+                self.last_update = Instant::now() - Duration::from_secs_f32(elapsed);
+            }
+        }
     }
 
     pub fn pause(&mut self) {
         self.game_state = GameState::Paused;
+        self.frozen_frame_fraction = Some(self.frame_fraction());
     }
 
     pub fn game_over(&mut self) {
         self.game_state = GameState::GameOver;
+        self.frozen_frame_fraction = Some(self.frame_fraction());
     }
 
-    pub fn frame_num(&self) -> usize {
-        self.frame_num
+    pub fn graphics_frame_num(&self) -> usize {
+        self.graphics_frame_num
     }
 
     // fraction of the current game frame that has elapsed
     pub fn frame_fraction(&self) -> f32 {
-        let game_frames = self.last_update.elapsed().as_secs_f32()
-            / self.game_frame_duration.as_secs_f32()
-            + self.surplus as f32;
-        if game_frames > 1. {
-            1.
-        } else {
-            game_frames
+        match self.frozen_frame_fraction {
+            Some(frac) => frac,
+            None => {
+                let frac = self.last_update.elapsed().as_secs_f32()
+                    / self.game_frame_duration.as_secs_f32()
+                    + self.surplus as f32;
+                if frac > 1. {
+                    1.
+                } else {
+                    frac
+                }
+            }
         }
     }
 

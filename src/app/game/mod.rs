@@ -586,17 +586,7 @@ impl Game {
         // to be drawn later (potentially on top of body segments)
         let mut heads = vec![];
 
-        let frame_frac = if matches!(
-            self.control.state(),
-            GameState::Paused | GameState::GameOver
-        ) {
-            // TODO: implement some paused animation
-            // let x = self.fps_limiter.elapsed().as_secs_f32() % 2.;
-            // if x > 1. { 2. - x } else { x }
-            0.5
-        } else {
-            self.control.frame_fraction()
-        };
+        let frame_frac = self.control.frame_fraction();
 
         for (snake_idx, snake) in self.snakes.iter_mut().enumerate() {
             let len = snake.len();
@@ -723,7 +713,7 @@ impl Game {
             let color = match apple.typ {
                 AppleType::Normal(_) => self.palette.apple_color,
                 AppleType::SpawnSnake(_) => {
-                    let hue = 360. * (self.control.frame_num() % 12) as f64 / 11.;
+                    let hue = 360. * (self.control.graphics_frame_num() as f64 / 60. % 1.);
                     let hsl = HSL {
                         h: hue,
                         s: 1.,
