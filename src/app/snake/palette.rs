@@ -1,10 +1,15 @@
+use std::cmp::max;
+
+use ggez::graphics::Color;
+use hsl::HSL;
+
+use SegmentType::*;
+
 use crate::{
     app::snake::{Segment, SegmentType},
     oklab::OkLab,
 };
-use ggez::graphics::Color;
-use hsl::HSL;
-use std::cmp::max;
+
 macro_rules! gray {
     ($lightness:expr) => {
         Color {
@@ -19,7 +24,6 @@ macro_rules! gray {
 lazy_static! {
     static ref DEFAULT_EATEN_COLOR: Color = Color::from_rgb(0, 255, 128);
     static ref DEFAULT_CRASHED_COLOR: Color = Color::from_rgb(255, 0, 128);
-    static ref DEFAULT_BLACK_HOLE_COLOR: Color = Color::from_rgb(245, 197, 66);
     // static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgb(245, 192, 64);
 }
 
@@ -193,7 +197,7 @@ pub struct RGBGradient {
 
 impl SnakePainter for RGBGradient {
     fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
-        if segment.typ == SegmentType::Crashed {
+        if segment.typ == Crashed {
             return *DEFAULT_CRASHED_COLOR;
         }
 
@@ -207,10 +211,9 @@ impl SnakePainter for RGBGradient {
         };
 
         match segment.typ {
-            SegmentType::Normal => normal_color,
-            SegmentType::Eaten { .. } => self.eaten.paint_segment(&normal_color),
-            SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
-            SegmentType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
+            Normal | BlackHole => normal_color,
+            Eaten { .. } => self.eaten.paint_segment(&normal_color),
+            Crashed => *DEFAULT_CRASHED_COLOR,
         }
     }
 }
@@ -224,13 +227,13 @@ pub struct HSLGradient {
 
 impl SnakePainter for HSLGradient {
     fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
-        if segment.typ == SegmentType::Crashed {
+        if segment.typ == Crashed {
             return *DEFAULT_CRASHED_COLOR;
         }
 
         let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
         match segment.typ {
-            SegmentType::Normal => {
+            Normal | BlackHole => {
                 let hsl = HSL {
                     h: hue,
                     s: 1.,
@@ -238,7 +241,7 @@ impl SnakePainter for HSLGradient {
                 };
                 Color::from(hsl.to_rgb())
             }
-            SegmentType::Eaten { .. } => {
+            Eaten { .. } => {
                 // invert lightness twice
                 let hsl = HSL {
                     h: hue,
@@ -247,8 +250,7 @@ impl SnakePainter for HSLGradient {
                 };
                 Color::from(invert_rgb(hsl.to_rgb()))
             }
-            SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
-            SegmentType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
+            Crashed => *DEFAULT_CRASHED_COLOR,
         }
     }
 }
@@ -262,23 +264,22 @@ pub struct OkLabGradient {
 
 impl SnakePainter for OkLabGradient {
     fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
-        if segment.typ == SegmentType::Crashed {
+        if segment.typ == Crashed {
             return *DEFAULT_CRASHED_COLOR;
         }
 
         let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
         match segment.typ {
-            SegmentType::Normal => {
+            Normal | BlackHole => {
                 let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
                 Color::from(oklab.to_rgb())
             }
-            SegmentType::Eaten { .. } => {
+            Eaten { .. } => {
                 // invert lightness twice
                 let oklab = OkLab::from_lch(1. - self.eaten_lightness, 0.5, hue);
                 Color::from(invert_rgb(oklab.to_rgb()))
             }
-            SegmentType::Crashed => *DEFAULT_CRASHED_COLOR,
-            SegmentType::BlackHole => *DEFAULT_BLACK_HOLE_COLOR,
+            Crashed => *DEFAULT_CRASHED_COLOR,
         }
     }
 }

@@ -161,7 +161,7 @@ impl Snake {
     }
 
     pub fn update_dir(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
-        if !self.body.dir_grace {
+        if !self.body.dir_grace && self.state == SnakeState::Living {
             if let Some(new_dir) =
                 self.controller
                     .next_dir(&self.body, other_snakes, apples, board_dim)

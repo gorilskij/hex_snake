@@ -77,6 +77,9 @@ struct Prefs {
     display_fps: bool,
     apple_food: Food,
     message_duration: Frames,
+    // full hexagons, no animation
+    old_style_graphics: bool,
+    special_apples: bool,
 }
 
 impl Default for Prefs {
@@ -86,6 +89,8 @@ impl Default for Prefs {
             display_fps: false,
             apple_food: 1,
             message_duration: 100,
+            old_style_graphics: false,
+            special_apples: true,
         }
     }
 }
@@ -314,38 +319,42 @@ impl Game {
                 Err(idx) => occupied_cells.insert(idx, apple_pos),
             }
 
-            let apple_type = match self.rng.gen::<f32>() {
-                x if x < 0.025 => {
-                    let controller = if self.rng.gen::<f32>() < 0.5 {
-                        SnakeControllerTemplate::CompetitorAI
-                    } else {
-                        SnakeControllerTemplate::CompetitorAI2
-                    };
-                    AppleType::SpawnSnake(SnakeSeed {
-                        snake_type: SnakeType::CompetitorSnake { life: Some(200) },
-                        eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                        palette: SnakePaletteTemplate::pastel_rainbow().persistent(),
-                        controller,
-                    })
-                }
-                x if x < 0.040 => {
-                    if !self
-                        .snakes
-                        .iter()
-                        .any(|s| s.snake_type == SnakeType::PlayerSnake)
-                    {
-                        println!("warning: didn't spawn killer snake apple because there is no player snake");
-                        AppleType::Normal(1)
-                    } else {
+            let apple_type = if self.prefs.special_apples {
+                match self.rng.gen::<f32>() {
+                    x if x < 0.025 => {
+                        let controller = if self.rng.gen::<f32>() < 0.5 {
+                            SnakeControllerTemplate::CompetitorAI
+                        } else {
+                            SnakeControllerTemplate::CompetitorAI2
+                        };
                         AppleType::SpawnSnake(SnakeSeed {
-                            snake_type: SnakeType::KillerSnake { life: Some(200) },
+                            snake_type: SnakeType::CompetitorSnake { life: Some(200) },
                             eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                            palette: SnakePaletteTemplate::dark_blue_to_red(),
-                            controller: SnakeControllerTemplate::KillerAI,
+                            palette: SnakePaletteTemplate::pastel_rainbow().persistent(),
+                            controller,
                         })
                     }
+                    x if x < 0.040 => {
+                        if !self
+                            .snakes
+                            .iter()
+                            .any(|s| s.snake_type == SnakeType::PlayerSnake)
+                        {
+                            println!("warning: didn't spawn killer snake apple because there is no player snake");
+                            AppleType::Normal(1)
+                        } else {
+                            AppleType::SpawnSnake(SnakeSeed {
+                                snake_type: SnakeType::KillerSnake { life: Some(200) },
+                                eat_mechanics: EatMechanics::always(EatBehavior::Die),
+                                palette: SnakePaletteTemplate::dark_blue_to_red(),
+                                controller: SnakeControllerTemplate::KillerAI,
+                            })
+                        }
+                    }
+                    _ => AppleType::Normal(self.prefs.apple_food),
                 }
-                _ => AppleType::Normal(self.prefs.apple_food),
+            } else {
+                AppleType::Normal(self.prefs.apple_food)
             };
 
             self.apples.push(Apple {
@@ -648,7 +657,6 @@ impl Game {
                     continue;
                 }
 
-                let points;
                 let dest = segment.pos.to_point(self.cell_dim);
                 let color = snake
                     .painter
@@ -672,7 +680,11 @@ impl Game {
                     _ => SegmentFraction::Solid,
                 };
 
-                points = get_points_animated(dest, previous, next, self.cell_dim, fraction);
+                let points = if self.prefs.old_style_graphics {
+                    get_full_hexagon(dest, self.cell_dim)
+                } else {
+                    get_points_animated(dest, previous, next, self.cell_dim, fraction)
+                };
 
                 builder.polygon(DrawMode::fill(), &points, color)?;
             }
@@ -680,27 +692,29 @@ impl Game {
 
         for (snake_idx, segment, previous, next, color_offset) in heads {
             let Segment { pos, typ, .. } = segment;
-
             let dest = pos.to_point(self.cell_dim);
-
             let snake = &mut self.snakes[snake_idx];
 
             match typ {
                 SegmentType::BlackHole => {
-                    let hexagon_color = Color::from_rgb(255, 255, 255);
+                    let hexagon_color = Color::from_rgb(1, 36, 92);
                     let segment_color = snake.painter.paint_segment(
                         color_offset,
                         snake.len() + color_offset,
                         &segment,
                     );
                     let hexagon_points = get_full_hexagon(dest, self.cell_dim);
-                    let segment_points = get_points_animated(
-                        dest,
-                        previous,
-                        next,
-                        self.cell_dim,
-                        SegmentFraction::Appearing(0.5),
-                    );
+                    let segment_points = if self.prefs.old_style_graphics {
+                        get_full_hexagon(dest, self.cell_dim)
+                    } else {
+                        get_points_animated(
+                            dest,
+                            previous,
+                            next,
+                            self.cell_dim,
+                            SegmentFraction::Appearing(0.5),
+                        )
+                    };
                     builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
                     builder.polygon(DrawMode::fill(), &segment_points, segment_color)?;
                 }
@@ -708,13 +722,17 @@ impl Game {
                     let color = snake
                         .painter
                         .paint_segment(0, snake.len(), &snake.body.cells[0]);
-                    let points = get_points_animated(
-                        dest,
-                        previous,
-                        next,
-                        self.cell_dim,
-                        SegmentFraction::Appearing(0.5),
-                    );
+                    let points = if self.prefs.old_style_graphics {
+                        get_full_hexagon(dest, self.cell_dim)
+                    } else {
+                        get_points_animated(
+                            dest,
+                            previous,
+                            next,
+                            self.cell_dim,
+                            SegmentFraction::Appearing(0.5),
+                        )
+                    };
                     builder.polygon(DrawMode::fill(), &points, color)?;
                 }
                 _ => unreachable!(
@@ -725,7 +743,6 @@ impl Game {
         }
 
         for apple in &self.apples {
-            let dest = apple.pos.to_point(self.cell_dim) + self.cell_dim.center();
             let color = match apple.typ {
                 AppleType::Normal(_) => self.palette.apple_color,
                 AppleType::SpawnSnake(_) => {
@@ -738,7 +755,14 @@ impl Game {
                     Color::from(hsl.to_rgb())
                 }
             };
-            builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 1.5, 0.1, color);
+            if self.prefs.old_style_graphics {
+                let dest = apple.pos.to_point(self.cell_dim);
+                let points = get_full_hexagon(dest, self.cell_dim);
+                builder.polygon(DrawMode::fill(), &points, color)?;
+            } else {
+                let dest = apple.pos.to_point(self.cell_dim) + self.cell_dim.center();
+                builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 1.5, 0.1, color);
+            }
         }
 
         let mesh = builder.build(ctx)?;
@@ -904,6 +928,30 @@ impl EventHandler for Game {
                 self.control.set_fps(new_fps);
                 self.message_top_right = Some(Message::from((
                     format!("fps: {}", new_fps),
+                    self.prefs.message_duration,
+                )));
+            }
+            Escape => {
+                self.prefs.old_style_graphics = !self.prefs.old_style_graphics;
+                let message = if self.prefs.old_style_graphics {
+                    "RTX off"
+                } else {
+                    "RTX on"
+                };
+                self.message_top_right = Some(Message::from((
+                    message.to_string(),
+                    self.prefs.message_duration,
+                )));
+            }
+            X => {
+                self.prefs.special_apples = !self.prefs.special_apples;
+                let message = if self.prefs.special_apples {
+                    "Special apples enabled"
+                } else {
+                    "Special apples disabled"
+                };
+                self.message_top_right = Some(Message::from((
+                    message.to_string(),
                     self.prefs.message_duration,
                 )));
             }
