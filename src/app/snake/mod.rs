@@ -160,12 +160,7 @@ impl Snake {
             .collect()
     }
 
-    pub fn update_dir(
-        &mut self,
-        other_snakes: OtherSnakes,
-        apples: &[Apple],
-        board_dim: HexDim,
-    ) {
+    pub fn update_dir(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
         if !self.body.dir_grace {
             if let Some(new_dir) =
                 self.controller

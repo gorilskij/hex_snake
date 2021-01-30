@@ -462,6 +462,7 @@ impl Game {
                 EatBehavior::Cut => {
                     let crash_point = self.snakes[i].head().pos;
                     if i != j && crash_point == self.snakes[j].head().pos {
+                        // TODO: cause only a crash if even one of the snakes crashed
                         // special case for a head-to-head collision, can't cut..
                         println!("warning: invoked head-to-head collision special case");
                         self.snakes[i].die();
@@ -494,7 +495,11 @@ impl Game {
         // check apple eating
         let mut k = -1;
         let mut spawn_snake = None;
-        for snake in &mut self.snakes {
+        for snake in self
+            .snakes
+            .iter_mut()
+            .filter(|snake| snake.state == SnakeState::Living)
+        {
             k += 1;
             for i in (0..self.apples.len()).rev() {
                 if snake.len() == 0 {
@@ -614,8 +619,6 @@ impl Game {
             //     builder.polygon(DrawMode::fill(), &points, WHITE)?;
             // }
 
-            let draw_head_separately =
-                matches!(snake.state, SnakeState::Crashed | SnakeState::Dying(_));
             let color_offset = match snake.state {
                 SnakeState::Dying(offset) => offset,
                 _ => 0,
@@ -632,7 +635,15 @@ impl Game {
 
                 let next = segment.next_segment;
 
-                if draw_head_separately && seg_idx == 0 {
+                if seg_idx == 0 && matches!(snake.state, SnakeState::Crashed | SnakeState::Dying(_))
+                {
+                    assert!(
+                        matches!(segment.typ, SegmentType::Crashed | SegmentType::BlackHole),
+                        "head of type {:?} in snake in state {:?}",
+                        segment.typ,
+                        snake.state
+                    );
+                    // draw head separately
                     heads.push((snake_idx, *segment, previous, next, color_offset));
                     continue;
                 }
