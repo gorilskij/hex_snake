@@ -190,14 +190,13 @@ mod hex_pos {
             }
         }
 
-        // TODO: replace this with manhattan distance
         // approximate straight-line distance in units of side length
-        pub fn distance_to(self, other: Self) -> usize {
-            let dh = (self.h - other.h).abs() as f32;
-            let dv = (self.v - other.v).abs() as f32;
-            let CellDim { side, sin, cos } = CellDim::from(1.);
-            (dh / (side + cos) + dv / (2. * sin)) as usize
-        }
+        // pub fn distance_to(self, other: Self) -> usize {
+        //     let dh = (self.h - other.h).abs() as f32;
+        //     let dv = (self.v - other.v).abs() as f32;
+        //     let CellDim { side, sin, cos } = CellDim::from(1.);
+        //     (dh / (side + cos) + dv / (2. * sin)) as usize
+        // }
 
         // untested
         // None if the two points are not on the same line

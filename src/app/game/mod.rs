@@ -355,6 +355,14 @@ impl Game {
         }
     }
 
+    // mut snake at idk and immutable all other snakes
+    fn split_snakes(snakes: &mut [Snake], idx: usize) -> (&mut Snake, OtherSnakes) {
+        let (other_snakes1, rest) = snakes.split_at_mut(idx);
+        let (snake, other_snakes2) = rest.split_at_mut(1);
+        let snake = &mut snake[0];
+        (snake, OtherSnakes(other_snakes1, other_snakes2))
+    }
+
     fn advance_snakes(&mut self) {
         let mut remove_snakes = vec![];
         for snake_idx in 0..self.snakes.len() {
@@ -371,16 +379,10 @@ impl Game {
                 _ => (),
             }
 
-            // advance the snake
-            let (other_snakes1, rest) = self.snakes.split_at_mut(snake_idx);
-            let (snake, other_snakes2) = rest.split_at_mut(1);
-            let snake = &mut snake[0];
+            let (snake, other_snakes) = Self::split_snakes(&mut self.snakes, snake_idx);
 
-            snake.advance(
-                OtherSnakes(other_snakes1, other_snakes2),
-                &self.apples,
-                self.dim,
-            );
+            // advance the snake
+            snake.advance(other_snakes, &self.apples, self.dim);
 
             // remove snake if it ran out of body
             if snake.len() == 0 {
@@ -593,10 +595,13 @@ impl Game {
 
         let frame_frac = self.control.frame_fraction();
 
-        for (snake_idx, snake) in self.snakes.iter_mut().enumerate() {
-            let len = snake.len();
+        for snake_idx in 0..self.snakes.len() {
+            let (snake, other_snakes) = Self::split_snakes(&mut self.snakes, snake_idx);
 
-            snake.new_dir_mid_frame();
+            // update the direction of the snake as soon as possible (mid game-frame)
+            snake.update_dir(other_snakes, &self.apples, self.dim);
+
+            let len = snake.len();
 
             if len < 2 {
                 println!("warning: snakes of length <= 1 interact weirdly with animation ")

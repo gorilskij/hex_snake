@@ -60,21 +60,13 @@ impl OtherSnakes<'_> {
 }
 
 pub trait SnakeController {
-    // NOTE: implement exactly one of next_dir or next_dir_light
     fn next_dir(
         &mut self,
-        _snake_body: &SnakeBody,
-        _other_snakes: OtherSnakes,
-        _apples: &[Apple],
-        _board_dim: HexDim,
-    ) -> Option<Dir> {
-        self.next_dir_light()
-    }
-
-    // a lightweight version of next_dir to be called more frequently
-    fn next_dir_light(&mut self) -> Option<Dir> {
-        None
-    }
+        snake_body: &SnakeBody,
+        other_snakes: OtherSnakes,
+        apples: &[Apple],
+        board_dim: HexDim,
+    ) -> Option<Dir>;
 
     fn reset(&mut self, _dir: Dir) {}
 
@@ -119,7 +111,7 @@ impl PlayerController {
 }
 
 impl SnakeController for PlayerController {
-    fn next_dir_light(&mut self) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = queue_dir;
             Some(self.dir)
@@ -203,7 +195,7 @@ struct PlayerController12 {
 }
 
 impl SnakeController for PlayerController12 {
-    fn next_dir_light(&mut self) -> Option<Dir> {
+    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
         if let Some(new_dir) = self.next_dir.take() {
             self.dir = new_dir;
             self.alternation = false;

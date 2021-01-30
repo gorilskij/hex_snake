@@ -160,18 +160,12 @@ impl Snake {
             .collect()
     }
 
-    // called during graphics frames (potentially multiple times for game frame)
-    // careful with performance!
-    pub fn new_dir_mid_frame(&mut self) {
-        if !self.body.dir_grace {
-            if let Some(new_dir) = self.controller.next_dir_light() {
-                self.body.dir = new_dir;
-                self.body.dir_grace = true;
-            }
-        }
-    }
-
-    fn new_dir_checked(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
+    pub fn update_dir(
+        &mut self,
+        other_snakes: OtherSnakes,
+        apples: &[Apple],
+        board_dim: HexDim,
+    ) {
         if !self.body.dir_grace {
             if let Some(new_dir) =
                 self.controller
@@ -197,7 +191,7 @@ impl Snake {
         match &mut self.state {
             SnakeState::Dying(removed) => *removed += 1,
             SnakeState::Living => {
-                self.new_dir_checked(other_snakes, apples, board_dim);
+                self.update_dir(other_snakes, apples, board_dim);
 
                 // create new head for snake
                 let dir = self.dir();
