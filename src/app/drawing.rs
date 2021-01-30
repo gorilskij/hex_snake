@@ -97,16 +97,7 @@ pub fn generate_border_mesh(ctx: &mut Context) -> GameResult<Mesh> {
 }
 
 fn rotate(points: &mut [Point], angle: f32, origin: Point) {
-    let sin = angle.sin();
-    let cos = angle.cos();
-
     for point in points.iter_mut() {
-        // *point -= origin;
-        // *point = Point {
-        //     x: point.x * cos - point.y * sin,
-        //     y: point.x * sin + point.y * cos,
-        // };
-        // *point += origin;
         *point = point.clockwise_rotate_around(origin, angle);
     }
 }

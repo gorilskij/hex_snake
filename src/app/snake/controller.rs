@@ -82,7 +82,9 @@ impl SnakeControllerTemplate {
         let mut vec = Vec::with_capacity(12);
         for dir in Dir::iter() {
             vec.push(SimMove::Move(dir));
-            vec.push(SimMove::Wait(side_len));
+            if side_len > 0 {
+                vec.push(SimMove::Wait(side_len));
+            }
         }
         Self::DemoController(vec)
     }

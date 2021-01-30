@@ -19,6 +19,8 @@ use crate::app::{
         controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
     },
 };
+use crate::app::snake::controller::SimMove;
+use crate::app::hex::Dir;
 
 macro_rules! hash_map {
     {} => {
@@ -127,9 +129,27 @@ impl App {
 
         // let seeds = vec![SnakeSeed {
         //     snake_type: SnakeType::PlayerSnake,
-        //     eat_mechanics: EatMechanics::always(EatBehavior::Crash),
+        //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::rainbow(),
         //     controller: SnakeControllerTemplate::demo_hexagon_pattern(1),
+        // }];
+
+        // let seeds = vec![SnakeSeed {
+        //     snake_type: SnakeType::PlayerSnake,
+        //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
+        //     palette: SnakePaletteTemplate::rainbow(),
+        //     controller: SnakeControllerTemplate::demo_hexagon_pattern(0),
+        // }];
+
+        // let seeds = vec![SnakeSeed {
+        //     snake_type: SnakeType::PlayerSnake,
+        //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
+        //     palette: SnakePaletteTemplate::rainbow(),
+        //     controller: SnakeControllerTemplate::DemoController(vec![
+        //         SimMove::Move(Dir::U),
+        //         SimMove::Move(Dir::DR),
+        //         SimMove::Move(Dir::DL),
+        //     ]),
         // }];
 
         Self {
