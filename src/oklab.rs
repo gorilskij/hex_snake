@@ -5,16 +5,6 @@ pub struct OkLab {
     pub b: f64,
 }
 
-#[test]
-fn test() {
-    let rgb = (143, 123, 44);
-    assert_eq!(rgb, OkLab::from(rgb).to_rgb());
-
-    // let lab = OkLab::from((25, 131, 58));
-    // let (l, c, h) = lab.to_lch();
-    // assert_eq!(lab, OkLab::from_lch(l, c, h));
-}
-
 impl From<(u8, u8, u8)> for OkLab {
     fn from(rgb: (u8, u8, u8)) -> Self {
         // let r = r as f64 / 255.;

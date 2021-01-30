@@ -226,18 +226,17 @@ mod hex_pos {
         //     None
         // }
 
-        // untested
-        // pub fn manhattan_distance_to(self, other: Self) -> usize {
-        //     let dh = (self.h - other.h).abs();
-        //     let max_dv = if self.v > other.v {
-        //         dh - (dh + self.h % 2) / 2
-        //     } else {
-        //         dh - (dh + (self.h + 1) % 2) / 2
-        //     };
-        //     let dv = (self.v - other.v).abs();
-        //     let dv_overflow = max(0, dv - max_dv);
-        //     (dh + dv_overflow) as usize
-        // }
+        pub fn manhattan_distance_to(self, other: Self) -> usize {
+            let dh = (self.h - other.h).abs();
+            let max_dv = if self.v > other.v {
+                dh - (dh + self.h % 2) / 2
+            } else {
+                dh - (dh + (self.h + 1) % 2) / 2
+            };
+            let dv = (self.v - other.v).abs();
+            let dv_overflow = max(0, dv - max_dv);
+            (dh + dv_overflow) as usize
+        }
 
         // all cells within a manhattan distance of radius (including self)
         // guarantees no duplicates, not sorted
@@ -287,8 +286,8 @@ mod hex_pos {
 
     impl HexPoint {
         #[must_use]
-        pub fn translate(self, dir: Dir, dh: usize) -> Self {
-            let dh = dh as isize;
+        pub fn translate(self, dir: Dir, dist: usize) -> Self {
+            let dh = dist as isize;
             let mut new_pos = self;
 
             // adjustment:
@@ -422,5 +421,26 @@ mod hex_pos {
         pub fn contains(self, pos: Self) -> bool {
             (0..self.h).contains(&pos.h) && (0..self.v).contains(&pos.v)
         }
+    }
+
+    #[test]
+    fn test_manhattan_distance() {
+        [
+            ((0, 0), (0, 0), 0),
+            ((0, 0), (0, 1), 1),
+            ((0, 0), (1, 0), 1),
+            ((0, 0), (0, 10), 10),
+            ((0, 0), (0, -10), 10),
+            ((0, 10), (0, 0), 10),
+            ((0, -10), (0, 0), 10),
+            ((1, 1), (2, 2), 1),
+            ((1, 1), (3, 3), 3),
+        ]
+        .iter()
+        .for_each(|&((h1, v1), (h2, v2), d)| {
+            let p1 = HexPoint { h: h1, v: v1 };
+            let p2 = HexPoint { h: h2, v: v2 };
+            assert_eq!(p1.manhattan_distance_to(p2), d);
+        });
     }
 }

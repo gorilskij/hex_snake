@@ -315,12 +315,19 @@ impl Game {
             }
 
             let apple_type = match self.rng.gen::<f32>() {
-                x if x < 0.025 => AppleType::SpawnSnake(SnakeSeed {
-                    snake_type: SnakeType::CompetitorSnake { life: Some(200) },
-                    eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                    palette: SnakePaletteTemplate::pastel_rainbow().persistent(),
-                    controller: SnakeControllerTemplate::CompetitorAI,
-                }),
+                x if x < 0.025 => {
+                    let controller = if self.rng.gen::<f32>() < 0.5 {
+                        SnakeControllerTemplate::CompetitorAI
+                    } else {
+                        SnakeControllerTemplate::CompetitorAI2
+                    };
+                    AppleType::SpawnSnake(SnakeSeed {
+                        snake_type: SnakeType::CompetitorSnake { life: Some(200) },
+                        eat_mechanics: EatMechanics::always(EatBehavior::Die),
+                        palette: SnakePaletteTemplate::pastel_rainbow().persistent(),
+                        controller,
+                    })
+                }
                 x if x < 0.040 => {
                     if !self
                         .snakes

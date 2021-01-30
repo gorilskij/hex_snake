@@ -31,6 +31,7 @@ pub enum SnakeControllerTemplate {
     PlayerController12,
     DemoController(Vec<SimMove>),
     CompetitorAI,
+    CompetitorAI2,
     KillerAI,
 }
 
@@ -93,6 +94,7 @@ impl SnakeControllerTemplate {
                 wait: 0,
             }),
             SnakeControllerTemplate::CompetitorAI => Box::new(CompetitorAI),
+            SnakeControllerTemplate::CompetitorAI2 => Box::new(CompetitorAI2),
             SnakeControllerTemplate::KillerAI => Box::new(KillerAI),
         }
     }
@@ -354,7 +356,12 @@ impl SnakeController for CompetitorAI {
 
 struct CompetitorAI2;
 
-fn approximate_dir(from: HexPoint, to: HexPoint, filter: impl Fn(Dir) -> bool) -> Option<Dir> {
+fn approximate_dir(
+    from: HexPoint,
+    to: HexPoint,
+    filter: impl Fn(Dir) -> bool,
+    penalty: impl Fn(Dir) -> f32, // higher = worse
+) -> Option<Dir> {
     use std::f32::consts::PI;
     use Dir::*;
 
@@ -385,10 +392,34 @@ fn approximate_dir(from: HexPoint, to: HexPoint, filter: impl Fn(Dir) -> bool) -
         .iter()
         .copied()
         .filter(|(d, _)| filter(*d))
-        .min_by_key(|(_, a)| TotalF32((a - angle).abs()))
+        .min_by_key(|(d, a)| TotalF32((a - angle).abs() + penalty(*d)))
         .map(|(d, _)| d)
 }
 
+fn distance_to_snake(
+    mut point: HexPoint,
+    dir: Dir,
+    snake_body: &SnakeBody,
+    other_snakes: OtherSnakes,
+    board_dim: HexDim,
+    max_dist: Option<usize>, // if not within max_dist, returns max_dist
+) -> usize {
+    // guaranteed to terminate anyway whenever the head reaches itself again
+    let upper_bound = max_dist.unwrap_or(usize::MAX);
+    for distance in 1..=upper_bound {
+        point = point.wrapping_translate(dir, 1, board_dim);
+
+        for Segment { pos, .. } in snake_body.cells.iter().chain(other_snakes.iter_segments()) {
+            if *pos == point {
+                return distance;
+            }
+        }
+    }
+    upper_bound
+}
+
+// for some reason this doesn't behave symmetrically
+// there's a pattern that only occurs when moving left, not right
 impl SnakeController for CompetitorAI2 {
     fn next_dir(
         &mut self,
@@ -397,53 +428,42 @@ impl SnakeController for CompetitorAI2 {
         apples: &[Apple],
         board_dim: HexDim,
     ) -> Option<Dir> {
-        // untested
-        // let closest_apple = apples
-        //     .iter()
-        //     .min_by_key(|apple| snake_body.cells[0].pos.manhattan_distance_to(apple.pos))
-        //     .unwrap()
-        //     .pos;
-        //
-        // let head_pos = snake_body.cells[0].pos;
-        // let snake_dir = snake_body.dir;
-        // approximate_dir(head_pos, closest_apple, |dir| {
-        //     dir != -snake_dir
-        //         && !other_snakes.iter_segments().any(|segment| {
-        //             head_pos.translate(dir, 1) == segment.pos
-        //                 || head_pos.translate(dir, 2) == segment.pos
-        //         })
-        // })
-        None
+        let (apple_pos, apple_dist) = apples
+            .iter()
+            .map(|apple| {
+                (
+                    apple.pos,
+                    snake_body.cells[0].pos.manhattan_distance_to(apple.pos),
+                )
+            })
+            .min_by_key(|(_, dist)| *dist)
+            .unwrap();
+
+        let head_pos = snake_body.cells[0].pos;
+        let snake_dir = snake_body.dir;
+        let dir = approximate_dir(
+            head_pos,
+            apple_pos,
+            |dir| dir != -snake_dir,
+            |dir| {
+                10. * (apple_dist as f32
+                    - distance_to_snake(
+                        head_pos,
+                        dir,
+                        snake_body,
+                        other_snakes,
+                        board_dim,
+                        Some(10),
+                    ) as f32)
+            },
+        );
+        // println!("{:?}", dir);
+        dir
     }
 }
 
 // tries to kill player
 struct KillerAI;
-
-fn distance_to_snake(
-    dir: Dir,
-    snake_body: &SnakeBody,
-    other_snakes: OtherSnakes,
-    board_dim: HexDim,
-) -> usize {
-    let mut distance = 0;
-    let mut new_head = snake_body.cells[0].pos;
-    // guaranteed to terminate whenever the head reaches itself again
-    loop {
-        distance += 1;
-        new_head = new_head.wrapping_translate(dir, 1, board_dim);
-
-        for body in once(snake_body).chain(other_snakes.iter_bodies()) {
-            if body
-                .cells
-                .iter()
-                .any(|Segment { pos, .. }| pos == &new_head)
-            {
-                return distance;
-            }
-        }
-    }
-}
 
 // potential alternative to searching for the closest angle
 // would still require searching through a list so not an improvement..
@@ -479,12 +499,16 @@ fn rough_direction(
         (DR, 11. / 6. * PI),
     ];
 
+    let head_pos = snake_body.cells[0].pos;
+
     // this could probably be done with math
     DIR_ANGLES
         .iter()
         .copied()
         .filter(|(d, _)| *d != -snake_body.dir)
-        .filter(|(d, _)| distance_to_snake(*d, snake_body, other_snakes, board_dim) > 1)
+        .filter(|(d, _)| {
+            distance_to_snake(head_pos, *d, snake_body, other_snakes, board_dim, Some(2)) > 1
+        })
         .min_by_key(|(_, a)| TotalF32((a - angle).abs()))
         .take()
         .map(|(d, _)| d)
@@ -503,7 +527,7 @@ impl SnakeController for KillerAI {
         let player_snake = other_snakes
             .iter_snakes()
             .filter(|s| s.snake_type == SnakeType::PlayerSnake)
-            .min_by_key(|s| s.head().pos.distance_to(snake_body.cells[0].pos))
+            .min_by_key(|s| s.head().pos.manhattan_distance_to(snake_body.cells[0].pos))
             .expect("no player snake found");
 
         let mut target = player_snake.head().pos;
