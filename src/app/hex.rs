@@ -227,9 +227,9 @@ mod hex_pos {
         pub fn manhattan_distance_to(self, other: Self) -> usize {
             let dh = (self.h - other.h).abs();
             let max_dv = if self.v > other.v {
-                dh - (dh + self.h % 2) / 2
+                dh - (dh + (self.h % 2).abs()) / 2
             } else {
-                dh - (dh + (self.h + 1) % 2) / 2
+                dh - (dh + 1 - (self.h % 2).abs()) / 2
             };
             let dv = (self.v - other.v).abs();
             let dv_overflow = max(0, dv - max_dv);

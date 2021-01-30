@@ -418,8 +418,6 @@ fn distance_to_snake(
     upper_bound
 }
 
-// for some reason this doesn't behave symmetrically
-// there's a pattern that only occurs when moving left, not right
 impl SnakeController for CompetitorAI2 {
     fn next_dir(
         &mut self,
