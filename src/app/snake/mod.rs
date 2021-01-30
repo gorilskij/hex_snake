@@ -34,7 +34,8 @@ pub enum SegmentType {
     Normal,
     Eaten { original_food: u32, food_left: u32 },
     Crashed,
-    BlackHole, // does not advance, sucks the rest of the snake in
+    // does not advance, sucks the rest of the snake in
+    BlackHole,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -75,6 +76,8 @@ impl EatMechanics {
 pub struct SnakeBody {
     pub cells: VecDeque<Segment>,
     pub dir: Dir,
+    // prevent updating dir multiple times per game frame
+    pub dir_grace: bool,
     pub grow: usize,
 }
 
@@ -123,6 +126,7 @@ impl Snake {
             body: SnakeBody {
                 cells: body,
                 dir,
+                dir_grace: false,
                 grow,
             },
             state: SnakeState::Living,
@@ -156,6 +160,29 @@ impl Snake {
             .collect()
     }
 
+    // called during graphics frames (potentially multiple times for game frame)
+    // careful with performance!
+    pub fn new_dir_mid_frame(&mut self) {
+        if !self.body.dir_grace {
+            if let Some(new_dir) = self.controller.next_dir_light() {
+                self.body.dir = new_dir;
+                self.body.dir_grace = true;
+            }
+        }
+    }
+
+    fn new_dir_checked(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
+        if !self.body.dir_grace {
+            if let Some(new_dir) =
+                self.controller
+                    .next_dir(&self.body, other_snakes, apples, board_dim)
+            {
+                self.body.dir = new_dir;
+                self.body.dir_grace = true;
+            }
+        }
+    }
+
     pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
         let last_idx = self.len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].typ {
@@ -170,18 +197,10 @@ impl Snake {
         match &mut self.state {
             SnakeState::Dying(removed) => *removed += 1,
             SnakeState::Living => {
-                // determine new direction for snake
-                let dir = if let Some(new_dir) =
-                    self.controller
-                        .next_dir(&self.body, other_snakes, apples, board_dim)
-                {
-                    self.body.dir = new_dir;
-                    new_dir
-                } else {
-                    self.dir()
-                };
+                self.new_dir_checked(other_snakes, apples, board_dim);
 
                 // create new head for snake
+                let dir = self.dir();
                 let new_head = Segment {
                     typ: SegmentType::Normal,
                     pos: self.head().pos.wrapping_translate(dir, 1, board_dim),
@@ -192,6 +211,8 @@ impl Snake {
             }
             SnakeState::Crashed => panic!("called advance() on a crashed snake"),
         }
+
+        self.body.dir_grace = false;
 
         if self.body.grow > 0 {
             self.body.grow -= 1;

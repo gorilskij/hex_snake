@@ -167,7 +167,6 @@ mod dir {
 mod hex_pos {
     use super::dir::{Axis, Dir};
     use crate::{app::game::CellDim, point::Point};
-    use num_integer::Integer;
     use std::{
         cmp::{max, Ordering},
         fmt::{Debug, Error, Formatter},

@@ -52,6 +52,7 @@ impl SnakeDemo {
                 body: SnakeBody {
                     cells: body,
                     dir,
+                    dir_grace: false,
                     grow: 10,
                 },
                 state: SnakeState::Living,

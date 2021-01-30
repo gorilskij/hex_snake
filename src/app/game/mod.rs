@@ -596,6 +596,8 @@ impl Game {
         for (snake_idx, snake) in self.snakes.iter_mut().enumerate() {
             let len = snake.len();
 
+            snake.new_dir_mid_frame();
+
             if len < 2 {
                 println!("warning: snakes of length <= 1 interact weirdly with animation ")
             }
@@ -606,12 +608,6 @@ impl Game {
             //     let points = get_full_hexagon(dest, self.cell_dim);
             //     builder.polygon(DrawMode::fill(), &points, WHITE)?;
             // }
-
-            // TODO: this is weird
-            if snake.state == SnakeState::Crashed && snake.head().typ != SegmentType::Crashed {
-                println!("idx: {}, len: {}", snake_idx, len);
-                panic!("crashed snake with head: {:?}", snake.head().typ)
-            }
 
             let draw_head_separately =
                 matches!(snake.state, SnakeState::Crashed | SnakeState::Dying(_));
