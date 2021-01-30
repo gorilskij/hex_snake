@@ -11,6 +11,7 @@ use ggez::{
     Context, GameResult,
 };
 use num_integer::Integer;
+use std::f32::consts::PI;
 
 pub fn generate_grid_mesh(
     ctx: &mut Context,
@@ -100,12 +101,13 @@ fn rotate(points: &mut [Point], angle: f32, origin: Point) {
     let cos = angle.cos();
 
     for point in points.iter_mut() {
-        *point -= origin;
-        *point = Point {
-            x: point.x * cos - point.y * sin,
-            y: point.x * sin + point.y * cos,
-        };
-        *point += origin;
+        // *point -= origin;
+        // *point = Point {
+        //     x: point.x * cos - point.y * sin,
+        //     y: point.x * sin + point.y * cos,
+        // };
+        // *point += origin;
+        *point = point.clockwise_rotate_around(origin, angle);
     }
 }
 
@@ -189,17 +191,59 @@ pub fn get_points_animated(
                 }
             };
 
-            let start_a = #[rustfmt::skip] Point { x: side + cos, y: 2. * sin };
-            let start_b = #[rustfmt::skip] Point { x: side + 2. * cos, y: sin };
-            let end_a = #[rustfmt::skip] Point { x: cos, y: 0. };
-            let end_b = #[rustfmt::skip] Point { x: side + cos, y: 0. };
+            // sharp corners
+            // let start_a = #[rustfmt::skip] Point { x: side + cos, y: 2. * sin };
+            // let start_b = #[rustfmt::skip] Point { x: side + 2. * cos, y: sin };
+            // let end_a = #[rustfmt::skip] Point { x: cos, y: 0. };
+            // let end_b = #[rustfmt::skip] Point { x: side + cos, y: 0. };
+            //
+            // points = vec![
+            //     appear * end_a + (1. - appear) * start_a,
+            //     appear * end_b + (1. - appear) * start_b,
+            //     disappear * start_b + (1. - disappear) * end_b,
+            //     disappear * start_a + (1. - disappear) * end_a,
+            // ];
 
-            points = vec![
-                appear * end_a + (1. - appear) * start_a,
-                appear * end_b + (1. - appear) * start_b,
-                disappear * start_b + (1. - disappear) * end_b,
-                disappear * start_a + (1. - disappear) * end_a,
-            ];
+            const ANGLE_STEP: f32 = 0.1;
+
+            let pivot = #[rustfmt::skip] Point { x: side + 3. * cos, y: 0. };
+            let a = #[rustfmt::skip] Point { x: cos, y: 0. };
+            let b = #[rustfmt::skip] Point { x: side + cos, y: 0. };
+
+            points = vec![];
+
+            let (angle_start, angle_end);
+            if appear < 1. {
+                angle_start = -PI / 3.;
+                angle_end = (1. - appear) * angle_start;
+            } else {
+                angle_start = disappear * (-PI / 3.);
+                angle_end = 0.;
+            };
+
+            // a one way
+            let mut ang = angle_start;
+            while ang < angle_end {
+                let pt = a.clockwise_rotate_around(pivot, ang);
+                points.push(pt);
+                ang += ANGLE_STEP;
+            }
+            points.push(a.clockwise_rotate_around(pivot, angle_end));
+
+            // b the other way
+            ang = angle_end;
+            while ang > angle_start {
+                let pt = b.clockwise_rotate_around(pivot, ang);
+                points.push(pt);
+                ang -= ANGLE_STEP;
+            }
+            points.push(b.clockwise_rotate_around(pivot, angle_start));
+
+            // hacky
+            if points.len() < 3 {
+                assert_eq!(points.len(), 2);
+                points.push(pivot);
+            }
 
             rotate(&mut points, angle, cell_dim.center());
         }
@@ -212,6 +256,11 @@ pub fn get_points_animated(
             //     Point { x: cos, y: 2. * sin },
             // ];
 
+            assert!(
+                appear == 1. || disappear == 1.,
+                "simultaneous appar and disappear not implemented"
+            );
+
             let (angle, appear, disappear) = match turn_direction {
                 TurnDirection::Clockwise => (previous.clockwise_angle_from_u(), appear, disappear),
                 TurnDirection::CounterClockwise => {
@@ -219,39 +268,66 @@ pub fn get_points_animated(
                 }
             };
 
-            assert!(
-                appear == 1. || disappear == 1.,
-                "simultaneous appar and disappear not implemented"
-            );
+            // sharp point
+            // let pivot = #[rustfmt::skip] Point { x: side + cos, y: 0. };
+            // let a = #[rustfmt::skip] Point { x: cos, y: 0. };
+            // let b = #[rustfmt::skip] Point { x: cos, y: 2. * sin };
+            // let c = #[rustfmt::skip] Point { x: side + 2. * cos, y: sin };
+            //
+            // points = Vec::with_capacity(4);
+            // if appear < 1. {
+            //     if appear >= 0.5 {
+            //         let f = (appear - 0.5) / 0.5;
+            //         points.push(f * a + (1. - f) * b);
+            //         points.push(b);
+            //     } else {
+            //         let f = appear / 0.5;
+            //         points.push(f * b + (1. - f) * c);
+            //     }
+            //     points.push(c);
+            //     points.push(pivot);
+            // } else {
+            //     points.push(pivot);
+            //     points.push(a);
+            //     if disappear >= 0.5 {
+            //         let f = (disappear - 0.5) / 0.5;
+            //         points.push(b);
+            //         points.push((1. - f) * b + f * c);
+            //     } else {
+            //         let f = disappear / 0.5;
+            //         points.push((1. - f) * a + f * b);
+            //     }
+            // }
+
+            const ANGLE_STEP: f32 = 0.1;
 
             let pivot = #[rustfmt::skip] Point { x: side + cos, y: 0. };
             let a = #[rustfmt::skip] Point { x: cos, y: 0. };
-            let b = #[rustfmt::skip] Point { x: cos, y: 2. * sin };
-            let c = #[rustfmt::skip] Point { x: side + 2. * cos, y: sin };
 
-            points = Vec::with_capacity(4);
+            points = vec![];
+            points.push(pivot);
+
+            let (angle_start, angle_end);
             if appear < 1. {
-                if appear >= 0.5 {
-                    let f = (appear - 0.5) / 0.5;
-                    points.push(f * a + (1. - f) * b);
-                    points.push(b);
-                } else {
-                    let f = appear / 0.5;
-                    points.push(f * b + (1. - f) * c);
-                }
-                points.push(c);
-                points.push(pivot);
+                angle_start = -2. * PI / 3.;
+                angle_end = (1. - appear) * angle_start;
             } else {
+                angle_start = disappear * (-2. * PI / 3.);
+                angle_end = 0.;
+            };
+
+            let mut ang = angle_start;
+            while ang < angle_end {
+                let pt = a.clockwise_rotate_around(pivot, ang);
+                points.push(pt);
+                ang += ANGLE_STEP;
+            }
+            points.push(a.clockwise_rotate_around(pivot, angle_end));
+
+            // hacky
+            if points.len() < 3 {
+                assert_eq!(points.len(), 2);
                 points.push(pivot);
-                points.push(a);
-                if disappear >= 0.5 {
-                    let f = (disappear - 0.5) / 0.5;
-                    points.push(b);
-                    points.push((1. - f) * b + f * c);
-                } else {
-                    let f = disappear / 0.5;
-                    points.push((1. - f) * a + f * b);
-                }
             }
 
             rotate(&mut points, angle, cell_dim.center());

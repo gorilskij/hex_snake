@@ -37,3 +37,16 @@ impl Mul<Point> for f32 {
         rhs * self
     }
 }
+
+impl Point {
+    #[must_use]
+    pub fn clockwise_rotate_around(mut self, origin: Self, angle: f32) -> Self {
+        let (sin, cos) = angle.sin_cos();
+        self -= origin;
+        self = Point {
+            x: self.x * cos - self.y * sin,
+            y: self.x * sin + self.y * cos,
+        };
+        self + origin
+    }
+}
