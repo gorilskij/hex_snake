@@ -70,6 +70,8 @@ impl EatMechanics {
     }
 }
 
+// TODO: implement changing dir in the middle of a game frame
+//  for graphical reasons
 pub struct SnakeBody {
     pub cells: VecDeque<Segment>,
     pub dir: Dir,

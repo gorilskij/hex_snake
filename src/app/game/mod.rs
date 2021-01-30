@@ -627,7 +627,7 @@ impl Game {
                 let previous = seg_idx
                     .checked_sub(1)
                     .map(|prev_idx| -snake.body.cells[prev_idx].next_segment)
-                    .unwrap_or(snake.dir());
+                    .unwrap_or_else(|| snake.dir());
 
                 let next = segment.next_segment;
 

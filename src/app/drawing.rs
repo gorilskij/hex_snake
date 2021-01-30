@@ -174,32 +174,86 @@ pub fn get_points_animated(
         }
         TurnType::Blunt(turn_direction) => {
             // DR => U
-            points = #[rustfmt::skip] vec![
-                Point { x: cos, y: 0. },
-                Point { x: side + cos, y: 0. },
-                Point { x: side + 2. * cos, y: sin },
-                Point { x: side + cos, y: 2. * sin },
+            // points = #[rustfmt::skip] vec![
+            //     Point { x: cos, y: 0. },
+            //     Point { x: side + cos, y: 0. },
+            //     Point { x: side + 2. * cos, y: sin },
+            //     Point { x: side + cos, y: 2. * sin },
+            // ];
+
+            // feels hacky
+            let (angle, appear, disappear) = match turn_direction {
+                TurnDirection::Clockwise => (previous.clockwise_angle_from_u(), appear, disappear),
+                TurnDirection::CounterClockwise => {
+                    (next.clockwise_angle_from_u(), disappear, appear)
+                }
+            };
+
+            let start_a = #[rustfmt::skip] Point { x: side + cos, y: 2. * sin };
+            let start_b = #[rustfmt::skip] Point { x: side + 2. * cos, y: sin };
+            let end_a = #[rustfmt::skip] Point { x: cos, y: 0. };
+            let end_b = #[rustfmt::skip] Point { x: side + cos, y: 0. };
+
+            points = vec![
+                appear * end_a + (1. - appear) * start_a,
+                appear * end_b + (1. - appear) * start_b,
+                disappear * start_b + (1. - disappear) * end_b,
+                disappear * start_a + (1. - disappear) * end_a,
             ];
 
-            let angle = match turn_direction {
-                TurnDirection::Clockwise => previous.clockwise_angle_from_u(),
-                TurnDirection::CounterClockwise => next.clockwise_angle_from_u(),
-            };
             rotate(&mut points, angle, cell_dim.center());
         }
         TurnType::Sharp(turn_direction) => {
             // UR => U
-            points = #[rustfmt::skip] vec![
-                Point { x: cos, y: 0. },
-                Point { x: side + cos, y: 0. },
-                Point { x: side + 2. * cos, y: sin },
-                Point { x: cos, y: 2. * sin },
-            ];
+            // points = #[rustfmt::skip] vec![
+            //     Point { x: cos, y: 0. },
+            //     Point { x: side + cos, y: 0. },
+            //     Point { x: side + 2. * cos, y: sin },
+            //     Point { x: cos, y: 2. * sin },
+            // ];
 
-            let angle = match turn_direction {
-                TurnDirection::Clockwise => previous.clockwise_angle_from_u(),
-                TurnDirection::CounterClockwise => next.clockwise_angle_from_u(),
+            let (angle, appear, disappear) = match turn_direction {
+                TurnDirection::Clockwise => (previous.clockwise_angle_from_u(), appear, disappear),
+                TurnDirection::CounterClockwise => {
+                    (next.clockwise_angle_from_u(), disappear, appear)
+                }
             };
+
+            assert!(
+                appear == 1. || disappear == 1.,
+                "simultaneous appar and disappear not implemented"
+            );
+
+            let pivot = #[rustfmt::skip] Point { x: side + cos, y: 0. };
+            let a = #[rustfmt::skip] Point { x: cos, y: 0. };
+            let b = #[rustfmt::skip] Point { x: cos, y: 2. * sin };
+            let c = #[rustfmt::skip] Point { x: side + 2. * cos, y: sin };
+
+            points = Vec::with_capacity(4);
+            if appear < 1. {
+                if appear >= 0.5 {
+                    let f = (appear - 0.5) / 0.5;
+                    points.push(f * a + (1. - f) * b);
+                    points.push(b);
+                } else {
+                    let f = appear / 0.5;
+                    points.push(f * b + (1. - f) * c);
+                }
+                points.push(c);
+                points.push(pivot);
+            } else {
+                points.push(pivot);
+                points.push(a);
+                if disappear >= 0.5 {
+                    let f = (disappear - 0.5) / 0.5;
+                    points.push(b);
+                    points.push((1. - f) * b + f * c);
+                } else {
+                    let f = disappear / 0.5;
+                    points.push((1. - f) * a + f * b);
+                }
+            }
+
             rotate(&mut points, angle, cell_dim.center());
         }
     }
