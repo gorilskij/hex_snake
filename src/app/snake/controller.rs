@@ -60,6 +60,9 @@ impl OtherSnakes<'_> {
 }
 
 pub trait SnakeController {
+    // NOTE: there is a difference between returning None and the same dir
+    //  returning None will cause the snake to query again on the
+    //  next graphics frame, otherwise it will wait until the next game frame
     fn next_dir(
         &mut self,
         snake_body: &SnakeBody,
@@ -73,7 +76,17 @@ pub trait SnakeController {
     fn key_pressed(&mut self, _key: KeyCode) {}
 }
 
+#[allow(dead_code)]
 impl SnakeControllerTemplate {
+    pub fn demo_hexagon_pattern(side_len: usize) -> Self {
+        let mut vec = Vec::with_capacity(12);
+        for dir in Dir::iter() {
+            vec.push(SimMove::Move(dir));
+            vec.push(SimMove::Wait(side_len));
+        }
+        Self::DemoController(vec)
+    }
+
     pub fn into_controller(self, initial_dir: Dir) -> Box<dyn SnakeController> {
         match self {
             SnakeControllerTemplate::PlayerController(control_setup) => {
@@ -90,6 +103,7 @@ impl SnakeControllerTemplate {
             }),
             SnakeControllerTemplate::DemoController(move_sequence) => Box::new(DemoController {
                 move_sequence,
+                dir: initial_dir,
                 next_move_idx: 0,
                 wait: 0,
             }),
@@ -248,6 +262,7 @@ pub enum SimMove {
 
 struct DemoController {
     move_sequence: Vec<SimMove>,
+    dir: Dir,
     next_move_idx: usize,
     wait: usize,
 }
@@ -256,23 +271,21 @@ impl SnakeController for DemoController {
     fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
-            None
         } else {
-            let new_dir = match self.move_sequence[self.next_move_idx] {
-                SimMove::Wait(wait) => {
-                    self.wait = wait;
-                    None
-                }
-                SimMove::Move(new_dir) => Some(new_dir),
+            match self.move_sequence[self.next_move_idx] {
+                SimMove::Wait(wait) => self.wait = wait - 1,
+                SimMove::Move(new_dir) => self.dir = new_dir,
             };
 
             self.next_move_idx += 1;
             self.next_move_idx %= self.move_sequence.len();
-            new_dir
         }
+
+        Some(self.dir)
     }
 
-    fn reset(&mut self, _: Dir) {
+    fn reset(&mut self, dir: Dir) {
+        self.dir = dir;
         self.next_move_idx = 0;
         self.wait = 0;
     }

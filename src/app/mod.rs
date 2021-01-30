@@ -6,6 +6,12 @@ use ggez::{
     graphics::Rect,
     Context, GameResult,
 };
+use itertools::Itertools;
+
+use game::Game;
+use palette::GamePalette;
+use snake::{EatMechanics, SnakeSeed};
+use start_screen::StartScreen;
 
 use crate::app::{
     keyboard_control::ControlSetup,
@@ -13,11 +19,6 @@ use crate::app::{
         controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
     },
 };
-use game::Game;
-use itertools::Itertools;
-use palette::GamePalette;
-use snake::{EatMechanics, SnakeSeed};
-use start_screen::StartScreen;
 
 macro_rules! hash_map {
     {} => {
@@ -125,14 +126,10 @@ impl App {
             .collect();
 
         // let seeds = vec![SnakeSeed {
-        //     snake_type: SnakeType::CompetitorSnake { life: None },
-        //     eat_mechanics: EatMechanics {
-        //         eat_self: EatBehavior::Cut,
-        //         eat_other: Default::default(),
-        //         default: EatBehavior::Cut,
-        //     },
-        //     palette: SnakePaletteTemplate::new_persistent_pastel_rainbow(),
-        //     controller: SnakeControllerTemplate::CompetitorAI,
+        //     snake_type: SnakeType::PlayerSnake,
+        //     eat_mechanics: EatMechanics::always(EatBehavior::Crash),
+        //     palette: SnakePaletteTemplate::rainbow(),
+        //     controller: SnakeControllerTemplate::demo_hexagon_pattern(1),
         // }];
 
         Self {
