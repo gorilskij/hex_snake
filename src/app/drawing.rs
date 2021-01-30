@@ -1,3 +1,11 @@
+use std::f32::consts::PI;
+
+use ggez::{
+    graphics::{DrawMode, Mesh, MeshBuilder},
+    Context, GameResult,
+};
+use num_integer::Integer;
+
 use crate::{
     app::{
         game::CellDim,
@@ -6,12 +14,6 @@ use crate::{
     },
     point::Point,
 };
-use ggez::{
-    graphics::{DrawMode, Mesh, MeshBuilder},
-    Context, GameResult,
-};
-use num_integer::Integer;
-use std::f32::consts::PI;
 
 pub fn generate_grid_mesh(
     ctx: &mut Context,
@@ -55,9 +57,8 @@ pub fn generate_grid_mesh(
             let dv = v as f32 * 2. * sin;
 
             // line between a and b
-            #[rustfmt::skip]
             builder.line(
-                &[
+                #[rustfmt::skip] &[
                     Point { x: cos + dh, y: dv },
                     Point { x: cos + side + dh, y: dv },
                 ],
@@ -67,9 +68,8 @@ pub fn generate_grid_mesh(
 
             // line between b and a
             if !(dim.h.is_odd() && h == (dim.h + 1) / 2 - 1) {
-                #[rustfmt::skip]
                 builder.line(
-                    &[
+                    #[rustfmt::skip] &[
                         Point { x: 2. * cos + side + dh, y: sin + dv },
                         Point { x: 2. * cos + 2. * side + dh, y: sin + dv },
                     ],

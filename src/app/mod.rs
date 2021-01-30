@@ -14,13 +14,14 @@ use snake::{EatMechanics, SnakeSeed};
 use start_screen::StartScreen;
 
 use crate::app::{
+    hex::Dir,
     keyboard_control::ControlSetup,
     snake::{
-        controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
+        controller::{SimMove, SnakeControllerTemplate},
+        palette::SnakePaletteTemplate,
+        EatBehavior, SnakeType,
     },
 };
-use crate::app::snake::controller::SimMove;
-use crate::app::hex::Dir;
 
 macro_rules! hash_map {
     {} => {

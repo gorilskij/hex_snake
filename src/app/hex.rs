@@ -100,7 +100,6 @@ mod dir {
                 2 => Blunt(Clockwise),
                 4 => Blunt(CounterClockwise),
                 3 => Straight,
-                // TODO: this still happens
                 _ => panic!("impossible turn {:?} => {:?}", self, other),
             }
         }
