@@ -24,7 +24,11 @@ pub enum SnakeState {
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum SnakeType {
     PlayerSnake,
-    SimulatedSnake,
+    SimulatedSnake {
+        start_pos: HexPoint,
+        start_dir: Dir,
+        start_grow: usize,
+    },
     CompetitorSnake { life: Option<Frames> },
     KillerSnake { life: Option<Frames> },
 }
@@ -192,6 +196,8 @@ impl Snake {
                 let dir = self.dir();
                 let new_head = Segment {
                     typ: SegmentType::Normal,
+                    // this gets very interesting if you move 2 cells each time
+                    // (porous snake)
                     pos: self.head().pos.wrapping_translate(dir, 1, board_dim),
                     next_segment: -dir,
                     teleported: None,

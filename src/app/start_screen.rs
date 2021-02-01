@@ -38,42 +38,43 @@ impl SnakeDemo {
         let mut body = VecDeque::new();
         body.push_back(head);
         let board_dim = HexPoint { h: 20, v: 20 };
-        Self {
-            top_left,
-            dim: board_dim,
-            snake: Snake {
-                snake_type: SnakeType::SimulatedSnake,
-                eat_mechanics: EatMechanics {
-                    eat_self: EatBehavior::Cut,
-                    eat_other: hash_map! {},
-                    default: EatBehavior::Cut,
-                },
-
-                body: SnakeBody {
-                    cells: body,
-                    dir,
-                    dir_grace: false,
-                    grow: 10,
-                },
-                state: SnakeState::Living,
-
-                controller: SnakeControllerTemplate::DemoController(vec![
-                    SimMove::Move(Dir::UR),
-                    SimMove::Wait(5),
-                    SimMove::Move(Dir::DR),
-                    SimMove::Wait(5),
-                    SimMove::Move(Dir::D),
-                    SimMove::Wait(5),
-                    SimMove::Move(Dir::DL),
-                    SimMove::Wait(5),
-                    SimMove::Move(Dir::UL),
-                    SimMove::Wait(5),
-                ])
-                .into_controller(dir),
-                painter: SnakePaletteTemplate::gray_gradient().into(),
-            },
-            cell_dim,
-        }
+        todo!()
+        // Self {
+        //     top_left,
+        //     dim: board_dim,
+        //     snake: Snake {
+        //         snake_type: SnakeType::SimulatedSnake,
+        //         eat_mechanics: EatMechanics {
+        //             eat_self: EatBehavior::Cut,
+        //             eat_other: hash_map! {},
+        //             default: EatBehavior::Cut,
+        //         },
+        //
+        //         body: SnakeBody {
+        //             cells: body,
+        //             dir,
+        //             dir_grace: false,
+        //             grow: 10,
+        //         },
+        //         state: SnakeState::Living,
+        //
+        //         controller: SnakeControllerTemplate::DemoController(vec![
+        //             SimMove::Move(Dir::UR),
+        //             SimMove::Wait(5),
+        //             SimMove::Move(Dir::DR),
+        //             SimMove::Wait(5),
+        //             SimMove::Move(Dir::D),
+        //             SimMove::Wait(5),
+        //             SimMove::Move(Dir::DL),
+        //             SimMove::Wait(5),
+        //             SimMove::Move(Dir::UL),
+        //             SimMove::Wait(5),
+        //         ])
+        //         .into_controller(dir),
+        //         painter: SnakePaletteTemplate::gray_gradient().into(),
+        //     },
+        //     cell_dim,
+        // }
     }
 }
 

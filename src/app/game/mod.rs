@@ -30,6 +30,28 @@ use ggez::graphics::WHITE;
 
 mod game_control;
 
+pub enum AppleSpawn {
+    Spawn(HexPoint),
+    Wait {
+        total: usize,
+        current: usize,
+    },
+}
+
+pub enum AppleSpawnStrategy {
+    Random {
+        apple_count: usize,
+    },
+    // a new apple is spawed each time there are not enough apples on the board
+    ScheduledOnEat {
+        apple_count: usize,
+        spawns: Vec<AppleSpawn>,
+        next_index: usize,
+    },
+    // apples are spawned at a given time
+    // ScheduledOtTime { .. }
+}
+
 #[derive(Copy, Clone)]
 pub struct CellDim {
     pub side: f32,
@@ -127,14 +149,14 @@ pub struct Game {
     window_dim: Point,
 
     dim: HexDim,
-    players: Vec<SnakeSeed>,
+    seeds: Vec<SnakeSeed>,
     snakes: Vec<Snake>,
     apples: Vec<Apple>,
 
+    apple_spawn_strategy: AppleSpawnStrategy,
+
     cell_dim: CellDim,
     palette: GamePalette,
-
-    apple_count: usize,
 
     rng: ThreadRng,
     grid_mesh: Option<Mesh>,
@@ -148,11 +170,12 @@ pub struct Game {
 impl Game {
     pub fn new(
         cell_side_len: f32,
-        players: Vec<SnakeSeed>,
+        seeds: Vec<SnakeSeed>,
         palette: GamePalette,
+        apple_spawn_strategy: AppleSpawnStrategy,
         wm: WindowMode,
     ) -> Self {
-        assert!(!players.is_empty(), "No players specified");
+        assert!(!seeds.is_empty(), "No players specified");
 
         let cell_dim = CellDim::from(cell_side_len);
 
@@ -165,14 +188,14 @@ impl Game {
             },
 
             dim: HexDim { h: 0, v: 0 }, // placeholder
-            players: players.into_iter().map(Into::into).collect(),
+            seeds: seeds.into_iter().map(Into::into).collect(),
             snakes: vec![],
             apples: vec![],
 
+            apple_spawn_strategy,
+
             cell_dim,
             palette,
-
-            apple_count: 5,
 
             rng: thread_rng(),
             grid_mesh: None,
@@ -230,35 +253,62 @@ impl Game {
         self.snakes.clear();
         self.apples.clear();
 
-        // const DISTANCE_BETWEEN_SNAKES: isize = 10;
-        const DISTANCE_BETWEEN_SNAKES: isize = 1;
-
-        let total_width = (self.players.len() - 1) as isize * DISTANCE_BETWEEN_SNAKES + 1;
-        assert!(total_width < self.dim.h, "snakes spread too wide");
-
-        let half = total_width / 2;
-        let middle = self.dim.h / 2;
-        let start = middle - half;
-        let end = start + total_width;
-        let mut dir = Dir::U;
-        for (seed, h_pos) in self
-            .players
+        // seeds without a defined spawn point
+        let unpositioned = self
+            .seeds
             .iter()
-            .zip((start..=end).step_by(DISTANCE_BETWEEN_SNAKES as usize))
-        {
-            self.snakes.push(Snake::from_seed(
-                seed,
-                HexPoint {
-                    h: h_pos,
-                    v: self.dim.v / 2,
-                },
-                dir,
-                10,
-            ));
+            .filter(|seed| !matches!(seed.snake_type, SnakeType::SimulatedSnake { .. }))
+            .count();
 
-            // alternate
-            dir = -dir;
+        let mut unpositioned_dir = Dir::U;
+        let mut unpositioned_h_pos: Box<dyn Iterator<Item = isize>> = if unpositioned > 0 {
+            const DISTANCE_BETWEEN_SNAKES: isize = 1;
+
+            let total_width = (unpositioned - 1) as isize * DISTANCE_BETWEEN_SNAKES + 1;
+            assert!(total_width < self.dim.h, "snakes spread too wide");
+
+            let half = total_width / 2;
+            let middle = self.dim.h / 2;
+            let start = middle - half;
+            let end = start + total_width - 1;
+
+            Box::new((start..=end).step_by(DISTANCE_BETWEEN_SNAKES as usize))
+        } else {
+            Box::new(std::iter::empty())
+        };
+
+        for seed in self
+            .seeds
+            .iter()
+        {
+            match seed.snake_type {
+                SnakeType::SimulatedSnake { start_pos, start_dir, start_grow } => {
+                    self.snakes.push(Snake::from_seed(
+                        seed,
+                        start_pos,
+                        start_dir,
+                        start_grow,
+                    ));
+                }
+                _ => {
+                    self.snakes.push(Snake::from_seed(
+                        seed,
+                        HexPoint {
+                            h: unpositioned_h_pos.next().unwrap(),
+                            v: self.dim.v / 2,
+                        },
+                        unpositioned_dir,
+                        10,
+                    ));
+
+                    // alternate
+                    unpositioned_dir = -unpositioned_dir;
+                }
+            }
         }
+
+        let left = unpositioned_h_pos.count();
+        assert_eq!(left, 0, "unexpected iterator length");
 
         self.spawn_apples();
     }
@@ -277,90 +327,135 @@ impl Game {
         occupied_cells
     }
 
-    fn random_free_spot(&mut self, occupied_cells: &[HexPoint]) -> Option<HexPoint> {
-        let free_spaces = (self.dim.h * self.dim.v) as usize - occupied_cells.len();
+    fn random_free_spot(occupied_cells: &[HexPoint], board_dim: HexDim, rng: &mut ThreadRng) -> Option<HexPoint> {
+        let free_spaces = (board_dim.h * board_dim.v) as usize - occupied_cells.len();
         if free_spaces == 0 {
             return None;
         }
 
-        let mut new_idx = self.rng.gen_range(0, free_spaces);
+        let mut new_idx = rng.gen_range(0, free_spaces);
         for HexPoint { h, v } in occupied_cells {
-            let idx = (v * self.dim.h + h) as usize;
+            let idx = (v * board_dim.h + h) as usize;
             if idx <= new_idx {
                 new_idx += 1;
             }
         }
 
-        assert!(new_idx < (self.dim.h * self.dim.v) as usize);
+        assert!(new_idx < (board_dim.h * board_dim.v) as usize);
         Some(HexPoint {
-            h: new_idx as isize % self.dim.h,
-            v: new_idx as isize / self.dim.h,
+            h: new_idx as isize % board_dim.h,
+            v: new_idx as isize / board_dim.h,
         })
     }
 
-    pub fn spawn_apples(&mut self) {
-        let mut occupied_cells = self.occupied_cells();
-
-        while self.apples.len() < self.apple_count {
-            let apple_pos = match self.random_free_spot(&occupied_cells) {
-                Some(pos) => pos,
-                None => {
-                    println!(
-                        "warning: no space left for new apples ({} apples will be missing)",
-                        self.apple_count - self.apples.len()
-                    );
-                    return;
+    fn generate_apple(&mut self, apple_pos: HexPoint) {
+        let apple_type = if self.prefs.special_apples {
+            match self.rng.gen::<f32>() {
+                x if x < 0.025 => {
+                    let controller = if self.rng.gen::<f32>() < 0.5 {
+                        SnakeControllerTemplate::CompetitorAI
+                    } else {
+                        SnakeControllerTemplate::CompetitorAI2
+                    };
+                    AppleType::SpawnSnake(SnakeSeed {
+                        snake_type: SnakeType::CompetitorSnake { life: Some(200) },
+                        eat_mechanics: EatMechanics::always(EatBehavior::Die),
+                        palette: SnakePaletteTemplate::pastel_rainbow().persistent(),
+                        controller,
+                    })
                 }
-            };
-
-            // insert at sorted position
-            match occupied_cells.binary_search(&apple_pos) {
-                Ok(idx) => panic!("Spawned apple at occupied cell {:?}", occupied_cells[idx]),
-                Err(idx) => occupied_cells.insert(idx, apple_pos),
-            }
-
-            let apple_type = if self.prefs.special_apples {
-                match self.rng.gen::<f32>() {
-                    x if x < 0.025 => {
-                        let controller = if self.rng.gen::<f32>() < 0.5 {
-                            SnakeControllerTemplate::CompetitorAI
-                        } else {
-                            SnakeControllerTemplate::CompetitorAI2
-                        };
+                x if x < 0.040 => {
+                    if !self
+                        .snakes
+                        .iter()
+                        .any(|s| s.snake_type == SnakeType::PlayerSnake)
+                    {
+                        println!("warning: didn't spawn killer snake apple because there is no player snake");
+                        AppleType::Normal(1)
+                    } else {
                         AppleType::SpawnSnake(SnakeSeed {
-                            snake_type: SnakeType::CompetitorSnake { life: Some(200) },
+                            snake_type: SnakeType::KillerSnake { life: Some(200) },
                             eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                            palette: SnakePaletteTemplate::pastel_rainbow().persistent(),
-                            controller,
+                            palette: SnakePaletteTemplate::dark_blue_to_red(),
+                            controller: SnakeControllerTemplate::KillerAI,
                         })
                     }
-                    x if x < 0.040 => {
-                        if !self
-                            .snakes
-                            .iter()
-                            .any(|s| s.snake_type == SnakeType::PlayerSnake)
-                        {
-                            println!("warning: didn't spawn killer snake apple because there is no player snake");
-                            AppleType::Normal(1)
-                        } else {
-                            AppleType::SpawnSnake(SnakeSeed {
-                                snake_type: SnakeType::KillerSnake { life: Some(200) },
-                                eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                                palette: SnakePaletteTemplate::dark_blue_to_red(),
-                                controller: SnakeControllerTemplate::KillerAI,
-                            })
-                        }
-                    }
-                    _ => AppleType::Normal(self.prefs.apple_food),
                 }
-            } else {
-                AppleType::Normal(self.prefs.apple_food)
+                _ => AppleType::Normal(self.prefs.apple_food),
+            }
+        } else {
+            AppleType::Normal(self.prefs.apple_food)
+        };
+
+        self.apples.push(Apple {
+            pos: apple_pos,
+            typ: apple_type,
+        });
+    }
+
+    pub fn spawn_apples(&mut self) {
+        // lazy
+        let mut occupied_cells = None;
+
+        loop {
+            let can_spawn = match self.apple_spawn_strategy {
+                AppleSpawnStrategy::Random { apple_count } => self.apples.len() < apple_count,
+                AppleSpawnStrategy::ScheduledOnEat { apple_count, .. } => self.apples.len() < apple_count,
             };
 
-            self.apples.push(Apple {
-                pos: apple_pos,
-                typ: apple_type,
-            });
+            if !can_spawn {
+                break;
+            }
+
+            let occupied_cells = occupied_cells.get_or_insert_with(|| self.occupied_cells());
+
+            let apple_pos = match &mut self.apple_spawn_strategy {
+                AppleSpawnStrategy::Random { apple_count } => {
+                    let apple_pos = match Self::random_free_spot(&occupied_cells, self.dim, &mut self.rng) {
+                        Some(pos) => pos,
+                        None => {
+                            println!(
+                                "warning: no space left for new apples ({} apples will be missing)",
+                                *apple_count - self.apples.len()
+                            );
+                            return;
+                        }
+                    };
+
+                    // insert at sorted position
+                    match occupied_cells.binary_search(&apple_pos) {
+                        Ok(idx) => panic!("Spawned apple at occupied cell {:?}", occupied_cells[idx]),
+                        Err(idx) => occupied_cells.insert(idx, apple_pos),
+                    }
+
+                    Some(apple_pos)
+                }
+                AppleSpawnStrategy::ScheduledOnEat { spawns, next_index, .. } => {
+                    let len = spawns.len();
+                    match &mut spawns[*next_index] {
+                        AppleSpawn::Wait { total, current } => {
+                            if *current == *total - 1 {
+                                *current = 0;
+                                *next_index = (*next_index + 1) % len;
+                            } else {
+                                *current += 1;
+                            }
+                            None
+                        }
+                        AppleSpawn::Spawn(pos) => {
+                            *next_index = (*next_index + 1) % len;
+                            Some(*pos)
+                        }
+                    }
+                }
+            };
+
+            match apple_pos {
+                Some(pos) => {
+                    self.generate_apple(pos)
+                },
+                None => break,
+            }
         }
     }
 
@@ -546,7 +641,7 @@ impl Game {
             occupied_cells.sort_unstable();
             occupied_cells.dedup();
 
-            if let Some(pos) = self.random_free_spot(&occupied_cells) {
+            if let Some(pos) = Self::random_free_spot(&occupied_cells, self.dim, &mut self.rng) {
                 self.snakes
                     .push(Snake::from_seed(&seed, pos, Dir::random(&mut self.rng), 10))
             } else {
@@ -865,7 +960,7 @@ impl EventHandler for Game {
             }
             A => {
                 // only apply if there is exactly one player snake
-                if self.players.len() == 1 {
+                if self.seeds.len() == 1 {
                     // hacky
                     unsafe {
                         static mut STASHED_CONTROLLER: Option<Box<dyn SnakeController>> = None;
