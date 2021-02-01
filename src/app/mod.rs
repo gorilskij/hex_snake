@@ -41,7 +41,7 @@ mod start_screen;
 #[macro_use]
 mod apple_spawn_strategy;
 
-pub type Frames = u32;
+pub type Frames = u64;
 
 pub enum Screen {
     StartScreen(StartScreen),

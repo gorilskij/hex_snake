@@ -71,7 +71,7 @@ struct Message {
 }
 
 impl From<(String, Frames)> for Message {
-    fn from((message, life): (String, u32)) -> Self {
+    fn from((message, life): (String, Frames)) -> Self {
         Self {
             message,
             duration: Some(life),
@@ -274,7 +274,7 @@ impl Game {
     fn random_free_spot(
         occupied_cells: &[HexPoint],
         board_dim: HexDim,
-        rng: &mut ThreadRng,
+        rng: &mut impl Rng,
     ) -> Option<HexPoint> {
         let free_spaces = (board_dim.h * board_dim.v) as usize - occupied_cells.len();
         if free_spaces == 0 {
@@ -520,6 +520,7 @@ impl Game {
                     let crash_point = self.snakes[i].head().pos;
                     if i != j && crash_point == self.snakes[j].head().pos {
                         // TODO: cause only a crash if even one of the snakes crashed
+                        //  what happens if a snake encounters a black hole in progress?
                         // special case for a head-to-head collision, can't cut..
                         println!("warning: invoked head-to-head collision special case");
                         self.snakes[i].die();

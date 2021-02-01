@@ -29,6 +29,7 @@ impl From<ControlSetup> for Controls {
     fn from(setup: ControlSetup) -> Self {
         use ggez::input::keyboard::KeyCode::*;
         use KeyboardLayout::*;
+
         match (setup.layout, setup.keyboard_side, setup.hand) {
             (Dvorak, Side::Right, Side::Right) => Self {
                 ul: H,

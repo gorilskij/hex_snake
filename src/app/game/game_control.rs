@@ -1,3 +1,4 @@
+use crate::app::Frames;
 use std::{
     cmp::max,
     collections::VecDeque,
@@ -5,8 +6,8 @@ use std::{
 };
 
 struct FPSCounter {
-    step: usize, // record once every 'step' frames
-    n: usize,
+    step: Frames, // record once every 'step' frames
+    n: Frames,    // counts down to recording the next frame
     buffer: VecDeque<Instant>,
 }
 
@@ -23,14 +24,14 @@ impl FPSCounter {
         counter
     }
 
-    fn set_fps(&mut self, fps: u64) {
-        self.step = max(1, 3 * fps as usize / Self::LEN);
+    fn set_fps(&mut self, fps: Frames) {
+        self.step = max(1, 3 * fps / Self::LEN as Frames);
         println!(
             "FPSCounter: fps = {}, step = {}, len = {}, frames = {}",
             fps,
             self.step,
             Self::LEN,
-            self.step * Self::LEN
+            self.step * Self::LEN as Frames
         );
         self.reset();
     }
@@ -54,7 +55,7 @@ impl FPSCounter {
 
     fn fps(&self) -> f64 {
         if self.buffer.len() >= 2 {
-            ((self.buffer.len() - 1) * self.step) as f64
+            ((self.buffer.len() - 1) as Frames * self.step) as f64
                 / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
         } else {
             0.
@@ -152,7 +153,7 @@ impl GameControl {
                     for _ in 0..updates {
                         self.measured_game_fps.register_frame();
                     }
-
+                    
                     true
                 } else {
                     false

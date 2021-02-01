@@ -25,15 +25,7 @@ impl Neg for Dir {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        match self {
-            U => D,
-            D => U,
-            UL => DR,
-            UR => DL,
-            DL => UR,
-            DR => UL,
-        }
-        // hypothetically: ((self as u8 + 3) % 6) as Dir
+        self + 3
     }
 }
 
@@ -55,7 +47,7 @@ impl Sub<u8> for Dir {
     type Output = Self;
 
     fn sub(self, rhs: u8) -> Self::Output {
-        Self::from(self as u8 + 6 - (rhs % 6))
+        self + (6 - (rhs % 6))
     }
 }
 

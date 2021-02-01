@@ -6,11 +6,9 @@ use ggez::{
 };
 use num_integer::Integer;
 
-use crate::{
-    app::palette::GamePalette,
-    basic::{CellDim, Dir, HexDim, Point, TurnDirection, TurnType},
-};
+use crate::{app::palette::GamePalette, basic::*};
 
+// TODO: make this readable
 pub fn generate_grid_mesh(
     ctx: &mut Context,
     dim: HexDim,

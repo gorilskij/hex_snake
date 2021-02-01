@@ -1,4 +1,3 @@
-
 use super::dir::{Axis, Dir};
 use crate::basic::{CellDim, Point};
 use std::{
