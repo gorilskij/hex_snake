@@ -6,6 +6,7 @@ use crate::app::{
 };
 use ggez::event::KeyCode;
 use std::{cmp::Ordering, collections::VecDeque, iter::once};
+use crate::app::keyboard_control::Side;
 
 // because Iterator::min_by_key requires Ord
 #[derive(PartialEq)]
@@ -81,12 +82,16 @@ impl SnakeControllerTemplate {
     pub fn demo_hexagon_pattern(side_len: usize) -> Self {
         let mut vec = Vec::with_capacity(12);
         for dir in Dir::iter() {
-            vec.push(SimMove::Move(dir));
+            vec.push(SimMove::Turn(dir));
             if side_len > 0 {
                 vec.push(SimMove::Wait(side_len));
             }
         }
         Self::DemoController(vec)
+    }
+
+    pub fn demo_triangle_pattern(side_len: usize, pointing_towards: Side) -> Self {
+        todo!()
     }
 
     pub fn into_controller(self, initial_dir: Dir) -> Box<dyn SnakeController> {
@@ -256,9 +261,23 @@ impl SnakeController for PlayerController12 {
     }
 }
 
+macro_rules! move_sequence {
+    (@ turn($dir:expr) ) => {
+        crate::app::snake::controller::SimMove::Turn($dir)
+    };
+    (@ wait($t:expr) ) => {
+        crate::app::snake::controller::SimMove::Wait($t)
+    };
+    [ $( $action:tt ( $( $inner:tt )* ) ),* $(,)? ] => {
+        vec![$(
+            move_sequence!(@ $action( $( $inner )* ))
+        ),*]
+    };
+}
+
 #[derive(Copy, Clone)]
 pub enum SimMove {
-    Move(Dir),
+    Turn(Dir),
     Wait(usize),
 }
 
@@ -276,7 +295,7 @@ impl SnakeController for DemoController {
         } else {
             match self.move_sequence[self.next_move_idx] {
                 SimMove::Wait(wait) => self.wait = wait - 1,
-                SimMove::Move(new_dir) => self.dir = new_dir,
+                SimMove::Turn(new_dir) => self.dir = new_dir,
             };
 
             self.next_move_idx += 1;

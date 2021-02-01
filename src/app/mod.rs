@@ -23,7 +23,7 @@ use crate::app::{
     },
 };
 use crate::app::hex::HexPoint;
-use crate::app::game::{AppleSpawnStrategy, AppleSpawn};
+use crate::app::apple_spawn_strategy::AppleSpawnStrategy;
 
 macro_rules! hash_map {
     {} => {
@@ -43,6 +43,7 @@ pub mod keyboard_control;
 mod palette;
 mod snake;
 mod start_screen;
+#[macro_use] mod apple_spawn_strategy;
 
 pub type Frames = u32;
 
@@ -163,11 +164,15 @@ impl App {
             // screen: Screen::StartScreen(StartScreen::new()),
             screen: Screen::Game(Game::new(12., seeds, GamePalette::dark(), AppleSpawnStrategy::ScheduledOnEat {
                 apple_count: 1,
-                spawns: vec![
-                    AppleSpawn::Spawn(HexPoint { h: 10, v: 9 }),
-                    AppleSpawn::Wait { total: 10, current: 0 }
+                // spawns: vec![
+                //     AppleSpawn::Spawn(HexPoint { h: 10, v: 9 }),
+                //     AppleSpawn::Wait { total: 10, current: 0 }
+                // ],
+                spawns: spawn_schedule! [
+                    spawn(10, 9),
+                    wait(10),
                 ],
-                next_index: 0
+                next_index: 0,
             }, window_mode)),
             window_mode,
             window_setup,

@@ -27,30 +27,9 @@ use crate::{
     point::Point,
 };
 use ggez::graphics::WHITE;
+use crate::app::apple_spawn_strategy::{AppleSpawnStrategy, AppleSpawn};
 
 mod game_control;
-
-pub enum AppleSpawn {
-    Spawn(HexPoint),
-    Wait {
-        total: usize,
-        current: usize,
-    },
-}
-
-pub enum AppleSpawnStrategy {
-    Random {
-        apple_count: usize,
-    },
-    // a new apple is spawed each time there are not enough apples on the board
-    ScheduledOnEat {
-        apple_count: usize,
-        spawns: Vec<AppleSpawn>,
-        next_index: usize,
-    },
-    // apples are spawned at a given time
-    // ScheduledOtTime { .. }
-}
 
 #[derive(Copy, Clone)]
 pub struct CellDim {

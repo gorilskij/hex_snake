@@ -10,9 +10,9 @@ use crate::app::{
     game::CellDim,
     hex::{Dir, HexDim, HexPoint},
     snake::{
-        controller::{OtherSnakes, SimMove, SnakeControllerTemplate},
+        controller::OtherSnakes,
         palette::SnakePaletteTemplate,
-        EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeBody, SnakeState, SnakeType,
+         Segment, SegmentType, Snake,
     },
     Screen,
 };
