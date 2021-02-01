@@ -14,16 +14,12 @@ use snake::{EatMechanics, SnakeSeed};
 use start_screen::StartScreen;
 
 use crate::app::{
-    hex::Dir,
+    apple_spawn_strategy::AppleSpawnStrategy,
     keyboard_control::ControlSetup,
     snake::{
-        controller::SnakeControllerTemplate,
-        palette::SnakePaletteTemplate,
-        EatBehavior, SnakeType,
+        controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
     },
 };
-use crate::app::hex::HexPoint;
-use crate::app::apple_spawn_strategy::AppleSpawnStrategy;
 
 macro_rules! hash_map {
     {} => {
@@ -38,12 +34,12 @@ macro_rules! hash_map {
 
 mod drawing;
 mod game;
-mod hex;
 pub mod keyboard_control;
 mod palette;
 mod snake;
 mod start_screen;
-#[macro_use] mod apple_spawn_strategy;
+#[macro_use]
+mod apple_spawn_strategy;
 
 pub type Frames = u32;
 
@@ -131,16 +127,46 @@ impl App {
             })
             .collect();
 
-        let seeds = vec![SnakeSeed {
-            snake_type: SnakeType::SimulatedSnake {
-                start_pos: HexPoint { h: 10, v: 10 },
-                start_dir: Dir::U,
-                start_grow: 5,
-            },
-            eat_mechanics: EatMechanics::always(EatBehavior::Cut),
-            palette: SnakePaletteTemplate::rainbow(),
-            controller: SnakeControllerTemplate::demo_hexagon_pattern(1),
-        }];
+        Self {
+            // screen: Screen::StartScreen(StartScreen::new()),
+            screen: Screen::Game(Game::new(
+                12.,
+                seeds,
+                GamePalette::dark(),
+                AppleSpawnStrategy::Random { apple_count: 5 },
+                window_mode,
+            )),
+            window_mode,
+            window_setup,
+        }
+
+        // let seeds = vec![SnakeSeed {
+        //     snake_type: SnakeType::SimulatedSnake {
+        //         start_pos: HexPoint { h: 10, v: 10 },
+        //         start_dir: Dir::U,
+        //         start_grow: 2,
+        //     },
+        //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
+        //     palette: SnakePaletteTemplate::rainbow(),
+        //     controller: SnakeControllerTemplate::demo_triangle_pattern(0, Side::Right),
+        // }];
+        //
+        // Self {
+        //     // screen: Screen::StartScreen(StartScreen::new()),
+        //     screen: Screen::Game(Game::new(
+        //         12.,
+        //         seeds,
+        //         GamePalette::dark(),
+        //         AppleSpawnStrategy::ScheduledOnEat {
+        //             apple_count: 1,
+        //             spawns: spawn_schedule![spawn(10, 9), wait(10),],
+        //             next_index: 0,
+        //         },
+        //         window_mode,
+        //     )),
+        //     window_mode,
+        //     window_setup,
+        // }
 
         // let seeds = vec![SnakeSeed {
         //     snake_type: SnakeType::PlayerSnake,
@@ -159,24 +185,6 @@ impl App {
         //         SimMove::Move(Dir::DL),
         //     ]),
         // }];
-
-        Self {
-            // screen: Screen::StartScreen(StartScreen::new()),
-            screen: Screen::Game(Game::new(12., seeds, GamePalette::dark(), AppleSpawnStrategy::ScheduledOnEat {
-                apple_count: 1,
-                // spawns: vec![
-                //     AppleSpawn::Spawn(HexPoint { h: 10, v: 9 }),
-                //     AppleSpawn::Wait { total: 10, current: 0 }
-                // ],
-                spawns: spawn_schedule! [
-                    spawn(10, 9),
-                    wait(10),
-                ],
-                next_index: 0,
-            }, window_mode)),
-            window_mode,
-            window_setup,
-        }
     }
 
     pub fn wm(&self) -> WindowMode {

@@ -1,5 +1,6 @@
-use crate::app::hex::HexPoint;
+use crate::basic::HexPoint;
 
+#[allow(unused_macros)]
 macro_rules! spawn_schedule {
     (@ spawn($h:expr, $v:expr) ) => {
         crate::app::apple_spawn_strategy::AppleSpawn::Spawn(
@@ -23,10 +24,7 @@ macro_rules! spawn_schedule {
 
 pub enum AppleSpawn {
     Spawn(HexPoint),
-    Wait {
-        total: usize,
-        current: usize,
-    },
+    Wait { total: usize, current: usize },
 }
 
 pub enum AppleSpawnStrategy {

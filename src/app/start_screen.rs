@@ -6,15 +6,14 @@ use ggez::{
     Context, GameResult,
 };
 
-use crate::app::{
-    game::CellDim,
-    hex::{Dir, HexDim, HexPoint},
-    snake::{
-        controller::OtherSnakes,
-        palette::SnakePaletteTemplate,
-         Segment, SegmentType, Snake,
+use crate::{
+    app::{
+        snake::{
+            controller::OtherSnakes, palette::SnakePaletteTemplate, Segment, SegmentType, Snake,
+        },
+        Screen,
     },
-    Screen,
+    basic::{CellDim, Dir, HexDim, HexPoint},
 };
 
 struct SnakeDemo {

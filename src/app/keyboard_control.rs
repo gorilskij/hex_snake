@@ -1,3 +1,4 @@
+use crate::basic::Side;
 use ggez::input::keyboard::KeyCode;
 
 #[derive(Copy, Clone)]
@@ -15,13 +16,6 @@ pub struct Controls {
 pub enum KeyboardLayout {
     Qwerty,
     Dvorak,
-}
-
-#[allow(dead_code)]
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum Side {
-    Left,
-    Right,
 }
 
 #[derive(Clone)]

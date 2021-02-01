@@ -1,13 +1,15 @@
 use std::collections::{HashMap, VecDeque};
 
-use crate::app::{
-    game::Apple,
-    hex::{Dir, HexDim, HexPoint},
-    snake::{
-        controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
-        palette::{SnakePainter, SnakePaletteTemplate},
+use crate::{
+    app::{
+        game::Apple,
+        snake::{
+            controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
+            palette::{SnakePainter, SnakePaletteTemplate},
+        },
+        Frames,
     },
-    Frames,
+    basic::{Dir, HexDim, HexPoint},
 };
 
 pub mod controller;
@@ -29,8 +31,12 @@ pub enum SnakeType {
         start_dir: Dir,
         start_grow: usize,
     },
-    CompetitorSnake { life: Option<Frames> },
-    KillerSnake { life: Option<Frames> },
+    CompetitorSnake {
+        life: Option<Frames>,
+    },
+    KillerSnake {
+        life: Option<Frames>,
+    },
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]

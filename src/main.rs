@@ -8,14 +8,17 @@ extern crate lazy_static;
 
 use ggez::{event::run, ContextBuilder};
 
-use crate::app::{
-    keyboard_control::{ControlSetup, KeyboardLayout, Side},
-    App,
+use crate::{
+    app::{
+        keyboard_control::{ControlSetup, KeyboardLayout},
+        App,
+    },
+    basic::Side,
 };
 
 mod app;
+mod basic;
 mod oklab;
-mod point;
 
 fn main() {
     // NOTE: configure number of players and controls here

@@ -1,12 +1,13 @@
-use crate::app::{
-    game::{Apple, CellDim},
-    hex::{Dir, HexDim, HexPoint},
-    keyboard_control::{ControlSetup, Controls},
-    snake::{Segment, Snake, SnakeBody, SnakeType},
+use crate::{
+    app::{
+        game::Apple,
+        keyboard_control::{ControlSetup, Controls},
+        snake::{Segment, Snake, SnakeBody, SnakeType},
+    },
+    basic::{CellDim, Dir, HexDim, HexPoint, Side},
 };
 use ggez::event::KeyCode;
 use std::{cmp::Ordering, collections::VecDeque, iter::once};
-use crate::app::keyboard_control::Side;
 
 // because Iterator::min_by_key requires Ord
 #[derive(PartialEq)]
@@ -91,7 +92,19 @@ impl SnakeControllerTemplate {
     }
 
     pub fn demo_triangle_pattern(side_len: usize, pointing_towards: Side) -> Self {
-        todo!()
+        let mut vec = Vec::with_capacity(6);
+        let mut dir = Dir::U;
+        for _ in 0..3 {
+            vec.push(SimMove::Turn(dir));
+            if side_len > 0 {
+                vec.push(SimMove::Wait(side_len));
+            }
+            dir = match pointing_towards {
+                Side::Left => dir - 2,
+                Side::Right => dir + 2,
+            };
+        }
+        Self::DemoController(vec)
     }
 
     pub fn into_controller(self, initial_dir: Dir) -> Box<dyn SnakeController> {
@@ -261,6 +274,7 @@ impl SnakeController for PlayerController12 {
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! move_sequence {
     (@ turn($dir:expr) ) => {
         crate::app::snake::controller::SimMove::Turn($dir)
@@ -275,7 +289,7 @@ macro_rules! move_sequence {
     };
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum SimMove {
     Turn(Dir),
     Wait(usize),
@@ -468,8 +482,7 @@ impl SnakeController for CompetitorAI2 {
                     snake_body.cells[0].pos.manhattan_distance_to(apple.pos),
                 )
             })
-            .min_by_key(|(_, dist)| *dist)
-            .unwrap();
+            .min_by_key(|(_, dist)| *dist)?;
 
         let head_pos = snake_body.cells[0].pos;
         let snake_dir = snake_body.dir;

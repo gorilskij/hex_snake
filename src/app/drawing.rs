@@ -7,12 +7,8 @@ use ggez::{
 use num_integer::Integer;
 
 use crate::{
-    app::{
-        game::CellDim,
-        hex::{Dir, HexDim, TurnDirection, TurnType},
-        palette::GamePalette,
-    },
-    point::Point,
+    app::palette::GamePalette,
+    basic::{CellDim, Dir, HexDim, Point, TurnDirection, TurnType},
 };
 
 pub fn generate_grid_mesh(

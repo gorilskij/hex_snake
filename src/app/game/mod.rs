@@ -11,10 +11,9 @@ use rand::prelude::*;
 
 use crate::{
     app::{
+        apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
         drawing::{generate_grid_mesh, get_full_hexagon, get_points_animated, SegmentFraction},
         game::game_control::{GameControl, GameState},
-        hex::{Dir, HexDim, HexPoint},
-        keyboard_control::Side,
         palette::GamePalette,
         snake::{
             controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
@@ -24,42 +23,11 @@ use crate::{
         },
         Frames,
     },
-    point::Point,
+    basic::{CellDim, Dir, HexDim, HexPoint, Point, Side},
 };
 use ggez::graphics::WHITE;
-use crate::app::apple_spawn_strategy::{AppleSpawnStrategy, AppleSpawn};
 
 mod game_control;
-
-#[derive(Copy, Clone)]
-pub struct CellDim {
-    pub side: f32,
-    // sin is longer than cos
-    // they describe the height and width of the diagonal segments of
-    // a hexagon with its flat segments horizontal on the top and bottom
-    pub sin: f32,
-    pub cos: f32,
-}
-
-impl From<f32> for CellDim {
-    fn from(side: f32) -> Self {
-        use std::f32::consts::FRAC_PI_3;
-        Self {
-            side,
-            sin: FRAC_PI_3.sin() * side,
-            cos: FRAC_PI_3.cos() * side,
-        }
-    }
-}
-
-impl CellDim {
-    pub fn center(self) -> Point {
-        Point {
-            x: self.cos + self.side / 2.,
-            y: self.sin,
-        }
-    }
-}
 
 type Food = u32;
 
@@ -256,18 +224,15 @@ impl Game {
             Box::new(std::iter::empty())
         };
 
-        for seed in self
-            .seeds
-            .iter()
-        {
+        for seed in self.seeds.iter() {
             match seed.snake_type {
-                SnakeType::SimulatedSnake { start_pos, start_dir, start_grow } => {
-                    self.snakes.push(Snake::from_seed(
-                        seed,
-                        start_pos,
-                        start_dir,
-                        start_grow,
-                    ));
+                SnakeType::SimulatedSnake {
+                    start_pos,
+                    start_dir,
+                    start_grow,
+                } => {
+                    self.snakes
+                        .push(Snake::from_seed(seed, start_pos, start_dir, start_grow));
                 }
                 _ => {
                     self.snakes.push(Snake::from_seed(
@@ -306,7 +271,11 @@ impl Game {
         occupied_cells
     }
 
-    fn random_free_spot(occupied_cells: &[HexPoint], board_dim: HexDim, rng: &mut ThreadRng) -> Option<HexPoint> {
+    fn random_free_spot(
+        occupied_cells: &[HexPoint],
+        board_dim: HexDim,
+        rng: &mut ThreadRng,
+    ) -> Option<HexPoint> {
         let free_spaces = (board_dim.h * board_dim.v) as usize - occupied_cells.len();
         if free_spaces == 0 {
             return None;
@@ -379,7 +348,9 @@ impl Game {
         loop {
             let can_spawn = match self.apple_spawn_strategy {
                 AppleSpawnStrategy::Random { apple_count } => self.apples.len() < apple_count,
-                AppleSpawnStrategy::ScheduledOnEat { apple_count, .. } => self.apples.len() < apple_count,
+                AppleSpawnStrategy::ScheduledOnEat { apple_count, .. } => {
+                    self.apples.len() < apple_count
+                }
             };
 
             if !can_spawn {
@@ -390,26 +361,31 @@ impl Game {
 
             let apple_pos = match &mut self.apple_spawn_strategy {
                 AppleSpawnStrategy::Random { apple_count } => {
-                    let apple_pos = match Self::random_free_spot(&occupied_cells, self.dim, &mut self.rng) {
-                        Some(pos) => pos,
-                        None => {
-                            println!(
+                    let apple_pos =
+                        match Self::random_free_spot(&occupied_cells, self.dim, &mut self.rng) {
+                            Some(pos) => pos,
+                            None => {
+                                println!(
                                 "warning: no space left for new apples ({} apples will be missing)",
                                 *apple_count - self.apples.len()
                             );
-                            return;
-                        }
-                    };
+                                return;
+                            }
+                        };
 
                     // insert at sorted position
                     match occupied_cells.binary_search(&apple_pos) {
-                        Ok(idx) => panic!("Spawned apple at occupied cell {:?}", occupied_cells[idx]),
+                        Ok(idx) => {
+                            panic!("Spawned apple at occupied cell {:?}", occupied_cells[idx])
+                        }
                         Err(idx) => occupied_cells.insert(idx, apple_pos),
                     }
 
                     Some(apple_pos)
                 }
-                AppleSpawnStrategy::ScheduledOnEat { spawns, next_index, .. } => {
+                AppleSpawnStrategy::ScheduledOnEat {
+                    spawns, next_index, ..
+                } => {
                     let len = spawns.len();
                     match &mut spawns[*next_index] {
                         AppleSpawn::Wait { total, current } => {
@@ -430,9 +406,7 @@ impl Game {
             };
 
             match apple_pos {
-                Some(pos) => {
-                    self.generate_apple(pos)
-                },
+                Some(pos) => self.generate_apple(pos),
                 None => break,
             }
         }
