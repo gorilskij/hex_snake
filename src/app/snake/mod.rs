@@ -1,4 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::{
+    cmp::min,
+    collections::{HashMap, VecDeque},
+};
 
 use crate::{
     app::{
@@ -11,9 +14,9 @@ use crate::{
     },
     basic::{Dir, HexDim, HexPoint},
 };
-use std::cmp::min;
 
 pub mod controller;
+pub mod drawing;
 pub mod palette;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -169,12 +172,14 @@ impl Snake {
     // }
 
     // very inefficient
+    // all points theoretically reachable in 'radius' steps (assumes no cutting)
     pub fn reachable(&self, radius: usize, board_dim: HexDim) -> Vec<HexPoint> {
         let mut out = vec![];
         let mut layer = vec![self.head().pos];
 
+        // excluding the point itself
         fn immediate_neighborhood(point: HexPoint, board_dim: HexDim) -> Vec<HexPoint> {
-            // excluding the point itself
+            // could exclude -(current dir) but that might not be worth it overall
             Dir::iter()
                 .map(|dir| point.wrapping_translate(dir, 1, board_dim))
                 .collect()

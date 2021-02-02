@@ -1,7 +1,7 @@
 use crate::basic::Dir;
 use std::{
     cmp::Ordering,
-    ops::{Add, AddAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 use Dir::*;
 use Dir12::*;
@@ -17,22 +17,8 @@ pub enum Dir12 {
 }
 
 impl Dir12 {
-    //     const ORDER: &'static [Dir12] = &[
-    //         Dir12::Single(Dir::U),
-    //         Dir12::Combined(Dir::U, Dir::UR),
-    //         Dir12::Single(Dir::UR),
-    //         Dir12::Combined(Dir::UR, Dir::DR),
-    //         Dir12::Single(Dir::DR),
-    //         Dir12::Combined(Dir::DR, Dir::D),
-    //         Dir12::Single(Dir::D),
-    //         Dir12::Combined(Dir::D, Dir::DL),
-    //         Dir12::Single(Dir::DL),
-    //         Dir12::Combined(Dir::DL, Dir::UL),
-    //         Dir12::Single(Dir::UL),
-    //         Dir12::Combined(Dir::UL, Dir::U),
-    //     ];
-
     pub fn iter() -> impl Iterator<Item = Self> {
+        // clockwise from U
         [
             Single(U),
             Combined(U, UR),
@@ -143,6 +129,14 @@ impl SubAssign<u8> for Dir12 {
     }
 }
 
+impl Neg for Dir12 {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        self + 6
+    }
+}
+
 #[test]
 fn test_dir12_math() {
     for (a, b) in Dir12::iter().zip(Dir12::iter().skip(1)) {
@@ -153,5 +147,10 @@ fn test_dir12_math() {
     for (a, b) in Dir12::iter().zip(Dir12::iter().skip(2)) {
         assert_eq!(a + 2, b, "failed {:?} + 2 == {:?}", a, b);
         assert_eq!(a, b - 2, "failed {:?} == {:?} - 2", a, b);
+    }
+
+    for (a, b) in Dir12::iter().zip(Dir12::iter().skip(6).chain(Dir12::iter())) {
+        assert_eq!(a, -b, "failed {:?} == -{:?}", a, b);
+        assert_eq!(-a, b, "failed -{:?} == {:?}", a, b);
     }
 }

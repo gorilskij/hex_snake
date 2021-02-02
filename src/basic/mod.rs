@@ -15,3 +15,10 @@ pub enum Side {
     Left,
     Right,
 }
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum DrawStyle {
+    Hexagon,
+    Pointy,
+    Smooth,
+}

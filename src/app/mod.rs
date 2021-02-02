@@ -32,7 +32,6 @@ macro_rules! hash_map {
     }};
 }
 
-mod drawing;
 mod game;
 pub mod keyboard_control;
 mod palette;

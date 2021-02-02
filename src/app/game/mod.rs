@@ -3,6 +3,7 @@ use ggez::{
     event::{EventHandler, KeyCode, KeyMods},
     graphics::{
         clear, draw, present, Color, DrawMode, DrawParam, Font, Mesh, MeshBuilder, Scale, Text,
+        WHITE,
     },
     Context, GameResult,
 };
@@ -12,20 +13,19 @@ use rand::prelude::*;
 use crate::{
     app::{
         apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
-        drawing::{generate_grid_mesh, get_full_hexagon, get_points_animated, SegmentFraction},
         game::game_control::{GameControl, GameState},
         palette::GamePalette,
         snake::{
             controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
+            drawing::{generate_grid_mesh, get_full_hexagon, get_points_animated, SegmentFraction},
             palette::SnakePaletteTemplate,
             EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
             SnakeType,
         },
         Frames,
     },
-    basic::{CellDim, Dir, HexDim, HexPoint, Point, Side},
+    basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point, Side},
 };
-use ggez::graphics::WHITE;
 
 mod game_control;
 
@@ -46,8 +46,7 @@ struct Prefs {
     display_fps: bool,
     apple_food: Food,
     message_duration: Frames,
-    // full hexagons, no animation
-    old_style_graphics: bool,
+    draw_style: DrawStyle,
     special_apples: bool,
 }
 
@@ -58,7 +57,7 @@ impl Default for Prefs {
             display_fps: false,
             apple_food: 1,
             message_duration: 100,
-            old_style_graphics: false,
+            draw_style: DrawStyle::Smooth,
             special_apples: true,
         }
     }
@@ -594,8 +593,7 @@ impl Game {
                 .iter()
                 .filter(|s| s.snake_type == SnakeType::PlayerSnake)
             {
-                let neighborhood =
-                    snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.dim);
+                let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.dim);
                 occupied_cells.extend_from_slice(&neighborhood);
             }
             occupied_cells.sort_unstable();
@@ -731,11 +729,14 @@ impl Game {
                     _ => SegmentFraction::Solid,
                 };
 
-                let points = if self.prefs.old_style_graphics {
-                    get_full_hexagon(dest, self.cell_dim)
-                } else {
-                    get_points_animated(dest, previous, next, self.cell_dim, fraction)
-                };
+                let points = get_points_animated(
+                    dest,
+                    previous,
+                    next,
+                    self.cell_dim,
+                    fraction,
+                    self.prefs.draw_style,
+                );
 
                 builder.polygon(DrawMode::fill(), &points, color)?;
             }
@@ -755,17 +756,14 @@ impl Game {
                         &segment,
                     );
                     let hexagon_points = get_full_hexagon(dest, self.cell_dim);
-                    let segment_points = if self.prefs.old_style_graphics {
-                        get_full_hexagon(dest, self.cell_dim)
-                    } else {
-                        get_points_animated(
-                            dest,
-                            previous,
-                            next,
-                            self.cell_dim,
-                            SegmentFraction::Appearing(0.5),
-                        )
-                    };
+                    let segment_points = get_points_animated(
+                        dest,
+                        previous,
+                        next,
+                        self.cell_dim,
+                        SegmentFraction::Appearing(0.5),
+                        self.prefs.draw_style,
+                    );
                     builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
                     builder.polygon(DrawMode::fill(), &segment_points, segment_color)?;
                 }
@@ -773,17 +771,14 @@ impl Game {
                     let color = snake
                         .painter
                         .paint_segment(0, snake.len(), &snake.body.cells[0]);
-                    let points = if self.prefs.old_style_graphics {
-                        get_full_hexagon(dest, self.cell_dim)
-                    } else {
-                        get_points_animated(
-                            dest,
-                            previous,
-                            next,
-                            self.cell_dim,
-                            SegmentFraction::Appearing(0.5),
-                        )
-                    };
+                    let points = get_points_animated(
+                        dest,
+                        previous,
+                        next,
+                        self.cell_dim,
+                        SegmentFraction::Appearing(0.5),
+                        self.prefs.draw_style,
+                    );
                     builder.polygon(DrawMode::fill(), &points, color)?;
                 }
                 _ => unreachable!(
@@ -806,7 +801,8 @@ impl Game {
                     Color::from(hsl.to_rgb())
                 }
             };
-            if self.prefs.old_style_graphics {
+
+            if self.prefs.draw_style == DrawStyle::Hexagon {
                 let dest = apple.pos.to_point(self.cell_dim);
                 let points = get_full_hexagon(dest, self.cell_dim);
                 builder.polygon(DrawMode::fill(), &points, color)?;
@@ -983,12 +979,22 @@ impl EventHandler for Game {
                 )));
             }
             Escape => {
-                self.prefs.old_style_graphics = !self.prefs.old_style_graphics;
-                let message = if self.prefs.old_style_graphics {
-                    "RTX off"
-                } else {
-                    "RTX on"
-                };
+                let message;
+                match self.prefs.draw_style {
+                    DrawStyle::Hexagon => {
+                        self.prefs.draw_style = DrawStyle::Pointy;
+                        message = "draw style: pointy";
+                    }
+                    DrawStyle::Pointy => {
+                        self.prefs.draw_style = DrawStyle::Smooth;
+                        message = "draw style: smooth";
+                    }
+                    DrawStyle::Smooth => {
+                        self.prefs.draw_style = DrawStyle::Hexagon;
+                        message = "draw style: hexagon";
+                    }
+                }
+
                 self.message_top_right = Some(Message::from((
                     message.to_string(),
                     self.prefs.message_duration,
