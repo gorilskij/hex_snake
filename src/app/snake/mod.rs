@@ -11,6 +11,7 @@ use crate::{
     },
     basic::{Dir, HexDim, HexPoint},
 };
+use std::cmp::min;
 
 pub mod controller;
 pub mod palette;
@@ -156,16 +157,46 @@ impl Snake {
         &self.body.cells[0]
     }
 
-    // TODO: this is still broken around edges, it doesn't show the cells within a
-    //  manhattan distance if including teleportation, this is due to the way
-    //  neighborhood is calculated, a correct calculation might be very involved
-    pub fn head_neighborhood(&self, radius: usize, board_dim: HexDim) -> Vec<HexPoint> {
-        self.head()
-            .pos
-            .neighborhood(radius)
-            .into_iter()
-            .filter_map(|point| point.wrap_around(board_dim, self.dir().axis()))
-            .collect()
+    // similar to reachable(..), much more efficient, only works in the plane,
+    // doesn't account for the snake itself
+    // pub fn head_neighborhood(&self, radius: usize, board_dim: HexDim) -> Vec<HexPoint> {
+    //     self.head()
+    //         .pos
+    //         .neighborhood(radius)
+    //         .into_iter()
+    //         .filter_map(|point| point.wrap_around(board_dim, self.dir().axis()))
+    //         .collect()
+    // }
+
+    // very inefficient
+    pub fn reachable(&self, radius: usize, board_dim: HexDim) -> Vec<HexPoint> {
+        let mut out = vec![];
+        let mut layer = vec![self.head().pos];
+
+        fn immediate_neighborhood(point: HexPoint, board_dim: HexDim) -> Vec<HexPoint> {
+            // excluding the point itself
+            Dir::iter()
+                .map(|dir| point.wrapping_translate(dir, 1, board_dim))
+                .collect()
+        }
+
+        fn snake_contains(snake: &Snake, point: HexPoint) -> bool {
+            snake.body.cells.iter().any(|segment| segment.pos == point)
+        }
+
+        for _ in 0..radius {
+            let mut new: Vec<_> = layer
+                .iter()
+                .flat_map(|point| immediate_neighborhood(*point, board_dim).into_iter())
+                .collect();
+            new.sort_unstable();
+            new.dedup();
+            new.retain(|x| !out.contains(x) && !snake_contains(self, *x));
+            out.extend_from_slice(&new);
+            layer = new;
+        }
+
+        out
     }
 
     pub fn update_dir(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {

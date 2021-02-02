@@ -26,13 +26,14 @@ impl FPSCounter {
 
     fn set_fps(&mut self, fps: Frames) {
         self.step = max(1, 3 * fps / Self::LEN as Frames);
-        println!(
-            "FPSCounter: fps = {}, step = {}, len = {}, frames = {}",
-            fps,
-            self.step,
-            Self::LEN,
-            self.step * Self::LEN as Frames
-        );
+        // debug
+        // println!(
+        //     "FPSCounter: fps = {}, step = {}, len = {}, frames = {}",
+        //     fps,
+        //     self.step,
+        //     Self::LEN,
+        //     self.step * Self::LEN as Frames
+        // );
         self.reset();
     }
 

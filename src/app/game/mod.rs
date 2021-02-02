@@ -520,7 +520,7 @@ impl Game {
                     let crash_point = self.snakes[i].head().pos;
                     if i != j && crash_point == self.snakes[j].head().pos {
                         // TODO: cause only a crash if even one of the snakes crashed
-                        //  what happens if a snake encounters a black hole in progress?
+                        // TODO: what happens if a snake encounters a black hole in progress?
                         // special case for a head-to-head collision, can't cut..
                         println!("warning: invoked head-to-head collision special case");
                         self.snakes[i].die();
@@ -537,7 +537,13 @@ impl Game {
                             });
 
                         let _ = self.snakes[j].body.cells.drain(drain_start_idx + 1..);
-                        self.snakes[j].body.grow = 0;
+
+                        // ensure a length of at least 2 to avoid weird animation
+                        if self.snakes[j].len() < 2 {
+                            self.snakes[j].body.grow = 2 - self.snakes.len();
+                        } else {
+                            self.snakes[j].body.grow = 0;
+                        }
                     }
                 }
                 EatBehavior::Crash => {
@@ -589,7 +595,7 @@ impl Game {
                 .filter(|s| s.snake_type == SnakeType::PlayerSnake)
             {
                 let neighborhood =
-                    snake.head_neighborhood(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.dim);
+                    snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.dim);
                 occupied_cells.extend_from_slice(&neighborhood);
             }
             occupied_cells.sort_unstable();
@@ -666,12 +672,8 @@ impl Game {
 
             let len = snake.len();
 
-            if len < 2 {
-                println!("warning: snakes of length <= 1 interact weirdly with animation ")
-            }
-
             // draw white aura around snake heads (debug)
-            // for pos in snake.head_neighborhood(7, self.dim) {
+            // for pos in snake.reachable(7, self.dim) {
             //     let dest = pos.to_point(self.cell_dim);
             //     let points = get_full_hexagon(dest, self.cell_dim);
             //     builder.polygon(DrawMode::fill(), &points, WHITE)?;

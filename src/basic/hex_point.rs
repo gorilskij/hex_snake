@@ -69,29 +69,30 @@ impl HexPoint {
         (dh + dv_overflow) as usize
     }
 
+    // obviously oblivious to teleportation, only works on the plane
     // all cells within a manhattan distance of radius (including self)
     // guarantees no duplicates, not sorted
-    pub fn neighborhood(self, radius: usize) -> Vec<Self> {
-        let mut neighborhood = vec![self];
-        for dir in Dir::iter() {
-            for r in 1..radius {
-                let branch = self.translate(dir, r);
-                neighborhood.push(branch);
-                let dir2 = dir + 1;
-                for r2 in 1..(radius - r) {
-                    neighborhood.push(branch.translate(dir2, r2))
-                }
-            }
-        }
-
-        // check that no duplicates were introduced
-        // let len = neighborhood.len();
-        // neighborhood.sort()
-        // neighborhood.dedup();
-        // assert_eq!(neighborhood.len(), len);
-
-        neighborhood
-    }
+    // pub fn neighborhood(self, radius: usize) -> Vec<Self> {
+    //     let mut neighborhood = vec![self];
+    //     for dir in Dir::iter() {
+    //         for r in 1..radius {
+    //             let branch = self.translate(dir, r);
+    //             neighborhood.push(branch);
+    //             let dir2 = dir + 1;
+    //             for r2 in 1..(radius - r) {
+    //                 neighborhood.push(branch.translate(dir2, r2))
+    //             }
+    //         }
+    //     }
+    //
+    //     // check that no duplicates were introduced
+    //     // let len = neighborhood.len();
+    //     // neighborhood.sort()
+    //     // neighborhood.dedup();
+    //     // assert_eq!(neighborhood.len(), len);
+    //
+    //     neighborhood
+    // }
 }
 
 impl Debug for HexPoint {
