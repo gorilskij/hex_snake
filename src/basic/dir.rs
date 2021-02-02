@@ -1,6 +1,7 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
 use rand::Rng;
+use std::cmp::Ordering;
 use Dir::*;
 
 // defined in clockwise order starting at U
@@ -54,6 +55,20 @@ impl Sub<u8> for Dir {
 impl SubAssign<u8> for Dir {
     fn sub_assign(&mut self, rhs: u8) {
         *self = *self - rhs;
+    }
+}
+
+// U is the smallest, directions get bigger clockwise, UL is the largest
+// UL > U
+impl Ord for Dir {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (*self as u8).cmp(&(*other as u8))
+    }
+}
+
+impl PartialOrd for Dir {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

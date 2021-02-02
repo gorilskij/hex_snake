@@ -102,6 +102,7 @@ fn translate(points: &mut [Point], dest: Point) {
     }
 }
 
+// TODO: implement simultaneous appear and disappear
 pub enum SegmentFraction {
     Appearing(f32),
     Disappearing(f32),

@@ -153,7 +153,7 @@ impl GameControl {
                     for _ in 0..updates {
                         self.measured_game_fps.register_frame();
                     }
-                    
+
                     true
                 } else {
                     false

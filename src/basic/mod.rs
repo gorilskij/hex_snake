@@ -1,10 +1,12 @@
 pub use cell_dim::CellDim;
 pub use dir::{Dir, TurnDirection, TurnType};
+pub use dir12::Dir12;
 pub use hex_point::{HexDim, HexPoint};
 pub use point::Point;
 
 mod cell_dim;
 mod dir;
+mod dir12;
 mod hex_point;
 mod point;
 
