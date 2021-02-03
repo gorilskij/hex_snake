@@ -128,7 +128,9 @@ impl SnakeControllerTemplate {
                 wait: 0,
             }),
             SnakeControllerTemplate::CompetitorAI => Box::new(CompetitorAI),
-            SnakeControllerTemplate::CompetitorAI2 => Box::new(CompetitorAI2),
+            SnakeControllerTemplate::CompetitorAI2 => {
+                Box::new(CompetitorAI2 { target_apple: None })
+            }
             SnakeControllerTemplate::KillerAI => Box::new(KillerAI),
         }
     }
@@ -349,47 +351,49 @@ impl SnakeController for CompetitorAI {
     }
 }
 
-struct CompetitorAI2;
-
-fn approximate_dir(
-    from: HexPoint,
-    to: HexPoint,
-    filter: impl Fn(Dir) -> bool,
-    penalty: impl Fn(Dir) -> f32, // higher = worse
-) -> Option<Dir> {
-    use std::f32::consts::PI;
-    use Dir::*;
-
-    const TWO_PI: f32 = 2. * PI;
-    let CellDim { side, sin, cos, .. } = CellDim::from(1.);
-
-    let x_step = side + cos;
-    let y_step = 2. * sin;
-
-    let dh = to.h - from.h;
-    let dv = to.v - from.v;
-
-    let dx = dh as f32 / x_step;
-    let dy = -dv as f32 / y_step; // convert to y going up
-    let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
-
-    const DIR_ANGLES: [(Dir, f32); 6] = [
-        (UR, 1. / 6. * PI),
-        (U, 3. / 6. * PI),
-        (UL, 5. / 6. * PI),
-        (DL, 7. / 6. * PI),
-        (D, 9. / 6. * PI),
-        (DR, 11. / 6. * PI),
-    ];
-
-    // this could probably be done with math
-    DIR_ANGLES
-        .iter()
-        .copied()
-        .filter(|(d, _)| filter(*d))
-        .min_by_key(|(d, a)| TotalF32((a - angle).abs() + penalty(*d)))
-        .map(|(d, _)| d)
+struct CompetitorAI2 {
+    target_apple: Option<HexPoint>,
 }
+
+// fn approximate_dir(
+//     from: HexPoint,
+//     to: HexPoint,
+//     filter: impl Fn(Dir) -> bool,
+//     penalty: impl Fn(Dir) -> f32, // higher = worse
+// ) -> Option<Dir> {
+//     use std::f32::consts::PI;
+//     use Dir::*;
+//
+//     const TWO_PI: f32 = 2. * PI;
+//     let CellDim { side, sin, cos, .. } = CellDim::from(1.);
+//
+//     let x_step = side + cos;
+//     let y_step = 2. * sin;
+//
+//     let dh = to.h - from.h;
+//     let dv = to.v - from.v;
+//
+//     let dx = dh as f32 / x_step;
+//     let dy = -dv as f32 / y_step; // convert to y going up
+//     let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
+//
+//     const DIR_ANGLES: [(Dir, f32); 6] = [
+//         (UR, 1. / 6. * PI),
+//         (U, 3. / 6. * PI),
+//         (UL, 5. / 6. * PI),
+//         (DL, 7. / 6. * PI),
+//         (D, 9. / 6. * PI),
+//         (DR, 11. / 6. * PI),
+//     ];
+//
+//     // this could probably be done with math
+//     DIR_ANGLES
+//         .iter()
+//         .copied()
+//         .filter(|(d, _)| filter(*d))
+//         .min_by_key(|(d, a)| TotalF32((a - angle).abs() + penalty(*d)))
+//         .map(|(d, _)| d)
+// }
 
 fn distance_to_snake(
     mut point: HexPoint,
@@ -421,35 +425,62 @@ impl SnakeController for CompetitorAI2 {
         apples: &[Apple],
         board_dim: HexDim,
     ) -> Option<Dir> {
-        let (apple_pos, apple_dist) = apples
-            .iter()
-            .map(|apple| {
-                (
-                    apple.pos,
-                    snake_body.cells[0].pos.manhattan_distance_to(apple.pos),
-                )
-            })
-            .min_by_key(|(_, dist)| *dist)?;
-
         let head_pos = snake_body.cells[0].pos;
-        let snake_dir = snake_body.dir;
-        let dir = approximate_dir(
-            head_pos,
-            apple_pos,
-            |dir| dir != -snake_dir,
-            |dir| {
-                10. * (apple_dist as f32
-                    - distance_to_snake(
-                        head_pos,
-                        dir,
-                        snake_body,
-                        other_snakes,
-                        board_dim,
-                        Some(10),
-                    ) as f32)
-            },
-        );
-        // println!("{:?}", dir);
+        let target_pos = match self.target_apple {
+            Some(pos) if apples.iter().any(|apple| apple.pos == pos) => pos,
+            _ => {
+                // find closest apple
+                let closest_apple = apples
+                    .iter()
+                    .map(|apple| apple.pos)
+                    .min_by_key(|pos| head_pos.manhattan_distance_to(*pos))?;
+                self.target_apple = Some(closest_apple);
+                closest_apple
+            }
+        };
+
+        use std::f32::consts::PI;
+        use Dir::*;
+
+        const TWO_PI: f32 = 2. * PI;
+        let CellDim { side, sin, cos, .. } = CellDim::from(1.);
+
+        let x_step = side + cos;
+        let y_step = 2. * sin;
+
+        let dh = target_pos.h - head_pos.h;
+        let dv = target_pos.v - head_pos.v;
+
+        let dx = dh as f32 / x_step;
+        let dy = -dv as f32 / y_step; // convert to y going up
+        let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
+
+        const DIR_ANGLES: [(Dir, f32); 6] = [
+            (UR, 1. / 6. * PI),
+            (U, 3. / 6. * PI),
+            (UL, 5. / 6. * PI),
+            (DL, 7. / 6. * PI),
+            (D, 9. / 6. * PI),
+            (DR, 11. / 6. * PI),
+        ];
+
+        let dir_is_safe = |dir| {
+            let new_head = head_pos.wrapping_translate(dir, 1, board_dim);
+            !snake_body
+                .cells
+                .iter()
+                .any(|segment| segment.pos == new_head)
+                && !other_snakes.contains(new_head)
+        };
+
+        // this could probably be done with math
+        let dir = DIR_ANGLES
+            .iter()
+            .copied()
+            .filter(|(d, _)| *d != -snake_body.dir && dir_is_safe(*d))
+            .min_by_key(|(d, a)| TotalF32((a - angle).abs()))
+            .map(|(d, _)| d);
+
         dir
     }
 }
