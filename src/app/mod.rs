@@ -110,33 +110,33 @@ impl App {
             srgb: true,
         };
 
-        // let seeds: Vec<_> = players
-        //     .into_iter()
-        //     .map(|cs| SnakeSeed {
-        //         snake_type: SnakeType::PlayerSnake,
-        //         eat_mechanics: EatMechanics {
-        //             eat_self: EatBehavior::Cut,
-        //             eat_other: hash_map! {},
-        //             default: EatBehavior::Crash,
-        //         },
-        //         palette: SnakePaletteTemplate::rainbow().persistent(),
-        //         controller: SnakeControllerTemplate::PlayerController(cs),
-        //         // controller: SnakeControllerTemplate::PlayerController12,
-        //     })
-        //     .collect();
-        //
-        // Self {
-        //     // screen: Screen::StartScreen(StartScreen::new()),
-        //     screen: Screen::Game(Game::new(
-        //         12.,
-        //         seeds,
-        //         GamePalette::dark(),
-        //         AppleSpawnStrategy::Random { apple_count: 5 },
-        //         window_mode,
-        //     )),
-        //     window_mode,
-        //     window_setup,
-        // }
+        let seeds: Vec<_> = players
+            .into_iter()
+            .map(|cs| SnakeSeed {
+                snake_type: SnakeType::PlayerSnake,
+                eat_mechanics: EatMechanics {
+                    eat_self: EatBehavior::Cut,
+                    eat_other: hash_map! {},
+                    default: EatBehavior::Crash,
+                },
+                palette: SnakePaletteTemplate::rainbow().persistent(),
+                controller: SnakeControllerTemplate::PlayerController(cs),
+                // controller: SnakeControllerTemplate::PlayerController12,
+            })
+            .collect();
+
+        Self {
+            // screen: Screen::StartScreen(StartScreen::new()),
+            screen: Screen::Game(Game::new(
+                12.,
+                seeds,
+                GamePalette::dark(),
+                AppleSpawnStrategy::Random { apple_count: 5 },
+                window_mode,
+            )),
+            window_mode,
+            window_setup,
+        }
 
         // let seeds = vec![SnakeSeed {
         //     snake_type: SnakeType::SimulatedSnake {
@@ -184,25 +184,25 @@ impl App {
         //     ]),
         // }];
 
-        let seeds = vec![SnakeSeed {
-            snake_type: SnakeType::PlayerSnake,
-            eat_mechanics: EatMechanics::always(EatBehavior::Cut),
-            palette: SnakePaletteTemplate::gray_gradient(),
-            controller: SnakeControllerTemplate::CompetitorAI2,
-        }];
-
-        Self {
-            // screen: Screen::StartScreen(StartScreen::new()),
-            screen: Screen::Game(Game::new(
-                12.,
-                seeds,
-                GamePalette::dark(),
-                AppleSpawnStrategy::Random { apple_count: 1 },
-                window_mode,
-            )),
-            window_mode,
-            window_setup,
-        }
+        // let seeds = vec![SnakeSeed {
+        //     snake_type: SnakeType::PlayerSnake,
+        //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
+        //     palette: SnakePaletteTemplate::gray_gradient(),
+        //     controller: SnakeControllerTemplate::CompetitorAI2,
+        // }];
+        //
+        // Self {
+        //     // screen: Screen::StartScreen(StartScreen::new()),
+        //     screen: Screen::Game(Game::new(
+        //         12.,
+        //         seeds,
+        //         GamePalette::dark(),
+        //         AppleSpawnStrategy::Random { apple_count: 1 },
+        //         window_mode,
+        //     )),
+        //     window_mode,
+        //     window_setup,
+        // }
     }
 
     pub fn wm(&self) -> WindowMode {
