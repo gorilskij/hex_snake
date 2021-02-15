@@ -76,7 +76,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(players: Vec<ControlSetup>) -> Self {
+    pub fn new(
+        players: Vec<ControlSetup>,
+        window_mode: WindowMode,
+        window_setup: WindowSetup,
+    ) -> Self {
         assert_eq!(
             players.iter().map(|cs| cs.layout).dedup().count(),
             1,
@@ -88,27 +92,6 @@ impl App {
             players.len(),
             "found multiple players on the same side of the keyboard"
         );
-
-        let window_mode = WindowMode {
-            width: 1000.,
-            height: 800.,
-            maximized: false,
-            fullscreen_type: FullscreenType::Windowed,
-            borderless: false,
-            min_width: 0.,
-            min_height: 0.,
-            max_width: 0.,
-            max_height: 0.,
-            resizable: true,
-        };
-
-        let window_setup = WindowSetup {
-            title: "Hex Snake".to_string(),
-            samples: NumSamples::Zero,
-            vsync: true,
-            icon: "".to_string(),
-            srgb: true,
-        };
 
         let seeds: Vec<_> = players
             .into_iter()
@@ -238,12 +221,13 @@ impl EventHandler for App {
             Rect {
                 x: 0.0,
                 y: 0.0,
-                w: width,
-                h: height,
+                w: width / 2.,
+                h: height / 2.,
             },
         )
         .unwrap();
 
-        self.screen.resize_event(ctx, width, height);
+        // TODO: hacky fix for ggez bug, remove /2
+        self.screen.resize_event(ctx, width / 2., height / 2.);
     }
 }

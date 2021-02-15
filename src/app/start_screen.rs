@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use ggez::{
     event::EventHandler,
-    graphics::{clear, draw, present, DrawParam, MeshBuilder, BLACK},
+    graphics::{clear, draw, present, DrawParam, MeshBuilder},
     Context, GameResult,
 };
 
@@ -15,6 +15,7 @@ use crate::{
     },
     basic::{CellDim, Dir, HexDim, HexPoint},
 };
+use ggez::graphics::Color;
 
 struct SnakeDemo {
     top_left: HexPoint,
@@ -129,7 +130,7 @@ impl EventHandler for StartScreen {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        clear(ctx, BLACK);
+        clear(ctx, Color::BLACK);
 
         self.player1_demo.draw(ctx)?;
 

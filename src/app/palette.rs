@@ -1,4 +1,4 @@
-use ggez::graphics::{Color, BLACK, WHITE};
+use ggez::graphics::Color;
 
 macro_rules! gray {
     ($lightness:expr) => {
@@ -50,9 +50,9 @@ impl GamePalette {
             grid_thickness: 0.5,
             border_thickness: 3.,
 
-            background_color: BLACK,
+            background_color: Color::BLACK,
             grid_color: gray!(0.25),
-            border_color: WHITE,
+            border_color: Color::WHITE,
             apple_color: gray!(0.45),
         }
     }

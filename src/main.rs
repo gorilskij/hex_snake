@@ -15,24 +15,67 @@ use crate::{
     },
     basic::Side,
 };
+use ggez::{
+    conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
+    graphics::Rect,
+};
 
 mod app;
 mod basic;
 mod oklab;
 
 fn main() {
-    // NOTE: configure number of players and controls here
-    let app = &mut App::new(vec![ControlSetup {
-        layout: KeyboardLayout::Dvorak,
-        keyboard_side: Side::Right,
-        hand: Side::Right,
-    }]);
+    let width = 1000.;
+    let height = 800.;
 
-    let (ctx, event_loop) = &mut ContextBuilder::new("hex_snake", "gorilskij")
+    let window_mode = WindowMode {
+        width,
+        height,
+        maximized: false,
+        fullscreen_type: FullscreenType::Windowed,
+        borderless: false,
+        min_width: 0.,
+        min_height: 0.,
+        max_width: 0.,
+        max_height: 0.,
+        resizable: true,
+        visible: true,
+    };
+
+    let window_setup = WindowSetup {
+        title: "Hex Snake".to_string(),
+        samples: NumSamples::One,
+        vsync: true,
+        icon: "".to_string(),
+        srgb: true,
+    };
+
+    let app = App::new(
+        vec![ControlSetup {
+            layout: KeyboardLayout::Dvorak,
+            keyboard_side: Side::Right,
+            hand: Side::Right,
+        }],
+        window_mode,
+        window_setup,
+    );
+
+    let (mut ctx, event_loop) = ContextBuilder::new("hex_snake", "gorilskij")
         .window_mode(app.wm())
         .window_setup(app.ws())
         .build()
         .unwrap();
 
-    run(ctx, event_loop, app).expect("crashed")
+    ggez::graphics::set_screen_coordinates(
+        &mut ctx,
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            w: width,
+            h: height,
+        },
+    )
+    .unwrap();
+
+    run(ctx, event_loop, app)
 }

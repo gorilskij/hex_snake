@@ -7,9 +7,11 @@ use ggez::{
 use num_integer::Integer;
 
 use crate::{app::palette::GamePalette, basic::*};
+use crate::app::snake::drawing::point_factory::{AnimatedSegmentsPointy, PointFactory, AnimatedSegmentsSmooth, HexagonSegments};
 
-mod animated_points_pointy;
-mod animated_points_smooth;
+pub(crate) mod point_factory;
+// mod animated_points_pointy;
+// mod animated_points_smooth;
 
 // TODO: make this readable
 pub fn generate_grid_mesh(
@@ -99,7 +101,7 @@ fn rotate(points: &mut [Point], angle: f32, origin: Point) {
     }
 }
 
-fn translate(points: &mut [Point], dest: Point) {
+pub(crate) fn translate(points: &mut [Point], dest: Point) {
     for point in points {
         *point += dest;
     }
@@ -111,21 +113,7 @@ pub enum SegmentFraction {
     Solid,
 }
 
-pub fn get_full_hexagon(dest: Point, cell_dim: CellDim) -> Vec<Point> {
-    let CellDim { side, sin, cos } = cell_dim;
 
-    let mut points = #[rustfmt::skip] vec![
-        Point { x: cos,             y: 0. },
-        Point { x: cos + side,      y: 0. },
-        Point { x: cos * 2. + side, y: sin },
-        Point { x: cos + side,      y: sin * 2. },
-        Point { x: cos,             y: sin * 2. },
-        Point { x: 0.,              y: sin },
-    ];
-
-    translate(&mut points, dest);
-    points
-}
 
 pub fn get_points_animated(
     dest: Point,
@@ -141,24 +129,19 @@ pub fn get_points_animated(
         SegmentFraction::Solid => (1., 1.),
     };
 
-    if draw_style == DrawStyle::Hexagon {
-        return get_full_hexagon(dest, cell_dim);
-    }
+    // NOTE: a lot of this function is redundant if only hexagons are being used
+    let point_factory: Box<dyn PointFactory> = match draw_style {
+        DrawStyle::Hexagon => Box::new(HexagonSegments),
+        DrawStyle::Pointy => Box::new(AnimatedSegmentsPointy),
+        DrawStyle::Smooth => Box::new(AnimatedSegmentsSmooth),
+    };
 
     let mut points;
     let angle;
 
     match previous.turn_type(next) {
         TurnType::Straight => {
-            points = match draw_style {
-                DrawStyle::Pointy => {
-                    animated_points_pointy::straight_segment(cell_dim, appear, disappear)
-                }
-                DrawStyle::Smooth => {
-                    animated_points_smooth::straight_segment(cell_dim, appear, disappear)
-                }
-                _ => unreachable!(),
-            };
+            points = point_factory.straight_segment(cell_dim, appear, disappear);
             angle = previous.clockwise_angle_from_u();
         }
         TurnType::Blunt(turn_direction) => {
@@ -170,15 +153,7 @@ pub fn get_points_animated(
                 }
             };
 
-            points = match draw_style {
-                DrawStyle::Pointy => {
-                    animated_points_pointy::blunt_turn_segment(cell_dim, appear, disappear)
-                }
-                DrawStyle::Smooth => {
-                    animated_points_smooth::blunt_turn_segment(cell_dim, appear, disappear)
-                }
-                _ => unreachable!(),
-            };
+            points = point_factory.blunt_turn_segment(cell_dim, appear, disappear);
             angle = ang;
         }
         TurnType::Sharp(turn_direction) => {
@@ -190,18 +165,11 @@ pub fn get_points_animated(
                 }
             };
 
-            points = match draw_style {
-                DrawStyle::Pointy => {
-                    animated_points_pointy::sharp_turn_segment(cell_dim, appear, disappear)
-                }
-                DrawStyle::Smooth => {
-                    animated_points_smooth::sharp_turn_segment(cell_dim, appear, disappear)
-                }
-                _ => unreachable!(),
-            };
+            points = point_factory.sharp_turn_segment(cell_dim, appear, disappear);
             angle = ang;
         }
     }
+
     rotate(&mut points, angle, cell_dim.center());
     translate(&mut points, dest);
     points

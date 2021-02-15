@@ -1,10 +1,7 @@
 use ggez::{
     conf::WindowMode,
     event::{EventHandler, KeyCode, KeyMods},
-    graphics::{
-        clear, draw, present, Color, DrawMode, DrawParam, Font, Mesh, MeshBuilder, Scale, Text,
-        WHITE,
-    },
+    graphics::{clear, draw, present, Color, DrawMode, DrawParam, Font, Mesh, MeshBuilder, Text},
     Context, GameResult,
 };
 use hsl::HSL;
@@ -17,15 +14,18 @@ use crate::{
         palette::GamePalette,
         snake::{
             controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
-            drawing::{generate_grid_mesh, get_full_hexagon, get_points_animated, SegmentFraction},
+            drawing::{generate_grid_mesh, get_points_animated, SegmentFraction},
             palette::SnakePaletteTemplate,
             EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
             SnakeType,
+            drawing::point_factory::full_hexagon
         },
         Frames,
     },
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point, Side},
 };
+use ggez::graphics::PxScale;
+use crate::app::snake::drawing::translate;
 
 mod game_control;
 
@@ -74,7 +74,7 @@ impl From<(String, Frames)> for Message {
         Self {
             message,
             duration: Some(life),
-            color: WHITE,
+            color: Color::WHITE,
         }
     }
 }
@@ -167,6 +167,9 @@ impl Game {
             h: (width / (side + cos)) as isize,
             v: (height / (2. * sin)) as isize - 1,
         };
+
+        println!("w/h: {}/{}", width, height);
+        println!("new dim: {:?}", new_dim);
 
         if self.dim != new_dim {
             self.dim = new_dim;
@@ -620,7 +623,7 @@ impl Game {
         }) = maybe_message
         {
             let mut text = Text::new(message as &str);
-            text.set_font(Font::default(), Scale::uniform(20.));
+            text.set_font(Font::default(), PxScale::from(20.));
 
             let offset = 10.;
             let x = match side {
@@ -755,7 +758,8 @@ impl Game {
                         snake.len() + color_offset,
                         &segment,
                     );
-                    let hexagon_points = get_full_hexagon(dest, self.cell_dim);
+                    let mut hexagon_points = full_hexagon(self.cell_dim);
+                    translate(&mut hexagon_points, dest);
                     let segment_points = get_points_animated(
                         dest,
                         previous,
@@ -804,11 +808,12 @@ impl Game {
 
             if self.prefs.draw_style == DrawStyle::Hexagon {
                 let dest = apple.pos.to_point(self.cell_dim);
-                let points = get_full_hexagon(dest, self.cell_dim);
+                let mut points = full_hexagon(self.cell_dim);
+                translate(&mut points, dest);
                 builder.polygon(DrawMode::fill(), &points, color)?;
             } else {
                 let dest = apple.pos.to_point(self.cell_dim) + self.cell_dim.center();
-                builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 1.5, 0.1, color);
+                builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 1.5, 0.1, color)?;
             }
         }
 
@@ -844,7 +849,7 @@ impl EventHandler for Game {
                 Color::from_rgb(235, 168, 52)
             } else {
                 // at or overshoot: white
-                WHITE
+                Color::WHITE
             };
 
             self.message_top_left = Some(Message::from((
