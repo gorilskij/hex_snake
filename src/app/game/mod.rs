@@ -14,17 +14,19 @@ use crate::{
         palette::GamePalette,
         snake::{
             controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
-            drawing::{generate_grid_mesh, get_points_animated, SegmentFraction},
+            drawing::{
+                generate_grid_mesh,
+            },
             palette::SnakePaletteTemplate,
             EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
             SnakeType,
-            drawing::point_factory::full_hexagon
         },
         Frames,
     },
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point, Side},
 };
 use ggez::graphics::PxScale;
+use crate::app::snake::drawing::point_factory::{SegmentDescription, full_hexagon, SegmentFraction};
 use crate::app::snake::drawing::translate;
 
 mod game_control;
@@ -689,12 +691,12 @@ impl Game {
                 // previous = towards head
                 // next = towards tail
 
-                let previous = seg_idx
+                let previous_segment = seg_idx
                     .checked_sub(1)
                     .map(|prev_idx| -snake.body.cells[prev_idx].next_segment)
                     .unwrap_or_else(|| snake.dir());
 
-                let next = segment.next_segment;
+                let next_segment = segment.next_segment;
 
                 if seg_idx == 0 && matches!(snake.state, SnakeState::Crashed | SnakeState::Dying(_))
                 {
@@ -705,11 +707,11 @@ impl Game {
                         snake.state
                     );
                     // draw head separately
-                    heads.push((snake_idx, *segment, previous, next, color_offset));
+                    heads.push((snake_idx, *segment, previous_segment, next_segment, color_offset));
                     continue;
                 }
 
-                let dest = segment.pos.to_point(self.cell_dim);
+                let location = segment.pos.to_point(self.cell_dim);
                 let color = snake
                     .painter
                     .paint_segment(seg_idx + color_offset, len, segment);
@@ -732,22 +734,22 @@ impl Game {
                     _ => SegmentFraction::Solid,
                 };
 
-                let points = get_points_animated(
-                    dest,
-                    previous,
-                    next,
-                    self.cell_dim,
+                let points = SegmentDescription {
+                    location,
+                    previous_segment,
+                    next_segment,
                     fraction,
-                    self.prefs.draw_style,
-                );
+                    draw_style: self.prefs.draw_style,
+                    cell_dim: self.cell_dim,
+                }.render();
 
                 builder.polygon(DrawMode::fill(), &points, color)?;
             }
         }
 
-        for (snake_idx, segment, previous, next, color_offset) in heads {
+        for (snake_idx, segment, previous_segment, next_segment, color_offset) in heads {
             let Segment { pos, typ, .. } = segment;
-            let dest = pos.to_point(self.cell_dim);
+            let location = pos.to_point(self.cell_dim);
             let snake = &mut self.snakes[snake_idx];
 
             match typ {
@@ -759,15 +761,16 @@ impl Game {
                         &segment,
                     );
                     let mut hexagon_points = full_hexagon(self.cell_dim);
-                    translate(&mut hexagon_points, dest);
-                    let segment_points = get_points_animated(
-                        dest,
-                        previous,
-                        next,
-                        self.cell_dim,
-                        SegmentFraction::Appearing(0.5),
-                        self.prefs.draw_style,
-                    );
+                    translate(&mut hexagon_points, location);
+                    let segment_points =
+                        SegmentDescription {
+                            location,
+                            previous_segment,
+                            next_segment,
+                            fraction: SegmentFraction::Appearing(0.5),
+                            draw_style: self.prefs.draw_style,
+                            cell_dim: self.cell_dim,
+                        }.render();
                     builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
                     builder.polygon(DrawMode::fill(), &segment_points, segment_color)?;
                 }
@@ -775,14 +778,16 @@ impl Game {
                     let color = snake
                         .painter
                         .paint_segment(0, snake.len(), &snake.body.cells[0]);
-                    let points = get_points_animated(
-                        dest,
-                        previous,
-                        next,
-                        self.cell_dim,
-                        SegmentFraction::Appearing(0.5),
-                        self.prefs.draw_style,
-                    );
+                    let points =
+
+                        SegmentDescription {
+                            location,
+                            previous_segment,
+                            next_segment,
+                            fraction: SegmentFraction::Appearing(0.5),
+                            draw_style: self.prefs.draw_style,
+                            cell_dim: self.cell_dim,
+                        }.render();
                     builder.polygon(DrawMode::fill(), &points, color)?;
                 }
                 _ => unreachable!(

@@ -1,15 +1,22 @@
-use std::f32::consts::PI;
-
 use ggez::{
     graphics::{DrawMode, Mesh, MeshBuilder},
     Context, GameResult,
 };
 use num_integer::Integer;
 
-use crate::{app::palette::GamePalette, basic::*};
-use crate::app::snake::drawing::point_factory::{AnimatedSegmentsPointy, PointFactory, AnimatedSegmentsSmooth, HexagonSegments};
+use crate::{
+    app::{
+        palette::GamePalette,
+        // snake::drawing::point_factory::{
+        //     AnimatedSegmentsPointy, AnimatedSegmentsSmooth, HexagonSegments, PointFactory,
+        // },
+    },
+    basic::*,
+};
 
-pub(crate) mod point_factory;
+pub(crate) use point_factory::translate;
+
+pub mod point_factory;
 // mod animated_points_pointy;
 // mod animated_points_smooth;
 
@@ -93,84 +100,4 @@ pub fn generate_grid_mesh(
 pub fn generate_border_mesh(ctx: &mut Context) -> GameResult<Mesh> {
     let _ = ctx;
     unimplemented!()
-}
-
-fn rotate(points: &mut [Point], angle: f32, origin: Point) {
-    for point in points.iter_mut() {
-        *point = point.clockwise_rotate_around(origin, angle);
-    }
-}
-
-pub(crate) fn translate(points: &mut [Point], dest: Point) {
-    for point in points {
-        *point += dest;
-    }
-}
-
-pub enum SegmentFraction {
-    Appearing(f32),
-    Disappearing(f32),
-    Solid,
-}
-
-
-
-pub fn get_points_animated(
-    dest: Point,
-    previous: Dir,
-    next: Dir,
-    cell_dim: CellDim,
-    fraction: SegmentFraction,
-    draw_style: DrawStyle,
-) -> Vec<Point> {
-    let (appear, disappear) = match fraction {
-        SegmentFraction::Appearing(f) => (f, 1.),
-        SegmentFraction::Disappearing(f) => (1., 1. - f),
-        SegmentFraction::Solid => (1., 1.),
-    };
-
-    // NOTE: a lot of this function is redundant if only hexagons are being used
-    let point_factory: Box<dyn PointFactory> = match draw_style {
-        DrawStyle::Hexagon => Box::new(HexagonSegments),
-        DrawStyle::Pointy => Box::new(AnimatedSegmentsPointy),
-        DrawStyle::Smooth => Box::new(AnimatedSegmentsSmooth),
-    };
-
-    let mut points;
-    let angle;
-
-    match previous.turn_type(next) {
-        TurnType::Straight => {
-            points = point_factory.straight_segment(cell_dim, appear, disappear);
-            angle = previous.clockwise_angle_from_u();
-        }
-        TurnType::Blunt(turn_direction) => {
-            // feels hacky
-            let (ang, appear, disappear) = match turn_direction {
-                TurnDirection::Clockwise => (previous.clockwise_angle_from_u(), appear, disappear),
-                TurnDirection::CounterClockwise => {
-                    (next.clockwise_angle_from_u(), disappear, appear)
-                }
-            };
-
-            points = point_factory.blunt_turn_segment(cell_dim, appear, disappear);
-            angle = ang;
-        }
-        TurnType::Sharp(turn_direction) => {
-            // feels hacky
-            let (ang, appear, disappear) = match turn_direction {
-                TurnDirection::Clockwise => (previous.clockwise_angle_from_u(), appear, disappear),
-                TurnDirection::CounterClockwise => {
-                    (next.clockwise_angle_from_u(), disappear, appear)
-                }
-            };
-
-            points = point_factory.sharp_turn_segment(cell_dim, appear, disappear);
-            angle = ang;
-        }
-    }
-
-    rotate(&mut points, angle, cell_dim.center());
-    translate(&mut points, dest);
-    points
 }

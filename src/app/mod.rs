@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use ggez::{
-    conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
+    conf::{WindowMode, WindowSetup},
     event::{EventHandler, KeyCode, KeyMods},
     graphics::Rect,
     Context, GameResult,

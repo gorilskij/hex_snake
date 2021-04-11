@@ -1,16 +1,50 @@
-use crate::basic::{CellDim, Point};
+use crate::basic::{CellDim, Dir, Point, DrawStyle, TurnType, TurnDirection};
 use std::f32::consts::PI;
 
-pub trait PointFactory {
-    // D => U
-    fn straight_segment(&self, cell_dim: CellDim, show_front: f32, show_back: f32) -> Vec<Point>;
-
-    // DR => U
-    fn blunt_turn_segment(&self, cell_dim: CellDim, show_front: f32, show_back: f32) -> Vec<Point>;
-
-    // UR => U
-    fn sharp_turn_segment(&self, cell_dim: CellDim, show_front: f32, show_back: f32) -> Vec<Point>;
+pub enum SegmentFraction {
+    Appearing(f32),
+    Disappearing(f32),
+    Solid,
 }
+
+pub enum Turn {
+    Straight {
+        previous: Dir,
+    },
+    NormalTurn {
+        previous: Dir,
+        next: Dir,
+    },
+    TransitionTurn {
+        previous: Dir,
+        next1: Dir,
+        next2: Dir,
+    },
+}
+
+fn rotate(points: &mut [Point], angle: f32, origin: Point) {
+    for point in points.iter_mut() {
+        *point = point.clockwise_rotate_around(origin, angle);
+    }
+}
+
+pub fn translate(points: &mut [Point], dest: Point) {
+    for point in points {
+        *point += dest;
+    }
+}
+
+// // the trait includes only clockwise turns, for counterclockwise turns, show_front and show_back are reversed
+// pub trait PointFactory {
+//     // D => U
+//     fn straight_segment(&self, cell_dim: CellDim, show_front: f32, show_back: f32) -> Vec<Point>;
+//
+//     // D => UR
+//     fn blunt_turn_segment(&self, cell_dim: CellDim, show_front: f32, show_back: f32) -> Vec<Point>;
+//
+//     // D => DR
+//     fn sharp_turn_segment(&self, cell_dim: CellDim, show_front: f32, show_back: f32) -> Vec<Point>;
+// }
 
 pub struct HexagonSegments;
 
@@ -25,21 +59,7 @@ pub(crate) fn full_hexagon(CellDim { side, sin, cos }: CellDim) -> Vec<Point> {
     ]
 }
 
-impl PointFactory for HexagonSegments {
-    fn straight_segment(&self, cell_dim: CellDim, _: f32, _: f32) -> Vec<Point> {
-        full_hexagon(cell_dim)
-    }
-
-    fn blunt_turn_segment(&self, cell_dim: CellDim, _: f32, _: f32) -> Vec<Point> {
-        full_hexagon(cell_dim)
-    }
-
-    fn sharp_turn_segment(&self, cell_dim: CellDim, _: f32, _: f32) -> Vec<Point> {
-        full_hexagon(cell_dim)
-    }
-}
-
-pub struct AnimatedSegmentsPointy;
+pub struct PointySegments;
 
 // D => U
 fn thin_straight_segment(
@@ -55,13 +75,8 @@ fn thin_straight_segment(
     ]
 }
 
-impl PointFactory for AnimatedSegmentsPointy {
-    fn straight_segment(&self, cell_dim: CellDim, show_front: f32, show_back: f32) -> Vec<Point> {
-        thin_straight_segment(cell_dim, show_front, show_back)
-    }
-
+impl PointySegments {
     fn blunt_turn_segment(
-        &self,
         CellDim { side, sin, cos }: CellDim,
         show_front: f32,
         show_back: f32,
@@ -80,7 +95,6 @@ impl PointFactory for AnimatedSegmentsPointy {
     }
 
     fn sharp_turn_segment(
-        &self,
         CellDim { side, sin, cos }: CellDim,
         show_front: f32,
         show_back: f32,
@@ -120,19 +134,12 @@ impl PointFactory for AnimatedSegmentsPointy {
     }
 }
 
-pub struct AnimatedSegmentsSmooth;
+pub struct SmoothSegments;
 
-impl AnimatedSegmentsSmooth {
+impl SmoothSegments {
     const ANGLE_STEP: f32 = 0.1;
-}
-
-impl PointFactory for AnimatedSegmentsSmooth {
-    fn straight_segment(&self, cell_dim: CellDim, show_front: f32, show_back: f32) -> Vec<Point> {
-        thin_straight_segment(cell_dim, show_front, show_back)
-    }
 
     fn blunt_turn_segment(
-        &self,
         CellDim { side, cos, .. }: CellDim,
         show_front: f32,
         show_back: f32,
@@ -173,7 +180,6 @@ impl PointFactory for AnimatedSegmentsSmooth {
     }
 
     fn sharp_turn_segment(
-        &self,
         CellDim { side, cos, .. }: CellDim,
         show_front: f32,
         show_back: f32,
@@ -204,3 +210,73 @@ impl PointFactory for AnimatedSegmentsSmooth {
         points
     }
 }
+
+pub struct SegmentDescription {
+    pub location: Point,
+    pub previous_segment: Dir,
+    pub next_segment: Dir,
+    pub fraction: SegmentFraction,
+    pub draw_style: DrawStyle,
+
+    pub cell_dim: CellDim,
+}
+
+impl SegmentDescription {
+    pub fn render(self) -> Vec<Point> {
+        match self.draw_style {
+            DrawStyle::Hexagon => HexagonSegments::render_segment(self),
+            DrawStyle::Pointy => PointySegments::render_segment(self),
+            DrawStyle::Smooth => SmoothSegments::render_segment(self),
+        }
+    }
+}
+
+pub trait SegmentRenderer {
+    fn render_segment(description: SegmentDescription) -> Vec<Point>;
+}
+
+impl SegmentRenderer for HexagonSegments {
+    fn render_segment(description: SegmentDescription) -> Vec<Point> {
+        let mut points = full_hexagon(description.cell_dim);
+        translate(&mut points, description.location);
+        points
+    }
+}
+
+macro_rules! implement_segment_renderer {
+    ($renderer:ident) => {
+        impl SegmentRenderer for $renderer {
+            fn render_segment(description: SegmentDescription) -> Vec<Point> {
+                use TurnType::*;
+                use TurnDirection::*;
+
+                let (mut show_front, mut show_back) = match description.fraction {
+                    SegmentFraction::Appearing(f) => (f, 1.),
+                    SegmentFraction::Disappearing(f) => (1., 1. - f),
+                    SegmentFraction::Solid => (1., 1.),
+                };
+
+                let turn_type = description.previous_segment.turn_type(description.next_segment);
+                let angle = match turn_type {
+                    Blunt(Clockwise) | Sharp(Clockwise) => description.previous_segment.clockwise_angle_from_u(),
+                    Blunt(CounterClockwise) | Sharp(CounterClockwise) | Straight => {
+                        std::mem::swap(&mut show_front, &mut show_back);
+                        description.next_segment.clockwise_angle_from_u()
+                    }
+                };
+                let mut points = match turn_type {
+                    Straight => thin_straight_segment(description.cell_dim, show_front, show_back),
+                    Blunt(_) => Self::blunt_turn_segment(description.cell_dim, show_front, show_back),
+                    Sharp(_) => Self::sharp_turn_segment(description.cell_dim, show_front, show_back),
+                };
+
+                rotate(&mut points, angle, description.cell_dim.center());
+                translate(&mut points, description.location);
+                points
+            }
+        }
+    }
+}
+
+implement_segment_renderer!(PointySegments);
+implement_segment_renderer!(SmoothSegments);

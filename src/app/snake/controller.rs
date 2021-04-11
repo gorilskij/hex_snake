@@ -11,6 +11,7 @@ use std::{cmp::Ordering, collections::VecDeque, iter::once};
 
 // because Iterator::min_by_key requires Ord
 #[derive(PartialEq)]
+#[repr(transparent)]
 struct TotalF32(f32);
 
 impl Eq for TotalF32 {}
@@ -478,7 +479,7 @@ impl SnakeController for CompetitorAI2 {
             .iter()
             .copied()
             .filter(|(d, _)| *d != -snake_body.dir && dir_is_safe(*d))
-            .min_by_key(|(d, a)| TotalF32((a - angle).abs()))
+            .min_by_key(|(_, a)| TotalF32((a - angle).abs()))
             .map(|(d, _)| d);
 
         dir
