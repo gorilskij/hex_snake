@@ -1,4 +1,4 @@
-use crate::basic::{CellDim, Dir, Point, DrawStyle, TurnType, TurnDirection};
+use crate::basic::{CellDim, Dir, DrawStyle, Point, TurnDirection, TurnType};
 use std::f32::consts::PI;
 
 pub enum SegmentFraction {
@@ -247,8 +247,8 @@ macro_rules! implement_segment_renderer {
     ($renderer:ident) => {
         impl SegmentRenderer for $renderer {
             fn render_segment(description: SegmentDescription) -> Vec<Point> {
-                use TurnType::*;
                 use TurnDirection::*;
+                use TurnType::*;
 
                 let (mut show_front, mut show_back) = match description.fraction {
                     SegmentFraction::Appearing(f) => (f, 1.),
@@ -256,9 +256,13 @@ macro_rules! implement_segment_renderer {
                     SegmentFraction::Solid => (1., 1.),
                 };
 
-                let turn_type = description.previous_segment.turn_type(description.next_segment);
+                let turn_type = description
+                    .previous_segment
+                    .turn_type(description.next_segment);
                 let angle = match turn_type {
-                    Blunt(Clockwise) | Sharp(Clockwise) => description.previous_segment.clockwise_angle_from_u(),
+                    Blunt(Clockwise) | Sharp(Clockwise) => {
+                        description.previous_segment.clockwise_angle_from_u()
+                    }
                     Blunt(CounterClockwise) | Sharp(CounterClockwise) | Straight => {
                         std::mem::swap(&mut show_front, &mut show_back);
                         description.next_segment.clockwise_angle_from_u()
@@ -266,8 +270,12 @@ macro_rules! implement_segment_renderer {
                 };
                 let mut points = match turn_type {
                     Straight => thin_straight_segment(description.cell_dim, show_front, show_back),
-                    Blunt(_) => Self::blunt_turn_segment(description.cell_dim, show_front, show_back),
-                    Sharp(_) => Self::sharp_turn_segment(description.cell_dim, show_front, show_back),
+                    Blunt(_) => {
+                        Self::blunt_turn_segment(description.cell_dim, show_front, show_back)
+                    }
+                    Sharp(_) => {
+                        Self::sharp_turn_segment(description.cell_dim, show_front, show_back)
+                    }
                 };
 
                 rotate(&mut points, angle, description.cell_dim.center());
@@ -275,7 +283,7 @@ macro_rules! implement_segment_renderer {
                 points
             }
         }
-    }
+    };
 }
 
 implement_segment_renderer!(PointySegments);

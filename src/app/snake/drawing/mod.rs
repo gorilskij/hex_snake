@@ -4,15 +4,7 @@ use ggez::{
 };
 use num_integer::Integer;
 
-use crate::{
-    app::{
-        palette::GamePalette,
-        // snake::drawing::point_factory::{
-        //     AnimatedSegmentsPointy, AnimatedSegmentsSmooth, HexagonSegments, PointFactory,
-        // },
-    },
-    basic::*,
-};
+use crate::{app::palette::GamePalette, basic::*};
 
 pub(crate) use point_factory::translate;
 
@@ -30,8 +22,8 @@ pub fn generate_grid_mesh(
     let CellDim { side, sin, cos } = cell_dim;
 
     // two kinds of alternating vertical lines
-    let mut vline_a = vec![];
-    let mut vline_b = vec![];
+    let mut vline_a = vec![]; // lines that start from the top with /
+    let mut vline_b = vec![]; // lines that start from the top with \
 
     #[rustfmt::skip]
     for dv in (0..=dim.v).map(|v| v as f32 * 2. * sin) {
