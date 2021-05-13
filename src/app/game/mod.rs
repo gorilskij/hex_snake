@@ -83,11 +83,7 @@ impl From<(String, Frames)> for Message {
 
 impl From<(String, Color)> for Message {
     fn from((message, color): (String, Color)) -> Self {
-        Self {
-            message,
-            duration: None,
-            color,
-        }
+        Self { message, duration: None, color }
     }
 }
 
@@ -130,10 +126,7 @@ impl Game {
         let mut game = Self {
             control: GameControl::new(12),
 
-            window_dim: Point {
-                x: wm.width,
-                y: wm.height,
-            },
+            window_dim: Point { x: wm.width, y: wm.height },
 
             dim: HexDim { h: 0, v: 0 }, // placeholder
             seeds: seeds.into_iter().map(Into::into).collect(),
@@ -160,10 +153,7 @@ impl Game {
     }
 
     fn update_dim(&mut self) {
-        let Point {
-            x: width,
-            y: height,
-        } = self.window_dim;
+        let Point { x: width, y: height } = self.window_dim;
         let CellDim { side, sin, cos } = self.cell_dim;
         let new_dim = HexDim {
             h: (width / (side + cos)) as isize,
@@ -230,11 +220,7 @@ impl Game {
 
         for seed in self.seeds.iter() {
             match seed.snake_type {
-                SnakeType::SimulatedSnake {
-                    start_pos,
-                    start_dir,
-                    start_grow,
-                } => {
+                SnakeType::SimulatedSnake { start_pos, start_dir, start_grow } => {
                     self.snakes
                         .push(Snake::from_seed(seed, start_pos, start_dir, start_grow));
                 }
@@ -339,10 +325,7 @@ impl Game {
             AppleType::Normal(self.prefs.apple_food)
         };
 
-        self.apples.push(Apple {
-            pos: apple_pos,
-            typ: apple_type,
-        });
+        self.apples.push(Apple { pos: apple_pos, typ: apple_type });
     }
 
     pub fn spawn_apples(&mut self) {
@@ -387,9 +370,7 @@ impl Game {
 
                     Some(apple_pos)
                 }
-                AppleSpawnStrategy::ScheduledOnEat {
-                    spawns, next_index, ..
-                } => {
+                AppleSpawnStrategy::ScheduledOnEat { spawns, next_index, .. } => {
                     let len = spawns.len();
                     match &mut spawns[*next_index] {
                         AppleSpawn::Wait { total, current } => {
@@ -725,11 +706,7 @@ impl Game {
                 let fraction = match seg_idx {
                     0 => SegmentFraction::Appearing(frame_frac),
                     i if i == len - 1 && snake.body.grow == 0 => {
-                        if let SegmentType::Eaten {
-                            original_food,
-                            food_left,
-                        } = segment.typ
-                        {
+                        if let SegmentType::Eaten { original_food, food_left } = segment.typ {
                             let frac = ((original_food - food_left) as f32 + frame_frac)
                                 / (original_food + 1) as f32;
                             SegmentFraction::Disappearing(frac)
@@ -808,11 +785,7 @@ impl Game {
                 AppleType::Normal(_) => self.palette.apple_color,
                 AppleType::SpawnSnake(_) => {
                     let hue = 360. * (self.control.graphics_frame_num() as f64 / 60. % 1.);
-                    let hsl = HSL {
-                        h: hue,
-                        s: 1.,
-                        l: 0.3,
-                    };
+                    let hsl = HSL { h: hue, s: 1., l: 0.3 };
                     Color::from(hsl.to_rgb())
                 }
             };
@@ -944,7 +917,7 @@ impl EventHandler for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    SnakeControllerTemplate::CompetitorAI
+                                    SnakeControllerTemplate::CompetitorAI2
                                         .into_controller(player_snake.body.dir),
                                 ));
                                 message = "Autopilot on";
@@ -967,11 +940,13 @@ impl EventHandler for Game {
             LBracket => {
                 let new_fps = match self.control.fps() {
                     f if f <= 1 => 1,
-                    f if f <= 50 => f - 1,
-                    f if f <= 100 => f - 5,
-                    f if f <= 250 => f - 10,
+                    f if f <= 20 => f - 1,
+                    f if f <= 50 => f - 5,
+                    f if f <= 100 => f - 10,
                     f if f <= 500 => f - 50,
-                    f => f - 100,
+                    f if f <= 1000 => f - 100,
+                    f if f <= 10_000 => f - 1000,
+                    f => f - 10_000,
                 };
                 self.control.set_fps(new_fps);
                 self.message_top_right = Some(Message::from((
@@ -982,11 +957,13 @@ impl EventHandler for Game {
             RBracket => {
                 let new_fps = match self.control.fps() {
                     f if f < 1 => 1,
-                    f if f < 50 => f + 1,
-                    f if f < 100 => f + 5,
-                    f if f < 250 => f + 10,
-                    f if f <= 450 => f + 50,
-                    f => f + 100,
+                    f if f < 20 => f + 1,
+                    f if f < 50 => f + 5,
+                    f if f < 100 => f + 10,
+                    f if f < 500 => f + 50,
+                    f if f < 1000 => f + 100,
+                    f if f < 10_000 => f + 1000,
+                    f => f + 10_000,
                 };
                 self.control.set_fps(new_fps);
                 self.message_top_right = Some(Message::from((
@@ -1072,10 +1049,7 @@ impl EventHandler for Game {
 
     // TODO: forbid resizing in-game
     fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
-        self.window_dim = Point {
-            x: width,
-            y: height,
-        };
+        self.window_dim = Point { x: width, y: height };
         self.update_dim();
         let HexDim { h, v } = self.dim;
         self.message_top_right = Some(Message::from((

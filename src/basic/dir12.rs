@@ -1,6 +1,7 @@
 use crate::basic::Dir;
 use std::{
     cmp::Ordering,
+    f32::consts::PI,
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 use Dir::*;
@@ -17,8 +18,24 @@ pub enum Dir12 {
 }
 
 impl Dir12 {
+    // angles of directions, clockwise from U
+    pub const ANGLES: [(Dir12, f32); 12] = [
+        (Single(U), 3. / 6. * PI),
+        (Combined(U, UR), 2. / 6. * PI),
+        (Single(UR), 1. / 6. * PI),
+        (Combined(UR, DR), 0. / 6. * PI),
+        (Single(DR), 11. / 6. * PI),
+        (Combined(DR, D), 10. / 6. * PI),
+        (Single(D), 9. / 6. * PI),
+        (Combined(D, DL), 8. / 6. * PI),
+        (Single(DL), 7. / 6. * PI),
+        (Combined(DL, UL), 6. / 6. * PI),
+        (Single(UL), 5. / 6. * PI),
+        (Combined(UL, U), 4. / 6. * PI),
+    ];
+
+    // clockwise from U
     pub fn iter() -> impl Iterator<Item = Self> {
-        // clockwise from U
         [
             Single(U),
             Combined(U, UR),
@@ -35,6 +52,20 @@ impl Dir12 {
         ]
         .iter()
         .copied()
+    }
+
+    // flip_flop_state is meant to change on every frame
+    pub fn to_dir(self, flip_flop_state: bool) -> Dir {
+        match self {
+            Single(dir) => dir,
+            Combined(a, b) => {
+                if flip_flop_state {
+                    b
+                } else {
+                    a
+                }
+            }
+        }
     }
 }
 

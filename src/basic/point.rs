@@ -23,10 +23,7 @@ impl Mul<f32> for Point {
     type Output = Self;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        Self {
-            x: self.x * rhs,
-            y: self.y * rhs,
-        }
+        Self { x: self.x * rhs, y: self.y * rhs }
     }
 }
 

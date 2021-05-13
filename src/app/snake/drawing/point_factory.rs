@@ -99,10 +99,11 @@ impl PointySegments {
         show_front: f32,
         show_back: f32,
     ) -> Vec<Point> {
-        let pivot = #[rustfmt::skip] Point { x: side + cos, y: 0. };
-        let a = #[rustfmt::skip] Point { x: cos, y: 0. };
-        let b = #[rustfmt::skip] Point { x: cos, y: 2. * sin };
-        let c = #[rustfmt::skip] Point { x: side + 2. * cos, y: sin };
+        let pivot = Point { x: side + cos, y: 0. };
+        let a = Point { x: cos, y: 0. };
+        // let b = #[rustfmt::skip] Point { x: cos, y: 2. * sin };
+        let b = Point { x: cos + side / 2., y: sin };
+        let c = Point { x: side + 2. * cos, y: sin };
 
         let mut points = Vec::with_capacity(4);
 
@@ -144,9 +145,9 @@ impl SmoothSegments {
         show_front: f32,
         show_back: f32,
     ) -> Vec<Point> {
-        let pivot = #[rustfmt::skip] Point { x: side + 3. * cos, y: 0. };
-        let a = #[rustfmt::skip] Point { x: cos, y: 0. };
-        let b = #[rustfmt::skip] Point { x: side + cos, y: 0. };
+        let pivot = Point { x: side + 3. * cos, y: 0. };
+        let a = Point { x: cos, y: 0. };
+        let b = Point { x: side + cos, y: 0. };
 
         let mut points = vec![];
         let angle_start = show_back * (-PI / 3.);
@@ -184,8 +185,8 @@ impl SmoothSegments {
         show_front: f32,
         show_back: f32,
     ) -> Vec<Point> {
-        let pivot = #[rustfmt::skip] Point { x: side + cos, y: 0. };
-        let a = #[rustfmt::skip] Point { x: cos, y: 0. };
+        let pivot = Point { x: side + cos, y: 0. };
+        let a = Point { x: cos, y: 0. };
 
         let mut points = vec![];
         points.push(pivot);

@@ -7,7 +7,14 @@ use crate::{
     basic::{CellDim, Dir, Dir12, HexDim, HexPoint, Side},
 };
 use ggez::event::KeyCode;
-use std::{cmp::Ordering, collections::VecDeque, iter::once};
+use itertools::Itertools;
+use rand::{prelude::SliceRandom, thread_rng};
+use std::{
+    cmp::{max, min, Ordering},
+    collections::VecDeque,
+    f32::consts::PI,
+    iter::once,
+};
 
 // because Iterator::min_by_key requires Ord
 #[derive(PartialEq)]
@@ -129,9 +136,11 @@ impl SnakeControllerTemplate {
                 wait: 0,
             }),
             SnakeControllerTemplate::CompetitorAI => Box::new(CompetitorAI),
-            SnakeControllerTemplate::CompetitorAI2 => {
-                Box::new(CompetitorAI2 { target_apple: None })
-            }
+            SnakeControllerTemplate::CompetitorAI2 => Box::new(CompetitorAI2 {
+                dir_state: false,
+                target_apple: None,
+                frames_since_update: 0,
+            }),
             SnakeControllerTemplate::KillerAI => Box::new(KillerAI),
         }
     }
@@ -353,7 +362,13 @@ impl SnakeController for CompetitorAI {
 }
 
 struct CompetitorAI2 {
+    dir_state: bool, // Dir12 flip-flop state
     target_apple: Option<HexPoint>,
+    frames_since_update: usize,
+}
+
+impl CompetitorAI2 {
+    const UPDATE_EVERY_N_FRAMES: usize = 20;
 }
 
 // fn approximate_dir(
@@ -418,6 +433,33 @@ fn distance_to_snake(
     upper_bound
 }
 
+// favors the first number in case comparison is not possible
+fn partial_min<T: PartialOrd>(a: T, b: T) -> T {
+    if a > b {
+        b
+    } else {
+        a
+    }
+}
+
+// favors the first number in case comparison is not possible
+fn partial_max<T: PartialOrd>(a: T, b: T) -> T {
+    if a < b {
+        b
+    } else {
+        a
+    }
+}
+
+fn angle_distance(a1: f32, a2: f32) -> f32 {
+    let d1 = (a1 - a2).abs();
+    // add 2pi to the smaller of the two angles and consider that distance as well
+    let b1 = partial_min(a1, a2) + 2. * PI;
+    let b2 = partial_max(a1, a2);
+    let d2 = (b1 - b2).abs();
+    partial_min(d1, d2)
+}
+
 impl SnakeController for CompetitorAI2 {
     fn next_dir(
         &mut self,
@@ -426,11 +468,25 @@ impl SnakeController for CompetitorAI2 {
         apples: &[Apple],
         board_dim: HexDim,
     ) -> Option<Dir> {
+        use Dir::*;
+        use Dir12::*;
+
+        // this also sets the target apple on the first frame
+        if self.frames_since_update % Self::UPDATE_EVERY_N_FRAMES == 0 {
+            self.target_apple = None;
+        }
+        self.frames_since_update += 1;
+
         let head_pos = snake_body.cells[0].pos;
+        if let Some(pos) = self.target_apple {
+            if pos == head_pos {
+                // apple eaten
+                self.target_apple = None;
+            }
+        }
+
         let target_pos = match self.target_apple {
-            Some(pos) if apples.iter().any(|apple| apple.pos == pos) => pos,
-            _ => {
-                // find closest apple
+            None => {
                 let closest_apple = apples
                     .iter()
                     .map(|apple| apple.pos)
@@ -438,10 +494,8 @@ impl SnakeController for CompetitorAI2 {
                 self.target_apple = Some(closest_apple);
                 closest_apple
             }
+            Some(pos) => pos,
         };
-
-        use std::f32::consts::PI;
-        use Dir::*;
 
         const TWO_PI: f32 = 2. * PI;
         let CellDim { side, sin, cos, .. } = CellDim::from(1.);
@@ -456,33 +510,38 @@ impl SnakeController for CompetitorAI2 {
         let dy = -dv as f32 / y_step; // convert to y going up
         let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
 
-        const DIR_ANGLES: [(Dir, f32); 6] = [
-            (UR, 1. / 6. * PI),
-            (U, 3. / 6. * PI),
-            (UL, 5. / 6. * PI),
-            (DL, 7. / 6. * PI),
-            (D, 9. / 6. * PI),
-            (DR, 11. / 6. * PI),
-        ];
+        // positions where the head is not allowed to move
+        let forbidden_head_positions = snake_body
+            .cells
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .map(|Segment { pos, .. }| *pos)
+            .filter(|pos| pos.manhattan_distance_to(head_pos) == 1)
+            .collect_vec();
 
-        let dir_is_safe = |dir| {
-            let new_head = head_pos.wrapping_translate(dir, 1, board_dim);
-            !snake_body
-                .cells
-                .iter()
-                .any(|segment| segment.pos == new_head)
-                && !other_snakes.contains(new_head)
+        let dir_is_safe = |dir: Dir12| {
+            if dir == Single(-snake_body.dir) {
+                return false;
+            }
+            let translate_dir = dir.to_dir(self.dir_state);
+            let new_head = head_pos.wrapping_translate(translate_dir, 1, board_dim);
+            !forbidden_head_positions.contains(&new_head)
         };
 
         // this could probably be done with math
-        let dir = DIR_ANGLES
+        let dir = Dir12::ANGLES
             .iter()
             .copied()
-            .filter(|(d, _)| *d != -snake_body.dir && dir_is_safe(*d))
-            .min_by_key(|(_, a)| TotalF32((a - angle).abs()))
+            .filter(|(d, _)| dir_is_safe(*d))
+            .min_by_key(|(_, a)| TotalF32(angle_distance(angle, *a)))
             .map(|(d, _)| d);
 
-        dir
+        // println!("preferred dir: {:?}", dir);
+        // println!("target: {:?}", self.target_apple);
+
+        let new_dir = Some(dir?.to_dir(self.dir_state));
+        self.dir_state = !self.dir_state;
+        new_dir
     }
 }
 
@@ -514,26 +573,17 @@ fn rough_direction(
     let dy = -(to.v - from.v) as f32 / (2. * sin);
     let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
 
-    const DIR_ANGLES: [(Dir, f32); 6] = [
-        (UR, 1. / 6. * PI),
-        (U, 3. / 6. * PI),
-        (UL, 5. / 6. * PI),
-        (DL, 7. / 6. * PI),
-        (D, 9. / 6. * PI),
-        (DR, 11. / 6. * PI),
-    ];
-
     let head_pos = snake_body.cells[0].pos;
 
     // this could probably be done with math
-    DIR_ANGLES
+    Dir::ANGLES
         .iter()
         .copied()
         .filter(|(d, _)| *d != -snake_body.dir)
         .filter(|(d, _)| {
             distance_to_snake(head_pos, *d, snake_body, other_snakes, board_dim, Some(2)) > 1
         })
-        .min_by_key(|(_, a)| TotalF32((a - angle).abs()))
+        .min_by_key(|(_, a)| TotalF32(angle_distance(angle, *a)))
         .take()
         .map(|(d, _)| d)
 }

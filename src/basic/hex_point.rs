@@ -6,6 +6,7 @@ use std::{
 };
 use Dir::*;
 
+// INVARIANT: even columns are half a cell higher than odd columns
 #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
 pub struct HexPoint {
     pub h: isize,
@@ -15,11 +16,12 @@ pub struct HexPoint {
 pub type HexDim = HexPoint;
 
 impl HexPoint {
-    pub fn to_point(self, CellDim { side, sin, cos }: CellDim) -> Point {
+    pub fn to_point(self, cell_dim: CellDim) -> Point {
         let Self { h, v } = self;
+        let CellDim { side, sin, cos } = cell_dim;
         Point {
             x: h as f32 * (side + cos),
-            y: v as f32 * 2. * sin + if h % 2 == 0 { 0. } else { sin },
+            y: (v as f32 * 2. + (h % 2) as f32) * sin,
         }
     }
 
@@ -57,6 +59,7 @@ impl HexPoint {
     //     None
     // }
 
+    // O(1)
     pub fn manhattan_distance_to(self, other: Self) -> usize {
         let dh = (self.h - other.h).abs();
         let max_dv = if self.v > other.v {

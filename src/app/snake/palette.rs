@@ -234,11 +234,7 @@ impl SnakePainter for HSLGradient {
         let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
         match segment.typ {
             Normal | BlackHole => {
-                let hsl = HSL {
-                    h: hue,
-                    s: 1.,
-                    l: self.lightness,
-                };
+                let hsl = HSL { h: hue, s: 1., l: self.lightness };
                 Color::from(hsl.to_rgb())
             }
             Eaten { .. } => {

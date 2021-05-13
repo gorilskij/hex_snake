@@ -66,16 +66,8 @@ fn main() {
         .build()
         .unwrap();
 
-    ggez::graphics::set_screen_coordinates(
-        &mut ctx,
-        Rect {
-            x: 0.0,
-            y: 0.0,
-            w: width,
-            h: height,
-        },
-    )
-    .unwrap();
+    ggez::graphics::set_screen_coordinates(&mut ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
+        .unwrap();
 
     run(ctx, event_loop, app)
 }

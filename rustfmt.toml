@@ -1,1 +1,2 @@
 merge_imports = true
+struct_lit_width = 35

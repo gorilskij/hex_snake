@@ -1,7 +1,7 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
 use rand::Rng;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, f32::consts::PI};
 use Dir::*;
 
 // defined in clockwise order starting at U
@@ -107,6 +107,16 @@ pub enum TurnType {
 }
 
 impl Dir {
+    // angles around the unit circle
+    pub const ANGLES: [(Dir, f32); 6] = [
+        (U, 3. / 6. * PI),
+        (UR, 1. / 6. * PI),
+        (DR, 11. / 6. * PI),
+        (D, 9. / 6. * PI),
+        (DL, 7. / 6. * PI),
+        (UL, 5. / 6. * PI),
+    ];
+
     // clockwise order starting from U
     pub fn iter() -> impl Iterator<Item = Self> {
         [U, UR, DR, D, DL, UL].iter().copied()
