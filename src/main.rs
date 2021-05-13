@@ -23,7 +23,7 @@ mod oklab;
 fn main() {
     // NOTE: configure number of players and controls here
     let app = &mut App::new(vec![ControlSetup {
-        layout: KeyboardLayout::Dvorak,
+        layout: KeyboardLayout::Qwerty,
         keyboard_side: Side::Right,
         hand: Side::Right,
     }]);
