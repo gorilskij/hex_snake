@@ -40,13 +40,13 @@ impl HexPoint {
             return Some(if self.v > other.v { U } else { D });
         } else {
             let dh = (self.h - other.h).abs();
-            if self.v > other.v {
+            if self.v > other.v || self.v == other.v && self.h % 2 == 1 {
                 // going up
                 let dv = dh - (dh + self.h % 2) / 2;
                 if other.v == self.v - dv {
                     return Some(if self.h > other.h { UL } else { UR });
                 }
-            } else if self.v < other.v {
+            } else if self.v < other.v || self.v == other.v && self.h % 2 == 0 {
                 // going down
                 let dv = dh - (dh + (self.h + 1) % 2) / 2;
                 let expected_v = self.v + dv;

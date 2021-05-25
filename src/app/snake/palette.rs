@@ -290,29 +290,40 @@ impl Palette for HSLGradient {
 
         let len = and_update_max_len(&mut self.max_len, body.len());
         for (i, seg) in body.iter().enumerate() {
-            let color = if seg.typ == Crashed {
-                *DEFAULT_CRASHED_COLOR
+            if seg.typ == Crashed {
+                styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
             } else {
                 let r = i + body.missing_front;
-                let hue = self.head_hue + (self.tail_hue - self.head_hue) * r as f64 / len as f64;
-                match seg.typ {
+                let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r as f64 / len as f64;
+                let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1) as f64 / len as f64;
+                let (start_color, end_color) = match seg.typ {
                     Normal | BlackHole => {
-                        let hsl = HSL { h: hue, s: 1., l: self.lightness };
-                        Color::from(hsl.to_rgb())
+                        let start_hsl = HSL { h: start_hue, s: 1., l: self.lightness };
+                        let end_hsl = HSL { h: end_hue, s: 1., l: self.lightness };
+                        (Color::from(start_hsl.to_rgb()), Color::from(end_hsl.to_rgb()))
                     }
                     Eaten { .. } => {
                         // invert lightness twice
-                        let hsl = HSL {
-                            h: hue,
+                        let start_hsl = HSL {
+                            h: start_hue,
                             s: 1.,
                             l: 1. - self.eaten_lightness,
                         };
-                        Color::from(invert_rgb(hsl.to_rgb()))
+                        let end_hsl = HSL {
+                            h: end_hue,
+                            s: 1.,
+                            l: 1. - self.eaten_lightness,
+                        };
+                        (
+                            Color::from(invert_rgb(start_hsl.to_rgb())),
+                            Color::from(invert_rgb(end_hsl.to_rgb())),
+                        )
                     }
-                    Crashed => *DEFAULT_CRASHED_COLOR,
-                }
-            };
-            styles.push(SegmentStyle::Solid(color));
+                    Crashed => unreachable!(),
+                };
+                // styles.push(SegmentStyle::HSLGradient(start_color, end_color));
+                styles.push(SegmentStyle::Solid(start_color));
+            }
         }
 
         styles

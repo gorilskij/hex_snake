@@ -512,7 +512,7 @@ impl SnakeController for CompetitorAI2 {
             .chain(other_snakes.iter_segments())
             .map(|seg| seg.pos)
             .filter(|pos| pos.manhattan_distance_to(head_pos) == 1)
-            .map(|pos| head_pos.dir_to(pos).unwrap())
+            .map(|pos| head_pos.dir_to(pos).unwrap_or_else(|| panic!("no direction from {:?} to {:?}", head_pos, pos)))
             .collect_vec();
         forbidden_directions.push(-snake_body.dir);
 
