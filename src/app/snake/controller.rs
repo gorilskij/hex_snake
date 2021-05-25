@@ -10,7 +10,7 @@ use ggez::event::KeyCode;
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
-    collections::VecDeque,
+    collections::{HashSet, VecDeque},
     f32::consts::PI,
     iter::once,
 };
@@ -35,13 +35,14 @@ impl Ord for TotalF32 {
 }
 
 #[derive(Clone)]
-pub enum SnakeControllerTemplate {
+pub enum ControllerTemplate {
     PlayerController(ControlSetup),
     PlayerController12,
     DemoController(Vec<SimMove>),
     CompetitorAI,
     CompetitorAI2,
     KillerAI,
+    AStarAI,
 }
 
 #[derive(Copy, Clone)]
@@ -68,7 +69,7 @@ impl OtherSnakes<'_> {
     }
 }
 
-pub trait SnakeController {
+pub trait Controller {
     // NOTE: there is a difference between returning None and the same dir
     //  returning None will cause the snake to query again on the
     //  next graphics frame, otherwise it will wait until the next game frame
@@ -86,7 +87,7 @@ pub trait SnakeController {
 }
 
 #[allow(dead_code)]
-impl SnakeControllerTemplate {
+impl ControllerTemplate {
     pub fn demo_hexagon_pattern(side_len: usize) -> Self {
         let mut vec = Vec::with_capacity(12);
         for dir in Dir::iter() {
@@ -114,33 +115,37 @@ impl SnakeControllerTemplate {
         Self::DemoController(vec)
     }
 
-    pub fn into_controller(self, initial_dir: Dir) -> Box<dyn SnakeController> {
+    // TODO: remove initial_dir
+    pub fn into_controller(self, initial_dir: Dir) -> Box<dyn Controller> {
         match self {
-            SnakeControllerTemplate::PlayerController(control_setup) => {
-                Box::new(PlayerController {
-                    controls: control_setup.into(),
-                    control_queue: VecDeque::with_capacity(PlayerController::CTRL_QUEUE_LIMIT),
-                    dir: initial_dir,
-                })
-            }
-            SnakeControllerTemplate::PlayerController12 => Box::new(PlayerController12 {
+            ControllerTemplate::PlayerController(control_setup) => Box::new(PlayerController {
+                controls: control_setup.into(),
+                control_queue: VecDeque::with_capacity(PlayerController::CTRL_QUEUE_LIMIT),
+                dir: initial_dir,
+            }),
+            ControllerTemplate::PlayerController12 => Box::new(PlayerController12 {
                 dir: Dir12::Single(initial_dir),
                 alternation: false,
                 next_dir: None,
             }),
-            SnakeControllerTemplate::DemoController(move_sequence) => Box::new(DemoController {
+            ControllerTemplate::DemoController(move_sequence) => Box::new(DemoController {
                 move_sequence,
                 dir: initial_dir,
                 next_move_idx: 0,
                 wait: 0,
             }),
-            SnakeControllerTemplate::CompetitorAI => Box::new(CompetitorAI),
-            SnakeControllerTemplate::CompetitorAI2 => Box::new(CompetitorAI2 {
+            ControllerTemplate::CompetitorAI => Box::new(CompetitorAI),
+            ControllerTemplate::CompetitorAI2 => Box::new(CompetitorAI2 {
                 dir_state: false,
                 target_apple: None,
                 frames_since_update: 0,
             }),
-            SnakeControllerTemplate::KillerAI => Box::new(KillerAI),
+            ControllerTemplate::KillerAI => Box::new(KillerAI),
+            ControllerTemplate::AStarAI => Box::new(AStarAI {
+                target: None,
+                path: vec![],
+                steps_since_update: 0,
+            }),
         }
     }
 }
@@ -155,7 +160,7 @@ impl PlayerController {
     const CTRL_QUEUE_LIMIT: usize = 3;
 }
 
-impl SnakeController for PlayerController {
+impl Controller for PlayerController {
     fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = queue_dir;
@@ -200,7 +205,7 @@ struct PlayerController12 {
     next_dir: Option<Dir12>,
 }
 
-impl SnakeController for PlayerController12 {
+impl Controller for PlayerController12 {
     fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
         if let Some(new_dir) = self.next_dir.take() {
             self.dir = new_dir;
@@ -260,7 +265,7 @@ struct DemoController {
     wait: usize,
 }
 
-impl SnakeController for DemoController {
+impl Controller for DemoController {
     fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
@@ -313,7 +318,7 @@ fn dir_score(
     board_dim.h as usize + board_dim.v as usize - distance
 }
 
-impl SnakeController for CompetitorAI {
+impl Controller for CompetitorAI {
     fn next_dir(
         &mut self,
         snake_body: &SnakeBody,
@@ -370,46 +375,6 @@ impl CompetitorAI2 {
     const UPDATE_EVERY_N_FRAMES: usize = 20;
 }
 
-// fn approximate_dir(
-//     from: HexPoint,
-//     to: HexPoint,
-//     filter: impl Fn(Dir) -> bool,
-//     penalty: impl Fn(Dir) -> f32, // higher = worse
-// ) -> Option<Dir> {
-//     use std::f32::consts::PI;
-//     use Dir::*;
-//
-//     const TWO_PI: f32 = 2. * PI;
-//     let CellDim { side, sin, cos, .. } = CellDim::from(1.);
-//
-//     let x_step = side + cos;
-//     let y_step = 2. * sin;
-//
-//     let dh = to.h - from.h;
-//     let dv = to.v - from.v;
-//
-//     let dx = dh as f32 / x_step;
-//     let dy = -dv as f32 / y_step; // convert to y going up
-//     let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
-//
-//     const DIR_ANGLES: [(Dir, f32); 6] = [
-//         (UR, 1. / 6. * PI),
-//         (U, 3. / 6. * PI),
-//         (UL, 5. / 6. * PI),
-//         (DL, 7. / 6. * PI),
-//         (D, 9. / 6. * PI),
-//         (DR, 11. / 6. * PI),
-//     ];
-//
-//     // this could probably be done with math
-//     DIR_ANGLES
-//         .iter()
-//         .copied()
-//         .filter(|(d, _)| filter(*d))
-//         .min_by_key(|(d, a)| TotalF32((a - angle).abs() + penalty(*d)))
-//         .map(|(d, _)| d)
-// }
-
 fn distance_to_snake(
     mut point: HexPoint,
     dir: Dir,
@@ -459,7 +424,7 @@ fn angle_distance(a1: f32, a2: f32) -> f32 {
     partial_min(d1, d2)
 }
 
-impl SnakeController for CompetitorAI2 {
+impl Controller for CompetitorAI2 {
     fn next_dir(
         &mut self,
         snake_body: &SnakeBody,
@@ -512,7 +477,11 @@ impl SnakeController for CompetitorAI2 {
             .chain(other_snakes.iter_segments())
             .map(|seg| seg.pos)
             .filter(|pos| pos.manhattan_distance_to(head_pos) == 1)
-            .map(|pos| head_pos.dir_to(pos).unwrap_or_else(|| panic!("no direction from {:?} to {:?}", head_pos, pos)))
+            .map(|pos| {
+                head_pos
+                    .dir_to(pos)
+                    .unwrap_or_else(|| panic!("no direction from {:?} to {:?}", head_pos, pos))
+            })
             .collect_vec();
         forbidden_directions.push(-snake_body.dir);
 
@@ -582,7 +551,7 @@ fn rough_direction(
         .map(|(d, _)| d)
 }
 
-impl SnakeController for KillerAI {
+impl Controller for KillerAI {
     fn next_dir(
         &mut self,
         snake_body: &SnakeBody,
@@ -608,5 +577,171 @@ impl SnakeController for KillerAI {
             other_snakes,
             board_dim,
         )
+    }
+}
+
+pub struct AStarAI {
+    target: Option<HexPoint>,
+    path: Vec<Dir>,
+    steps_since_update: usize,
+}
+
+#[cfg(debug_assertions)]
+pub static mut ETHEREAL_PATH: Option<Vec<HexPoint>> = None;
+
+impl AStarAI {
+    const UPDATE_EVERY_N_STEPS: usize = 1000;
+
+    fn recalculate_target(&mut self, head: HexPoint, apples: &[Apple]) {
+        let new_target = apples
+            .iter()
+            .map(|a| a.pos)
+            .min_by_key(|p| head.manhattan_distance_to(*p));
+        if new_target != self.target {
+            self.target = new_target;
+            self.path.clear();
+        }
+    }
+
+    fn recalculate_path(
+        &mut self,
+        snake_body: &SnakeBody,
+        other_snakes: OtherSnakes,
+        board_dim: HexDim,
+    ) {
+        let target = match self.target {
+            Some(p) => p,
+            None => {
+                self.path.clear();
+                return;
+            }
+        };
+
+        // A* search
+
+        let head = snake_body[0].pos;
+
+        let mut seen = HashSet::new();
+        seen.insert(head);
+        // the last node in each path is the newest
+        let mut paths = vec![vec![head]];
+
+        let mut forbidden_positions = snake_body
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .map(|seg| seg.pos)
+            .collect::<HashSet<_>>();
+
+        loop {
+            // select which node to expand (f(x) is the length of the path)
+            let expand_idx = paths.iter().position_min_by_key(|path| {
+                path.len() - 1 + path.last().unwrap().manhattan_distance_to(target)
+            });
+            let expand_idx = match expand_idx {
+                Some(idx) => idx,
+                None => {
+                    self.path.clear();
+                    return;
+                }
+            };
+
+            let path = paths.remove(expand_idx);
+            let node = *path.last().unwrap();
+
+            if node == target {
+                #[cfg(debug_assertions)]
+                unsafe {
+                    ETHEREAL_PATH = Some(path.clone());
+                }
+
+                // calculate directions
+                self.path = path
+                    .iter()
+                    .zip(path.iter().skip(1))
+                    .map(|(a, b)| {
+                        a.wrapping_dir_to_1(*b, board_dim)
+                            .unwrap_or_else(|| panic!("no dir from {:?} to {:?}", a, b))
+                    })
+                    .collect();
+                return;
+            }
+
+            for dir in Dir::iter() {
+                let candidate = node.wrapping_translate(dir, 1, board_dim);
+                if forbidden_positions.contains(&candidate) || seen.contains(&candidate) {
+                    continue;
+                }
+                seen.insert(candidate);
+
+                // inefficient path cloning
+                let mut new_path = path.clone();
+                new_path.push(candidate);
+                paths.push(new_path);
+            }
+        }
+    }
+
+    // if there's no best path, at least avoid running into something
+    fn least_damage(
+        head: HexPoint,
+        snake_body: &SnakeBody,
+        other_snakes: OtherSnakes,
+        board_dim: HexDim,
+    ) -> Option<Dir> {
+        let forbidden = snake_body
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .map(|seg| seg.pos)
+            .collect::<HashSet<_>>();
+        Dir::iter().find(|dir| !forbidden.contains(&head.wrapping_translate(*dir, 1, board_dim)))
+    }
+}
+
+impl Controller for AStarAI {
+    fn next_dir(
+        &mut self,
+        snake_body: &SnakeBody,
+        other_snakes: OtherSnakes,
+        apples: &[Apple],
+        board_dim: HexDim,
+    ) -> Option<Dir> {
+        if let Some(p) = self.target {
+            if p == snake_body[0].pos {
+                // apple eaten
+                self.target = None;
+            }
+        }
+
+        if self.target.is_none()
+            || self.path.is_empty()
+            || self.steps_since_update >= Self::UPDATE_EVERY_N_STEPS
+        {
+            self.recalculate_target(snake_body[0].pos, apples);
+            self.recalculate_path(snake_body, other_snakes, board_dim);
+            self.steps_since_update = 0;
+        }
+        self.steps_since_update += 1;
+
+        #[cfg(debug_assertions)]
+        unsafe {
+            match &mut ETHEREAL_PATH {
+                Some(v) if !v.is_empty() => drop(v.remove(0)),
+                _ => ETHEREAL_PATH = None,
+            }
+        }
+
+        if !self.path.is_empty() {
+            let dir = self.path.remove(0);
+            Some(dir)
+        } else {
+            Self::least_damage(snake_body[0].pos, snake_body, other_snakes, board_dim)
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+impl Drop for AStarAI {
+    fn drop(&mut self) {
+        unsafe { ETHEREAL_PATH = None }
     }
 }

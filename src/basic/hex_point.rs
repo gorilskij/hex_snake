@@ -33,8 +33,8 @@ impl HexPoint {
     //     (dh / (side + cos) + dv / (2. * sin)) as usize
     // }
 
-    // untested
     // None if the two points are not on the same line
+    // NOTE: doesn't consider wrapping!
     pub fn dir_to(self, other: Self) -> Option<Dir> {
         if self.h == other.h {
             return Some(if self.v > other.v { U } else { D });
@@ -58,6 +58,13 @@ impl HexPoint {
 
         println!("no dir from {:?} to {:?}", self, other);
         None
+    }
+
+    // None if the two points are not on the same line or are farther than 1 unit apart
+    // This version allows wrapping around the board
+    pub fn wrapping_dir_to_1(self, other: Self, board_dim: HexDim) -> Option<Dir> {
+        // O(12) goon enough?
+        Dir::iter().find(|dir| self.wrapping_translate(*dir, 1, board_dim) == other)
     }
 
     // O(1)

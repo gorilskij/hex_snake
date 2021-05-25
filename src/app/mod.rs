@@ -16,9 +16,7 @@ use start_screen::StartScreen;
 use crate::app::{
     apple_spawn_strategy::AppleSpawnStrategy,
     keyboard_control::ControlSetup,
-    snake::{
-        controller::SnakeControllerTemplate, palette::PaletteTemplate, EatBehavior, SnakeType,
-    },
+    snake::{controller::ControllerTemplate, palette::PaletteTemplate, EatBehavior, SnakeType},
 };
 
 macro_rules! hash_map {
@@ -103,7 +101,7 @@ impl App {
                     default: EatBehavior::Crash,
                 },
                 palette: PaletteTemplate::rainbow(true),
-                controller: SnakeControllerTemplate::PlayerController(cs),
+                controller: ControllerTemplate::PlayerController(cs),
                 // controller: SnakeControllerTemplate::PlayerController12,
             })
             .collect();

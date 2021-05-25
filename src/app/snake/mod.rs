@@ -4,7 +4,7 @@ use crate::{
     app::{
         game::Apple,
         snake::{
-            controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
+            controller::{Controller, ControllerTemplate, OtherSnakes},
             palette::{Palette, PaletteTemplate},
         },
         Frames,
@@ -107,7 +107,7 @@ pub struct Snake {
     pub body: SnakeBody,
     pub state: SnakeState,
 
-    pub controller: Box<dyn SnakeController>,
+    pub controller: Box<dyn Controller>,
     pub palette: Box<dyn Palette>,
 }
 
@@ -116,7 +116,7 @@ pub struct SnakeSeed {
     pub snake_type: SnakeType,
     pub eat_mechanics: EatMechanics,
     pub palette: PaletteTemplate,
-    pub controller: SnakeControllerTemplate,
+    pub controller: ControllerTemplate,
 }
 
 impl Snake {

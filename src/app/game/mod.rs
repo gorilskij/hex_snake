@@ -13,7 +13,7 @@ use crate::{
         game::game_control::{GameControl, GameState},
         palette::GamePalette,
         snake::{
-            controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
+            controller::{Controller, ControllerTemplate, OtherSnakes},
             drawing::{
                 generate_grid_mesh,
                 point_factory::{full_hexagon, SegmentDescription, SegmentFraction},
@@ -291,9 +291,9 @@ impl Game {
             match self.rng.gen::<f32>() {
                 x if x < 0.025 => {
                     let controller = if self.rng.gen::<f32>() < 0.5 {
-                        SnakeControllerTemplate::CompetitorAI
+                        ControllerTemplate::CompetitorAI
                     } else {
-                        SnakeControllerTemplate::CompetitorAI2
+                        ControllerTemplate::CompetitorAI2
                     };
                     AppleType::SpawnSnake(SnakeSeed {
                         snake_type: SnakeType::CompetitorSnake { life: Some(200) },
@@ -315,7 +315,7 @@ impl Game {
                             snake_type: SnakeType::KillerSnake { life: Some(200) },
                             eat_mechanics: EatMechanics::always(EatBehavior::Die),
                             palette: PaletteTemplate::dark_blue_to_red(false),
-                            controller: SnakeControllerTemplate::KillerAI,
+                            controller: ControllerTemplate::KillerAI,
                         })
                     }
                 }
@@ -648,7 +648,7 @@ impl Game {
 
         let frame_frac = self.control.frame_fraction();
 
-        // paint bodies
+        // draw bodies
         for snake_idx in 0..self.snakes.len() {
             let (snake, other_snakes) = Self::split_snakes(&mut self.snakes, snake_idx);
 
@@ -727,7 +727,7 @@ impl Game {
             }
         }
 
-        // paint heads
+        // draw heads
         for (segment, previous_segment, next_segment, seg_style) in heads {
             let Segment { pos, typ, .. } = segment;
             let location = pos.to_point(self.cell_dim);
@@ -773,6 +773,24 @@ impl Game {
             }
         }
 
+        // draw A* plan
+        #[cfg(debug_assertions)]
+        unsafe {
+            if let Some(path) = &crate::app::snake::controller::ETHEREAL_PATH {
+                for point in path {
+                    let mut hexagon_points = full_hexagon(self.cell_dim);
+                    let location = point.to_point(self.cell_dim);
+                    translate(&mut hexagon_points, location);
+                    builder.polygon(
+                        DrawMode::fill(),
+                        &hexagon_points,
+                        Color::from_rgb(0, 255, 255),
+                    )?;
+                }
+            }
+        }
+
+        // draw apples
         for apple in &self.apples {
             let color = match apple.typ {
                 AppleType::Normal(_) => self.palette.apple_color,
@@ -897,7 +915,7 @@ impl EventHandler for Game {
                 if self.seeds.len() == 1 {
                     // hacky
                     unsafe {
-                        static mut STASHED_CONTROLLER: Option<Box<dyn SnakeController>> = None;
+                        static mut STASHED_CONTROLLER: Option<Box<dyn Controller>> = None;
 
                         let player_snake = self
                             .snakes
@@ -910,7 +928,7 @@ impl EventHandler for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    SnakeControllerTemplate::CompetitorAI2
+                                    ControllerTemplate::AStarAI
                                         .into_controller(player_snake.body.dir),
                                 ));
                                 message = "Autopilot on";
