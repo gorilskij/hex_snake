@@ -8,9 +8,8 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use itertools::Itertools;
-use rand::{prelude::SliceRandom, thread_rng};
 use std::{
-    cmp::{max, min, Ordering},
+    cmp::Ordering,
     collections::VecDeque,
     f32::consts::PI,
     iter::once,
@@ -466,11 +465,8 @@ impl SnakeController for CompetitorAI2 {
         snake_body: &SnakeBody,
         other_snakes: OtherSnakes,
         apples: &[Apple],
-        board_dim: HexDim,
+        _board_dim: HexDim,
     ) -> Option<Dir> {
-        use Dir::*;
-        use Dir12::*;
-
         // this also sets the target apple on the first frame
         if self.frames_since_update % Self::UPDATE_EVERY_N_FRAMES == 0 {
             self.target_apple = None;
@@ -563,9 +559,6 @@ fn rough_direction(
     other_snakes: OtherSnakes,
     board_dim: HexDim,
 ) -> Option<Dir> {
-    use std::f32::consts::PI;
-    use Dir::*;
-
     const TWO_PI: f32 = 2. * PI;
 
     // dy is scaled to convert from 'hex' coordinates to approximate cartesian coordinates

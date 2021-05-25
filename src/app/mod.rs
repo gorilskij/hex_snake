@@ -17,7 +17,7 @@ use crate::app::{
     apple_spawn_strategy::AppleSpawnStrategy,
     keyboard_control::ControlSetup,
     snake::{
-        controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
+        controller::SnakeControllerTemplate, palette::PaletteTemplate, EatBehavior, SnakeType,
     },
 };
 
@@ -102,7 +102,7 @@ impl App {
                     eat_other: hash_map! {},
                     default: EatBehavior::Crash,
                 },
-                palette: SnakePaletteTemplate::rainbow().persistent(),
+                palette: PaletteTemplate::rainbow(true),
                 controller: SnakeControllerTemplate::PlayerController(cs),
                 // controller: SnakeControllerTemplate::PlayerController12,
             })

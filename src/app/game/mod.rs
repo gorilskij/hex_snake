@@ -19,7 +19,7 @@ use crate::{
                 point_factory::{full_hexagon, SegmentDescription, SegmentFraction},
                 translate,
             },
-            palette::SnakePaletteTemplate,
+            palette::{PaletteTemplate, SegmentStyle},
             EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
             SnakeType,
         },
@@ -298,7 +298,7 @@ impl Game {
                     AppleType::SpawnSnake(SnakeSeed {
                         snake_type: SnakeType::CompetitorSnake { life: Some(200) },
                         eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                        palette: SnakePaletteTemplate::pastel_rainbow().persistent(),
+                        palette: PaletteTemplate::pastel_rainbow(true),
                         controller,
                     })
                 }
@@ -314,7 +314,7 @@ impl Game {
                         AppleType::SpawnSnake(SnakeSeed {
                             snake_type: SnakeType::KillerSnake { life: Some(200) },
                             eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                            palette: SnakePaletteTemplate::dark_blue_to_red(),
+                            palette: PaletteTemplate::dark_blue_to_red(false),
                             controller: SnakeControllerTemplate::KillerAI,
                         })
                     }
@@ -439,7 +439,7 @@ impl Game {
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
-            matches!(snake.state, SnakeState::Dying(_))
+            matches!(snake.state, SnakeState::Dying)
                 || matches!(
                     snake.snake_type,
                     SnakeType::CompetitorSnake { life: Some(_) }
@@ -466,7 +466,7 @@ impl Game {
             .snakes
             .iter()
             .enumerate()
-            .filter(|(_, s)| !matches!(s.state, SnakeState::Crashed | SnakeState::Dying(_)))
+            .filter(|(_, s)| !matches!(s.state, SnakeState::Crashed | SnakeState::Dying))
         {
             for (j, other) in self.snakes.iter().enumerate() {
                 // check head-head crash
@@ -648,6 +648,7 @@ impl Game {
 
         let frame_frac = self.control.frame_fraction();
 
+        // paint bodies
         for snake_idx in 0..self.snakes.len() {
             let (snake, other_snakes) = Self::split_snakes(&mut self.snakes, snake_idx);
 
@@ -663,11 +664,7 @@ impl Game {
             //     builder.polygon(DrawMode::fill(), &points, WHITE)?;
             // }
 
-            let color_offset = match snake.state {
-                SnakeState::Dying(offset) => offset,
-                _ => 0,
-            };
-
+            let segment_styles = snake.palette.segment_styles(&snake.body);
             for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
                 // previous = towards head
                 // next = towards tail
@@ -679,8 +676,7 @@ impl Game {
 
                 let next_segment = segment.next_segment;
 
-                if seg_idx == 0 && matches!(snake.state, SnakeState::Crashed | SnakeState::Dying(_))
-                {
+                if seg_idx == 0 && matches!(snake.state, SnakeState::Crashed | SnakeState::Dying) {
                     assert!(
                         matches!(segment.typ, SegmentType::Crashed | SegmentType::BlackHole),
                         "head of type {:?} in snake in state {:?}",
@@ -689,19 +685,19 @@ impl Game {
                     );
                     // draw head separately
                     heads.push((
-                        snake_idx,
                         *segment,
                         previous_segment,
                         next_segment,
-                        color_offset,
+                        segment_styles[seg_idx],
                     ));
                     continue;
                 }
 
                 let location = segment.pos.to_point(self.cell_dim);
-                let color = snake
-                    .painter
-                    .paint_segment(seg_idx + color_offset, len, segment);
+                let color = match segment_styles[seg_idx] {
+                    SegmentStyle::Solid(color) => color,
+                    _ => unimplemented!(),
+                };
 
                 let fraction = match seg_idx {
                     0 => SegmentFraction::Appearing(frame_frac),
@@ -731,19 +727,19 @@ impl Game {
             }
         }
 
-        for (snake_idx, segment, previous_segment, next_segment, color_offset) in heads {
+        // paint heads
+        for (segment, previous_segment, next_segment, seg_style) in heads {
             let Segment { pos, typ, .. } = segment;
             let location = pos.to_point(self.cell_dim);
-            let snake = &mut self.snakes[snake_idx];
+
+            let segment_color = match seg_style {
+                SegmentStyle::Solid(color) => color,
+                _ => unimplemented!(),
+            };
 
             match typ {
                 SegmentType::BlackHole => {
                     let hexagon_color = Color::from_rgb(1, 36, 92);
-                    let segment_color = snake.painter.paint_segment(
-                        color_offset,
-                        snake.len() + color_offset,
-                        &segment,
-                    );
                     let mut hexagon_points = full_hexagon(self.cell_dim);
                     translate(&mut hexagon_points, location);
                     let segment_points = SegmentDescription {
@@ -759,9 +755,6 @@ impl Game {
                     builder.polygon(DrawMode::fill(), &segment_points, segment_color)?;
                 }
                 SegmentType::Crashed => {
-                    let color = snake
-                        .painter
-                        .paint_segment(0, snake.len(), &snake.body.cells[0]);
                     let points = SegmentDescription {
                         location,
                         previous_segment,
@@ -771,7 +764,7 @@ impl Game {
                         cell_dim: self.cell_dim,
                     }
                     .render();
-                    builder.polygon(DrawMode::fill(), &points, color)?;
+                    builder.polygon(DrawMode::fill(), &points, segment_color)?;
                 }
                 _ => unreachable!(
                     "head segment of type {:?} should not have been queued to be drawn separately",

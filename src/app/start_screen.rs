@@ -8,9 +8,7 @@ use ggez::{
 
 use crate::{
     app::{
-        snake::{
-            controller::OtherSnakes, palette::SnakePaletteTemplate, Segment, SegmentType, Snake,
-        },
+        snake::{controller::OtherSnakes, palette::PaletteTemplate, Segment, SegmentType, Snake},
         Screen,
     },
     basic::{CellDim, Dir, HexDim, HexPoint},
@@ -25,7 +23,7 @@ struct SnakeDemo {
 }
 
 impl SnakeDemo {
-    fn new(top_left: HexPoint, cell_dim: CellDim) -> Self {
+    fn new(top_left: HexPoint, _cell_dim: CellDim) -> Self {
         let dir = Dir::U;
 
         let pos = top_left + HexPoint { h: 0, v: -5 };
@@ -37,7 +35,7 @@ impl SnakeDemo {
         };
         let mut body = VecDeque::new();
         body.push_back(head);
-        let board_dim = HexPoint { h: 20, v: 20 };
+        let _board_dim = HexPoint { h: 20, v: 20 };
         todo!()
         // Self {
         //     top_left,
@@ -97,7 +95,7 @@ impl EventHandler for SnakeDemo {
 pub struct StartScreen {
     // options selected
     players: usize,
-    palettes: Vec<SnakePaletteTemplate>,
+    palettes: Vec<PaletteTemplate>,
     player1_palette_idx: usize,
     player2_palette_idx: usize,
 
@@ -110,8 +108,8 @@ impl StartScreen {
         Self {
             players: 1,
             palettes: vec![
-                SnakePaletteTemplate::gray_gradient(),
-                SnakePaletteTemplate::rainbow(),
+                PaletteTemplate::gray_gradient(false),
+                PaletteTemplate::rainbow(false),
                 // SnakePaletteTemplate::new_rainbow_sin(10),
             ],
             player1_palette_idx: 0,

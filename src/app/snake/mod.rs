@@ -5,12 +5,13 @@ use crate::{
         game::Apple,
         snake::{
             controller::{OtherSnakes, SnakeController, SnakeControllerTemplate},
-            palette::{SnakePainter, SnakePaletteTemplate},
+            palette::{Palette, PaletteTemplate},
         },
         Frames,
     },
     basic::{Dir, HexDim, HexPoint},
 };
+use std::ops::Deref;
 
 pub mod controller;
 pub mod drawing;
@@ -19,8 +20,7 @@ pub mod palette;
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SnakeState {
     Living,
-    // counts how many segments have already been removed
-    Dying(usize),
+    Dying,
     Crashed,
 }
 
@@ -84,10 +84,20 @@ impl EatMechanics {
 
 pub struct SnakeBody {
     pub cells: VecDeque<Segment>,
+    // when a snake is being destroyed from the front
+    pub missing_front: usize,
     pub dir: Dir,
     // prevent updating dir multiple times per game frame
     pub dir_grace: bool,
     pub grow: usize,
+}
+
+impl Deref for SnakeBody {
+    type Target = VecDeque<Segment>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cells
+    }
 }
 
 pub struct Snake {
@@ -98,14 +108,14 @@ pub struct Snake {
     pub state: SnakeState,
 
     pub controller: Box<dyn SnakeController>,
-    pub painter: Box<dyn SnakePainter>,
+    pub palette: Box<dyn Palette>,
 }
 
 #[derive(Clone)]
 pub struct SnakeSeed {
     pub snake_type: SnakeType,
     pub eat_mechanics: EatMechanics,
-    pub palette: SnakePaletteTemplate,
+    pub palette: PaletteTemplate,
     pub controller: SnakeControllerTemplate,
 }
 
@@ -134,6 +144,7 @@ impl Snake {
 
             body: SnakeBody {
                 cells: body,
+                missing_front: 0,
                 dir,
                 dir_grace: false,
                 grow,
@@ -141,7 +152,7 @@ impl Snake {
             state: SnakeState::Living,
 
             controller: controller.into_controller(dir),
-            painter: palette.into(),
+            palette: palette.into(),
         }
     }
 
@@ -225,7 +236,7 @@ impl Snake {
         }
 
         match &mut self.state {
-            SnakeState::Dying(removed) => *removed += 1,
+            SnakeState::Dying => self.body.missing_front += 1,
             SnakeState::Living => {
                 self.update_dir(other_snakes, apples, board_dim);
 
@@ -261,8 +272,8 @@ impl Snake {
     }
 
     pub fn die(&mut self) {
-        if !matches!(self.state, SnakeState::Dying(_)) {
-            self.state = SnakeState::Dying(0);
+        if !matches!(self.state, SnakeState::Dying) {
+            self.state = SnakeState::Dying;
             self.body.cells[0].typ = SegmentType::BlackHole;
         }
     }

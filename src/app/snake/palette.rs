@@ -1,12 +1,10 @@
-use std::cmp::max;
-
 use ggez::graphics::Color;
 use hsl::HSL;
 
 use SegmentType::*;
 
 use crate::{
-    app::snake::{Segment, SegmentType},
+    app::snake::{SegmentType, SnakeBody},
     oklab::OkLab,
 };
 
@@ -51,40 +49,44 @@ impl EatenColor {
 }
 
 #[derive(Clone)]
-pub enum SnakePaletteTemplate {
+pub enum PaletteTemplate {
     RGBGradient {
         head: Color,
         tail: Color,
         eaten: EatenColor,
+        // keeps track of the longest length achieved so far and uses that as the tail color
+        persistent: bool,
     },
     HSLGradient {
         head_hue: f64,
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
+        persistent: bool,
     },
     OkLabGradient {
         head_hue: f64,
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
+        persistent: bool,
     },
-    // keeps track of the longest length achieved
-    Persistent(Box<SnakePaletteTemplate>),
 }
 
+// TODO: write a builder
 #[allow(dead_code)]
-impl SnakePaletteTemplate {
-    pub fn rgb_gradient(head: Color, tail: Color, eaten: Option<Color>) -> Self {
+impl PaletteTemplate {
+    pub fn rgb_gradient(head: Color, tail: Color, eaten: Option<Color>, persistent: bool) -> Self {
         Self::RGBGradient {
             head,
             tail,
             eaten: EatenColor::Fixed(eaten.unwrap_or(*DEFAULT_EATEN_COLOR)),
+            persistent,
         }
     }
 
-    pub fn gray_gradient() -> Self {
-        Self::rgb_gradient(gray!(0.72), gray!(0.25), None)
+    pub fn gray_gradient(persistent: bool) -> Self {
+        Self::rgb_gradient(gray!(0.72), gray!(0.25), None, persistent)
     }
 
     pub fn hsl_gradient(
@@ -92,12 +94,14 @@ impl SnakePaletteTemplate {
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
+        persistent: bool,
     ) -> Self {
         Self::HSLGradient {
             head_hue,
             tail_hue,
             lightness,
             eaten_lightness,
+            persistent,
         }
     }
 
@@ -106,12 +110,14 @@ impl SnakePaletteTemplate {
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
+        persistent: bool,
     ) -> Self {
         Self::OkLabGradient {
             head_hue,
             tail_hue,
             lightness,
             eaten_lightness,
+            persistent,
         }
     }
 
@@ -121,71 +127,113 @@ impl SnakePaletteTemplate {
     // green -> red (yellows are very ugly in oklab)
     const OKLAB_RAINBOW: (f64, f64) = (147.3, 428.);
 
-    pub fn persistent(self) -> Self {
-        match self {
-            Self::Persistent(_) => self,
-            template => Self::Persistent(Box::new(template)),
-        }
+    pub fn rainbow(persistent: bool) -> Self {
+        Self::hsl_gradient(
+            Self::HSL_RAINBOW.0,
+            Self::HSL_RAINBOW.1,
+            0.4,
+            0.7,
+            persistent,
+        )
     }
 
-    pub fn rainbow() -> Self {
-        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.4, 0.7)
+    pub fn pastel_rainbow(persistent: bool) -> Self {
+        Self::hsl_gradient(
+            Self::HSL_RAINBOW.0,
+            Self::HSL_RAINBOW.1,
+            0.75,
+            0.7,
+            persistent,
+        )
     }
 
-    pub fn pastel_rainbow() -> Self {
-        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.75, 0.7)
+    pub fn dark_rainbow(persistent: bool) -> Self {
+        Self::hsl_gradient(
+            Self::HSL_RAINBOW.0,
+            Self::HSL_RAINBOW.1,
+            0.2,
+            0.2,
+            persistent,
+        )
     }
 
-    pub fn dark_rainbow() -> Self {
-        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.2, 0.2)
+    pub fn green_to_red(persistent: bool) -> Self {
+        Self::oklab_gradient(
+            Self::OKLAB_RAINBOW.0,
+            Self::OKLAB_RAINBOW.1,
+            0.6,
+            0.7,
+            persistent,
+        )
     }
 
-    pub fn green_to_red() -> Self {
-        Self::oklab_gradient(Self::OKLAB_RAINBOW.0, Self::OKLAB_RAINBOW.1, 0.6, 0.7)
-    }
-
-    pub fn dark_blue_to_red() -> Self {
-        Self::oklab_gradient(250., Self::OKLAB_RAINBOW.1, 0.3, 0.3)
+    pub fn dark_blue_to_red(persistent: bool) -> Self {
+        Self::oklab_gradient(250., Self::OKLAB_RAINBOW.1, 0.3, 0.3, persistent)
     }
 }
 
-pub trait SnakePainter {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color;
+#[derive(Copy, Clone)]
+pub enum SegmentStyle {
+    Solid(Color),
+    RGBGradient(Color, Color),
+    HSLGradient(Color, Color),
 }
 
-impl From<SnakePaletteTemplate> for Box<dyn SnakePainter> {
-    fn from(template: SnakePaletteTemplate) -> Self {
+pub trait Palette {
+    fn segment_styles(&mut self, body: &SnakeBody) -> Vec<SegmentStyle>;
+}
+
+impl From<PaletteTemplate> for Box<dyn Palette> {
+    fn from(template: PaletteTemplate) -> Self {
         match template {
-            SnakePaletteTemplate::RGBGradient { head, tail, eaten } => {
-                Box::new(RGBGradient { head, tail, eaten })
+            PaletteTemplate::RGBGradient { head, tail, eaten, persistent } => {
+                Box::new(RGBGradient {
+                    head,
+                    tail,
+                    eaten,
+                    max_len: persistent.then(|| 0),
+                })
             }
-            SnakePaletteTemplate::HSLGradient {
+            PaletteTemplate::HSLGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
+                persistent,
             } => Box::new(HSLGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
+                max_len: persistent.then(|| 0),
             }),
-            SnakePaletteTemplate::OkLabGradient {
+            PaletteTemplate::OkLabGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
+                persistent,
             } => Box::new(OkLabGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
-            }),
-            SnakePaletteTemplate::Persistent(palette) => Box::new(Persistent {
-                painter: (*palette).into(),
-                max_len: 0,
+                max_len: persistent.then(|| 0),
             }),
         }
+    }
+}
+
+// if max_len is None, use body.len(), otherwise, update max_len to be the maximum of itself and body.len() and use that
+fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
+    match max_len {
+        Some(len) => {
+            if body_len > *len {
+                *len = body_len;
+            }
+            *len
+        }
+        None => body_len,
     }
 }
 
@@ -193,28 +241,38 @@ pub struct RGBGradient {
     head: Color,
     tail: Color,
     eaten: EatenColor,
+    max_len: Option<usize>,
 }
 
-impl SnakePainter for RGBGradient {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
-        if segment.typ == Crashed {
-            return *DEFAULT_CRASHED_COLOR;
+impl Palette for RGBGradient {
+    fn segment_styles(&mut self, body: &SnakeBody) -> Vec<SegmentStyle> {
+        let mut styles = Vec::with_capacity(body.len());
+
+        let len = and_update_max_len(&mut self.max_len, body.len());
+        for (i, seg) in body.iter().enumerate() {
+            let color = if seg.typ == Crashed {
+                *DEFAULT_CRASHED_COLOR
+            } else {
+                let r = i + body.missing_front;
+                let head_ratio = 1. - r as f32 / (len - 1) as f32;
+                let tail_ratio = 1. - head_ratio;
+                let normal_color = Color {
+                    r: head_ratio * self.head.r + tail_ratio * self.tail.r,
+                    g: head_ratio * self.head.g + tail_ratio * self.tail.g,
+                    b: head_ratio * self.head.b + tail_ratio * self.tail.b,
+                    a: 1.,
+                };
+
+                match seg.typ {
+                    Normal | BlackHole => normal_color,
+                    Eaten { .. } => self.eaten.paint_segment(&normal_color),
+                    Crashed => *DEFAULT_CRASHED_COLOR,
+                }
+            };
+            styles.push(SegmentStyle::Solid(color));
         }
 
-        let head_ratio = 1. - seg_idx as f32 / (len - 1) as f32;
-        let tail_ratio = 1. - head_ratio;
-        let normal_color = Color {
-            r: head_ratio * self.head.r + tail_ratio * self.tail.r,
-            g: head_ratio * self.head.g + tail_ratio * self.tail.g,
-            b: head_ratio * self.head.b + tail_ratio * self.tail.b,
-            a: 1.,
-        };
-
-        match segment.typ {
-            Normal | BlackHole => normal_color,
-            Eaten { .. } => self.eaten.paint_segment(&normal_color),
-            Crashed => *DEFAULT_CRASHED_COLOR,
-        }
+        styles
     }
 }
 
@@ -223,31 +281,41 @@ pub struct HSLGradient {
     tail_hue: f64,
     lightness: f64,
     eaten_lightness: f64,
+    max_len: Option<usize>, // optional feature
 }
 
-impl SnakePainter for HSLGradient {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
-        if segment.typ == Crashed {
-            return *DEFAULT_CRASHED_COLOR;
+impl Palette for HSLGradient {
+    fn segment_styles(&mut self, body: &SnakeBody) -> Vec<SegmentStyle> {
+        let mut styles = Vec::with_capacity(body.len());
+
+        let len = and_update_max_len(&mut self.max_len, body.len());
+        for (i, seg) in body.iter().enumerate() {
+            let color = if seg.typ == Crashed {
+                *DEFAULT_CRASHED_COLOR
+            } else {
+                let r = i + body.missing_front;
+                let hue = self.head_hue + (self.tail_hue - self.head_hue) * r as f64 / len as f64;
+                match seg.typ {
+                    Normal | BlackHole => {
+                        let hsl = HSL { h: hue, s: 1., l: self.lightness };
+                        Color::from(hsl.to_rgb())
+                    }
+                    Eaten { .. } => {
+                        // invert lightness twice
+                        let hsl = HSL {
+                            h: hue,
+                            s: 1.,
+                            l: 1. - self.eaten_lightness,
+                        };
+                        Color::from(invert_rgb(hsl.to_rgb()))
+                    }
+                    Crashed => *DEFAULT_CRASHED_COLOR,
+                }
+            };
+            styles.push(SegmentStyle::Solid(color));
         }
 
-        let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
-        match segment.typ {
-            Normal | BlackHole => {
-                let hsl = HSL { h: hue, s: 1., l: self.lightness };
-                Color::from(hsl.to_rgb())
-            }
-            Eaten { .. } => {
-                // invert lightness twice
-                let hsl = HSL {
-                    h: hue,
-                    s: 1.,
-                    l: 1. - self.eaten_lightness,
-                };
-                Color::from(invert_rgb(hsl.to_rgb()))
-            }
-            Crashed => *DEFAULT_CRASHED_COLOR,
-        }
+        styles
     }
 }
 
@@ -256,39 +324,37 @@ pub struct OkLabGradient {
     tail_hue: f64,
     lightness: f64,
     eaten_lightness: f64,
+    max_len: Option<usize>,
 }
 
-impl SnakePainter for OkLabGradient {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
-        if segment.typ == Crashed {
-            return *DEFAULT_CRASHED_COLOR;
+impl Palette for OkLabGradient {
+    fn segment_styles(&mut self, body: &SnakeBody) -> Vec<SegmentStyle> {
+        let mut styles = Vec::with_capacity(body.len());
+
+        let len = and_update_max_len(&mut self.max_len, body.len());
+        for (i, seg) in body.iter().enumerate() {
+            let color = if seg.typ == Crashed {
+                *DEFAULT_CRASHED_COLOR
+            } else {
+                let r = i + body.missing_front;
+                let hue = self.head_hue + (self.tail_hue - self.head_hue) * r as f64 / len as f64;
+                match seg.typ {
+                    Normal | BlackHole => {
+                        let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
+                        Color::from(oklab.to_rgb())
+                    }
+                    Eaten { .. } => {
+                        // invert lightness twice
+                        let oklab = OkLab::from_lch(1. - self.eaten_lightness, 0.5, hue);
+                        Color::from(invert_rgb(oklab.to_rgb()))
+                    }
+                    Crashed => *DEFAULT_CRASHED_COLOR,
+                }
+            };
+            styles.push(SegmentStyle::Solid(color));
         }
 
-        let hue = self.head_hue + (self.tail_hue - self.head_hue) * seg_idx as f64 / len as f64;
-        match segment.typ {
-            Normal | BlackHole => {
-                let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
-                Color::from(oklab.to_rgb())
-            }
-            Eaten { .. } => {
-                // invert lightness twice
-                let oklab = OkLab::from_lch(1. - self.eaten_lightness, 0.5, hue);
-                Color::from(invert_rgb(oklab.to_rgb()))
-            }
-            Crashed => *DEFAULT_CRASHED_COLOR,
-        }
-    }
-}
-
-pub struct Persistent {
-    painter: Box<dyn SnakePainter>,
-    max_len: usize,
-}
-
-impl SnakePainter for Persistent {
-    fn paint_segment(&mut self, seg_idx: usize, len: usize, segment: &Segment) -> Color {
-        self.max_len = max(len, self.max_len);
-        self.painter.paint_segment(seg_idx, self.max_len, segment)
+        styles
     }
 }
 
