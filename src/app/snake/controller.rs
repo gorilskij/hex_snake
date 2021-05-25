@@ -510,36 +510,37 @@ impl SnakeController for CompetitorAI2 {
         let dy = -dv as f32 / y_step; // convert to y going up
         let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
 
-        // positions where the head is not allowed to move
-        let forbidden_head_positions = snake_body
+        let mut forbidden_directions = snake_body
             .cells
             .iter()
             .chain(other_snakes.iter_segments())
-            .map(|Segment { pos, .. }| *pos)
+            .map(|seg| seg.pos)
             .filter(|pos| pos.manhattan_distance_to(head_pos) == 1)
+            .map(|pos| head_pos.dir_to(pos).unwrap())
             .collect_vec();
+        forbidden_directions.push(-snake_body.dir);
 
-        let dir_is_safe = |dir: Dir12| {
-            if dir == Single(-snake_body.dir) {
-                return false;
-            }
-            let translate_dir = dir.to_dir(self.dir_state);
-            let new_head = head_pos.wrapping_translate(translate_dir, 1, board_dim);
-            !forbidden_head_positions.contains(&new_head)
-        };
+        // let dir_is_safe = |dir: Dir12| {
+        //     if dir == Single(-snake_body.dir) {
+        //         return false;
+        //     }
+        //     let translate_dir = dir.to_dir(self.dir_state);
+        //     let new_head = head_pos.wrapping_translate(translate_dir, 1, board_dim);
+        //     !forbidden_head_positions.contains(&new_head)
+        // };
 
         // this could probably be done with math
-        let dir = Dir12::ANGLES
+        let new_dir = Dir12::ANGLES
             .iter()
             .copied()
-            .filter(|(d, _)| dir_is_safe(*d))
+            .map(|(d, a)| (d.to_dir(self.dir_state), a))
+            .filter(|(d, _)| !forbidden_directions.contains(d))
             .min_by_key(|(_, a)| TotalF32(angle_distance(angle, *a)))
             .map(|(d, _)| d);
 
         // println!("preferred dir: {:?}", dir);
         // println!("target: {:?}", self.target_apple);
 
-        let new_dir = Some(dir?.to_dir(self.dir_state));
         self.dir_state = !self.dir_state;
         new_dir
     }

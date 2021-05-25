@@ -35,29 +35,30 @@ impl HexPoint {
 
     // untested
     // None if the two points are not on the same line
-    // pub fn dir_to(self, other: Self) -> Option<Dir> {
-    //     if self.h == other.h {
-    //         return Some(if self.v > other.v { U } else { D });
-    //     } else {
-    //         let dh = (self.h - other.h).abs();
-    //         if self.v > other.v {
-    //             // going up
-    //             let dv = dh - (dh + self.h % 2) / 2;
-    //             if other.v == self.v - dv {
-    //                 return if self.h > other.h { Some(UL) } else { Some(UR) };
-    //             }
-    //         } else if self.v < other.v {
-    //             // going down
-    //             let dv = dh - (dh + (self.h + 1) % 2) / 2;
-    //             let expected_v = self.v + dv;
-    //             if expected_v == other.v {
-    //                 return if self.h > other.h { Some(DL) } else { Some(DR) };
-    //             }
-    //         }
-    //     }
-    //
-    //     None
-    // }
+    pub fn dir_to(self, other: Self) -> Option<Dir> {
+        if self.h == other.h {
+            return Some(if self.v > other.v { U } else { D });
+        } else {
+            let dh = (self.h - other.h).abs();
+            if self.v > other.v {
+                // going up
+                let dv = dh - (dh + self.h % 2) / 2;
+                if other.v == self.v - dv {
+                    return Some(if self.h > other.h { UL } else { UR });
+                }
+            } else if self.v < other.v {
+                // going down
+                let dv = dh - (dh + (self.h + 1) % 2) / 2;
+                let expected_v = self.v + dv;
+                if expected_v == other.v {
+                    return Some(if self.h > other.h { DL } else { DR });
+                }
+            }
+        }
+
+        println!("no dir from {:?} to {:?}", self, other);
+        None
+    }
 
     // O(1)
     pub fn manhattan_distance_to(self, other: Self) -> usize {
