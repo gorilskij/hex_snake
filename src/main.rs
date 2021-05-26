@@ -23,6 +23,9 @@ use ggez::{
 mod app;
 mod basic;
 mod oklab;
+mod partial_min_max;
+
+pub const SHOW_SEARCH_PATH: bool = true;
 
 fn main() {
     let width = 1000.;

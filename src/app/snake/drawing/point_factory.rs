@@ -7,20 +7,20 @@ pub enum SegmentFraction {
     Solid,
 }
 
-pub enum Turn {
-    Straight {
-        previous: Dir,
-    },
-    NormalTurn {
-        previous: Dir,
-        next: Dir,
-    },
-    TransitionTurn {
-        previous: Dir,
-        next1: Dir,
-        next2: Dir,
-    },
-}
+// pub enum Turn {
+//     Straight {
+//         previous: Dir,
+//     },
+//     NormalTurn {
+//         previous: Dir,
+//         next: Dir,
+//     },
+//     TransitionTurn {
+//         previous: Dir,
+//         next1: Dir,
+//         next2: Dir,
+//     },
+// }
 
 fn rotate(points: &mut [Point], angle: f32, origin: Point) {
     for point in points.iter_mut() {

@@ -291,9 +291,9 @@ impl Game {
             match self.rng.gen::<f32>() {
                 x if x < 0.025 => {
                     let controller = if self.rng.gen::<f32>() < 0.5 {
-                        ControllerTemplate::CompetitorAI
+                        ControllerTemplate::Competitor1
                     } else {
-                        ControllerTemplate::CompetitorAI2
+                        ControllerTemplate::Competitor2
                     };
                     AppleType::SpawnSnake(SnakeSeed {
                         snake_type: SnakeType::CompetitorSnake { life: Some(200) },
@@ -315,7 +315,7 @@ impl Game {
                             snake_type: SnakeType::KillerSnake { life: Some(200) },
                             eat_mechanics: EatMechanics::always(EatBehavior::Die),
                             palette: PaletteTemplate::dark_blue_to_red(false),
-                            controller: ControllerTemplate::KillerAI,
+                            controller: ControllerTemplate::Killer,
                         })
                     }
                 }
@@ -774,8 +774,21 @@ impl Game {
         }
 
         // draw A* plan
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "show_search_path")]
         unsafe {
+            if let Some(seen) = &crate::app::snake::controller::ETHEREAL_SEEN {
+                for point in seen {
+                    let mut hexagon_points = full_hexagon(self.cell_dim);
+                    let location = point.to_point(self.cell_dim);
+                    translate(&mut hexagon_points, location);
+                    builder.polygon(
+                        DrawMode::fill(),
+                        &hexagon_points,
+                        Color::from_rgb(130, 47, 5),
+                    )?;
+                }
+            }
+
             if let Some(path) = &crate::app::snake::controller::ETHEREAL_PATH {
                 for point in path {
                     let mut hexagon_points = full_hexagon(self.cell_dim);
@@ -784,7 +797,7 @@ impl Game {
                     builder.polygon(
                         DrawMode::fill(),
                         &hexagon_points,
-                        Color::from_rgb(0, 255, 255),
+                        Color::from_rgb(97, 128, 11),
                     )?;
                 }
             }

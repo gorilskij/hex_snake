@@ -68,7 +68,7 @@ impl HexPoint {
     }
 
     // O(1)
-    pub fn manhattan_distance_to(self, other: Self) -> usize {
+    pub fn manhattan_distance(self, other: Self) -> usize {
         let dh = (self.h - other.h).abs();
         let max_dv = if self.v > other.v {
             dh - (dh + (self.h % 2).abs()) / 2
@@ -283,6 +283,6 @@ fn test_manhattan_distance() {
     .for_each(|&((h1, v1), (h2, v2), d)| {
         let p1 = HexPoint { h: h1, v: v1 };
         let p2 = HexPoint { h: h2, v: v2 };
-        assert_eq!(p1.manhattan_distance_to(p2), d);
+        assert_eq!(p1.manhattan_distance(p2), d);
     });
 }

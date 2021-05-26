@@ -101,7 +101,7 @@ impl App {
                     default: EatBehavior::Crash,
                 },
                 palette: PaletteTemplate::rainbow(true),
-                controller: ControllerTemplate::PlayerController(cs),
+                controller: ControllerTemplate::Keyboard(cs),
                 // controller: SnakeControllerTemplate::PlayerController12,
             })
             .collect();
@@ -112,7 +112,7 @@ impl App {
                 12.,
                 seeds,
                 GamePalette::dark(),
-                AppleSpawnStrategy::Random { apple_count: 5 },
+                AppleSpawnStrategy::Random { apple_count: 50 },
                 window_mode,
             )),
             window_mode,
