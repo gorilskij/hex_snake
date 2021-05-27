@@ -10,26 +10,29 @@ use rand::prelude::*;
 use crate::{
     app::{
         apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
-        game::game_control::{GameControl, GameState},
+        game::{
+            game_control::{GameControl, GameState},
+            rendering::grid_mesh::generate_grid_mesh,
+        },
         palette::GamePalette,
         snake::{
             controller::{Controller, ControllerTemplate, OtherSnakes},
-            drawing::{
-                generate_grid_mesh,
-                point_factory::{full_hexagon, SegmentDescription, SegmentFraction},
-                translate,
-            },
             palette::{PaletteTemplate, SegmentStyle},
+            rendering::{
+                descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
+                render_hexagon,
+            },
             EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
             SnakeType,
         },
         Frames,
     },
-    basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point, Side},
+    basic::{transformations::translate, CellDim, Dir, DrawStyle, HexDim, HexPoint, Point, Side},
 };
 use ggez::graphics::PxScale;
 
 mod game_control;
+mod rendering;
 
 type Food = u32;
 
@@ -669,12 +672,11 @@ impl Game {
                 // previous = towards head
                 // next = towards tail
 
-                let previous_segment = seg_idx
+                let coming_from = segment.coming_from;
+                let going_to = seg_idx
                     .checked_sub(1)
-                    .map(|prev_idx| -snake.body.cells[prev_idx].next_segment)
+                    .map(|prev_idx| -snake.body.cells[prev_idx].coming_from)
                     .unwrap_or_else(|| snake.dir());
-
-                let next_segment = segment.next_segment;
 
                 if seg_idx == 0 && matches!(snake.state, SnakeState::Crashed | SnakeState::Dying) {
                     assert!(
@@ -684,12 +686,7 @@ impl Game {
                         snake.state
                     );
                     // draw head separately
-                    heads.push((
-                        *segment,
-                        previous_segment,
-                        next_segment,
-                        segment_styles[seg_idx],
-                    ));
+                    heads.push((*segment, coming_from, going_to, segment_styles[seg_idx]));
                     continue;
                 }
 
@@ -710,9 +707,8 @@ impl Game {
                 };
 
                 let subsegments = SegmentDescription {
-                    location,
-                    previous_segment,
-                    next_segment,
+                    destination: location,
+                    turn: TurnDescription { coming_from, going_to },
                     fraction,
                     draw_style: self.prefs.draw_style,
                     segment_style: segment_styles[seg_idx],
@@ -727,7 +723,7 @@ impl Game {
         }
 
         // draw heads
-        for (segment, previous_segment, next_segment, seg_style) in heads {
+        for (segment, coming_from, going_to, seg_style) in heads {
             let Segment { pos, typ, .. } = segment;
             let location = pos.to_point(self.cell_dim);
 
@@ -736,34 +732,24 @@ impl Game {
                 _ => unimplemented!(),
             };
 
+            let head_description = SegmentDescription {
+                destination: location,
+                turn: TurnDescription { coming_from, going_to },
+                fraction: SegmentFraction::appearing(0.5),
+                draw_style: self.prefs.draw_style,
+                segment_style: SegmentStyle::Solid(segment_color),
+                cell_dim: self.cell_dim,
+            };
             match typ {
                 SegmentType::BlackHole => {
                     let hexagon_color = Color::from_rgb(1, 36, 92);
-                    let mut hexagon_points = full_hexagon(self.cell_dim);
+                    let mut hexagon_points = render_hexagon(self.cell_dim);
                     translate(&mut hexagon_points, location);
                     builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
-                    let segment_points = SegmentDescription {
-                        location,
-                        previous_segment,
-                        next_segment,
-                        fraction: SegmentFraction::appearing(0.5),
-                        draw_style: self.prefs.draw_style,
-                        segment_style: SegmentStyle::Solid(segment_color),
-                        cell_dim: self.cell_dim,
-                    }
-                    .build(&mut builder)?;
+                    head_description.build(&mut builder)?;
                 }
                 SegmentType::Crashed => {
-                    let points = SegmentDescription {
-                        location,
-                        previous_segment,
-                        next_segment,
-                        fraction: SegmentFraction::appearing(0.5),
-                        draw_style: self.prefs.draw_style,
-                        segment_style: SegmentStyle::Solid(segment_color),
-                        cell_dim: self.cell_dim,
-                    }
-                    .build(&mut builder)?;
+                    head_description.build(&mut builder)?;
                 }
                 _ => unreachable!(
                     "head segment of type {:?} should not have been queued to be drawn separately",
@@ -777,7 +763,7 @@ impl Game {
         unsafe {
             if let Some(seen) = &crate::app::snake::controller::ETHEREAL_SEEN {
                 for point in seen {
-                    let mut hexagon_points = full_hexagon(self.cell_dim);
+                    let mut hexagon_points = render_hexagon(self.cell_dim);
                     let location = point.to_point(self.cell_dim);
                     translate(&mut hexagon_points, location);
                     builder.polygon(
@@ -790,7 +776,7 @@ impl Game {
 
             if let Some(path) = &crate::app::snake::controller::ETHEREAL_PATH {
                 for point in path {
-                    let mut hexagon_points = full_hexagon(self.cell_dim);
+                    let mut hexagon_points = render_hexagon(self.cell_dim);
                     let location = point.to_point(self.cell_dim);
                     translate(&mut hexagon_points, location);
                     builder.polygon(
@@ -815,7 +801,7 @@ impl Game {
 
             if self.prefs.draw_style == DrawStyle::Hexagon {
                 let dest = apple.pos.to_point(self.cell_dim);
-                let mut points = full_hexagon(self.cell_dim);
+                let mut points = render_hexagon(self.cell_dim);
                 translate(&mut points, dest);
                 builder.polygon(DrawMode::fill(), &points, color)?;
             } else {
@@ -998,10 +984,10 @@ impl EventHandler for Game {
                 let message;
                 match self.prefs.draw_style {
                     DrawStyle::Hexagon => {
-                        self.prefs.draw_style = DrawStyle::Pointy;
-                        message = "draw style: pointy";
+                        self.prefs.draw_style = DrawStyle::Rough;
+                        message = "draw style: rough";
                     }
-                    DrawStyle::Pointy => {
+                    DrawStyle::Rough => {
                         self.prefs.draw_style = DrawStyle::Smooth;
                         message = "draw style: smooth";
                     }

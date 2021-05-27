@@ -1,16 +1,12 @@
+use crate::{
+    app::palette::GamePalette,
+    basic::{CellDim, HexDim, Point},
+};
 use ggez::{
     graphics::{DrawMode, Mesh, MeshBuilder},
     Context, GameResult,
 };
 use num_integer::Integer;
-
-use crate::{app::palette::GamePalette, basic::*};
-
-pub(crate) use point_factory::translate;
-
-pub mod point_factory;
-// mod animated_points_pointy;
-// mod animated_points_smooth;
 
 // TODO: make this readable
 pub fn generate_grid_mesh(
@@ -90,6 +86,6 @@ pub fn generate_grid_mesh(
 }
 
 pub fn generate_border_mesh(ctx: &mut Context) -> GameResult<Mesh> {
-    let _ = ctx;
+    // let _ = ctx;
     unimplemented!()
 }

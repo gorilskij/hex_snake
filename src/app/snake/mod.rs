@@ -14,8 +14,8 @@ use crate::{
 use std::ops::Deref;
 
 pub mod controller;
-pub mod drawing;
 pub mod palette;
+pub mod rendering;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SnakeState {
@@ -53,8 +53,8 @@ pub enum SegmentType {
 pub struct Segment {
     pub typ: SegmentType,
     pub pos: HexPoint,
-    // direction from this segment to the next one (towards the tail)
-    pub next_segment: Dir,
+    /// Direction from this segment to the next one (towards the tail)
+    pub coming_from: Dir,
     pub teleported: Option<Dir>,
 }
 
@@ -131,7 +131,7 @@ impl Snake {
         let head = Segment {
             typ: SegmentType::Normal,
             pos,
-            next_segment: -dir,
+            coming_from: -dir,
             teleported: None,
         };
 
@@ -247,7 +247,7 @@ impl Snake {
                     // this gets very interesting if you move 2 cells each time
                     // (porous snake)
                     pos: self.head().pos.wrapping_translate(dir, 1, board_dim),
-                    next_segment: -dir,
+                    coming_from: -dir,
                     teleported: None,
                 };
                 self.body.cells.push_front(new_head);

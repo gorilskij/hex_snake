@@ -1,6 +1,7 @@
 use ggez::mint::Point2;
-use std::ops::Mul;
+use std::ops::{Div, Mul};
 
+/// A more convenient version of mint::Point2<f32>
 #[derive(Copy, Clone, Debug, Add, AddAssign, Sub, SubAssign)]
 pub struct Point {
     pub x: f32,
@@ -35,9 +36,17 @@ impl Mul<Point> for f32 {
     }
 }
 
+impl Div<f32> for Point {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        Self { x: self.x / rhs, y: self.y / rhs }
+    }
+}
+
 impl Point {
     #[must_use]
-    pub fn clockwise_rotate_around(mut self, origin: Self, angle: f32) -> Self {
+    pub fn rotate_clockwise(mut self, origin: Self, angle: f32) -> Self {
         let (sin, cos) = angle.sin_cos();
         self -= origin;
         self = Point {
@@ -45,5 +54,10 @@ impl Point {
             y: self.x * sin + self.y * cos,
         };
         self + origin
+    }
+
+    #[must_use]
+    pub fn rotate_counterclockwise(mut self, origin: Self, angle: f32) -> Self {
+        self.rotate_clockwise(origin, -angle)
     }
 }

@@ -93,19 +93,6 @@ pub enum Axis {
     URDL, // /
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum TurnDirection {
-    Clockwise,
-    CounterClockwise,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum TurnType {
-    Straight,
-    Blunt(TurnDirection),
-    Sharp(TurnDirection),
-}
-
 impl Dir {
     // angles around the unit circle
     pub const ANGLES: [(Dir, f32); 6] = [
@@ -132,42 +119,18 @@ impl Dir {
         }
     }
 
-    // turn: self => other
-    pub fn turn_type(self, other: Self) -> TurnType {
-        use TurnDirection::*;
-        use TurnType::*;
-
-        let mut dir = self;
-        let mut clockwise_distance = 0;
-        while dir != other {
-            clockwise_distance += 1;
-            dir += 1;
-        }
-
-        match clockwise_distance {
-            1 => Sharp(Clockwise),
-            5 => Sharp(CounterClockwise),
-            2 => Blunt(Clockwise),
-            4 => Blunt(CounterClockwise),
-            3 => Straight,
-            _ => panic!("impossible turn {:?} => {:?}", self, other),
-        }
-    }
-
     pub fn random(rng: &mut impl Rng) -> Self {
         Self::from(rng.gen_range(0, 6))
     }
 
-    pub fn clockwise_angle_from_u(self) -> f32 {
-        use std::f32::consts::*;
-        match self {
-            U => 0.,
-            UR => FRAC_PI_3,
-            DR => 2. * FRAC_PI_3,
-            D => 3. * FRAC_PI_3,
-            DL => 4. * FRAC_PI_3,
-            UL => 5. * FRAC_PI_3,
-        }
+    /// Clockwise angle from self to other in units of 60°
+    pub fn clockwise_distance_to(self, other: Self) -> u8 {
+        (other as u8 + 6 - self as u8) % 6
+    }
+
+    /// Similar to `clockwise_distance_to` but returns an angle in radians
+    pub fn clockwise_angle_to(self, other: Self) -> f32 {
+        self.clockwise_distance_to(other) as f32 * std::f32::consts::FRAC_PI_3
     }
 
     pub fn blunt_turns(self) -> &'static [Self] {
@@ -202,5 +165,30 @@ impl Dir {
             D => C_D,
             DL => C_DL,
         }
+    }
+}
+
+#[test]
+fn test_clockwise_distance_to() {
+    use Dir::*;
+    for (from, to, clockwise_dist) in [
+        (U, U, 0),
+        (U, UR, 1),
+        (U, DR, 2),
+        (U, D, 3),
+        (U, DL, 4),
+        (U, UL, 5),
+        (UR, DR, 1),
+        (DR, UL, 3),
+        (UL, DR, 3),
+        (DL, U, 2),
+    ] {
+        assert_eq!(
+            from.clockwise_distance_to(to),
+            clockwise_dist,
+            "{:?} => {:?}",
+            from,
+            to
+        )
     }
 }
