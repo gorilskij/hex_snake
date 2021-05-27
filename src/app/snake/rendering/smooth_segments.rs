@@ -27,7 +27,7 @@ impl SegmentRenderer for SmoothSegments {
         let outer_line_start = Point { x: cos, y: 0. };
 
         let fraction_size = fraction.end - fraction.start;
-        let num_angle_segments = max(1, (NUM_ANGLE_SEGMENTS as f32 / fraction_size) as usize);
+        let num_angle_segments = max(1, (NUM_ANGLE_SEGMENTS as f32 * fraction_size) as usize);
 
         let mut points = Vec::with_capacity(num_angle_segments * 2 + 2);
         let start_angle = start * FRAC_PI_3;
@@ -68,7 +68,7 @@ impl SegmentRenderer for SmoothSegments {
         let line_start = Point { x: cos, y: 0. };
 
         let fraction_size = fraction.end - fraction.start;
-        let num_angle_segments = max(1, (NUM_ANGLE_SEGMENTS as f32 / fraction_size) as usize);
+        let num_angle_segments = max(1, (NUM_ANGLE_SEGMENTS as f32 * fraction_size) as usize);
 
         let mut points = Vec::with_capacity(num_angle_segments * 2 + 2 + 1); // + pivot
         let start_angle = start * 2. * FRAC_PI_3;

@@ -80,7 +80,6 @@ impl SegmentDescription {
 
         colors
             .into_iter()
-            .rev()
             .enumerate()
             .map(|(i, color)| {
                 let start = self.fraction.start + subsegment_size * i as f32;
@@ -106,18 +105,18 @@ impl SegmentDescription {
     }
 
     pub fn render(mut self) -> Vec<(Color, Vec<Point>)> {
-        // let subsegments = if let DrawStyle::Hexagon = self.draw_style {
-        //     // hexagon segments don't support gradients
-        //     self.fraction = SegmentFraction::solid();
-        //     self.segment_style = self.segment_style.into_solid();
-        //     vec![self]
-        // } else {
-        //     self.split_into_subsegments()
-        // };
+        let subsegments = if let DrawStyle::Hexagon = self.draw_style {
+            // hexagon segments don't support gradients
+            self.fraction = SegmentFraction::solid();
+            self.segment_style = self.segment_style.into_solid();
+            vec![self]
+        } else {
+            self.split_into_subsegments()
+        };
 
         // self.fraction = SegmentFraction::solid();
-        self.segment_style = self.segment_style.into_solid();
-        let subsegments = vec![self];
+        // self.segment_style = self.segment_style.into_solid();
+        // let subsegments = vec![self];
 
         subsegments
             .into_iter()
@@ -159,8 +158,6 @@ pub trait SegmentRenderer {
         use TurnDirection::*;
         use TurnType::*;
 
-        println!("{:?}", description.turn.turn_type());
-
         let mut segment = match description.turn.turn_type() {
             Straight => Self::render_default_straight(description.cell_dim, description.fraction),
             Blunt(turn_direction) => {
@@ -182,12 +179,6 @@ pub trait SegmentRenderer {
         };
 
         let rotation_angle = Dir::U.clockwise_angle_to(description.turn.coming_from);
-        println!(
-            "rotation: {} ({:?} => {:?})",
-            Dir::U.clockwise_distance_to(description.turn.coming_from),
-            Dir::U,
-            description.turn.coming_from
-        );
         if rotation_angle != 0. {
             rotate_clockwise(&mut segment, description.cell_dim.center(), rotation_angle);
         }

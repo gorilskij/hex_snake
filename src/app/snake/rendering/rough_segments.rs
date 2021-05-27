@@ -73,32 +73,6 @@ impl SegmentRenderer for RoughSegments {
             points.push((1. - start) * a + start * b);
         }
 
-        println!("shaaaaaaaaaaaaaarp");
-
-        // if end < 1. {
-        //     if end >= 0.5 {
-        //         let f = (end - 0.5) / 0.5;
-        //         points.push(f * a + (1. - f) * b);
-        //         points.push(b);
-        //     } else {
-        //         let f = end / 0.5;
-        //         points.push(f * b + (1. - f) * c);
-        //     }
-        //     points.push(c);
-        //     points.push(pivot);
-        // } else {
-        //     if start < 0.5 {
-        //         let f = (start - 0.5) / 0.5;
-        //         points.push(b);
-        //         points.push(f * b + (1. - f) * c);
-        //     } else {
-        //         let f = start / 0.5;
-        //         points.push(f * a + (1. - f) * b);
-        //     }
-        //     points.push(pivot);
-        //     points.push(a);
-        // }
-
         points
     }
 }
