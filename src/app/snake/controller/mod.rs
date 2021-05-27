@@ -41,13 +41,21 @@ pub enum ControllerTemplate {
     Competitor1,
     Competitor2,
     Killer,
-    AStarAI,
+    AStar,
 }
 
 #[derive(Copy, Clone)]
-pub struct OtherSnakes<'a>(pub &'a [Snake], pub &'a [Snake]);
+pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);
 
-impl OtherSnakes<'_> {
+impl<'a> OtherSnakes<'a> {
+    pub fn empty() -> Self {
+        Self(&[], &[])
+    }
+
+    pub fn new(a: &'a [Snake], b: &'a [Snake]) -> Self {
+        Self(a, b)
+    }
+
     pub fn iter_snakes(&self) -> impl Iterator<Item = &Snake> {
         self.0.iter().chain(self.1.iter())
     }
@@ -140,7 +148,7 @@ impl ControllerTemplate {
                 frames_since_update: 0,
             }),
             ControllerTemplate::Killer => Box::new(Killer),
-            ControllerTemplate::AStarAI => Box::new(AStar {
+            ControllerTemplate::AStar => Box::new(AStar {
                 target: None,
                 path: vec![],
                 steps_since_update: 0,

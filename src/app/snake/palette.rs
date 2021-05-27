@@ -5,7 +5,7 @@ use SegmentType::*;
 
 use crate::{
     app::snake::{SegmentType, SnakeBody},
-    oklab::OkLab,
+    color::oklab::OkLab,
 };
 
 macro_rules! gray {
@@ -172,11 +172,30 @@ impl PaletteTemplate {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum SegmentStyle {
     Solid(Color),
-    RGBGradient(Color, Color),
-    HSLGradient(Color, Color),
+    RGBGradient {
+        start_rgb: (u8, u8, u8),
+        end_rgb: (u8, u8, u8),
+    },
+    HSLGradient {
+        start_hue: f64,
+        end_hue: f64,
+        lightness: f64,
+    },
+}
+
+impl SegmentStyle {
+    pub fn into_solid(self) -> Self {
+        match self {
+            Self::Solid(_) => self,
+            Self::RGBGradient { start_rgb, .. } => Self::Solid(Color::from(start_rgb)),
+            Self::HSLGradient { start_hue, lightness, .. } => Self::Solid(Color::from(
+                HSL { h: start_hue, s: 1., l: lightness }.to_rgb(),
+            )),
+        }
+    }
 }
 
 pub trait Palette {
@@ -298,22 +317,13 @@ impl Palette for HSLGradient {
                     self.head_hue + (self.tail_hue - self.head_hue) * r as f64 / len as f64;
                 let end_hue =
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1) as f64 / len as f64;
-                let (start_color, end_color) = match seg.typ {
+                match seg.typ {
                     Normal | BlackHole => {
-                        let start_hsl = HSL {
-                            h: start_hue,
-                            s: 1.,
-                            l: self.lightness,
-                        };
-                        let end_hsl = HSL {
-                            h: end_hue,
-                            s: 1.,
-                            l: self.lightness,
-                        };
-                        (
-                            Color::from(start_hsl.to_rgb()),
-                            Color::from(end_hsl.to_rgb()),
-                        )
+                        styles.push(SegmentStyle::HSLGradient {
+                            start_hue,
+                            end_hue,
+                            lightness: self.lightness,
+                        });
                     }
                     Eaten { .. } => {
                         // invert lightness twice
@@ -327,15 +337,13 @@ impl Palette for HSLGradient {
                             s: 1.,
                             l: 1. - self.eaten_lightness,
                         };
-                        (
-                            Color::from(invert_rgb(start_hsl.to_rgb())),
-                            Color::from(invert_rgb(end_hsl.to_rgb())),
-                        )
+                        styles.push(SegmentStyle::RGBGradient {
+                            start_rgb: invert_rgb(start_hsl.to_rgb()),
+                            end_rgb: invert_rgb(end_hsl.to_rgb()),
+                        });
                     }
                     Crashed => unreachable!(),
                 };
-                // styles.push(SegmentStyle::HSLGradient(start_color, end_color));
-                styles.push(SegmentStyle::Solid(start_color));
             }
         }
 

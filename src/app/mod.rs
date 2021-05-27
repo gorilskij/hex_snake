@@ -112,7 +112,7 @@ impl App {
                 12.,
                 seeds,
                 GamePalette::dark(),
-                AppleSpawnStrategy::Random { apple_count: 50 },
+                AppleSpawnStrategy::Random { apple_count: 5 },
                 window_mode,
             )),
             window_mode,

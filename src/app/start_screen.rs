@@ -78,7 +78,7 @@ impl SnakeDemo {
 
 impl EventHandler for SnakeDemo {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        self.snake.advance(OtherSnakes(&[], &[]), &[], self.dim);
+        self.snake.advance(OtherSnakes::empty(), &[], self.dim);
         Ok(())
     }
 

@@ -7,7 +7,7 @@ use crate::{
         },
     },
     basic::{CellDim, Dir, Dir12, HexDim, HexPoint},
-    partial_min_max::{PartialMinMax},
+    partial_min_max::PartialMinMax,
 };
 use itertools::Itertools;
 use std::f32::consts::PI;

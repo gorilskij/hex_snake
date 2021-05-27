@@ -1,4 +1,4 @@
-use std::{ cmp::Ordering};
+use std::cmp::Ordering;
 
 // the partial functions return None in case of a failed comparison
 pub trait PartialMinMax

@@ -290,11 +290,12 @@ impl Game {
         let apple_type = if self.prefs.special_apples {
             match self.rng.gen::<f32>() {
                 x if x < 0.025 => {
-                    let controller = if self.rng.gen::<f32>() < 0.5 {
-                        ControllerTemplate::Competitor1
-                    } else {
-                        ControllerTemplate::Competitor2
-                    };
+                    // let controller = if self.rng.gen::<f32>() < 0.5 {
+                    //     ControllerTemplate::Competitor1
+                    // } else {
+                    //     ControllerTemplate::Competitor2
+                    // };
+                    let controller = ControllerTemplate::AStar;
                     AppleType::SpawnSnake(SnakeSeed {
                         snake_type: SnakeType::CompetitorSnake { life: Some(200) },
                         eat_mechanics: EatMechanics::always(EatBehavior::Die),
@@ -400,9 +401,8 @@ impl Game {
     // mut snake at idk and immutable all other snakes
     fn split_snakes(snakes: &mut [Snake], idx: usize) -> (&mut Snake, OtherSnakes) {
         let (other_snakes1, rest) = snakes.split_at_mut(idx);
-        let (snake, other_snakes2) = rest.split_at_mut(1);
-        let snake = &mut snake[0];
-        (snake, OtherSnakes(other_snakes1, other_snakes2))
+        let (snake, other_snakes2) = rest.split_first_mut().unwrap();
+        (snake, OtherSnakes::new(other_snakes1, other_snakes2))
     }
 
     fn advance_snakes(&mut self) {
@@ -694,36 +694,35 @@ impl Game {
                 }
 
                 let location = segment.pos.to_point(self.cell_dim);
-                let color = match segment_styles[seg_idx] {
-                    SegmentStyle::Solid(color) => color,
-                    _ => unimplemented!(),
-                };
 
                 let fraction = match seg_idx {
-                    0 => SegmentFraction::Appearing(frame_frac),
+                    0 => SegmentFraction::appearing(frame_frac),
                     i if i == len - 1 && snake.body.grow == 0 => {
                         if let SegmentType::Eaten { original_food, food_left } = segment.typ {
                             let frac = ((original_food - food_left) as f32 + frame_frac)
                                 / (original_food + 1) as f32;
-                            SegmentFraction::Disappearing(frac)
+                            SegmentFraction::disappearing(frac)
                         } else {
-                            SegmentFraction::Disappearing(frame_frac)
+                            SegmentFraction::disappearing(frame_frac)
                         }
                     }
-                    _ => SegmentFraction::Solid,
+                    _ => SegmentFraction::solid(),
                 };
 
-                let points = SegmentDescription {
+                let subsegments = SegmentDescription {
                     location,
                     previous_segment,
                     next_segment,
                     fraction,
                     draw_style: self.prefs.draw_style,
+                    segment_style: segment_styles[seg_idx],
                     cell_dim: self.cell_dim,
                 }
                 .render();
 
-                builder.polygon(DrawMode::fill(), &points, color)?;
+                for (color, points) in subsegments {
+                    builder.polygon(DrawMode::fill(), &points, color)?;
+                }
             }
         }
 
@@ -742,29 +741,29 @@ impl Game {
                     let hexagon_color = Color::from_rgb(1, 36, 92);
                     let mut hexagon_points = full_hexagon(self.cell_dim);
                     translate(&mut hexagon_points, location);
+                    builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
                     let segment_points = SegmentDescription {
                         location,
                         previous_segment,
                         next_segment,
-                        fraction: SegmentFraction::Appearing(0.5),
+                        fraction: SegmentFraction::appearing(0.5),
                         draw_style: self.prefs.draw_style,
+                        segment_style: SegmentStyle::Solid(segment_color),
                         cell_dim: self.cell_dim,
                     }
-                    .render();
-                    builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
-                    builder.polygon(DrawMode::fill(), &segment_points, segment_color)?;
+                    .build(&mut builder)?;
                 }
                 SegmentType::Crashed => {
                     let points = SegmentDescription {
                         location,
                         previous_segment,
                         next_segment,
-                        fraction: SegmentFraction::Appearing(0.5),
+                        fraction: SegmentFraction::appearing(0.5),
                         draw_style: self.prefs.draw_style,
+                        segment_style: SegmentStyle::Solid(segment_color),
                         cell_dim: self.cell_dim,
                     }
-                    .render();
-                    builder.polygon(DrawMode::fill(), &points, segment_color)?;
+                    .build(&mut builder)?;
                 }
                 _ => unreachable!(
                     "head segment of type {:?} should not have been queued to be drawn separately",
@@ -941,7 +940,7 @@ impl EventHandler for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    ControllerTemplate::AStarAI
+                                    ControllerTemplate::AStar
                                         .into_controller(player_snake.body.dir),
                                 ));
                                 message = "Autopilot on";

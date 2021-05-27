@@ -22,7 +22,7 @@ use ggez::{
 
 mod app;
 mod basic;
-mod oklab;
+mod color;
 mod partial_min_max;
 
 pub const SHOW_SEARCH_PATH: bool = true;
