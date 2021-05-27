@@ -667,7 +667,7 @@ impl Game {
             //     builder.polygon(DrawMode::fill(), &points, WHITE)?;
             // }
 
-            let segment_styles = snake.palette.segment_styles(&snake.body);
+            let segment_styles = snake.palette.segment_styles(&snake.body, frame_frac);
             for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
                 // previous = towards head
                 // next = towards tail

@@ -31,6 +31,10 @@ impl SegmentDescription {
         let segment_size = self.fraction.end - self.fraction.start;
         let subsegment_steps = max(2, (Self::SUBSEGMENT_STEPS as f32 * segment_size) as usize);
 
+        let SegmentFraction { start, end } = self.fraction;
+        let start_subsegment = (subsegment_steps as f32 * start) as usize;
+        let end_subsegment = (subsegment_steps as f32 * end) as usize;
+
         // gradients exclude the end color because this is the same as the start color of the next segment
         let mut colors = match self.segment_style {
             SegmentStyle::Solid(color) => vec![color],
@@ -44,7 +48,7 @@ impl SegmentDescription {
                 let r2 = r2 as f64;
                 let g2 = g2 as f64;
                 let b2 = b2 as f64;
-                (0..subsegment_steps)
+                (start_subsegment..end_subsegment)
                     .map(|f| {
                         let f = f as f64 / subsegment_steps as f64;
                         Color::from_rgb(
@@ -55,7 +59,8 @@ impl SegmentDescription {
                     })
                     .collect()
             }
-            SegmentStyle::HSLGradient { start_hue, end_hue, lightness } => (0..subsegment_steps)
+            SegmentStyle::HSLGradient { start_hue, end_hue, lightness } => (start_subsegment
+                ..end_subsegment)
                 .map(|f| {
                     let f = f as f64 / subsegment_steps as f64;
                     Color::from(
@@ -70,10 +75,9 @@ impl SegmentDescription {
                 .collect(),
         };
 
-        let len1 = colors.len();
-        colors.dedup();
-        assert_eq!(colors.len(), len1, "generated duplicate colors");
-        // colors.pop();
+        // Can't tell if it's more inefficient to run dedup each time or
+        // occasionally generate some extra segments
+        // colors.dedup();
 
         let num_subsegments = colors.len();
         let subsegment_size = segment_size / num_subsegments as f32;

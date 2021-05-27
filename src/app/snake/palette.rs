@@ -199,7 +199,7 @@ impl SegmentStyle {
 }
 
 pub trait Palette {
-    fn segment_styles(&mut self, body: &SnakeBody) -> Vec<SegmentStyle>;
+    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle>;
 }
 
 impl From<PaletteTemplate> for Box<dyn Palette> {
@@ -264,7 +264,7 @@ pub struct RGBGradient {
 }
 
 impl Palette for RGBGradient {
-    fn segment_styles(&mut self, body: &SnakeBody) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
@@ -272,8 +272,8 @@ impl Palette for RGBGradient {
             let color = if seg.typ == Crashed {
                 *DEFAULT_CRASHED_COLOR
             } else {
-                let r = i + body.missing_front;
-                let head_ratio = 1. - r as f32 / (len - 1) as f32;
+                let r = (i + body.missing_front) as f32 + frame_frac;
+                let head_ratio = 1. - r / (len - 1) as f32;
                 let tail_ratio = 1. - head_ratio;
                 let normal_color = Color {
                     r: head_ratio * self.head.r + tail_ratio * self.tail.r,
@@ -304,7 +304,7 @@ pub struct HSLGradient {
 }
 
 impl Palette for HSLGradient {
-    fn segment_styles(&mut self, body: &SnakeBody) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
@@ -312,11 +312,10 @@ impl Palette for HSLGradient {
             if seg.typ == Crashed {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
             } else {
-                let r = i + body.missing_front;
-                let start_hue =
-                    self.head_hue + (self.tail_hue - self.head_hue) * r as f64 / len as f64;
+                let r = (i + body.missing_front) as f64 + frame_frac as f64;
+                let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
                 let end_hue =
-                    self.head_hue + (self.tail_hue - self.head_hue) * (r + 1) as f64 / len as f64;
+                    self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
                 match seg.typ {
                     Normal | BlackHole => {
                         styles.push(SegmentStyle::HSLGradient {
@@ -360,7 +359,7 @@ pub struct OkLabGradient {
 }
 
 impl Palette for OkLabGradient {
-    fn segment_styles(&mut self, body: &SnakeBody) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
@@ -368,8 +367,8 @@ impl Palette for OkLabGradient {
             let color = if seg.typ == Crashed {
                 *DEFAULT_CRASHED_COLOR
             } else {
-                let r = i + body.missing_front;
-                let hue = self.head_hue + (self.tail_hue - self.head_hue) * r as f64 / len as f64;
+                let r = (i + body.missing_front) as f64 + frame_frac as f64;
+                let hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
                 match seg.typ {
                     Normal | BlackHole => {
                         let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
