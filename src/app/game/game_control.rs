@@ -6,15 +6,15 @@ use std::{
 };
 
 struct FPSCounter {
-    step: Frames, // record once every 'step' frames
-    n: Frames,    // counts down to recording the next frame
+    step: usize, // record once every 'step' frames
+    n: usize,    // counts down to recording the next frame
     buffer: VecDeque<Instant>,
 }
 
 impl FPSCounter {
     const LEN: usize = 10; // number of frame batches to store
 
-    fn new(fps: u64) -> Self {
+    fn new(fps: f64) -> Self {
         let mut counter = Self {
             step: 0,
             n: 0,
@@ -24,8 +24,8 @@ impl FPSCounter {
         counter
     }
 
-    fn set_fps(&mut self, fps: Frames) {
-        self.step = max(1, 3 * fps / Self::LEN as Frames);
+    fn set_fps(&mut self, fps: f64) {
+        self.step = max(1, (3. * fps / Self::LEN as f64) as usize);
         // debug
         // println!(
         //     "FPSCounter: fps = {}, step = {}, len = {}, frames = {}",
@@ -56,7 +56,7 @@ impl FPSCounter {
 
     fn fps(&self) -> f64 {
         if self.buffer.len() >= 2 {
-            ((self.buffer.len() - 1) as Frames * self.step) as f64
+            ((self.buffer.len() - 1) as f64 * self.step as f64)
                 / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
         } else {
             0.
@@ -73,7 +73,7 @@ pub enum GameState {
 
 // combines fps with game state management
 pub struct GameControl {
-    game_fps: u64,
+    game_fps: f64,
     game_frame_duration: Duration,
     last_update: Instant,
     surplus: f64, // secs
@@ -91,10 +91,10 @@ pub struct GameControl {
 }
 
 impl GameControl {
-    pub fn new(fps: u64) -> Self {
+    pub fn new(fps: f64) -> Self {
         Self {
             game_fps: fps,
-            game_frame_duration: Duration::from_nanos(1_000_000_000 / fps),
+            game_frame_duration: Duration::from_nanos((1_000_000_000.0 / fps) as u64),
             last_update: Instant::now(),
             surplus: 0.,
 
@@ -103,20 +103,20 @@ impl GameControl {
             graphics_frame_num: 0,
 
             measured_game_fps: FPSCounter::new(fps),
-            measured_graphics_fps: FPSCounter::new(60),
+            measured_graphics_fps: FPSCounter::new(60.),
 
             game_state: GameState::Playing,
             frozen_frame_fraction: None,
         }
     }
 
-    pub fn fps(&self) -> u64 {
+    pub fn fps(&self) -> f64 {
         self.game_fps
     }
 
-    pub fn set_fps(&mut self, fps: u64) {
+    pub fn set_fps(&mut self, fps: f64) {
         self.game_fps = fps;
-        self.game_frame_duration = Duration::from_nanos(1_000_000_000 / fps);
+        self.game_frame_duration = Duration::from_nanos((1_000_000_000.0 / fps) as u64);
         self.measured_game_fps.set_fps(fps);
     }
 

@@ -127,7 +127,7 @@ impl Game {
         let cell_dim = CellDim::from(cell_side_len);
 
         let mut game = Self {
-            control: GameControl::new(12),
+            control: GameControl::new(12.),
 
             window_dim: Point { x: wm.width, y: wm.height },
 
@@ -948,14 +948,15 @@ impl EventHandler for Game {
             }
             LBracket => {
                 let new_fps = match self.control.fps() {
-                    f if f <= 1 => 1,
-                    f if f <= 20 => f - 1,
-                    f if f <= 50 => f - 5,
-                    f if f <= 100 => f - 10,
-                    f if f <= 500 => f - 50,
-                    f if f <= 1000 => f - 100,
-                    f if f <= 10_000 => f - 1000,
-                    f => f - 10_000,
+                    f if f <= 0.1 => 0.1,
+                    f if f <= 1. => f - 0.1,
+                    f if f <= 20. => f - 1.,
+                    f if f <= 50. => f - 5.,
+                    f if f <= 100. => f - 10.,
+                    f if f <= 500. => f - 50.,
+                    f if f <= 1000. => f - 100.,
+                    f if f <= 10_000. => f - 1000.,
+                    f => f - 10_000.,
                 };
                 self.control.set_fps(new_fps);
                 self.message_top_right = Some(Message::from((
@@ -965,14 +966,15 @@ impl EventHandler for Game {
             }
             RBracket => {
                 let new_fps = match self.control.fps() {
-                    f if f < 1 => 1,
-                    f if f < 20 => f + 1,
-                    f if f < 50 => f + 5,
-                    f if f < 100 => f + 10,
-                    f if f < 500 => f + 50,
-                    f if f < 1000 => f + 100,
-                    f if f < 10_000 => f + 1000,
-                    f => f + 10_000,
+                    f if f < 0.1 => 0.1,
+                    f if f < 1. => f + 0.1,
+                    f if f < 20. => (f + 1.).floor(),
+                    f if f < 50. => f + 5.,
+                    f if f < 100. => f + 10.,
+                    f if f < 500. => f + 50.,
+                    f if f < 1000. => f + 100.,
+                    f if f < 10_000. => f + 1000.,
+                    f => f + 10_000.,
                 };
                 self.control.set_fps(new_fps);
                 self.message_top_right = Some(Message::from((

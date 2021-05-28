@@ -122,7 +122,7 @@ impl PaletteTemplate {
     }
 
     // red -> purple
-    const HSL_RAINBOW: (f64, f64) = (0., 273.);
+    const HSL_RAINBOW: (f64, f64) = (-20., 290.);
 
     // green -> red (yellows are very ugly in oklab)
     const OKLAB_RAINBOW: (f64, f64) = (147.3, 428.);
@@ -178,11 +178,13 @@ pub enum SegmentStyle {
     RGBGradient {
         start_rgb: (u8, u8, u8),
         end_rgb: (u8, u8, u8),
+        num_subsegments: usize,
     },
     HSLGradient {
         start_hue: f64,
         end_hue: f64,
         lightness: f64,
+        num_subsegments: usize,
     },
 }
 
@@ -308,6 +310,14 @@ impl Palette for HSLGradient {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
+        let num_subsegments = match body.len() {
+            0..=20 => 10,
+            21..=50 => 6,
+            51..=100 => 4,
+            101..=200 => 2,
+            _ => 1,
+        };
+
         for (i, seg) in body.iter().enumerate() {
             if seg.typ == Crashed {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
@@ -318,11 +328,23 @@ impl Palette for HSLGradient {
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
                 match seg.typ {
                     Normal | BlackHole => {
-                        styles.push(SegmentStyle::HSLGradient {
-                            start_hue,
-                            end_hue,
-                            lightness: self.lightness,
-                        });
+                        if num_subsegments == 1 {
+                            styles.push(SegmentStyle::Solid(Color::from(
+                                HSL {
+                                    h: start_hue,
+                                    s: 1.,
+                                    l: self.lightness,
+                                }
+                                .to_rgb(),
+                            )));
+                        } else {
+                            styles.push(SegmentStyle::HSLGradient {
+                                start_hue,
+                                end_hue,
+                                lightness: self.lightness,
+                                num_subsegments,
+                            });
+                        }
                     }
                     Eaten { .. } => {
                         // invert lightness twice
@@ -336,10 +358,17 @@ impl Palette for HSLGradient {
                             s: 1.,
                             l: 1. - self.eaten_lightness,
                         };
-                        styles.push(SegmentStyle::RGBGradient {
-                            start_rgb: invert_rgb(start_hsl.to_rgb()),
-                            end_rgb: invert_rgb(end_hsl.to_rgb()),
-                        });
+                        if num_subsegments == 1 {
+                            styles.push(SegmentStyle::Solid(Color::from(invert_rgb(
+                                start_hsl.to_rgb(),
+                            ))));
+                        } else {
+                            styles.push(SegmentStyle::RGBGradient {
+                                start_rgb: invert_rgb(start_hsl.to_rgb()),
+                                end_rgb: invert_rgb(end_hsl.to_rgb()),
+                                num_subsegments,
+                            });
+                        }
                     }
                     Crashed => unreachable!(),
                 };

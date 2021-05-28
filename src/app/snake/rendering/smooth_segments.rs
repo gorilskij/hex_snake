@@ -9,7 +9,7 @@ use std::cmp::max;
 
 pub struct SmoothSegments;
 
-const NUM_ANGLE_SEGMENTS: usize = 3;
+const NUM_ANGLE_SEGMENTS: usize = 10;
 
 impl SegmentRenderer for SmoothSegments {
     fn render_default_straight(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {

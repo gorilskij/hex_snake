@@ -24,16 +24,10 @@ use crate::{
 };
 
 impl SegmentDescription {
-    const SUBSEGMENT_STEPS: usize = 10;
-
     // for simulating gradient
     fn split_into_subsegments(self) -> Vec<Self> {
-        let segment_size = self.fraction.end - self.fraction.start;
-        let subsegment_steps = max(2, (Self::SUBSEGMENT_STEPS as f32 * segment_size) as usize);
-
         let SegmentFraction { start, end } = self.fraction;
-        let start_subsegment = (subsegment_steps as f32 * start) as usize;
-        let end_subsegment = (subsegment_steps as f32 * end) as usize;
+        let segment_size = self.fraction.end - self.fraction.start;
 
         // gradients exclude the end color because this is the same as the start color of the next segment
         let mut colors = match self.segment_style {
@@ -41,6 +35,7 @@ impl SegmentDescription {
             SegmentStyle::RGBGradient {
                 start_rgb: (r1, g1, b1),
                 end_rgb: (r2, g2, b2),
+                num_subsegments,
             } => {
                 let r1 = r1 as f64;
                 let g1 = g1 as f64;
@@ -48,9 +43,13 @@ impl SegmentDescription {
                 let r2 = r2 as f64;
                 let g2 = g2 as f64;
                 let b2 = b2 as f64;
+
+                let start_subsegment = (num_subsegments as f32 * start) as usize;
+                let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
+
                 (start_subsegment..end_subsegment)
                     .map(|f| {
-                        let f = f as f64 / subsegment_steps as f64;
+                        let f = f as f64 / num_subsegments as f64;
                         Color::from_rgb(
                             (f * r1 + (1. - f) * r2) as u8,
                             (f * g1 + (1. - f) * g2) as u8,
@@ -59,20 +58,28 @@ impl SegmentDescription {
                     })
                     .collect()
             }
-            SegmentStyle::HSLGradient { start_hue, end_hue, lightness } => (start_subsegment
-                ..end_subsegment)
-                .map(|f| {
-                    let f = f as f64 / subsegment_steps as f64;
-                    Color::from(
-                        HSL {
-                            h: f * start_hue + (1. - f) * end_hue,
-                            s: 1.,
-                            l: lightness,
-                        }
-                        .to_rgb(),
-                    )
-                })
-                .collect(),
+            SegmentStyle::HSLGradient {
+                start_hue,
+                end_hue,
+                lightness,
+                num_subsegments,
+            } => {
+                let start_subsegment = (num_subsegments as f32 * start) as usize;
+                let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
+                (start_subsegment..end_subsegment)
+                    .map(|f| {
+                        let f = f as f64 / num_subsegments as f64;
+                        Color::from(
+                            HSL {
+                                h: f * start_hue + (1. - f) * end_hue,
+                                s: 1.,
+                                l: lightness,
+                            }
+                            .to_rgb(),
+                        )
+                    })
+                    .collect()
+            }
         };
 
         // Can't tell if it's more inefficient to run dedup each time or
