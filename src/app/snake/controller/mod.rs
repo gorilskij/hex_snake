@@ -19,10 +19,7 @@ use crate::{
     partial_min_max::{partial_max, partial_min},
 };
 use ggez::event::KeyCode;
-use std::{
-    collections::{VecDeque},
-    f32::consts::PI,
-};
+use std::{collections::VecDeque, f32::consts::PI};
 
 #[cfg(feature = "show_search_path")]
 use std::collections::HashSet;

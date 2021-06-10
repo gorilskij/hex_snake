@@ -19,11 +19,13 @@ impl FPSCounter {
             n: 0,
             buffer: VecDeque::with_capacity(Self::LEN),
         };
-        counter.set_fps(fps);
+        counter.set_expected_fps(fps);
         counter
     }
 
-    fn set_fps(&mut self, fps: f64) {
+    // Counting parameters depend on the expected fps
+    // (very high fps won't be updated as often)
+    fn set_expected_fps(&mut self, fps: f64) {
         self.step = max(1, (3. * fps / Self::LEN as f64) as usize);
         // debug
         // println!(
@@ -75,17 +77,28 @@ pub struct GameControl {
     game_fps: f64,
     game_frame_duration: Duration,
     last_update: Instant,
-    surplus: f64, // secs
 
-    // counting down for the while loop in update()
-    queued_updates: Option<usize>,
+    // amount of time which game frames have not yet
+    // been accounted for (will be included next time
+    // this in done)
+    remainder: f64, // secs
 
+    // number of game frames that still need to be
+    // performed to catch up with the current time
+    // TODO: zero this when it gets too large to prevent lag
+    missed_updates: Option<usize>,
+
+    // counting graphics frames
     graphics_frame_num: usize,
 
+    // empirical measurement of framerates unrelated to
+    // control mechanism
     measured_game_fps: FPSCounter,
     measured_graphics_fps: FPSCounter,
 
     game_state: GameState,
+
+    // used to store the frame fraction when the game is paused
     frozen_frame_fraction: Option<f32>,
 }
 
@@ -95,9 +108,9 @@ impl GameControl {
             game_fps: fps,
             game_frame_duration: Duration::from_nanos((1_000_000_000.0 / fps) as u64),
             last_update: Instant::now(),
-            surplus: 0.,
+            remainder: 0.,
 
-            queued_updates: None,
+            missed_updates: None,
 
             graphics_frame_num: 0,
 
@@ -113,24 +126,48 @@ impl GameControl {
         self.game_fps
     }
 
-    pub fn set_fps(&mut self, fps: f64) {
-        self.game_fps = fps;
-        self.game_frame_duration = Duration::from_nanos((1_000_000_000.0 / fps) as u64);
-        self.measured_game_fps.set_fps(fps);
+    // adjust self.last_update to make it match the expected
+    // frame_fraction, this is done when resuming a paused game
+    // and when adjust fps to ensure smoothness
+    fn set_last_update_to_match_frame_frac(&mut self, frac: f32) {
+        let mut elapsed = (frac - self.remainder as f32) * self.game_frame_duration.as_secs_f32();
+        // slight tolerance
+        if (-0.01..0.).contains(&elapsed) {
+            elapsed = 0.;
+        } else {
+            assert!(elapsed >= 0., "elapsed ({}s) < 0", elapsed);
+        }
+
+        self.last_update = Instant::now() - Duration::from_secs_f32(elapsed);
     }
 
-    // WARNING this will perform as many updates as the framerate requires
+    pub fn set_game_fps(&mut self, fps: f64) {
+        if (self.game_fps - fps).abs() < f64::EPSILON {
+            return;
+        }
+
+        let frac = self.frame_fraction();
+
+        self.game_fps = fps;
+        self.game_frame_duration = Duration::from_nanos((1_000_000_000.0 / fps) as u64);
+        self.measured_game_fps.set_expected_fps(fps);
+
+        // keep frame_frac constant
+        self.set_last_update_to_match_frame_frac(frac);
+    }
+
+    // repeatedly called in update() as while loop condition
+    // WARN: this will perform as many updates as the framerate requires
     //  this can cause strong lag a high framerates
-    // TODO lower game framerate to keep up graphics framerate
-    // call in update(), run update code this many times
+    // TODO: automatically lower game framerate to keep up graphics framerate
     pub fn can_update(&mut self) -> bool {
         if self.game_state != GameState::Playing {
             return false;
         }
 
-        match &mut self.queued_updates {
+        match &mut self.missed_updates {
             Some(0) => {
-                self.queued_updates = None;
+                self.missed_updates = None;
                 false
             }
             Some(n) => {
@@ -138,19 +175,21 @@ impl GameControl {
                 true
             }
             None => {
+                // calculate how many game frames should have occurred
+                // since the last call to can_update
                 let game_frames = self.last_update.elapsed().as_secs_f64()
                     / self.game_frame_duration.as_secs_f64()
-                    + self.surplus;
-                let updates = game_frames as usize;
+                    + self.remainder;
+                let missed_updates = game_frames as usize;
 
-                if updates > 0 {
-                    self.surplus = game_frames % 1.;
+                if missed_updates > 0 {
+                    self.remainder = game_frames % 1.;
                     self.last_update = Instant::now();
 
-                    self.queued_updates = Some(updates - 1);
+                    self.missed_updates = Some(missed_updates - 1);
 
                     // TODO: O(1)ize
-                    for _ in 0..updates {
+                    for _ in 0..missed_updates {
                         self.measured_game_fps.register_frame();
                     }
 
@@ -177,17 +216,7 @@ impl GameControl {
         self.measured_game_fps.reset();
         match self.frozen_frame_fraction.take() {
             None => (),
-            Some(frac) => {
-                let mut elapsed =
-                    (frac - self.surplus as f32) * self.game_frame_duration.as_secs_f32();
-                // slight tolerance
-                if (-0.01..0.).contains(&elapsed) {
-                    elapsed = 0.;
-                } else {
-                    assert!(elapsed >= 0., "elapsed: {}s", elapsed);
-                }
-                self.last_update = Instant::now() - Duration::from_secs_f32(elapsed);
-            }
+            Some(frac) => self.set_last_update_to_match_frame_frac(frac),
         }
     }
 
@@ -212,7 +241,7 @@ impl GameControl {
             None => {
                 let frac = self.last_update.elapsed().as_secs_f32()
                     / self.game_frame_duration.as_secs_f32()
-                    + self.surplus as f32;
+                    + self.remainder as f32;
                 if frac > 1. {
                     1.
                 } else {

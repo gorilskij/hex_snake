@@ -947,8 +947,8 @@ impl EventHandler for Game {
                 }
             }
             LBracket => {
-                let new_fps = match self.control.fps() {
-                    f if f <= 0.1 => 0.1,
+                let mut new_fps = match self.control.fps() {
+                    f if f <= 0.2 => 0.1,
                     f if f <= 1. => f - 0.1,
                     f if f <= 20. => f - 1.,
                     f if f <= 50. => f - 5.,
@@ -958,15 +958,17 @@ impl EventHandler for Game {
                     f if f <= 10_000. => f - 1000.,
                     f => f - 10_000.,
                 };
-                self.control.set_fps(new_fps);
+                new_fps = (new_fps * 10.).round() / 10.;
+
+                self.control.set_game_fps(new_fps);
                 self.message_top_right = Some(Message::from((
                     format!("fps: {}", new_fps),
                     self.prefs.message_duration,
                 )));
             }
             RBracket => {
-                let new_fps = match self.control.fps() {
-                    f if f < 0.1 => 0.1,
+                let mut new_fps = match self.control.fps() {
+                    f if f <= 0.1 => 0.2,
                     f if f < 1. => f + 0.1,
                     f if f < 20. => (f + 1.).floor(),
                     f if f < 50. => f + 5.,
@@ -976,7 +978,9 @@ impl EventHandler for Game {
                     f if f < 10_000. => f + 1000.,
                     f => f + 10_000.,
                 };
-                self.control.set_fps(new_fps);
+                new_fps = (new_fps * 10.).round() / 10.;
+
+                self.control.set_game_fps(new_fps);
                 self.message_top_right = Some(Message::from((
                     format!("fps: {}", new_fps),
                     self.prefs.message_duration,
