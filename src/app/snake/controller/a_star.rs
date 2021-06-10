@@ -2,12 +2,16 @@ use crate::{
     app::{
         game::Apple,
         snake::{
-            controller::{Controller, OtherSnakes, ETHEREAL_PATH, ETHEREAL_SEEN},
+            controller::{Controller, OtherSnakes},
             SnakeBody,
         },
     },
     basic::{Dir, HexDim, HexPoint},
 };
+
+#[cfg(feature = "show_search_path")]
+use crate::app::snake::controller::{ETHEREAL_PATH, ETHEREAL_SEEN};
+
 use itertools::Itertools;
 use std::{
     cmp::{max, min},

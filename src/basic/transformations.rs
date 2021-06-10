@@ -1,5 +1,4 @@
 use crate::basic::Point;
-use ggez::graphics::Color;
 
 pub fn rotate_clockwise(points: &mut [Point], origin: Point, angle: f32) {
     points

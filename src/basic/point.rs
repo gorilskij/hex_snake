@@ -57,7 +57,7 @@ impl Point {
     }
 
     #[must_use]
-    pub fn rotate_counterclockwise(mut self, origin: Self, angle: f32) -> Self {
+    pub fn rotate_counterclockwise(self, origin: Self, angle: f32) -> Self {
         self.rotate_clockwise(origin, -angle)
     }
 }

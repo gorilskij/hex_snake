@@ -592,7 +592,7 @@ impl Game {
                 self.snakes
                     .push(Snake::from_seed(&seed, pos, Dir::random(&mut self.rng), 10))
             } else {
-                println!("warning: failed to spawn evil snake, no free spaces left")
+                println!("warning: failed to spawn killer snake, no free spaces left")
             }
         }
     }
@@ -604,41 +604,41 @@ impl Game {
     ) -> GameResult {
         if let Some(Message {
             ref message,
-            duration: ref mut life,
-            color,
-        }) = maybe_message
+            ref mut duration,
+            mut color,
+        }) = *maybe_message
         {
-            let mut text = Text::new(message as &str);
+            let mut text = Text::new(message.as_str());
             text.set_font(Font::default(), PxScale::from(20.));
 
-            let offset = 10.;
+            let margin = 10.;
             let x = match side {
-                Side::Left => 10.,
+                Side::Left => margin,
                 Side::Right => {
-                    ggez::graphics::drawable_size(ctx).0 - text.width(ctx) as f32 - offset
+                    ggez::graphics::drawable_size(ctx).0 - text.width(ctx) as f32 - margin
                 }
             };
-            let location = Point { x, y: offset };
+            let location = Point { x, y: margin };
 
-            let mut color = *color;
             // fade out
-            if let Some(frames) = life {
+            if let Some(frames) = duration {
                 if *frames < 10 {
                     color.a = *frames as f32 / 10.
                 }
             }
 
-            draw(ctx, &text, DrawParam::from((location, color)))?;
-
-            if let Some(frames) = life {
+            if let Some(frames) = duration {
                 if *frames == 0 {
                     *maybe_message = None;
                 } else {
                     *frames -= 1;
                 }
             }
+
+            draw(ctx, &text, DrawParam::from((location, color)))
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 }
 
@@ -1005,6 +1005,17 @@ impl EventHandler for Game {
                 )));
             }
             X => {
+                // replace special apples
+                let prefs = &self.prefs;
+                self.apples.iter_mut().for_each(|apple| {
+                    if !matches!(apple.typ, AppleType::Normal(_)) {
+                        *apple = Apple {
+                            pos: apple.pos,
+                            typ: AppleType::Normal(prefs.apple_food),
+                        }
+                    }
+                });
+
                 self.prefs.special_apples = !self.prefs.special_apples;
                 let message = if self.prefs.special_apples {
                     "Special apples enabled"

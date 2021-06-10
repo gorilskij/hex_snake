@@ -20,9 +20,12 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{VecDeque},
     f32::consts::PI,
 };
+
+#[cfg(feature = "show_search_path")]
+use std::collections::HashSet;
 
 mod a_star;
 mod competitor1;

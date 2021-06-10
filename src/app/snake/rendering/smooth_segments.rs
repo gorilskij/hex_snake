@@ -19,7 +19,7 @@ impl SegmentRenderer for SmoothSegments {
     fn render_default_blunt(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
         use std::f32::consts::FRAC_PI_3;
 
-        let CellDim { side, sin, cos } = cell_dim;
+        let CellDim { side, sin: _, cos } = cell_dim;
         let SegmentFraction { start, end } = fraction;
 
         let pivot = Point { x: side + 3. * cos, y: 0. };
@@ -61,7 +61,7 @@ impl SegmentRenderer for SmoothSegments {
     fn render_default_sharp(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
         use std::f32::consts::FRAC_PI_3;
 
-        let CellDim { side, sin, cos } = cell_dim;
+        let CellDim { side, sin: _, cos } = cell_dim;
         let SegmentFraction { start, end } = fraction;
 
         let pivot = Point { x: side + cos, y: 0. };

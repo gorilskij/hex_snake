@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 use ggez::{
     graphics::{Color, DrawMode, MeshBuilder},
     GameResult,
@@ -30,7 +28,7 @@ impl SegmentDescription {
         let segment_size = self.fraction.end - self.fraction.start;
 
         // gradients exclude the end color because this is the same as the start color of the next segment
-        let mut colors = match self.segment_style {
+        let colors = match self.segment_style {
             SegmentStyle::Solid(color) => vec![color],
             SegmentStyle::RGBGradient {
                 start_rgb: (r1, g1, b1),
