@@ -1,6 +1,6 @@
 use crate::{
     app::{
-        game::Game,
+        game::{Game, Stats},
         snake::{
             palette::SegmentStyle,
             rendering::{
@@ -18,7 +18,13 @@ use ggez::{
 };
 
 impl Game {
-    pub(in crate::app::game) fn snake_mesh(&mut self, ctx: &mut Context) -> GameResult<Mesh> {
+    pub(in crate::app::game) fn snake_mesh(
+        &mut self,
+        ctx: &mut Context,
+        stats: &mut Stats,
+    ) -> GameResult<Mesh> {
+        stats.redrawing_snakes = true;
+
         let mut builder = MeshBuilder::new();
 
         // to be drawn later (potentially on top of body segments)
@@ -95,6 +101,7 @@ impl Game {
 
                 for (color, points) in segment.render() {
                     builder.polygon(DrawMode::fill(), &points, color)?;
+                    stats.total_segments += 1;
                 }
             }
         }

@@ -1,6 +1,6 @@
 use crate::{
     app::{
-        game::{AppleType, Game},
+        game::{AppleType, Game, Stats},
         snake::rendering::render_hexagon,
     },
     basic::{transformations::translate, DrawStyle},
@@ -12,7 +12,13 @@ use ggez::{
 use hsl::HSL;
 
 impl Game {
-    pub(in crate::app::game) fn apple_mesh(&self, ctx: &mut Context) -> GameResult<Mesh> {
+    pub(in crate::app::game) fn apple_mesh(
+        &self,
+        ctx: &mut Context,
+        stats: &mut Stats,
+    ) -> GameResult<Mesh> {
+        stats.redrawing_apples = true;
+
         let mut builder = MeshBuilder::new();
 
         for apple in &self.apples {

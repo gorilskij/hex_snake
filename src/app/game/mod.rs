@@ -45,6 +45,7 @@ pub struct Apple {
 struct Prefs {
     draw_grid: bool,
     display_fps: bool,
+    display_stats: bool,
     apple_food: Food,
     message_duration: Duration,
     draw_style: DrawStyle,
@@ -56,11 +57,42 @@ impl Default for Prefs {
         Self {
             draw_grid: false,
             display_fps: false,
+            display_stats: false,
             apple_food: 1,
             message_duration: Duration::from_secs(2),
             draw_style: DrawStyle::Smooth,
             special_apples: true,
         }
+    }
+}
+
+/// Collect statistics about the current game state
+#[derive(Default)]
+pub struct Stats {
+    /// Total number of graphical segments
+    /// currently visible (counts subsegments!)
+    total_segments: usize,
+    redrawing_apples: bool,
+    redrawing_snakes: bool,
+}
+
+impl Stats {
+    fn show_message(&self, game: &mut Game) {
+        let text = format!(
+            "segments: {}\nredrawing\n  apples: {}\n  snakes: {}",
+            self.total_segments, self.redrawing_apples, self.redrawing_snakes,
+        );
+        let message = Message {
+            text,
+            left: true,
+            top: true,
+            h_margin: Message::DEFAULT_MARGIN,
+            v_margin: Message::DEFAULT_MARGIN * 2. + Message::DEFAULT_FONT_SIZE,
+            font_size: Message::DEFAULT_FONT_SIZE,
+            color: Color::WHITE,
+            disappear: None,
+        };
+        game.messages.insert(MessageID::Stats, message);
     }
 }
 
@@ -80,14 +112,26 @@ pub struct Game {
     palette: GamePalette,
 
     rng: ThreadRng,
+
+    /// These meshes are always cached and only
+    /// recalculated when the board is resized
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
 
     prefs: Prefs,
     messages: HashMap<MessageID, Message>,
 
+    /// Cached meshes used when the game is paused
+    /// but redrawing still needs to occur (e.g. to
+    /// display a message fade or animated apple)
     cached_snake_mesh: Option<Mesh>,
     cached_apple_mesh: Option<Mesh>,
+
+    /// Consider the draw cache invalid for the
+    /// next n frames, forces a redraw even if
+    /// nothing changed, this is necessary to
+    /// avoid visual glitches
+    draw_cache_invalid: usize,
 }
 
 impl Game {
@@ -126,6 +170,8 @@ impl Game {
 
             cached_snake_mesh: None,
             cached_apple_mesh: None,
+
+            draw_cache_invalid: 0,
         };
         // warning: this spawns apples before there are any snakes
         game.update_dim();
@@ -446,6 +492,7 @@ impl Game {
 
         if self.snakes.is_empty() {
             self.control.game_over();
+            self.draw_cache_invalid = 5;
             return;
         }
 
@@ -623,7 +670,7 @@ impl Game {
 
     /// Show game and graphics FPS information in the
     /// top-left corner
-    fn show_fps_info(&mut self) {
+    fn update_fps_message(&mut self) {
         let game_fps = self.control.measured_game_fps();
         let graphics_fps = self.control.measured_graphics_fps();
 
@@ -665,7 +712,7 @@ impl EventHandler for Game {
         self.control.graphics_frame();
 
         if self.prefs.display_fps {
-            self.show_fps_info();
+            self.update_fps_message();
         }
 
         // selectively set to Some(_) if they need to be updated
@@ -673,12 +720,14 @@ impl EventHandler for Game {
         let mut snake_mesh = None;
         let mut apple_mesh = None;
 
+        let mut stats = Stats::default();
+
         if self.control.state() == GameState::Playing {
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
 
-            snake_mesh = Some(ROw::Owned(self.snake_mesh(ctx)?));
-            apple_mesh = Some(ROw::Owned(self.apple_mesh(ctx)?));
+            snake_mesh = Some(ROw::Owned(self.snake_mesh(ctx, &mut stats)?));
+            apple_mesh = Some(ROw::Owned(self.apple_mesh(ctx, &mut stats)?));
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
                     self.grid_mesh = Some(self.grid_mesh(ctx)?);
@@ -695,16 +744,21 @@ impl EventHandler for Game {
                     .iter()
                     .any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_)))
             {
-                self.cached_apple_mesh = Some(self.apple_mesh(ctx)?);
+                self.cached_apple_mesh = Some(self.apple_mesh(ctx, &mut stats)?);
                 update = true;
             }
 
             if self.cached_snake_mesh.is_none() {
-                self.cached_snake_mesh = Some(self.snake_mesh(ctx)?);
+                self.cached_snake_mesh = Some(self.snake_mesh(ctx, &mut stats)?);
                 update = true;
             }
 
             if !self.messages.is_empty() {
+                update = true;
+            }
+
+            if self.draw_cache_invalid > 0 {
+                self.draw_cache_invalid -= 1;
                 update = true;
             }
 
@@ -731,11 +785,15 @@ impl EventHandler for Game {
             if let Some(mesh) = snake_mesh {
                 draw(ctx, mesh.get(), DrawParam::default())?;
             }
+
+            if self.prefs.display_stats {
+                stats.show_message(self);
+            }
+
             self.draw_messages(ctx)?;
-            present(ctx)
-        } else {
-            Ok(())
         }
+
+        present(ctx)
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
@@ -750,7 +808,10 @@ impl EventHandler for Game {
                     self.restart();
                     self.control.play();
                 }
-                GameState::Playing => self.control.pause(),
+                GameState::Playing => {
+                    self.control.pause();
+                    self.draw_cache_invalid = 5;
+                },
                 GameState::Paused => self.control.play(),
             },
             G => {
@@ -766,6 +827,14 @@ impl EventHandler for Game {
                 self.prefs.display_fps = !self.prefs.display_fps;
                 if !self.prefs.display_fps {
                     self.messages.remove(&MessageID::FPS);
+                    self.draw_cache_invalid = 5;
+                }
+            }
+            S => {
+                self.prefs.display_stats = !self.prefs.display_stats;
+                if !self.prefs.display_stats {
+                    self.messages.remove(&MessageID::Stats);
+                    self.draw_cache_invalid = 5;
                 }
             }
             A => {

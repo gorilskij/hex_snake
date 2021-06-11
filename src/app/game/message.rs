@@ -13,26 +13,26 @@ pub enum MessageID {
     /// Temporary info when resizing window,
     /// toggling grid, or other notifications
     Notification,
-    /// Persistent debug information
-    Debug,
+    /// Stats about the game
+    Stats,
 }
 
 pub struct Message {
-    text: String,
+    pub text: String,
 
-    left: bool,
-    top: bool,
-    h_margin: f32,
-    v_margin: f32,
-    font_size: f32,
-    color: Color,
+    pub left: bool,
+    pub top: bool,
+    pub h_margin: f32,
+    pub v_margin: f32,
+    pub font_size: f32,
+    pub color: Color,
     // None means unlimited duration
-    disappear: Option<Instant>,
+    pub disappear: Option<Instant>,
 }
 
 impl Message {
-    const DEFAULT_MARGIN: f32 = 10.;
-    const DEFAULT_FONT_SIZE: f32 = 20.;
+    pub const DEFAULT_MARGIN: f32 = 10.;
+    pub const DEFAULT_FONT_SIZE: f32 = 20.;
 
     pub fn default_top_left(text: String, color: Color, duration: Option<Duration>) -> Self {
         Self {
