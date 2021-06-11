@@ -1,11 +1,11 @@
 use ggez::{
     conf::WindowMode,
     event::{EventHandler, KeyCode, KeyMods},
-    graphics::{clear, draw, present, Color, DrawMode, DrawParam, Mesh, MeshBuilder},
+    graphics::{clear, draw, present, Color, DrawParam, Mesh},
     Context, GameResult,
 };
-use hsl::HSL;
 use rand::prelude::*;
+use crate::row::ROw;
 
 use crate::{
     app::{
@@ -13,7 +13,6 @@ use crate::{
         game::{
             game_control::{GameControl, GameState},
             message::{Message, MessageID},
-            rendering::grid_mesh::generate_grid_mesh,
         },
         palette::GamePalette,
         snake::{
@@ -90,6 +89,9 @@ pub struct Game {
 
     prefs: Prefs,
     messages: HashMap<MessageID, Message>,
+
+    cached_snake_mesh: Option<Mesh>,
+    cached_apple_mesh: Option<Mesh>,
 }
 
 impl Game {
@@ -125,6 +127,9 @@ impl Game {
 
             prefs: Prefs::default(),
             messages: HashMap::new(),
+
+            cached_snake_mesh: None,
+            cached_apple_mesh: None,
         };
         // warning: this spawns apples before there are any snakes
         game.update_dim();
@@ -167,6 +172,8 @@ impl Game {
             // invalidate
             self.grid_mesh = None;
             self.border_mesh = None;
+            self.cached_apple_mesh = None;
+            self.cached_snake_mesh = None;
         }
     }
 
@@ -378,8 +385,17 @@ impl Game {
         }
     }
 
-    // mut snake at idk and immutable all other snakes
-    fn split_snakes(snakes: &mut [Snake], idx: usize) -> (&mut Snake, OtherSnakes) {
+    /// Extract one snake at `idx` and return all other
+    /// snakes in a special struct to avoid building
+    /// unnecessary vecs all the time (OtherSnakes is always
+    /// immutable)
+    fn split_snakes(snakes: &[Snake], idx: usize) -> (&Snake, OtherSnakes) {
+        let (other_snakes1, rest) = snakes.split_at(idx);
+        let (snake, other_snakes2) = rest.split_first().unwrap();
+        (snake, OtherSnakes::new(other_snakes1, other_snakes2))
+    }
+
+    fn split_snakes_mut(snakes: &mut [Snake], idx: usize) -> (&mut Snake, OtherSnakes) {
         let (other_snakes1, rest) = snakes.split_at_mut(idx);
         let (snake, other_snakes2) = rest.split_first_mut().unwrap();
         (snake, OtherSnakes::new(other_snakes1, other_snakes2))
@@ -401,7 +417,7 @@ impl Game {
                 _ => (),
             }
 
-            let (snake, other_snakes) = Self::split_snakes(&mut self.snakes, snake_idx);
+            let (snake, other_snakes) = Self::split_snakes_mut(&mut self.snakes, snake_idx);
 
             // advance the snake
             snake.advance(other_snakes, &self.apples, self.dim);
@@ -576,185 +592,64 @@ impl Game {
 }
 
 impl Game {
-    fn draw_snakes_and_apples(&mut self, ctx: &mut Context) -> GameResult {
-        let mut builder = MeshBuilder::new();
-
-        // to be drawn later (potentially on top of body segments)
-        let mut heads = vec![];
-
-        let frame_frac = self.control.frame_fraction();
-
-        // draw bodies
-        for snake_idx in 0..self.snakes.len() {
-            let (snake, other_snakes) = Self::split_snakes(&mut self.snakes, snake_idx);
-
-            // update the direction of the snake as soon as possible (mid game-frame)
-            snake.update_dir(other_snakes, &self.apples, self.dim);
-
-            let len = snake.len();
-
-            // draw white aura around snake heads (debug)
-            // for pos in snake.reachable(7, self.dim) {
-            //     let dest = pos.to_point(self.cell_dim);
-            //     let points = get_full_hexagon(dest, self.cell_dim);
-            //     builder.polygon(DrawMode::fill(), &points, WHITE)?;
-            // }
-
-            let segment_styles = snake.palette.segment_styles(&snake.body, frame_frac);
-            for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
-                // previous = towards head
-                // next = towards tail
-
-                let coming_from = segment.coming_from;
-                let going_to = seg_idx
-                    .checked_sub(1)
-                    .map(|prev_idx| -snake.body.cells[prev_idx].coming_from)
-                    .unwrap_or_else(|| snake.dir());
-
-                if seg_idx == 0 && matches!(snake.state, SnakeState::Crashed | SnakeState::Dying) {
-                    assert!(
-                        matches!(segment.typ, SegmentType::Crashed | SegmentType::BlackHole),
-                        "head of type {:?} in snake in state {:?}",
-                        segment.typ,
-                        snake.state
-                    );
-                    // draw head separately
-                    heads.push((*segment, coming_from, going_to, segment_styles[seg_idx]));
-                    continue;
-                }
-
-                let location = segment.pos.to_point(self.cell_dim);
-
-                let fraction = match seg_idx {
-                    0 => SegmentFraction::appearing(frame_frac),
-                    i if i == len - 1 && snake.body.grow == 0 => {
-                        if let SegmentType::Eaten { original_food, food_left } = segment.typ {
-                            let frac = ((original_food - food_left) as f32 + frame_frac)
-                                / (original_food + 1) as f32;
-                            SegmentFraction::disappearing(frac)
-                        } else {
-                            SegmentFraction::disappearing(frame_frac)
-                        }
-                    }
-                    _ => SegmentFraction::solid(),
-                };
-
-                let subsegments = SegmentDescription {
-                    destination: location,
-                    turn: TurnDescription { coming_from, going_to },
-                    fraction,
-                    draw_style: self.prefs.draw_style,
-                    segment_style: segment_styles[seg_idx],
-                    cell_dim: self.cell_dim,
-                }
-                .render();
-
-                for (color, points) in subsegments {
-                    builder.polygon(DrawMode::fill(), &points, color)?;
-                }
-            }
-        }
-
-        // draw heads
-        for (segment, coming_from, going_to, seg_style) in heads {
-            let Segment { pos, typ, .. } = segment;
-            let location = pos.to_point(self.cell_dim);
-
-            let segment_color = match seg_style {
-                SegmentStyle::Solid(color) => color,
-                _ => unimplemented!(),
-            };
-
-            let head_description = SegmentDescription {
-                destination: location,
-                turn: TurnDescription { coming_from, going_to },
-                fraction: SegmentFraction::appearing(0.5),
-                draw_style: self.prefs.draw_style,
-                segment_style: SegmentStyle::Solid(segment_color),
-                cell_dim: self.cell_dim,
-            };
-            match typ {
-                SegmentType::BlackHole => {
-                    let hexagon_color = Color::from_rgb(1, 36, 92);
-                    let mut hexagon_points = render_hexagon(self.cell_dim);
-                    translate(&mut hexagon_points, location);
-                    builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
-                    head_description.build(&mut builder)?;
-                }
-                SegmentType::Crashed => {
-                    head_description.build(&mut builder)?;
-                }
-                _ => unreachable!(
-                    "head segment of type {:?} should not have been queued to be drawn separately",
-                    typ
-                ),
-            }
-        }
-
-        // draw A* plan
-        #[cfg(feature = "show_search_path")]
-        unsafe {
-            if let Some(seen) = &crate::app::snake::controller::ETHEREAL_SEEN {
-                for point in seen {
-                    let mut hexagon_points = render_hexagon(self.cell_dim);
-                    let location = point.to_point(self.cell_dim);
-                    translate(&mut hexagon_points, location);
-                    builder.polygon(
-                        DrawMode::fill(),
-                        &hexagon_points,
-                        Color::from_rgb(130, 47, 5),
-                    )?;
-                }
-            }
-
-            if let Some(path) = &crate::app::snake::controller::ETHEREAL_PATH {
-                for point in path {
-                    let mut hexagon_points = render_hexagon(self.cell_dim);
-                    let location = point.to_point(self.cell_dim);
-                    translate(&mut hexagon_points, location);
-                    builder.polygon(
-                        DrawMode::fill(),
-                        &hexagon_points,
-                        Color::from_rgb(97, 128, 11),
-                    )?;
-                }
-            }
-        }
-
-        // draw apples
-        for apple in &self.apples {
-            let color = match apple.typ {
-                AppleType::Normal(_) => self.palette.apple_color,
-                AppleType::SpawnSnake(_) => {
-                    let hue = 360. * (self.control.graphics_frame_num() as f64 / 60. % 1.);
-                    let hsl = HSL { h: hue, s: 1., l: 0.3 };
-                    Color::from(hsl.to_rgb())
-                }
-            };
-
-            if self.prefs.draw_style == DrawStyle::Hexagon {
-                let dest = apple.pos.to_point(self.cell_dim);
-                let mut points = render_hexagon(self.cell_dim);
-                translate(&mut points, dest);
-                builder.polygon(DrawMode::fill(), &points, color)?;
-            } else {
-                let dest = apple.pos.to_point(self.cell_dim) + self.cell_dim.center();
-                builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 1.5, 0.1, color)?;
-            }
-        }
-
-        let mesh = builder.build(ctx)?;
-        draw(ctx, &mesh, DrawParam::default())
+    fn draw_messages(&mut self, ctx: &mut Context) -> GameResult {
+        // draw messages and remove the ones that have
+        // outlived their durations
+        let remove = self
+            .messages
+            .iter()
+            .map(|(id, message)| {
+                message
+                    .draw(ctx)
+                    .map(|keep| if !keep { Some(*id) } else { None })
+            })
+            .collect::<GameResult<Vec<_>>>()?;
+        remove
+            .iter()
+            .filter_map(|o| *o)
+            .for_each(|id| drop(self.messages.remove(&id)));
+        Ok(())
     }
 
-    /// Convenience method
-    fn notification<S: ToString>(&mut self, text: S) {
+    /// Display a notification message in the top-right
+    /// corner with limited duration and default parameters,
+    /// overwrite any previous notification message
+    fn display_notification<S: ToString>(&mut self, text: S) {
         self.messages.insert(
             MessageID::Notification,
             Message::default_top_right(
                 text.to_string(),
                 Color::WHITE,
                 Some(self.prefs.message_duration),
+            ),
+        );
+    }
+
+    /// Show game and graphics FPS information in the
+    /// top-left corner
+    fn show_fps_info(&mut self) {
+        let game_fps = self.control.measured_game_fps();
+        let graphics_fps = self.control.measured_graphics_fps();
+
+        let game_fps_undershoot = (self.control.fps() as f64 - game_fps) / game_fps;
+        let graphics_fps_undershoot = (60. - graphics_fps) / graphics_fps;
+        let color = if game_fps_undershoot > 0.05 || graphics_fps_undershoot > 0.05 {
+            // > 5% undershoot: red
+            Color::from_rgb(200, 0, 0)
+        } else if game_fps_undershoot > 0.02 || graphics_fps_undershoot > 0.02 {
+            // > 2% undershoot: orange
+            Color::from_rgb(235, 168, 52)
+        } else {
+            // at or overshoot: white
+            Color::WHITE
+        };
+
+        self.messages.insert(
+            MessageID::FPS,
+            Message::default_top_left(
+                format!("u: {:.2} g: {:.2}", game_fps, graphics_fps),
+                color,
+                None,
             ),
         );
     }
@@ -774,68 +669,71 @@ impl EventHandler for Game {
         self.control.graphics_frame();
 
         if self.prefs.display_fps {
-            let game_fps = self.control.measured_game_fps();
-            let graphics_fps = self.control.measured_graphics_fps();
-
-            let game_fps_undershoot = (self.control.fps() as f64 - game_fps) / game_fps;
-            let graphics_fps_undershoot = (60. - graphics_fps) / graphics_fps;
-            let color = if game_fps_undershoot > 0.05 || graphics_fps_undershoot > 0.05 {
-                // > 5% undershoot: red
-                Color::from_rgb(200, 0, 0)
-            } else if game_fps_undershoot > 0.02 || graphics_fps_undershoot > 0.02 {
-                // > 2% undershoot: orange
-                Color::from_rgb(235, 168, 52)
-            } else {
-                // at or overshoot: white
-                Color::WHITE
-            };
-
-            // replace previous fps message
-            self.messages.insert(
-                MessageID::FPS,
-                Message::default_top_left(
-                    format!("u: {:.2} g: {:.2}", game_fps, graphics_fps),
-                    color,
-                    None,
-                ),
-            );
+            self.show_fps_info();
         }
 
-        clear(ctx, self.palette.background_color);
+        // selectively set to Some(_) if they need to be updated
+        let mut grid_mesh = None;
+        let mut snake_mesh = None;
+        let mut apple_mesh = None;
 
-        if self.prefs.draw_grid {
-            if self.grid_mesh.is_none() {
-                self.grid_mesh = Some(generate_grid_mesh(
-                    ctx,
-                    self.dim,
-                    &self.palette,
-                    self.cell_dim,
-                )?);
-            };
-            draw(ctx, self.grid_mesh.as_ref().unwrap(), DrawParam::default())?;
+        if self.control.state() == GameState::Playing {
+            self.cached_snake_mesh = None;
+            self.cached_apple_mesh = None;
+
+            if self.prefs.draw_grid {
+                if self.grid_mesh.is_none() {
+                    self.grid_mesh = Some(self.grid_mesh(ctx)?);
+                };
+            }
+            snake_mesh = Some(ROw::Owned(self.snake_mesh(ctx)?));
+            apple_mesh = Some(ROw::Owned(self.apple_mesh(ctx)?));
+        } else {
+            let mut update = false;
+
+            // update apples if there are any animated ones
+            if self.cached_apple_mesh.is_none() || self.apples.iter().any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_))) {
+                self.cached_apple_mesh = Some(self.apple_mesh(ctx)?);
+                update = true;
+            }
+
+            if self.cached_snake_mesh.is_none() {
+                self.cached_snake_mesh = Some(self.snake_mesh(ctx)?);
+                update = true;
+            }
+
+            if !self.messages.is_empty() {
+                update = true;
+            }
+
+            if update {
+                if self.prefs.draw_grid {
+                    if self.grid_mesh.is_none() {
+                        self.grid_mesh = Some(self.grid_mesh(ctx)?);
+                    };
+                    grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
+                }
+                apple_mesh = Some(ROw::Ref(self.cached_apple_mesh.as_ref().unwrap()));
+                snake_mesh = Some(ROw::Ref(self.cached_snake_mesh.as_ref().unwrap()));
+            }
         }
-        // draw(ctx, self.border_mesh.as_ref().unwrap(), DrawParam::default())?;
 
-        self.draw_snakes_and_apples(ctx)?;
-
-        // draw messages and remove the ones that have
-        // outlived their durations
-        let remove = self
-            .messages
-            .iter()
-            .map(|(id, message)| {
-                message
-                    .draw(ctx)
-                    .map(|keep| if !keep { Some(*id) } else { None })
-            })
-            .collect::<GameResult<Vec<_>>>()?;
-        remove
-            .iter()
-            .filter_map(|o| *o)
-            .for_each(|id| drop(self.messages.remove(&id)));
-
-        // thread::yield_now();
-        present(ctx)
+        if grid_mesh.is_some() || apple_mesh.is_some() || snake_mesh.is_some() {
+            clear(ctx, self.palette.background_color);
+            if let Some(mesh) = grid_mesh {
+                draw(ctx, mesh, DrawParam::default())?;
+            }
+            if let Some(mesh) = apple_mesh {
+                draw(ctx, mesh.get(), DrawParam::default())?;
+            }
+            if let Some(mesh) = snake_mesh {
+                draw(ctx, mesh.get(), DrawParam::default())?;
+            }
+            self.draw_messages(ctx)?;
+            present(ctx)
+        } else {
+            Ok(())
+        }
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
@@ -860,7 +758,7 @@ impl EventHandler for Game {
                 } else {
                     "Grid off"
                 };
-                self.notification(text);
+                self.display_notification(text);
             }
             F => {
                 self.prefs.display_fps = !self.prefs.display_fps;
@@ -897,7 +795,7 @@ impl EventHandler for Game {
                                 "Autopilot off"
                             }
                         };
-                        self.notification(text);
+                        self.display_notification(text);
                     }
                 }
             }
@@ -916,7 +814,7 @@ impl EventHandler for Game {
                 new_fps = (new_fps * 10.).round() / 10.;
 
                 self.control.set_game_fps(new_fps);
-                self.notification(format!("fps: {}", new_fps));
+                self.display_notification(format!("fps: {}", new_fps));
             }
             RBracket => {
                 let mut new_fps = match self.control.fps() {
@@ -933,7 +831,7 @@ impl EventHandler for Game {
                 new_fps = (new_fps * 10.).round() / 10.;
 
                 self.control.set_game_fps(new_fps);
-                self.notification(format!("fps: {}", new_fps));
+                self.display_notification(format!("fps: {}", new_fps));
             }
             Escape => {
                 let text;
@@ -951,30 +849,30 @@ impl EventHandler for Game {
                         text = "draw style: hexagon";
                     }
                 }
-                self.notification(text);
+                self.display_notification(text);
             }
             X => {
-                // replace special apples
-                let prefs = &self.prefs;
-                self.apples.iter_mut().for_each(|apple| {
-                    if !matches!(apple.typ, AppleType::Normal(_)) {
-                        *apple = Apple {
-                            pos: apple.pos,
-                            typ: AppleType::Normal(prefs.apple_food),
-                        }
-                    }
-                });
-
                 self.prefs.special_apples = !self.prefs.special_apples;
                 let text = if self.prefs.special_apples {
                     "Special apples enabled"
                 } else {
+                    // replace special apples with normal apples
+                    let apple_food = self.prefs.apple_food;
+                    self.apples.iter_mut().for_each(|apple| {
+                        if !matches!(apple.typ, AppleType::Normal(_)) {
+                            *apple = Apple {
+                                pos: apple.pos,
+                                typ: AppleType::Normal(apple_food),
+                            }
+                        }
+                    });
+                    self.cached_apple_mesh = None;
                     "Special apples disabled"
                 };
-                self.notification(text);
+                self.display_notification(text);
             }
-            k if numeric_keys.contains(&k) => {
-                let new_food = numeric_keys.iter().position(|nk| *nk == k).unwrap() as Food + 1;
+            k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
+                let new_food = idx as Food + 1;
                 self.prefs.apple_food = new_food;
                 // change existing apples
                 for apple in &mut self.apples {
@@ -982,7 +880,7 @@ impl EventHandler for Game {
                         *food = new_food;
                     }
                 }
-                self.notification(format!("Apple food: {}", new_food));
+                self.display_notification(format!("Apple food: {}", new_food));
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
@@ -995,7 +893,7 @@ impl EventHandler for Game {
                 }
                 self.cell_dim = CellDim::from(new_side);
                 self.update_dim();
-                self.notification(format!("Cell side: {}", new_side));
+                self.display_notification(format!("Cell side: {}", new_side));
             }
             k => {
                 if self.control.state() == GameState::Playing {
@@ -1012,6 +910,6 @@ impl EventHandler for Game {
         self.window_dim = Point { x: width, y: height };
         self.update_dim();
         let HexDim { h, v } = self.dim;
-        self.notification(format!("{}x{}", h, v));
+        self.display_notification(format!("{}x{}", h, v));
     }
 }

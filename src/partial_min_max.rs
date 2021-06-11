@@ -3,12 +3,11 @@ use std::cmp::Ordering;
 // the partial functions return None in case of a failed comparison
 pub trait PartialMinMax
 where
-    Self: Iterator,
+    Self: Iterator + Sized,
 {
     // this could be more efficient if it stopped on the first None value but it's meant to be used where all items are comparable
     fn partial_min_by_key<B, F>(self, mut f: F) -> Option<Self::Item>
     where
-        Self: Sized,
         F: FnMut(&Self::Item) -> B,
         B: PartialOrd,
     {

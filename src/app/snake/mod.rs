@@ -12,6 +12,7 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 use std::ops::Deref;
+use ggez::graphics::Mesh;
 
 pub mod controller;
 pub mod palette;
@@ -87,7 +88,10 @@ pub struct SnakeBody {
     // when a snake is being destroyed from the front
     pub missing_front: usize,
     pub dir: Dir,
-    // prevent updating dir multiple times per game frame
+    /// When `Snake::update_dir` is called from a draw method
+    /// (this is done to show the snake turning as soon
+    /// as possible), dir_grace prevents a repeat call
+    /// arising from a subsequent call to `Snake::advance`
     pub dir_grace: bool,
     pub grow: usize,
 }

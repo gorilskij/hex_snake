@@ -1,5 +1,6 @@
 #![deny(unused_must_use)]
 #![feature(stmt_expr_attributes)] // for rustfmt::skip on expressions
+#![feature(if_let_guard)]
 
 #[macro_use]
 extern crate derive_more;
@@ -24,6 +25,7 @@ mod app;
 mod basic;
 mod color;
 mod partial_min_max;
+mod row;
 
 pub const SHOW_SEARCH_PATH: bool = true;
 
