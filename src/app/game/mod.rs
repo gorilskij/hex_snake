@@ -1,3 +1,4 @@
+use crate::row::ROw;
 use ggez::{
     conf::WindowMode,
     event::{EventHandler, KeyCode, KeyMods},
@@ -5,7 +6,6 @@ use ggez::{
     Context, GameResult,
 };
 use rand::prelude::*;
-use crate::row::ROw;
 
 use crate::{
     app::{
@@ -17,16 +17,12 @@ use crate::{
         palette::GamePalette,
         snake::{
             controller::{Controller, ControllerTemplate, OtherSnakes},
-            palette::{PaletteTemplate, SegmentStyle},
-            rendering::{
-                descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
-                render_hexagon,
-            },
+            palette::PaletteTemplate,
             EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
             SnakeType,
         },
     },
-    basic::{transformations::translate, CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
+    basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
 };
 use std::{collections::HashMap, time::Duration};
 
@@ -681,18 +677,24 @@ impl EventHandler for Game {
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
 
+            snake_mesh = Some(ROw::Owned(self.snake_mesh(ctx)?));
+            apple_mesh = Some(ROw::Owned(self.apple_mesh(ctx)?));
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
                     self.grid_mesh = Some(self.grid_mesh(ctx)?);
                 };
+                grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
             }
-            snake_mesh = Some(ROw::Owned(self.snake_mesh(ctx)?));
-            apple_mesh = Some(ROw::Owned(self.apple_mesh(ctx)?));
         } else {
             let mut update = false;
 
             // update apples if there are any animated ones
-            if self.cached_apple_mesh.is_none() || self.apples.iter().any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_))) {
+            if self.cached_apple_mesh.is_none()
+                || self
+                    .apples
+                    .iter()
+                    .any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_)))
+            {
                 self.cached_apple_mesh = Some(self.apple_mesh(ctx)?);
                 update = true;
             }

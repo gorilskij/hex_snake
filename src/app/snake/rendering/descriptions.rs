@@ -18,7 +18,7 @@ impl SegmentFraction {
 
     pub fn appearing(frame_frac: f32) -> Self {
         assert!(
-            frame_frac >= 0. && frame_frac <= 1.,
+            (0. ..=1.).contains(&frame_frac),
             "Invalid frame-frac {}",
             frame_frac
         );
@@ -27,7 +27,7 @@ impl SegmentFraction {
 
     pub fn disappearing(frame_frac: f32) -> Self {
         assert!(
-            frame_frac >= 0. && frame_frac <= 1.,
+            (0. ..=1.).contains(&frame_frac),
             "Invalid frame-frac {}",
             frame_frac
         );

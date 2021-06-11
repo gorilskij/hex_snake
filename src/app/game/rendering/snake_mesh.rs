@@ -1,18 +1,24 @@
-use crate::app::game::Game;
-use ggez::{Context, GameResult};
-use ggez::graphics::{Mesh, DrawMode, Color, MeshBuilder};
-use crate::app::snake::rendering::descriptions::{SegmentFraction, SegmentDescription, TurnDescription};
-use crate::app::snake::{SegmentType, Segment};
-use crate::app::snake::palette::SegmentStyle;
-use crate::app::snake::rendering::render_hexagon;
-use crate::basic::transformations::translate;
-use crate::app::snake::SnakeState;
+use crate::{
+    app::{
+        game::Game,
+        snake::{
+            palette::SegmentStyle,
+            rendering::{
+                descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
+                render_hexagon,
+            },
+            Segment, SegmentType, SnakeState,
+        },
+    },
+    basic::transformations::translate,
+};
+use ggez::{
+    graphics::{Color, DrawMode, Mesh, MeshBuilder},
+    Context, GameResult,
+};
 
 impl Game {
-    pub(in crate::app::game) fn snake_mesh(
-        &mut self,
-        ctx: &mut Context,
-    ) -> GameResult<Mesh> {
+    pub(in crate::app::game) fn snake_mesh(&mut self, ctx: &mut Context) -> GameResult<Mesh> {
         let mut builder = MeshBuilder::new();
 
         // to be drawn later (potentially on top of body segments)
@@ -131,7 +137,7 @@ impl Game {
 
         // draw A* plan
         #[cfg(feature = "show_search_path")]
-            unsafe {
+        unsafe {
             if let Some(seen) = &crate::app::snake::controller::ETHEREAL_SEEN {
                 for point in seen {
                     let mut hexagon_points = render_hexagon(self.cell_dim);

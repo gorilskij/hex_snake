@@ -1,11 +1,15 @@
-use crate::app::game::{Game, AppleType};
-use ggez::{GameResult, Context};
-use ggez::graphics::{Mesh, MeshBuilder, DrawMode};
+use crate::{
+    app::{
+        game::{AppleType, Game},
+        snake::rendering::render_hexagon,
+    },
+    basic::{transformations::translate, DrawStyle},
+};
+use ggez::{
+    graphics::{Color, DrawMode, Mesh, MeshBuilder},
+    Context, GameResult,
+};
 use hsl::HSL;
-use crate::basic::DrawStyle;
-use crate::app::snake::rendering::render_hexagon;
-use crate::basic::transformations::translate;
-use ggez::graphics::Color;
 
 impl Game {
     pub(in crate::app::game) fn apple_mesh(&self, ctx: &mut Context) -> GameResult<Mesh> {

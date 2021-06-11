@@ -12,7 +12,6 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 use std::ops::Deref;
-use ggez::graphics::Mesh;
 
 pub mod controller;
 pub mod palette;

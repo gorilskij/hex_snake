@@ -1,20 +1,16 @@
 use crate::{
-    app::palette::GamePalette,
-    basic::{CellDim, HexDim, Point},
+    app::game::Game,
+    basic::{CellDim, Point},
 };
 use ggez::{
     graphics::{DrawMode, Mesh, MeshBuilder},
     Context, GameResult,
 };
 use num_integer::Integer;
-use crate::app::game::Game;
 
 impl Game {
     // TODO: make this readable
-    pub(in crate::app::game) fn grid_mesh(
-        &self,
-        ctx: &mut Context,
-    ) -> GameResult<Mesh> {
+    pub(in crate::app::game) fn grid_mesh(&self, ctx: &mut Context) -> GameResult<Mesh> {
         let CellDim { side, sin, cos } = self.cell_dim;
 
         // two kinds of alternating vertical lines

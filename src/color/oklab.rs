@@ -23,6 +23,7 @@ pub struct OkLab {
 }
 
 impl From<(u8, u8, u8)> for OkLab {
+    #[allow(clippy::many_single_char_names)]
     fn from(rgb: (u8, u8, u8)) -> Self {
         let r = rgb.0 as f64 / 255.;
         let g = rgb.1 as f64 / 255.;
@@ -64,6 +65,7 @@ impl OkLab {
         )
     }
 
+    #[allow(clippy::many_single_char_names)]
     pub fn to_rgb(self) -> (u8, u8, u8) {
         let OkLab { l, a, b } = self;
 
