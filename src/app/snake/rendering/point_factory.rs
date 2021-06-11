@@ -22,7 +22,9 @@ use crate::{
 };
 
 impl SegmentDescription {
-    // for simulating gradient
+    /// Split a single segment description into a number of subsegments,
+    /// this is used to assign a solid color to each subsegment and thus
+    /// simulate a smoother gradient
     fn split_into_subsegments(self) -> Vec<Self> {
         let SegmentFraction { start, end } = self.fraction;
         let segment_size = self.fraction.end - self.fraction.start;

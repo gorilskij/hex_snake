@@ -85,7 +85,7 @@ pub fn generate_grid_mesh(
     builder.build(ctx)
 }
 
-pub fn generate_border_mesh(ctx: &mut Context) -> GameResult<Mesh> {
+pub fn generate_border_mesh(_ctx: &mut Context) -> GameResult<Mesh> {
     // let _ = ctx;
     unimplemented!()
 }

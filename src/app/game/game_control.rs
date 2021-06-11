@@ -223,6 +223,7 @@ impl GameControl {
     pub fn pause(&mut self) {
         self.game_state = GameState::Paused;
         self.frozen_frame_fraction = Some(self.frame_fraction());
+        self.missed_updates = None;
     }
 
     pub fn game_over(&mut self) {
