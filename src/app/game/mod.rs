@@ -1,7 +1,7 @@
 use ggez::{
     conf::WindowMode,
     event::{EventHandler, KeyCode, KeyMods},
-    graphics::{clear, draw, present, Color, DrawMode, DrawParam, Font, Mesh, MeshBuilder, Text},
+    graphics::{clear, draw, present, Color, DrawMode, DrawParam, Mesh, MeshBuilder},
     Context, GameResult,
 };
 use hsl::HSL;
@@ -12,6 +12,7 @@ use crate::{
         apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
         game::{
             game_control::{GameControl, GameState},
+            message::{Message, MessageID},
             rendering::grid_mesh::generate_grid_mesh,
         },
         palette::GamePalette,
@@ -25,13 +26,13 @@ use crate::{
             EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
             SnakeType,
         },
-        Frames,
     },
-    basic::{transformations::translate, CellDim, Dir, DrawStyle, HexDim, HexPoint, Point, Side},
+    basic::{transformations::translate, CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
 };
-use ggez::graphics::PxScale;
+use std::{collections::HashMap, time::Duration};
 
 mod game_control;
+mod message;
 mod rendering;
 
 type Food = u32;
@@ -50,7 +51,7 @@ struct Prefs {
     draw_grid: bool,
     display_fps: bool,
     apple_food: Food,
-    message_duration: Frames,
+    message_duration: Duration,
     draw_style: DrawStyle,
     special_apples: bool,
 }
@@ -61,32 +62,10 @@ impl Default for Prefs {
             draw_grid: false,
             display_fps: false,
             apple_food: 1,
-            message_duration: 100,
+            message_duration: Duration::from_secs(2),
             draw_style: DrawStyle::Smooth,
             special_apples: true,
         }
-    }
-}
-
-struct Message {
-    message: String,
-    duration: Option<Frames>,
-    color: Color,
-}
-
-impl From<(String, Frames)> for Message {
-    fn from((message, life): (String, Frames)) -> Self {
-        Self {
-            message,
-            duration: Some(life),
-            color: Color::WHITE,
-        }
-    }
-}
-
-impl From<(String, Color)> for Message {
-    fn from((message, color): (String, Color)) -> Self {
-        Self { message, duration: None, color }
     }
 }
 
@@ -110,8 +89,7 @@ pub struct Game {
     border_mesh: Option<Mesh>,
 
     prefs: Prefs,
-    message_top_left: Option<Message>,
-    message_top_right: Option<Message>,
+    messages: HashMap<MessageID, Message>,
 }
 
 impl Game {
@@ -146,8 +124,7 @@ impl Game {
             border_mesh: None,
 
             prefs: Prefs::default(),
-            message_top_left: None,
-            message_top_right: None,
+            messages: HashMap::new(),
         };
         // warning: this spawns apples before there are any snakes
         game.update_dim();
@@ -596,50 +573,6 @@ impl Game {
             }
         }
     }
-
-    fn draw_message(
-        maybe_message: &mut Option<Message>,
-        side: Side,
-        ctx: &mut Context,
-    ) -> GameResult {
-        if let Some(Message {
-            ref message,
-            ref mut duration,
-            mut color,
-        }) = *maybe_message
-        {
-            let mut text = Text::new(message.as_str());
-            text.set_font(Font::default(), PxScale::from(20.));
-
-            let margin = 10.;
-            let x = match side {
-                Side::Left => margin,
-                Side::Right => {
-                    ggez::graphics::drawable_size(ctx).0 - text.width(ctx) as f32 - margin
-                }
-            };
-            let location = Point { x, y: margin };
-
-            // fade out
-            if let Some(frames) = duration {
-                if *frames < 10 {
-                    color.a = *frames as f32 / 10.
-                }
-            }
-
-            if let Some(frames) = duration {
-                if *frames == 0 {
-                    *maybe_message = None;
-                } else {
-                    *frames -= 1;
-                }
-            }
-
-            draw(ctx, &text, DrawParam::from((location, color)))
-        } else {
-            Ok(())
-        }
-    }
 }
 
 impl Game {
@@ -813,6 +746,18 @@ impl Game {
         let mesh = builder.build(ctx)?;
         draw(ctx, &mesh, DrawParam::default())
     }
+
+    /// Convenience method
+    fn notification<S: ToString>(&mut self, text: S) {
+        self.messages.insert(
+            MessageID::Notification,
+            Message::default_top_right(
+                text.to_string(),
+                Color::WHITE,
+                Some(self.prefs.message_duration),
+            ),
+        );
+    }
 }
 
 impl EventHandler for Game {
@@ -845,10 +790,15 @@ impl EventHandler for Game {
                 Color::WHITE
             };
 
-            self.message_top_left = Some(Message::from((
-                format!("u: {:.2} g: {:.2}", game_fps, graphics_fps),
-                color,
-            )));
+            // replace previous fps message
+            self.messages.insert(
+                MessageID::FPS,
+                Message::default_top_left(
+                    format!("u: {:.2} g: {:.2}", game_fps, graphics_fps),
+                    color,
+                    None,
+                ),
+            );
         }
 
         clear(ctx, self.palette.background_color);
@@ -868,8 +818,21 @@ impl EventHandler for Game {
 
         self.draw_snakes_and_apples(ctx)?;
 
-        Self::draw_message(&mut self.message_top_left, Side::Left, ctx)?;
-        Self::draw_message(&mut self.message_top_right, Side::Right, ctx)?;
+        // draw messages and remove the ones that have
+        // outlived their durations
+        let remove = self
+            .messages
+            .iter()
+            .map(|(id, message)| {
+                message
+                    .draw(ctx)
+                    .map(|keep| if !keep { Some(*id) } else { None })
+            })
+            .collect::<GameResult<Vec<_>>>()?;
+        remove
+            .iter()
+            .filter_map(|o| *o)
+            .for_each(|id| drop(self.messages.remove(&id)));
 
         // thread::yield_now();
         present(ctx)
@@ -892,20 +855,17 @@ impl EventHandler for Game {
             },
             G => {
                 self.prefs.draw_grid = !self.prefs.draw_grid;
-                let message = if self.prefs.draw_grid {
+                let text = if self.prefs.draw_grid {
                     "Grid on"
                 } else {
                     "Grid off"
                 };
-                self.message_top_right = Some(Message::from((
-                    message.to_string(),
-                    self.prefs.message_duration,
-                )));
+                self.notification(text);
             }
             F => {
                 self.prefs.display_fps = !self.prefs.display_fps;
                 if !self.prefs.display_fps {
-                    self.message_top_left = None;
+                    self.messages.remove(&MessageID::FPS);
                 }
             }
             A => {
@@ -921,28 +881,23 @@ impl EventHandler for Game {
                             .find(|snake| snake.snake_type == SnakeType::PlayerSnake)
                             .unwrap();
 
-                        let message;
-                        match &STASHED_CONTROLLER {
+                        let text = match &STASHED_CONTROLLER {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
                                     ControllerTemplate::AStar
                                         .into_controller(player_snake.body.dir),
                                 ));
-                                message = "Autopilot on";
+                                "Autopilot on"
                             }
                             Some(_) => {
                                 let mut controller = STASHED_CONTROLLER.take().unwrap();
                                 controller.reset(player_snake.body.dir);
                                 player_snake.controller = controller;
-                                message = "Autopilot off"
+                                "Autopilot off"
                             }
-                        }
-
-                        self.message_top_right = Some(Message::from((
-                            message.to_string(),
-                            self.prefs.message_duration,
-                        )));
+                        };
+                        self.notification(text);
                     }
                 }
             }
@@ -961,10 +916,7 @@ impl EventHandler for Game {
                 new_fps = (new_fps * 10.).round() / 10.;
 
                 self.control.set_game_fps(new_fps);
-                self.message_top_right = Some(Message::from((
-                    format!("fps: {}", new_fps),
-                    self.prefs.message_duration,
-                )));
+                self.notification(format!("fps: {}", new_fps));
             }
             RBracket => {
                 let mut new_fps = match self.control.fps() {
@@ -981,32 +933,25 @@ impl EventHandler for Game {
                 new_fps = (new_fps * 10.).round() / 10.;
 
                 self.control.set_game_fps(new_fps);
-                self.message_top_right = Some(Message::from((
-                    format!("fps: {}", new_fps),
-                    self.prefs.message_duration,
-                )));
+                self.notification(format!("fps: {}", new_fps));
             }
             Escape => {
-                let message;
+                let text;
                 match self.prefs.draw_style {
                     DrawStyle::Hexagon => {
                         self.prefs.draw_style = DrawStyle::Rough;
-                        message = "draw style: rough";
+                        text = "draw style: rough";
                     }
                     DrawStyle::Rough => {
                         self.prefs.draw_style = DrawStyle::Smooth;
-                        message = "draw style: smooth";
+                        text = "draw style: smooth";
                     }
                     DrawStyle::Smooth => {
                         self.prefs.draw_style = DrawStyle::Hexagon;
-                        message = "draw style: hexagon";
+                        text = "draw style: hexagon";
                     }
                 }
-
-                self.message_top_right = Some(Message::from((
-                    message.to_string(),
-                    self.prefs.message_duration,
-                )));
+                self.notification(text);
             }
             X => {
                 // replace special apples
@@ -1021,15 +966,12 @@ impl EventHandler for Game {
                 });
 
                 self.prefs.special_apples = !self.prefs.special_apples;
-                let message = if self.prefs.special_apples {
+                let text = if self.prefs.special_apples {
                     "Special apples enabled"
                 } else {
                     "Special apples disabled"
                 };
-                self.message_top_right = Some(Message::from((
-                    message.to_string(),
-                    self.prefs.message_duration,
-                )));
+                self.notification(text);
             }
             k if numeric_keys.contains(&k) => {
                 let new_food = numeric_keys.iter().position(|nk| *nk == k).unwrap() as Food + 1;
@@ -1040,10 +982,7 @@ impl EventHandler for Game {
                         *food = new_food;
                     }
                 }
-                self.message_top_right = Some(Message::from((
-                    format!("Apple food: {}", new_food),
-                    self.prefs.message_duration,
-                )));
+                self.notification(format!("Apple food: {}", new_food));
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
@@ -1055,13 +994,8 @@ impl EventHandler for Game {
                     new_side = 20.
                 }
                 self.cell_dim = CellDim::from(new_side);
-
                 self.update_dim();
-
-                self.message_top_right = Some(Message::from((
-                    format!("Cell side: {}", new_side),
-                    self.prefs.message_duration,
-                )));
+                self.notification(format!("Cell side: {}", new_side));
             }
             k => {
                 if self.control.state() == GameState::Playing {
@@ -1078,9 +1012,6 @@ impl EventHandler for Game {
         self.window_dim = Point { x: width, y: height };
         self.update_dim();
         let HexDim { h, v } = self.dim;
-        self.message_top_right = Some(Message::from((
-            format!("{}x{}", h, v),
-            self.prefs.message_duration,
-        )));
+        self.notification(format!("{}x{}", h, v));
     }
 }
