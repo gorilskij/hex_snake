@@ -67,8 +67,9 @@ impl Game {
             // draw white aura around snake heads (debug)
             // for pos in snake.reachable(7, self.dim) {
             //     let dest = pos.to_point(self.cell_dim);
-            //     let points = get_full_hexagon(dest, self.cell_dim);
-            //     builder.polygon(DrawMode::fill(), &points, WHITE)?;
+            //     let mut points = render_hexagon(self.cell_dim);
+            //     translate(&mut points, dest);
+            //     builder.polygon(DrawMode::fill(), &points, Color::WHITE)?;
             // }
 
             let segment_styles = snake.palette.segment_styles(&snake.body, frame_frac);
