@@ -69,9 +69,13 @@ impl Default for Prefs {
 /// Collect statistics about the current game state
 #[derive(Default)]
 pub struct Stats {
-    /// Total number of graphical segments
-    /// currently visible (counts subsegments!)
-    total_segments: usize,
+    /// Total number of graphical (sub)segments
+    /// currently visible
+    total_subsegments: usize,
+    /// Number of subsegments per segment (note
+    /// that head and tail will have fewer).
+    /// Maximum in the case of multiple snakes
+    subsegments_per_segment: usize,
     redrawing_apples: bool,
     redrawing_snakes: bool,
 }
@@ -79,8 +83,8 @@ pub struct Stats {
 impl Stats {
     fn show_message(&self, game: &mut Game) {
         let text = format!(
-            "segments: {}\nredrawing\n  apples: {}\n  snakes: {}",
-            self.total_segments, self.redrawing_apples, self.redrawing_snakes,
+            "subsegments\n  total: {}\n  per segment: {}\nredrawing\n  apples: {}\n  snakes: {}",
+            self.total_subsegments, self.subsegments_per_segment, self.redrawing_apples, self.redrawing_snakes,
         );
         let message = Message {
             text,

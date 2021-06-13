@@ -36,6 +36,26 @@ impl Game {
         for snake_idx in 0..self.snakes.len() {
             let (snake, other_snakes) = Self::split_snakes_mut(&mut self.snakes, snake_idx);
 
+            // desired total number of subsegments for the whole snake
+            //  smaller snakes have higher resolution to show more detail
+            //  (this is intended to work with rainbows)
+            const TOTAL_SUBSEGMENTS: usize = 250;
+
+            // some bounds on the number of subsegments per segment
+            //  to avoid very high numbers of polygons or empty segments
+            const MIN_SUBSEGMENTS: usize = 1;
+            const MAX_SUBSEGMENTS: usize = 20;
+
+            let subsegments_per_segment = match TOTAL_SUBSEGMENTS / snake.len() {
+                x if x < MIN_SUBSEGMENTS => MIN_SUBSEGMENTS,
+                x if x > MAX_SUBSEGMENTS => MAX_SUBSEGMENTS,
+                x => x,
+            };
+
+            if subsegments_per_segment > stats.subsegments_per_segment {
+                stats.subsegments_per_segment = subsegments_per_segment;
+            }
+
             // update the direction of the snake early
             // to see it turning as soon as possible,
             // this could happen in the middle of a
@@ -70,7 +90,7 @@ impl Game {
                         snake.state
                     );
                     // draw head separately
-                    heads.push((*segment, coming_from, going_to, segment_styles[seg_idx]));
+                    heads.push((*segment, coming_from, going_to, segment_styles[seg_idx], subsegments_per_segment));
                     continue;
                 }
 
@@ -99,15 +119,15 @@ impl Game {
                     cell_dim: self.cell_dim,
                 };
 
-                for (color, points) in segment.render() {
+                for (color, points) in segment.render(subsegments_per_segment) {
                     builder.polygon(DrawMode::fill(), &points, color)?;
-                    stats.total_segments += 1;
+                    stats.total_subsegments += 1;
                 }
             }
         }
 
         // draw heads
-        for (segment, coming_from, going_to, seg_style) in heads {
+        for (segment, coming_from, going_to, seg_style, subsegments_per_segment) in heads {
             let Segment { pos, typ, .. } = segment;
             let location = pos.to_point(self.cell_dim);
 
@@ -130,10 +150,10 @@ impl Game {
                     let mut hexagon_points = render_hexagon(self.cell_dim);
                     translate(&mut hexagon_points, location);
                     builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
-                    head_description.build(&mut builder)?;
+                    head_description.build(&mut builder, subsegments_per_segment)?;
                 }
                 SegmentType::Crashed => {
-                    head_description.build(&mut builder)?;
+                    head_description.build(&mut builder, subsegments_per_segment)?;
                 }
                 _ => unreachable!(
                     "head segment of type {:?} should not have been queued to be drawn separately",

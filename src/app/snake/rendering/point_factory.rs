@@ -22,10 +22,14 @@ use crate::{
 };
 
 impl SegmentDescription {
-    /// Split a single segment description into a number of subsegments,
+    /// Split a single segment description into `n` subsegments,
     /// this is used to assign a solid color to each subsegment and thus
-    /// simulate a smoother gradient
-    fn split_into_subsegments(self) -> Vec<Self> {
+    /// simulate a smooth gradient
+    fn split_into_subsegments(self, num_subsegments: usize) -> Vec<Self> {
+        if num_subsegments == 1 {
+            return vec![self]
+        }
+
         let SegmentFraction { start, end } = self.fraction;
         let segment_size = self.fraction.end - self.fraction.start;
 
@@ -35,7 +39,6 @@ impl SegmentDescription {
             SegmentStyle::RGBGradient {
                 start_rgb: (r1, g1, b1),
                 end_rgb: (r2, g2, b2),
-                num_subsegments,
             } => {
                 let r1 = r1 as f64;
                 let g1 = g1 as f64;
@@ -62,7 +65,6 @@ impl SegmentDescription {
                 start_hue,
                 end_hue,
                 lightness,
-                num_subsegments,
             } => {
                 let start_subsegment = (num_subsegments as f32 * start) as usize;
                 let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
@@ -86,8 +88,10 @@ impl SegmentDescription {
         // occasionally generate some extra segments
         // colors.dedup();
 
-        let num_subsegments = colors.len();
-        let subsegment_size = segment_size / num_subsegments as f32;
+        // the actual number of subsegments (partial segments will
+        //  have fewer than expected)
+        let real_num_subsegments = colors.len();
+        let subsegment_size = segment_size / real_num_subsegments as f32;
 
         colors
             .into_iter()
@@ -108,21 +112,34 @@ impl SegmentDescription {
     }
 
     // subsegments in particular are expected to be of the Solid variant
-    fn unwrap_solid_color(&self) -> Color {
+    fn as_solid_color(&self) -> Color {
         match &self.segment_style {
             SegmentStyle::Solid(color) => *color,
-            style => panic!("Tried to unwrap {:?} as Solid", style),
+            SegmentStyle::RGBGradient { start_rgb, .. } => Color::from(*start_rgb),
+            SegmentStyle::HSLGradient { start_hue, lightness, .. } => {
+                let hsl = HSL {
+                    h: *start_hue,
+                    s: 1.,
+                    l: *lightness,
+                };
+                Color::from(hsl.to_rgb())
+            }
         }
     }
 
-    pub fn render(mut self) -> Vec<(Color, Vec<Point>)> {
-        let subsegments = if let DrawStyle::Hexagon = self.draw_style {
+    /// Render the segment into a list of drawable subsegments
+    /// each represented as a list of points and a color,
+    /// `snake_len` is used to calculate how many subsegments
+    /// there should be (longer snakes have lower subsegment
+    /// resolution)
+    pub fn render(mut self, subsegments_per_segment: usize) -> Vec<(Color, Vec<Point>)> {
+        let subsegments = if self.draw_style == DrawStyle::Hexagon {
             // hexagon segments don't support gradients
             self.fraction = SegmentFraction::solid();
             self.segment_style = self.segment_style.into_solid();
             vec![self]
         } else {
-            self.split_into_subsegments()
+            self.split_into_subsegments(subsegments_per_segment)
         };
 
         // self.fraction = SegmentFraction::solid();
@@ -132,7 +149,7 @@ impl SegmentDescription {
         subsegments
             .into_iter()
             .map(|subsegment| {
-                let color = subsegment.unwrap_solid_color();
+                let color = subsegment.as_solid_color();
                 let points = match subsegment.draw_style {
                     DrawStyle::Hexagon => HexagonSegments::render_segment(subsegment),
                     DrawStyle::Rough => RoughSegments::render_segment(subsegment),
@@ -143,8 +160,8 @@ impl SegmentDescription {
             .collect()
     }
 
-    pub fn build(self, builder: &mut MeshBuilder) -> GameResult {
-        for (color, points) in self.render() {
+    pub fn build(self, builder: &mut MeshBuilder, subsegments_per_segment: usize) -> GameResult {
+        for (color, points) in self.render(subsegments_per_segment) {
             builder.polygon(DrawMode::fill(), &points, color)?;
         }
         Ok(())

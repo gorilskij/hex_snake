@@ -178,13 +178,11 @@ pub enum SegmentStyle {
     RGBGradient {
         start_rgb: (u8, u8, u8),
         end_rgb: (u8, u8, u8),
-        num_subsegments: usize,
     },
     HSLGradient {
         start_hue: f64,
         end_hue: f64,
         lightness: f64,
-        num_subsegments: usize,
     },
 }
 
@@ -245,7 +243,12 @@ impl From<PaletteTemplate> for Box<dyn Palette> {
     }
 }
 
-// if max_len is None, use body.len(), otherwise, update max_len to be the maximum of itself and body.len() and use that
+// if max_len is None, use body.len(), otherwise, update max_len
+//  to be the maximum of itself and body.len() and use that,
+//  this is used to implement persistent rainbows
+// TODO: implement variable resolution asking the palette how
+//  much it needs, persistent rainbows don't need high
+//  resolutions even in short snakes
 fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
     match max_len {
         Some(len) => {
@@ -310,14 +313,6 @@ impl Palette for HSLGradient {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
-        let num_subsegments = match body.len() {
-            0..=20 => 10,
-            21..=50 => 6,
-            51..=100 => 4,
-            101..=200 => 2,
-            _ => 1,
-        };
-
         for (i, seg) in body.iter().enumerate() {
             if seg.typ == Crashed {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
@@ -328,23 +323,11 @@ impl Palette for HSLGradient {
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
                 match seg.typ {
                     Normal | BlackHole => {
-                        if num_subsegments == 1 {
-                            styles.push(SegmentStyle::Solid(Color::from(
-                                HSL {
-                                    h: start_hue,
-                                    s: 1.,
-                                    l: self.lightness,
-                                }
-                                .to_rgb(),
-                            )));
-                        } else {
-                            styles.push(SegmentStyle::HSLGradient {
-                                start_hue,
-                                end_hue,
-                                lightness: self.lightness,
-                                num_subsegments,
-                            });
-                        }
+                        styles.push(SegmentStyle::HSLGradient {
+                            start_hue,
+                            end_hue,
+                            lightness: self.lightness,
+                        });
                     }
                     Eaten { .. } => {
                         // invert lightness twice
@@ -358,17 +341,10 @@ impl Palette for HSLGradient {
                             s: 1.,
                             l: 1. - self.eaten_lightness,
                         };
-                        if num_subsegments == 1 {
-                            styles.push(SegmentStyle::Solid(Color::from(invert_rgb(
-                                start_hsl.to_rgb(),
-                            ))));
-                        } else {
-                            styles.push(SegmentStyle::RGBGradient {
-                                start_rgb: invert_rgb(start_hsl.to_rgb()),
-                                end_rgb: invert_rgb(end_hsl.to_rgb()),
-                                num_subsegments,
-                            });
-                        }
+                        styles.push(SegmentStyle::RGBGradient {
+                            start_rgb: invert_rgb(start_hsl.to_rgb()),
+                            end_rgb: invert_rgb(end_hsl.to_rgb()),
+                        });
                     }
                     Crashed => unreachable!(),
                 };
