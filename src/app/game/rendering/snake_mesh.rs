@@ -91,7 +91,13 @@ impl Game {
                         snake.state
                     );
                     // draw head separately
-                    heads.push((*segment, coming_from, going_to, segment_styles[seg_idx], subsegments_per_segment));
+                    heads.push((
+                        *segment,
+                        coming_from,
+                        going_to,
+                        segment_styles[seg_idx],
+                        subsegments_per_segment,
+                    ));
                     continue;
                 }
 

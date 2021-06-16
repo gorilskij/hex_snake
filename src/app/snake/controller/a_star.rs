@@ -26,78 +26,51 @@ pub struct AStar {
 }
 
 struct PathNode {
-    value: HexPoint,
+    /// Where the path reaches
+    point: HexPoint,
     length: usize,
     parent: Option<Rc<Self>>,
 }
 
+impl PathNode {
+    // Directions to take to follow this path
+    fn to_dir_vec(&self, board_dim: HexDim) -> Vec<Dir> {
+        let mut vec = vec![Dir::U; self.length];
+        // fill vec in reverse order
+        let mut latter = None;
+        let mut former = Some(self);
+        for i in (0..self.length).rev() {
+            latter = former;
+            former = former.and_then(|n| n.parent.as_ref().map(Rc::as_ref));
+            vec[i] = former
+                .unwrap()
+                .point
+                .wrapping_dir_to_1(latter.unwrap().point, board_dim)
+                .unwrap()
+        }
+
+        assert_eq!(vec.len(), self.length);
+        vec
+    }
+}
+
 impl AStar {
     const UPDATE_EVERY_N_STEPS: usize = 10;
-    const HEURISTIC: fn(HexPoint, HexPoint, HexDim) -> usize = Self::heuristic3;
+    const HEURISTIC: fn(HexPoint, HexPoint, HexDim) -> usize = Self::heuristic;
     const SEARCH_LIMIT: Option<usize> = None;
 
-    #[allow(dead_code)]
-    fn heuristic1(a: HexPoint, b: HexPoint, board_dim: HexDim) -> usize {
-        let h_dist = *[
-            (a.h - b.h).abs(),
-            (a.h + board_dim.h - b.h).abs(),
-            (b.h + board_dim.h - a.h).abs(),
-        ]
-        .iter()
-        .min()
-        .unwrap() as usize;
-        let v_dist = *[
-            (a.v - b.v).abs(),
-            (a.v + board_dim.v - b.v).abs(),
-            (b.v + board_dim.v - a.v).abs(),
-        ]
-        .iter()
-        .min()
-        .unwrap() as usize;
-        max(h_dist, v_dist)
-    }
+    fn heuristic(a: HexPoint, b: HexPoint, board_dim: HexDim) -> usize {
+        let h1 = (a.h - b.h).abs();
+        let h2 = (a.h + board_dim.h - b.h).abs();
+        let h3 = (b.h + board_dim.h - a.h).abs();
+        let h_dist = min(h1, min(h2, h3));
 
-    #[allow(dead_code)]
-    fn heuristic2(a: HexPoint, b: HexPoint, board_dim: HexDim) -> usize {
-        let h_dist = *[
-            (a.h - b.h).abs(),
-            (a.h + board_dim.h - b.h).abs(),
-            (b.h + board_dim.h - a.h).abs(),
-        ]
-        .iter()
-        .min()
-        .unwrap() as usize;
-        let v_dist = *[
-            (a.v - b.v).abs(),
-            (a.v + board_dim.v - b.v).abs(),
-            (b.v + board_dim.v - a.v).abs(),
-        ]
-        .iter()
-        .min()
-        .unwrap() as usize;
-        h_dist + v_dist
-    }
+        let v1 = (a.v - b.v).abs();
+        let v2 = (a.v + board_dim.v - b.v).abs();
+        let v3 = (b.v + board_dim.v - a.v).abs();
+        let v_dist = min(v1, min(v2, v3));
 
-    #[allow(dead_code)]
-    fn heuristic3(a: HexPoint, b: HexPoint, board_dim: HexDim) -> usize {
-        let h_dist = *[
-            (a.h - b.h).abs(),
-            (a.h + board_dim.h - b.h).abs(),
-            (b.h + board_dim.h - a.h).abs(),
-        ]
-        .iter()
-        .min()
-        .unwrap();
-        let v_dist = *[
-            (a.v - b.v).abs(),
-            (a.v + board_dim.v - b.v).abs(),
-            (b.v + board_dim.v - a.v).abs(),
-        ]
-        .iter()
-        .min()
-        .unwrap();
-        let h3 = max(max(h_dist, v_dist - h_dist / 2), 0) as usize;
-        min(HexPoint::manhattan_distance(a, b), h3)
+        max(h_dist, v_dist - h_dist / 2) as usize
     }
 
     fn recalculate_target(&mut self, head: HexPoint, apples: &[Apple], board_dim: HexDim) {
@@ -131,10 +104,9 @@ impl AStar {
 
         let mut seen = HashSet::new();
         seen.insert(head);
-        // the last node in each path is the newest
-        // let mut paths = vec![vec![head]];
+
         let mut paths = vec![PathNode {
-            value: head,
+            point: head,
             length: 0,
             parent: None,
         }];
@@ -146,115 +118,40 @@ impl AStar {
             .collect::<HashSet<_>>();
 
         loop {
-            // select which node to expand
-            // f(x) = length of path
-            // g(x) = non-wrapping manhattan distance to target
+            if paths.is_empty() {
+                self.path = vec![];
+                return;
+            }
+
             let expand_idx = paths
                 .iter()
-                .filter(|path| {
-                    Self::SEARCH_LIMIT
-                        .map(|limit| path.length < limit)
-                        .unwrap_or(true)
-                })
                 .position_min_by_key(|path| {
-                    path.length + Self::HEURISTIC(path.value, target, board_dim)
-                });
-            let expand_idx = match expand_idx {
-                Some(idx) => idx,
-                None => {
-                    match paths
-                        .iter()
-                        .min_by_key(|path| Self::HEURISTIC(path.value, target, board_dim))
-                    {
-                        Some(best_path) => {
-                            // get path (reversed)
-                            let mut vec_path = Vec::with_capacity(best_path.length + 1);
-                            let mut current = Some(best_path);
-                            // include snake head
-                            while let Some(c) = current {
-                                vec_path.push(c.value);
-                                current = c.parent.as_ref().map(|rc| Rc::as_ref(rc));
-                            }
-
-                            // calculate directions
-                            self.path = vec_path
-                                .iter()
-                                .rev()
-                                .zip(vec_path.iter().rev().skip(1))
-                                .map(|(a, b)| {
-                                    a.wrapping_dir_to_1(*b, board_dim)
-                                        .unwrap_or_else(|| panic!("no dir from {:?} to {:?}", a, b))
-                                })
-                                .collect();
-
-                            #[cfg(feature = "show_search_path")]
-                            unsafe {
-                                vec_path.reverse();
-                                ETHEREAL_PATH = Some(vec_path);
-                                ETHEREAL_SEEN = Some(seen);
-                            }
-
-                            return;
-                        }
-                        None => self.path.clear(),
-                    }
-
-                    return;
-                }
-            };
+                    path.length + Self::HEURISTIC(path.point, target, board_dim)
+                })
+                .unwrap();
 
             let path = paths.remove(expand_idx);
 
-            if path.value == target {
-                // get path (reversed)
-                let mut vec_path = Vec::with_capacity(path.length + 1);
-                let mut current = Some(&path);
-                // include snake head
-                while let Some(c) = current {
-                    vec_path.push(c.value);
-                    current = c.parent.as_ref().map(|rc| Rc::as_ref(rc));
-                }
-
-                // calculate directions
-                self.path = vec_path
-                    .iter()
-                    .rev()
-                    .zip(vec_path.iter().rev().skip(1))
-                    .map(|(a, b)| {
-                        a.wrapping_dir_to_1(*b, board_dim)
-                            .unwrap_or_else(|| panic!("no dir from {:?} to {:?}", a, b))
-                    })
-                    .collect();
-
-                #[cfg(feature = "show_search_path")]
-                unsafe {
-                    vec_path.reverse();
-                    ETHEREAL_PATH = Some(vec_path);
-                    ETHEREAL_SEEN = Some(seen);
-                }
-
+            if path.point == target {
+                self.path = path.to_dir_vec(board_dim);
                 return;
             }
 
             let new_length = path.length + 1;
             let parent = Rc::new(path);
             for dir in Dir::iter() {
-                let candidate = parent.value.wrapping_translate(dir, 1, board_dim);
+                let candidate = parent.point.wrapping_translate(dir, 1, board_dim);
                 if forbidden_positions.contains(&candidate) || seen.contains(&candidate) {
                     continue;
                 }
                 seen.insert(candidate);
 
                 let new_path = PathNode {
-                    value: candidate,
+                    point: candidate,
                     length: new_length,
                     parent: Some(Rc::clone(&parent)),
                 };
                 paths.push(new_path);
-                // inefficient path cloning
-                // let mut new_path = path.clone();
-                // new_path.push(candidate);
-                // paths.push(new_path);
             }
         }
     }

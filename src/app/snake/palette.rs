@@ -5,6 +5,7 @@ use SegmentType::*;
 
 use crate::{
     app::snake::{SegmentType, SnakeBody},
+    basic::HexPoint,
     color::oklab::OkLab,
 };
 
@@ -70,6 +71,10 @@ pub enum PaletteTemplate {
         lightness: f64,
         eaten_lightness: f64,
         persistent: bool,
+    },
+    Alternating {
+        color1: Color,
+        color2: Color,
     },
 }
 
@@ -170,6 +175,13 @@ impl PaletteTemplate {
     pub fn dark_blue_to_red(persistent: bool) -> Self {
         Self::oklab_gradient(250., Self::OKLAB_RAINBOW.1, 0.3, 0.3, persistent)
     }
+
+    pub fn alternating_white() -> Self {
+        Self::Alternating {
+            color1: Color::WHITE,
+            color2: Color::new(0., 0., 0., 0.),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -238,6 +250,12 @@ impl From<PaletteTemplate> for Box<dyn Palette> {
                 lightness,
                 eaten_lightness,
                 max_len: persistent.then(|| 0),
+            }),
+            PaletteTemplate::Alternating { color1, color2 } => Box::new(Alternating {
+                color1,
+                color2,
+                iteration: true,
+                last_head: None,
             }),
         }
     }
@@ -313,6 +331,23 @@ impl Palette for HSLGradient {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
+
+        // if the snake is growing, artificially change
+        //  the len to avoid jittery gradients
+        let len = if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].typ
+        {
+            // The actual visual length of the eaten segment
+            //  at the back of the snake
+            let eaten_segment_fraction =
+                (food_left as f64 + 1. - frame_frac as f64) / (original_food + 1) as f64;
+            // Correct front and back
+            len as f64 - 1. + eaten_segment_fraction + frame_frac as f64
+        } else {
+            // If the snake isn't growing, the front and
+            //  back corrections cancel out
+            len as f64
+        };
+
         for (i, seg) in body.iter().enumerate() {
             if seg.typ == Crashed {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
@@ -369,23 +404,61 @@ impl Palette for OkLabGradient {
 
         let len = and_update_max_len(&mut self.max_len, body.len());
         for (i, seg) in body.iter().enumerate() {
-            let color = if seg.typ == Crashed {
-                *DEFAULT_CRASHED_COLOR
-            } else {
-                let r = (i + body.missing_front) as f64 + frame_frac as f64;
-                let hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
-                match seg.typ {
-                    Normal | BlackHole => {
-                        let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
-                        Color::from(oklab.to_rgb())
-                    }
-                    Eaten { .. } => {
-                        // invert lightness twice
-                        let oklab = OkLab::from_lch(1. - self.eaten_lightness, 0.5, hue);
-                        Color::from(invert_rgb(oklab.to_rgb()))
-                    }
-                    Crashed => *DEFAULT_CRASHED_COLOR,
+            let r = (i + body.missing_front) as f64 + frame_frac as f64;
+            let hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
+            let color = match seg.typ {
+                Normal | BlackHole => {
+                    let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
+                    Color::from(oklab.to_rgb())
                 }
+                Eaten { .. } => {
+                    // invert lightness twice
+                    let oklab = OkLab::from_lch(1. - self.eaten_lightness, 0.5, hue);
+                    Color::from(invert_rgb(oklab.to_rgb()))
+                }
+                Crashed => *DEFAULT_CRASHED_COLOR,
+            };
+            styles.push(SegmentStyle::Solid(color));
+        }
+
+        styles
+    }
+}
+
+pub struct Alternating {
+    color1: Color,
+    color2: Color,
+    iteration: bool,
+    last_head: Option<HexPoint>,
+}
+
+impl Palette for Alternating {
+    fn segment_styles(&mut self, body: &SnakeBody, _frame_frac: f32) -> Vec<SegmentStyle> {
+        let mut styles = Vec::with_capacity(body.len());
+
+        let head = Some(body[0].pos);
+        if head != self.last_head {
+            self.last_head = head;
+            self.iteration = !self.iteration;
+        }
+        let expected_mod = if self.iteration { 0 } else { 1 };
+        for (i, seg) in body.iter().enumerate() {
+            let color = match seg.typ {
+                Normal | BlackHole => {
+                    if i % 2 == expected_mod {
+                        self.color1
+                    } else {
+                        self.color2
+                    }
+                }
+                Eaten { .. } => {
+                    if i % 2 == expected_mod {
+                        *DEFAULT_EATEN_COLOR
+                    } else {
+                        self.color2
+                    }
+                }
+                Crashed => *DEFAULT_CRASHED_COLOR,
             };
             styles.push(SegmentStyle::Solid(color));
         }

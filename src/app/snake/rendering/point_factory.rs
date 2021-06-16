@@ -27,7 +27,7 @@ impl SegmentDescription {
     /// simulate a smooth gradient
     fn split_into_subsegments(self, num_subsegments: usize) -> Vec<Self> {
         if num_subsegments == 1 {
-            return vec![self]
+            return vec![self];
         }
 
         let SegmentFraction { start, end } = self.fraction;
@@ -61,11 +61,7 @@ impl SegmentDescription {
                     })
                     .collect()
             }
-            SegmentStyle::HSLGradient {
-                start_hue,
-                end_hue,
-                lightness,
-            } => {
+            SegmentStyle::HSLGradient { start_hue, end_hue, lightness } => {
                 let start_subsegment = (num_subsegments as f32 * start) as usize;
                 let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
                 (start_subsegment..end_subsegment)
@@ -117,11 +113,7 @@ impl SegmentDescription {
             SegmentStyle::Solid(color) => *color,
             SegmentStyle::RGBGradient { start_rgb, .. } => Color::from(*start_rgb),
             SegmentStyle::HSLGradient { start_hue, lightness, .. } => {
-                let hsl = HSL {
-                    h: *start_hue,
-                    s: 1.,
-                    l: *lightness,
-                };
+                let hsl = HSL { h: *start_hue, s: 1., l: *lightness };
                 Color::from(hsl.to_rgb())
             }
         }

@@ -84,7 +84,10 @@ impl Stats {
     fn show_message(&self, game: &mut Game) {
         let text = format!(
             "subsegments\n  total: {}\n  per segment: {}\nredrawing\n  apples: {}\n  snakes: {}",
-            self.total_subsegments, self.subsegments_per_segment, self.redrawing_apples, self.redrawing_snakes,
+            self.total_subsegments,
+            self.subsegments_per_segment,
+            self.redrawing_apples,
+            self.redrawing_snakes,
         );
         let message = Message {
             text,
@@ -577,6 +580,7 @@ impl Game {
                 EatBehavior::Crash => {
                     self.snakes[i].crash();
                     self.control.game_over();
+                    self.draw_cache_invalid = 5;
                 }
                 EatBehavior::Die => {
                     self.snakes[i].die();
@@ -925,6 +929,11 @@ impl EventHandler for Game {
                     }
                 }
                 self.display_notification(text);
+                if self.control.state() != GameState::Playing {
+                    self.draw_cache_invalid = 5;
+                    self.cached_snake_mesh = None;
+                    self.cached_apple_mesh = None;
+                }
             }
             X => {
                 self.prefs.special_apples = !self.prefs.special_apples;

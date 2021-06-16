@@ -49,13 +49,16 @@ impl Controller for Keyboard {
             _ => return,
         };
 
-        // deny 180deg turns
-        if self.control_queue.is_empty() && self.dir != -new_dir
-            || !self.control_queue.is_empty()
-                && self.control_queue.len() < Self::CTRL_QUEUE_LIMIT
-                && new_dir != -self.control_queue[self.control_queue.len() - 1]
-        {
-            self.control_queue.push_back(new_dir)
+        // deny 180deg and 360deg turns
+        if self.control_queue.is_empty() {
+            if new_dir != self.dir && new_dir != -self.dir {
+                self.control_queue.push_back(new_dir);
+            }
+        } else if self.control_queue.len() < Self::CTRL_QUEUE_LIMIT {
+            let last_dir = self.control_queue[self.control_queue.len() - 1];
+            if new_dir != last_dir && new_dir != -last_dir {
+                self.control_queue.push_back(new_dir);
+            }
         }
     }
 }

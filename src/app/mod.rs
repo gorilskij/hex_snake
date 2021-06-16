@@ -100,7 +100,7 @@ impl App {
                     eat_other: hash_map! {},
                     default: EatBehavior::Crash,
                 },
-                palette: PaletteTemplate::rainbow(false),
+                palette: PaletteTemplate::rainbow(true),
                 controller: ControllerTemplate::Keyboard(cs),
                 // controller: SnakeControllerTemplate::PlayerController12,
             })
