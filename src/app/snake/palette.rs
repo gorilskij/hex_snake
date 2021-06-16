@@ -196,6 +196,11 @@ pub enum SegmentStyle {
         end_hue: f64,
         lightness: f64,
     },
+    OkLabGradient {
+        start_hue: f64,
+        end_hue: f64,
+        lightness: f64,
+    },
 }
 
 impl SegmentStyle {
@@ -205,6 +210,9 @@ impl SegmentStyle {
             Self::RGBGradient { start_rgb, .. } => Self::Solid(Color::from(start_rgb)),
             Self::HSLGradient { start_hue, lightness, .. } => Self::Solid(Color::from(
                 HSL { h: start_hue, s: 1., l: lightness }.to_rgb(),
+            )),
+            Self::OkLabGradient { start_hue, lightness, .. } => Self::Solid(Color::from(
+                OkLab::from_lch(lightness, 0.5, start_hue).to_rgb(),
             )),
         }
     }
@@ -284,8 +292,7 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
 /// and growing
 fn correct_len(len: usize, body: &SnakeBody, frame_frac: f64) -> f64 {
     let len = len as f64;
-    if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].typ
-    {
+    if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].typ {
         // Correct for eaten segment at the tail and
         //  fractional segment at the head (the eaten
         //  segment reduces in size more slowly than
@@ -396,7 +403,7 @@ impl Palette for HSLGradient {
                             end_rgb: invert_rgb(end_hsl.to_rgb()),
                         });
                     }
-                    Crashed => unreachable!(),
+                    Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
                 };
             }
         }
@@ -422,20 +429,32 @@ impl Palette for OkLabGradient {
         let len = correct_len(len, body, frame_frac);
         for (i, seg) in body.iter().enumerate() {
             let r = (i + body.missing_front) as f64 + frame_frac;
-            let hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len;
-            let color = match seg.typ {
+            let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
+            let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
+            match seg.typ {
                 Normal | BlackHole => {
-                    let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
-                    Color::from(oklab.to_rgb())
+                    styles.push(SegmentStyle::OkLabGradient {
+                        start_hue,
+                        end_hue,
+                        lightness: self.lightness,
+                    });
                 }
                 Eaten { .. } => {
                     // invert lightness twice
-                    let oklab = OkLab::from_lch(1. - self.eaten_lightness, 0.5, hue);
-                    Color::from(invert_rgb(oklab.to_rgb()))
+                    let start_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, start_hue);
+                    let end_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, end_hue);
+                    HSL {
+                        h: end_hue,
+                        s: 1.,
+                        l: 1. - self.eaten_lightness,
+                    };
+                    styles.push(SegmentStyle::RGBGradient {
+                        start_rgb: invert_rgb(start_okl.to_rgb()),
+                        end_rgb: invert_rgb(end_okl.to_rgb()),
+                    });
                 }
-                Crashed => *DEFAULT_CRASHED_COLOR,
+                Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
             };
-            styles.push(SegmentStyle::Solid(color));
         }
 
         styles

@@ -19,14 +19,16 @@ use crate::{
         transformations::{flip_horizontally, rotate_clockwise, translate},
         CellDim, Dir, DrawStyle, Point,
     },
+    color::oklab::OkLab,
 };
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
     /// this is used to assign a solid color to each subsegment and thus
     /// simulate a smooth gradient
-    fn split_into_subsegments(self, num_subsegments: usize) -> Vec<Self> {
+    fn split_into_subsegments(mut self, num_subsegments: usize) -> Vec<Self> {
         if num_subsegments == 1 {
+            self.segment_style = self.segment_style.into_solid();
             return vec![self];
         }
 
@@ -78,6 +80,19 @@ impl SegmentDescription {
                     })
                     .collect()
             }
+            SegmentStyle::OkLabGradient { start_hue, end_hue, lightness } => {
+                let start_subsegment = (num_subsegments as f32 * start) as usize;
+                let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
+                (start_subsegment..end_subsegment)
+                    .map(|f| {
+                        let f = f as f64 / num_subsegments as f64;
+                        Color::from(
+                            OkLab::from_lch(lightness, 0.5, f * start_hue + (1. - f) * end_hue)
+                                .to_rgb(),
+                        )
+                    })
+                    .collect()
+            }
         };
 
         // Can't tell if it's more inefficient to run dedup each time or
@@ -107,15 +122,16 @@ impl SegmentDescription {
             .collect_vec()
     }
 
-    // subsegments in particular are expected to be of the Solid variant
-    fn as_solid_color(&self) -> Color {
+    // subsegments are expected to be of the Solid variant
+    fn unwrap_solid_color(&self) -> Color {
         match &self.segment_style {
             SegmentStyle::Solid(color) => *color,
-            SegmentStyle::RGBGradient { start_rgb, .. } => Color::from(*start_rgb),
-            SegmentStyle::HSLGradient { start_hue, lightness, .. } => {
-                let hsl = HSL { h: *start_hue, s: 1., l: *lightness };
-                Color::from(hsl.to_rgb())
-            }
+            seg => unreachable!("Segment {:?} is not solid", seg),
+            // SegmentStyle::RGBGradient { start_rgb, .. } => Color::from(*start_rgb),
+            // SegmentStyle::HSLGradient { start_hue, lightness, .. } => {
+            //     let hsl = HSL { h: *start_hue, s: 1., l: *lightness };
+            //     Color::from(hsl.to_rgb())
+            // }
         }
     }
 
@@ -141,7 +157,7 @@ impl SegmentDescription {
         subsegments
             .into_iter()
             .map(|subsegment| {
-                let color = subsegment.as_solid_color();
+                let color = subsegment.unwrap_solid_color();
                 let points = match subsegment.draw_style {
                     DrawStyle::Hexagon => HexagonSegments::render_segment(subsegment),
                     DrawStyle::Rough => RoughSegments::render_segment(subsegment),
