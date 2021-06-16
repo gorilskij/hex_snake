@@ -72,10 +72,16 @@ pub enum PaletteTemplate {
         eaten_lightness: f64,
         persistent: bool,
     },
-    Alternating {
+    /// Segments are fixed to the board
+    AlternatingFixed {
         color1: Color,
         color2: Color,
     },
+    /// Segments travel along with the snake
+    Alternating {
+        color1: Color,
+        color2: Color,
+    }
 }
 
 // TODO: write a builder
@@ -177,10 +183,14 @@ impl PaletteTemplate {
     }
 
     pub fn alternating_white() -> Self {
-        Self::Alternating {
+        Self::AlternatingFixed {
             color1: Color::WHITE,
             color2: Color::new(0., 0., 0., 0.),
         }
+    }
+
+    pub fn zebra() -> Self {
+        Self::Alternating { color1: Color::WHITE, color2: Color { r: 0., g: 0., b: 0., a: 0. } }
     }
 }
 
@@ -259,12 +269,16 @@ impl From<PaletteTemplate> for Box<dyn Palette> {
                 eaten_lightness,
                 max_len: persistent.then(|| 0),
             }),
-            PaletteTemplate::Alternating { color1, color2 } => Box::new(Alternating {
+            PaletteTemplate::AlternatingFixed { color1, color2 } => Box::new(AlternatingFixed {
                 color1,
                 color2,
                 iteration: true,
                 last_head: None,
             }),
+            PaletteTemplate::Alternating { color1, color2 } => Box::new(Alternating {
+                color1,
+                color2,
+            })
         }
     }
 }
@@ -461,14 +475,14 @@ impl Palette for OkLabGradient {
     }
 }
 
-pub struct Alternating {
+pub struct AlternatingFixed {
     color1: Color,
     color2: Color,
     iteration: bool,
     last_head: Option<HexPoint>,
 }
 
-impl Palette for Alternating {
+impl Palette for AlternatingFixed {
     fn segment_styles(&mut self, body: &SnakeBody, _frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
@@ -497,6 +511,73 @@ impl Palette for Alternating {
                 Crashed => *DEFAULT_CRASHED_COLOR,
             };
             styles.push(SegmentStyle::Solid(color));
+        }
+
+        styles
+    }
+}
+
+pub struct Alternating {
+    color1: Color,
+    color2: Color,
+}
+
+fn mul_color(color: Color, factor: f32) -> Color {
+    Color {
+        r: color.r * factor,
+        g: color.g * factor,
+        b: color.b * factor,
+        a: color.a,
+    }
+}
+
+fn add_colors(color1: Color, color2: Color) -> Color {
+    Color {
+        r: color1.r + color2.r,
+        g: color1.g + color2.g,
+        b: color1.b + color2.b,
+        a: (color1.a + color2.a) / 2.,
+    }
+}
+
+impl Palette for Alternating {
+    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
+        let mut styles = Vec::with_capacity(body.len());
+
+        for (i, seg) in body.iter().enumerate() {
+            // How far along the snake we currently are (in units of segments)
+            let r = (i + body.missing_front) as f32 + frame_frac;
+
+            let color = match seg.typ {
+                Normal | BlackHole => {
+                    // Check whether there is a minimum or maximum within this segment
+                    use std::f32::consts::PI;
+                    if r % PI <= PI && r % PI + 1. >= PI {
+                        let diff = PI - r % PI;
+                        let cutoff = r + diff;
+
+                        unimplemented!();
+                    }
+
+                    let ratio1_start = (r.cos() + 1.) / 2.;
+                    let ratio1_end = ((r + 1.).cos() + 1.) / 2.;
+
+                    let start_color = add_colors(
+                        mul_color(self.color1, ratio1_start),
+                        mul_color(self.color2, 1. - ratio1_start),
+                    );
+                    let end_color = add_colors(
+                        mul_color(self.color1, ratio1_end),
+                        mul_color(self.color2, 1. - ratio1_end),
+                    );
+
+                    styles.push(SegmentStyle::RGBGradient { start_rgb: start_color.to_rgb(), end_rgb: end_color.to_rgb() });
+                }
+                Eaten { .. } => {
+                        styles.push(SegmentStyle::Solid(*DEFAULT_EATEN_COLOR));
+                }
+                Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
+            };
         }
 
         styles

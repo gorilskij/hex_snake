@@ -6,6 +6,7 @@ use crate::{
 };
 
 // A full (solid) segment starts at 0. and ends at 1.
+#[derive(Copy, Clone)]
 pub struct SegmentFraction {
     pub start: f32,
     pub end: f32,
@@ -75,6 +76,7 @@ impl TurnDescription {
     }
 }
 
+#[derive(Clone)]
 pub struct SegmentDescription {
     pub destination: Point,
     pub turn: TurnDescription,

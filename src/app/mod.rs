@@ -101,7 +101,8 @@ impl App {
                     default: EatBehavior::Crash,
                 },
                 // palette: PaletteTemplate::rainbow(true),
-                palette: PaletteTemplate::dark_blue_to_red(false),
+                // palette: PaletteTemplate::dark_blue_to_red(false),
+                palette: PaletteTemplate::zebra(),
                 controller: ControllerTemplate::Keyboard(cs),
                 // controller: SnakeControllerTemplate::PlayerController12,
             })

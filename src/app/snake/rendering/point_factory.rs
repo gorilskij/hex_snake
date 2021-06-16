@@ -21,6 +21,7 @@ use crate::{
     },
     color::oklab::OkLab,
 };
+use std::cmp::max;
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
