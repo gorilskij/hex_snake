@@ -194,8 +194,8 @@ impl Game {
             v: (height / (2. * sin)) as isize - 1,
         };
 
-        println!("w/h: {}/{}", width, height);
-        println!("new dim: {:?}", new_dim);
+        // println!("w/h: {}/{}", width, height);
+        // println!("new dim: {:?}", new_dim);
 
         if self.dim != new_dim {
             self.dim = new_dim;
@@ -722,6 +722,17 @@ impl EventHandler for Game {
         if self.prefs.display_fps {
             self.update_fps_message();
         }
+
+        // TODO: diagnose why the interframe interval is
+        //  1ms sometimes when out of focus
+        // unsafe {
+        //     use std::time::Instant;
+        //     static mut L: Option<Instant> = None;
+        //     if let Some(last) = L {
+        //         println!("{}ms", last.elapsed().as_millis());
+        //     }
+        //     L = Some(Instant::now());
+        // }
 
         // selectively set to Some(_) if they need to be updated
         let mut grid_mesh = None;

@@ -279,6 +279,36 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
     }
 }
 
+/// Correct an integer snake length to an f64 length
+/// that accounts for fractional segments, eaten segments
+/// and growing
+fn correct_len(len: usize, body: &SnakeBody, frame_frac: f64) -> f64 {
+    let len = len as f64;
+    if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].typ
+    {
+        // Correct for eaten segment at the tail and
+        //  fractional segment at the head (the eaten
+        //  segment reduces in size more slowly than
+        //  the head segment grows)
+
+        // The actual visual length of the eaten segment
+        //  at the tail of the snake
+        let eaten_segment_frac =
+            (food_left as f64 + 1. - frame_frac as f64) / (original_food + 1) as f64;
+
+        len - 1. + eaten_segment_frac + frame_frac
+    } else if body.grow > 0 {
+        // If growth is happening for a reason other
+        //  than eating (such as at the beginning of
+        //  the game), correct only for the head
+        len + frame_frac as f64
+    } else {
+        // If the snake isn't growing, the head and
+        //  tail corrections cancel out
+        len
+    }
+}
+
 pub struct RGBGradient {
     head: Color,
     tail: Color,
@@ -291,12 +321,13 @@ impl Palette for RGBGradient {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
+        let len = correct_len(len, body, frame_frac as f64) as f32;
         for (i, seg) in body.iter().enumerate() {
             let color = if seg.typ == Crashed {
                 *DEFAULT_CRASHED_COLOR
             } else {
                 let r = (i + body.missing_front) as f32 + frame_frac;
-                let head_ratio = 1. - r / (len - 1) as f32;
+                let head_ratio = 1. - r / (len - 1.);
                 let tail_ratio = 1. - head_ratio;
                 let normal_color = Color {
                     r: head_ratio * self.head.r + tail_ratio * self.tail.r,
@@ -331,23 +362,7 @@ impl Palette for HSLGradient {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
-
-        // if the snake is growing, artificially change
-        //  the len to avoid jittery gradients
-        let len = if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].typ
-        {
-            // The actual visual length of the eaten segment
-            //  at the back of the snake
-            let eaten_segment_fraction =
-                (food_left as f64 + 1. - frame_frac as f64) / (original_food + 1) as f64;
-            // Correct front and back
-            len as f64 - 1. + eaten_segment_fraction + frame_frac as f64
-        } else {
-            // If the snake isn't growing, the front and
-            //  back corrections cancel out
-            len as f64
-        };
-
+        let len = correct_len(len, body, frame_frac as f64);
         for (i, seg) in body.iter().enumerate() {
             if seg.typ == Crashed {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
@@ -402,10 +417,12 @@ impl Palette for OkLabGradient {
     fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
+        let frame_frac = frame_frac as f64;
         let len = and_update_max_len(&mut self.max_len, body.len());
+        let len = correct_len(len, body, frame_frac);
         for (i, seg) in body.iter().enumerate() {
-            let r = (i + body.missing_front) as f64 + frame_frac as f64;
-            let hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
+            let r = (i + body.missing_front) as f64 + frame_frac;
+            let hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len;
             let color = match seg.typ {
                 Normal | BlackHole => {
                     let oklab = OkLab::from_lch(self.lightness, 0.5, hue);
