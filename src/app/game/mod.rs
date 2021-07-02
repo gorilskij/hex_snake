@@ -32,6 +32,9 @@ mod rendering;
 
 type Food = u32;
 
+/// Represents (graphics frame number, frame fraction)
+pub(crate) type FrameStamp = (usize, f32);
+
 pub enum AppleType {
     Normal(Food),
     SpawnSnake(SnakeSeed),
@@ -326,17 +329,11 @@ impl Game {
         let apple_type = if self.prefs.special_apples {
             match self.rng.gen::<f32>() {
                 x if x < 0.025 => {
-                    // let controller = if self.rng.gen::<f32>() < 0.5 {
-                    //     ControllerTemplate::Competitor1
-                    // } else {
-                    //     ControllerTemplate::Competitor2
-                    // };
-                    let controller = ControllerTemplate::AStar;
                     AppleType::SpawnSnake(SnakeSeed {
                         snake_type: SnakeType::CompetitorSnake { life: Some(200) },
                         eat_mechanics: EatMechanics::always(EatBehavior::Die),
                         palette: PaletteTemplate::pastel_rainbow(true),
-                        controller,
+                        controller: ControllerTemplate::AStar,
                     })
                 }
                 x if x < 0.040 => {
@@ -993,7 +990,7 @@ impl EventHandler for Game {
             k => {
                 if self.control.state() == GameState::Playing {
                     for snake in &mut self.snakes {
-                        snake.controller.key_pressed(k)
+                        snake.controller.key_pressed(k, self.control.frame_stamp())
                     }
                 }
             }

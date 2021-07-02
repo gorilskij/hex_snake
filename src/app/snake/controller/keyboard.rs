@@ -11,6 +11,7 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use std::collections::VecDeque;
+use crate::app::game::FrameStamp;
 
 pub struct Keyboard {
     pub controls: Controls,
@@ -37,7 +38,7 @@ impl Controller for Keyboard {
         self.dir = dir;
     }
 
-    fn key_pressed(&mut self, key: KeyCode) {
+    fn key_pressed(&mut self, key: KeyCode, frame_stamp: FrameStamp) {
         use Dir::*;
         let new_dir = match key {
             k if k == self.controls.u => U,

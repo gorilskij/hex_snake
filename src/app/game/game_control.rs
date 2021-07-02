@@ -3,6 +3,7 @@ use std::{
     collections::VecDeque,
     time::{Duration, Instant},
 };
+use crate::app::game::FrameStamp;
 
 struct FPSCounter {
     step: usize, // record once every 'step' frames
@@ -250,6 +251,10 @@ impl GameControl {
                 }
             }
         }
+    }
+
+    pub fn frame_stamp(&self) -> FrameStamp {
+        (self.graphics_frame_num, self.frame_fraction())
     }
 
     pub fn measured_game_fps(&self) -> f64 {

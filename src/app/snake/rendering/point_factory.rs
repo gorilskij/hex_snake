@@ -141,7 +141,7 @@ impl SegmentDescription {
     /// `snake_len` is used to calculate how many subsegments
     /// there should be (longer snakes have lower subsegment
     /// resolution)
-    pub fn render(mut self, subsegments_per_segment: usize) -> Vec<(Color, Vec<Point>)> {
+    pub fn render(mut self, subsegments_per_segment: usize, turn: f32) -> Vec<(Color, Vec<Point>)> {
         let subsegments = if self.draw_style == DrawStyle::Hexagon {
             // hexagon segments don't support gradients
             self.fraction = SegmentFraction::solid();
@@ -160,17 +160,17 @@ impl SegmentDescription {
             .map(|subsegment| {
                 let color = subsegment.unwrap_solid_color();
                 let points = match subsegment.draw_style {
-                    DrawStyle::Hexagon => HexagonSegments::render_segment(subsegment),
-                    DrawStyle::Rough => RoughSegments::render_segment(subsegment),
-                    DrawStyle::Smooth => SmoothSegments::render_segment(subsegment),
+                    DrawStyle::Hexagon => HexagonSegments::render_segment(subsegment, turn),
+                    DrawStyle::Rough => RoughSegments::render_segment(subsegment, turn),
+                    DrawStyle::Smooth => SmoothSegments::render_segment(subsegment, turn),
                 };
                 (color, points)
             })
             .collect()
     }
 
-    pub fn build(self, builder: &mut MeshBuilder, subsegments_per_segment: usize) -> GameResult {
-        for (color, points) in self.render(subsegments_per_segment) {
+    pub fn build(self, builder: &mut MeshBuilder, subsegments_per_segment: usize, turn: f32) -> GameResult {
+        for (color, points) in self.render(subsegments_per_segment, turn) {
             builder.polygon(DrawMode::fill(), &points, color)?;
         }
         Ok(())
@@ -179,41 +179,41 @@ impl SegmentDescription {
 
 /// The `render_default_*` functions are without position or rotation, they simply generate the points that correspond to a type of turn (straight, blunt, or sharp)
 pub trait SegmentRenderer {
-    /// Default straight segment coming from above (U) and going down (D)
-    fn render_default_straight(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
+    // /// Default straight segment coming from above (U) and going down (D)
+    // fn render_default_straight(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
+    //
+    // /// Default blunt segment coming from above (U) and going down-right (DR)
+    // fn render_default_blunt(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
+    //
+    // /// Default sharp segment coming from above (U) and going up-right (UR)
+    // fn render_default_sharp(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
 
-    /// Default blunt segment coming from above (U) and going down-right (DR)
-    fn render_default_blunt(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
-
-    /// Default sharp segment coming from above (U) and going up-right (UR)
-    fn render_default_sharp(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
+    fn render_straight_segment(description: &SegmentDescription) -> Vec<Point>;
 
     /// Turns a default segment into one that is ready to be printed
     /// adding position and rotating and reflecting to fit the desired
-    /// from and to directions
-    fn render_segment(description: SegmentDescription) -> Vec<Point> {
+    /// from and to directions.
+    /// Turn describes how far along the segment is on the D -> DR -> UR progression
+    /// (coming from U) (0 = D, 1 = UR)
+    fn render_curved_segment(description: &SegmentDescription, turn: f32) -> Vec<Point>;
+
+    // account for rotation and translation
+    fn render_segment(description: SegmentDescription, turn: f32) -> Vec<Point> {
         use TurnDirection::*;
         use TurnType::*;
 
-        let mut segment = match description.turn.turn_type() {
-            Straight => Self::render_default_straight(description.cell_dim, description.fraction),
-            Blunt(turn_direction) => {
-                let mut default_segment =
-                    Self::render_default_blunt(description.cell_dim, description.fraction);
+        // let mut segment = Self::render_default_segment(&description, turn);
+
+        let mut segment;
+        match description.turn.turn_type() {
+            Straight => segment = Self::render_straight_segment(&description),
+            Blunt(turn_direction) | Sharp(turn_direction) => {
+                segment = Self::render_curved_segment(&description, turn);
                 if turn_direction == Clockwise {
-                    flip_horizontally(&mut default_segment, description.cell_dim.center().x);
+                    flip_horizontally(&mut segment, description.cell_dim.center().x);
                 }
-                default_segment
             }
-            Sharp(turn_direction) => {
-                let mut default_segment =
-                    Self::render_default_sharp(description.cell_dim, description.fraction);
-                if turn_direction == Clockwise {
-                    flip_horizontally(&mut default_segment, description.cell_dim.center().x);
-                }
-                default_segment
-            }
-        };
+        }
 
         let rotation_angle = Dir::U.clockwise_angle_to(description.turn.coming_from);
         if rotation_angle != 0. {

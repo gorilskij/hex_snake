@@ -84,9 +84,25 @@ impl EatMechanics {
 
 pub struct SnakeBody {
     pub cells: VecDeque<Segment>,
-    // when a snake is being destroyed from the front
+
+    /// When a snake is being destroyed from the front
+    /// (when it's falling into a black hole), this is
+    /// used to indicate how many segments are missing
+    /// off the front (how many are in the black hole)
     pub missing_front: usize,
+
+    /// Direction the snake is currently going
     pub dir: Dir,
+
+    /// When a snake changes direction halfway through
+    /// a segment appearing, the transition needs to be
+    /// done smoothly, this indicates at which frame and
+    /// frame_frac the transition was started
+    /// Note that this is a purely graphical phenomenon
+    /// and is handled by the graphics code, not by the
+    /// game code, this has no effect on gameplay.
+    pub turn_start: Option<(usize, f32)>,
+
     /// When `Snake::update_dir` is called from a draw method
     /// (this is done to show the snake turning as soon
     /// as possible), dir_grace prevents a repeat call
@@ -149,6 +165,7 @@ impl Snake {
                 cells: body,
                 missing_front: 0,
                 dir,
+                turn_start: None,
                 dir_grace: false,
                 grow,
             },

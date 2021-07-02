@@ -23,6 +23,7 @@ use std::{collections::VecDeque, f32::consts::PI};
 
 #[cfg(feature = "show_search_path")]
 use std::collections::HashSet;
+use crate::app::game::FrameStamp;
 
 mod a_star;
 mod competitor1;
@@ -90,7 +91,7 @@ pub trait Controller {
 
     fn reset(&mut self, _dir: Dir) {}
 
-    fn key_pressed(&mut self, _key: KeyCode) {}
+    fn key_pressed(&mut self, _key: KeyCode, _frame_stamp: FrameStamp) {}
 }
 
 #[allow(dead_code)]

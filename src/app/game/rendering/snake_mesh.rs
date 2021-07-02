@@ -97,6 +97,7 @@ impl Game {
                         going_to,
                         segment_styles[seg_idx],
                         subsegments_per_segment,
+                        snake.body.turn_transition,
                     ));
                     continue;
                 }
@@ -126,7 +127,8 @@ impl Game {
                     cell_dim: self.cell_dim,
                 };
 
-                for (color, points) in segment.render(subsegments_per_segment) {
+                // turn transition for all non-head segments is 1
+                for (color, points) in segment.render(subsegments_per_segment, 1.) {
                     builder.polygon(DrawMode::fill(), &points, color)?;
                     stats.total_subsegments += 1;
                 }
@@ -134,7 +136,14 @@ impl Game {
         }
 
         // draw heads
-        for (segment, coming_from, going_to, seg_style, subsegments_per_segment) in heads {
+        for (
+            segment,
+            coming_from,
+            going_to,
+            seg_style,
+            subsegments_per_segment,
+            turn_transition,
+        ) in heads {
             let Segment { pos, typ, .. } = segment;
             let location = pos.to_point(self.cell_dim);
 
@@ -157,10 +166,10 @@ impl Game {
                     let mut hexagon_points = render_hexagon(self.cell_dim);
                     translate(&mut hexagon_points, location);
                     builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
-                    head_description.build(&mut builder, subsegments_per_segment)?;
+                    head_description.build(&mut builder, subsegments_per_segment, turn_transition)?;
                 }
                 SegmentType::Crashed => {
-                    head_description.build(&mut builder, subsegments_per_segment)?;
+                    head_description.build(&mut builder, subsegments_per_segment, turn_transition)?;
                 }
                 _ => unreachable!(
                     "head segment of type {:?} should not have been queued to be drawn separately",
