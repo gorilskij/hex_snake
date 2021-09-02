@@ -144,6 +144,7 @@ pub struct Game {
 impl Game {
     pub fn new(
         cell_side_len: f32,
+        starting_fps: f64,
         seeds: Vec<SnakeSeed>,
         palette: GamePalette,
         apple_spawn_strategy: AppleSpawnStrategy,
@@ -154,7 +155,7 @@ impl Game {
         let cell_dim = CellDim::from(cell_side_len);
 
         let mut game = Self {
-            control: GameControl::new(12.),
+            control: GameControl::new(starting_fps),
 
             window_dim: Point { x: wm.width, y: wm.height },
 
@@ -643,6 +644,10 @@ impl Game {
 }
 
 impl Game {
+    /// Bounds for the length of one of the six sides of a cell
+    const CELL_SIDE_MIN: f32 = 5.;
+    const CELL_SIDE_MAX: f32 = 50.;
+
     fn draw_messages(&mut self, ctx: &mut Context) -> GameResult {
         // draw messages and remove the ones that have
         // outlived their durations
@@ -706,7 +711,7 @@ impl Game {
     }
 }
 
-impl EventHandler for Game {
+impl EventHandler<ggez::GameError> for Game {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         while self.control.can_update() {
             self.advance_snakes();
@@ -979,16 +984,15 @@ impl EventHandler for Game {
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
-                let mut new_side = self.cell_dim.side * factor;
-                if new_side < 1. {
-                    new_side = 1.
+                let mut new_side_length = self.cell_dim.side * factor;
+                if new_side_length < Self::CELL_SIDE_MIN {
+                    new_side_length = Self::CELL_SIDE_MIN
+                } else if new_side_length > Self::CELL_SIDE_MAX{
+                    new_side_length = Self::CELL_SIDE_MAX
                 }
-                if new_side > 20. {
-                    new_side = 20.
-                }
-                self.cell_dim = CellDim::from(new_side);
+                self.cell_dim = CellDim::from(new_side_length);
                 self.update_dim();
-                self.display_notification(format!("Cell side: {}", new_side));
+                self.display_notification(format!("Cell side: {}", new_side_length));
             }
             k => {
                 if self.control.state() == GameState::Playing {

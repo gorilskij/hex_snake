@@ -46,7 +46,7 @@ pub enum Screen {
 }
 
 impl Deref for Screen {
-    type Target = dyn EventHandler;
+    type Target = dyn EventHandler<ggez::GameError>;
 
     fn deref(&self) -> &Self::Target {
         use Screen::*;
@@ -111,7 +111,8 @@ impl App {
         Self {
             // screen: Screen::StartScreen(StartScreen::new()),
             screen: Screen::Game(Game::new(
-                12.,
+                30.,
+                7.,
                 seeds,
                 GamePalette::dark(),
                 AppleSpawnStrategy::Random { apple_count: 5 },
@@ -197,7 +198,7 @@ impl App {
     }
 }
 
-impl EventHandler for App {
+impl EventHandler<ggez::GameError> for App {
     fn update(&mut self, ctx: &mut Context) -> GameResult {
         if let Screen::StartScreen(start_screen) = &self.screen {
             if let Some(next_screen) = start_screen.next_screen() {
