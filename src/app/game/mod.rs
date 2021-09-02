@@ -71,7 +71,7 @@ impl Default for Prefs {
 pub struct Stats {
     /// Total number of graphical (sub)segments
     /// currently visible
-    total_subsegments: usize,
+    polygons: usize,
     /// Number of subsegments per segment (note
     /// that head and tail will have fewer).
     /// Maximum in the case of multiple snakes
@@ -84,7 +84,7 @@ impl Stats {
     fn show_message(&self, game: &mut Game) {
         let text = format!(
             "subsegments\n  total: {}\n  per segment: {}\nredrawing\n  apples: {}\n  snakes: {}",
-            self.total_subsegments,
+            self.polygons,
             self.subsegments_per_segment,
             self.redrawing_apples,
             self.redrawing_snakes,

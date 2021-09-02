@@ -126,29 +126,27 @@ impl Game {
                     cell_dim: self.cell_dim,
                 };
 
-                for (color, points) in segment.render(subsegments_per_segment) {
-                    builder.polygon(DrawMode::fill(), &points, color)?;
-                    stats.total_subsegments += 1;
-                }
+                stats.polygons += segment.build(&mut builder, subsegments_per_segment)?;
             }
         }
 
-        // draw heads
-        for (segment, coming_from, going_to, seg_style, subsegments_per_segment) in heads {
+        // Draw black holes first
+        heads.sort_by_key(|(Segment { typ, .. }, ..)| match typ {
+            SegmentType::BlackHole => 0,
+            _ => 1,
+        });
+
+        // draw crashed or dying heads on top of the segments they crashed into
+        for (segment, coming_from, going_to, segment_style, subsegments_per_segment) in heads {
             let Segment { pos, typ, .. } = segment;
             let location = pos.to_point(self.cell_dim);
-
-            let segment_color = match seg_style {
-                SegmentStyle::Solid(color) => color,
-                _ => unimplemented!(),
-            };
 
             let head_description = SegmentDescription {
                 destination: location,
                 turn: TurnDescription { coming_from, going_to },
                 fraction: SegmentFraction::appearing(0.5),
                 draw_style: self.prefs.draw_style,
-                segment_style: SegmentStyle::Solid(segment_color),
+                segment_style,
                 cell_dim: self.cell_dim,
             };
             match typ {
@@ -157,10 +155,11 @@ impl Game {
                     let mut hexagon_points = render_hexagon(self.cell_dim);
                     translate(&mut hexagon_points, location);
                     builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
-                    head_description.build(&mut builder, subsegments_per_segment)?;
+                    stats.polygons += 1;
+                    stats.polygons += head_description.build(&mut builder, subsegments_per_segment)?;
                 }
                 SegmentType::Crashed => {
-                    head_description.build(&mut builder, subsegments_per_segment)?;
+                    stats.polygons += head_description.build(&mut builder, subsegments_per_segment)?;
                 }
                 _ => unreachable!(
                     "head segment of type {:?} should not have been queued to be drawn separately",

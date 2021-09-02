@@ -169,11 +169,14 @@ impl SegmentDescription {
             .collect()
     }
 
-    pub fn build(self, builder: &mut MeshBuilder, subsegments_per_segment: usize) -> GameResult {
+    /// Returns number of polygons built
+    pub fn build(self, builder: &mut MeshBuilder, subsegments_per_segment: usize) -> GameResult<usize> {
+        let mut polygons = 0;
         for (color, points) in self.render(subsegments_per_segment) {
             builder.polygon(DrawMode::fill(), &points, color)?;
+            polygons += 1;
         }
-        Ok(())
+        Ok(polygons)
     }
 }
 
