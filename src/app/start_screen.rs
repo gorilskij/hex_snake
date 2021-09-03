@@ -78,7 +78,7 @@ impl SnakeDemo {
 
 impl EventHandler<ggez::GameError> for SnakeDemo {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        self.snake.advance(OtherSnakes::empty(), &[], self.dim);
+        // self.snake.advance(OtherSnakes::empty(), &[], self.dim);
         Ok(())
     }
 

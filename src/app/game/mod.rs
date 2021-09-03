@@ -467,7 +467,7 @@ impl Game {
             let (snake, other_snakes) = Self::split_snakes_mut(&mut self.snakes, snake_idx);
 
             // advance the snake
-            snake.advance(other_snakes, &self.apples, self.dim);
+            snake.advance(other_snakes, &self.apples, self.dim, self.control.frame_stamp());
 
             // remove snake if it ran out of body
             if snake.len() == 0 {
@@ -747,7 +747,7 @@ impl EventHandler<ggez::GameError> for Game {
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
 
-            snake_mesh = Some(ROw::Owned(self.snake_mesh(self.control.frame_fraction(), ctx, &mut stats)?));
+            snake_mesh = Some(ROw::Owned(self.snake_mesh(ctx, &mut stats)?));
             apple_mesh = Some(ROw::Owned(self.apple_mesh(ctx, &mut stats)?));
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
@@ -770,7 +770,7 @@ impl EventHandler<ggez::GameError> for Game {
             }
 
             if self.cached_snake_mesh.is_none() {
-                self.cached_snake_mesh = Some(self.snake_mesh(self.control.frame_fraction(), ctx, &mut stats)?);
+                self.cached_snake_mesh = Some(self.snake_mesh(ctx, &mut stats)?);
                 update = true;
             }
 

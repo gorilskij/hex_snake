@@ -12,6 +12,7 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 use std::ops::Deref;
+use crate::app::game::FrameStamp;
 
 pub mod controller;
 pub mod palette;
@@ -239,7 +240,7 @@ impl Snake {
         out
     }
 
-    pub fn update_dir(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
+    pub fn update_dir(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim, frame_stamp: FrameStamp) {
         if !self.body.dir_grace && self.state == SnakeState::Living {
             if let Some(new_dir) =
                 self.controller
@@ -247,11 +248,12 @@ impl Snake {
             {
                 self.body.dir = new_dir;
                 self.body.dir_grace = true;
+                self.body.turn_start = Some(frame_stamp);
             }
         }
     }
 
-    pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim) {
+    pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim, frame_stamp: FrameStamp) {
         let last_idx = self.len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].typ {
             if *food_left == 0 {
@@ -265,7 +267,7 @@ impl Snake {
         match &mut self.state {
             SnakeState::Dying => self.body.missing_front += 1,
             SnakeState::Living => {
-                self.update_dir(other_snakes, apples, board_dim);
+                self.update_dir(other_snakes, apples, board_dim, frame_stamp);
 
                 // create new head for snake
                 let dir = self.dir();
@@ -283,6 +285,7 @@ impl Snake {
         }
 
         self.body.dir_grace = false;
+        self.body.turn_start = None;
 
         if self.body.grow > 0 {
             self.body.grow -= 1;

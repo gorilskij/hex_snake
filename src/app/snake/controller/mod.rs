@@ -20,6 +20,7 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use std::{collections::VecDeque, f32::consts::PI};
+use crate::app::game::FrameStamp;
 
 mod a_star;
 mod competitor1;
