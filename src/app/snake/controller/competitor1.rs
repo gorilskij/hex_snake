@@ -41,7 +41,7 @@ fn dir_score(
 impl Controller for Competitor1 {
     fn next_dir(
         &mut self,
-        snake_body: &SnakeBody,
+        snake_body: &mut SnakeBody,
         other_snakes: OtherSnakes,
         apples: &[Apple],
         board_dim: HexDim,
@@ -63,7 +63,7 @@ impl Controller for Competitor1 {
         //     .collect();
 
         let apple_positions: Vec<_> = apples.iter().map(|a| a.pos).collect();
-        let snake_positions: Vec<_> = once(snake_body)
+        let snake_positions: Vec<_> = once(&*snake_body)
             .chain(other_snakes.iter_bodies())
             .flat_map(|b| b.cells.iter().map(|h| h.pos))
             .collect();

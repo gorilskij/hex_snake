@@ -21,9 +21,6 @@ use crate::{
 use ggez::event::KeyCode;
 use std::{collections::VecDeque, f32::consts::PI};
 
-#[cfg(feature = "show_search_path")]
-use std::collections::HashSet;
-
 mod a_star;
 mod competitor1;
 mod competitor2;
@@ -82,7 +79,7 @@ pub trait Controller {
     //  next graphics frame, otherwise it will wait until the next game frame
     fn next_dir(
         &mut self,
-        snake_body: &SnakeBody,
+        snake_body: &mut SnakeBody,
         other_snakes: OtherSnakes,
         apples: &[Apple],
         board_dim: HexDim,
@@ -166,9 +163,3 @@ fn angle_distance(a1: f32, a2: f32) -> f32 {
     let d2 = (b1 - b2).abs();
     partial_min(d1, d2).unwrap()
 }
-
-// hacky way to visualize search
-#[cfg(feature = "show_search_path")]
-pub static mut ETHEREAL_PATH: Option<Vec<HexPoint>> = None;
-#[cfg(feature = "show_search_path")]
-pub static mut ETHEREAL_SEEN: Option<HashSet<HexPoint>> = None;

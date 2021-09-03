@@ -23,7 +23,3 @@ num-traits = "0.2"
 
 [profile.release]
 debug = true
-
-[features]
-#default = ["show_search_path"]
-show_search_path = []

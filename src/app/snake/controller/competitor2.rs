@@ -25,7 +25,7 @@ impl Competitor2 {
 impl Controller for Competitor2 {
     fn next_dir(
         &mut self,
-        snake_body: &SnakeBody,
+        snake_body: &mut SnakeBody,
         other_snakes: OtherSnakes,
         apples: &[Apple],
         _board_dim: HexDim,

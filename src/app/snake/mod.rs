@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque, HashSet};
 
 use crate::{
     app::{
@@ -82,6 +82,11 @@ impl EatMechanics {
     }
 }
 
+pub struct SearchTrace {
+    pub cells_searched: HashSet<HexPoint>,
+    pub current_path: Vec<HexPoint>,
+}
+
 pub struct SnakeBody {
     pub cells: VecDeque<Segment>,
     // when a snake is being destroyed from the front
@@ -93,6 +98,10 @@ pub struct SnakeBody {
     /// arising from a subsequent call to `Snake::advance`
     pub dir_grace: bool,
     pub grow: usize,
+    /// For snakes that move using a search algorithm, this
+    /// field remembers which cells were searched and which
+    /// path is being followed, sored here to be drawn
+    pub search_trace: Option<SearchTrace>,
 }
 
 impl Deref for SnakeBody {
@@ -151,6 +160,7 @@ impl Snake {
                 dir,
                 dir_grace: false,
                 grow,
+                search_trace: None,
             },
             state: SnakeState::Living,
 
@@ -219,7 +229,7 @@ impl Snake {
         if !self.body.dir_grace && self.state == SnakeState::Living {
             if let Some(new_dir) =
                 self.controller
-                    .next_dir(&self.body, other_snakes, apples, board_dim)
+                    .next_dir(&mut self.body, other_snakes, apples, board_dim)
             {
                 self.body.dir = new_dir;
                 self.body.dir_grace = true;

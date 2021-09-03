@@ -27,8 +27,6 @@ mod color;
 mod partial_min_max;
 mod row;
 
-pub const SHOW_SEARCH_PATH: bool = true;
-
 fn main() {
     let width = 2000.;
     let height = 1600.;

@@ -230,6 +230,9 @@ impl SegmentStyle {
 
 pub trait Palette {
     fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle>;
+    // TODO: refactor as
+    //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_frac: f32) -> Color;
+    //  this avoids unnecessary work for hex palette and is called exactly as many times as needed
 }
 
 impl From<PaletteTemplate> for Box<dyn Palette> {

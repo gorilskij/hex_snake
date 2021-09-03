@@ -75,7 +75,7 @@ pub struct Stats {
     /// Number of subsegments per segment (note
     /// that head and tail will have fewer).
     /// Maximum in the case of multiple snakes
-    subsegments_per_segment: usize,
+    max_subsegments_per_segment: usize,
     redrawing_apples: bool,
     redrawing_snakes: bool,
 }
@@ -83,9 +83,9 @@ pub struct Stats {
 impl Stats {
     fn show_message(&self, game: &mut Game) {
         let text = format!(
-            "subsegments\n  total: {}\n  per segment: {}\nredrawing\n  apples: {}\n  snakes: {}",
+            "total polygons: {}\nmax subsegments: {}\nredrawing apples: {}\nredrawing snakes: {}",
             self.polygons,
-            self.subsegments_per_segment,
+            self.max_subsegments_per_segment,
             self.redrawing_apples,
             self.redrawing_snakes,
         );

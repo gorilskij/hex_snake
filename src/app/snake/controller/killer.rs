@@ -76,7 +76,7 @@ fn distance_to_snake(
 impl Controller for Killer {
     fn next_dir(
         &mut self,
-        snake_body: &SnakeBody,
+        snake_body: &mut SnakeBody,
         other_snakes: OtherSnakes,
         _apples: &[Apple],
         board_dim: HexDim,
