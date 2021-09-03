@@ -31,8 +31,8 @@ pub struct Message {
 }
 
 impl Message {
-    pub const DEFAULT_MARGIN: f32 = 10.;
-    pub const DEFAULT_FONT_SIZE: f32 = 20.;
+    pub const DEFAULT_MARGIN: f32 = 20.;
+    pub const DEFAULT_FONT_SIZE: f32 = 50.;
 
     pub fn default_top_left(text: String, color: Color, duration: Option<Duration>) -> Self {
         Self {

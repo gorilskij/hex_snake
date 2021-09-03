@@ -37,7 +37,7 @@ pub struct Programmed {
 }
 
 impl Controller for Programmed {
-    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
+    fn next_dir(&mut self, _: &mut SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
         } else {

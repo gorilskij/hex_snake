@@ -27,11 +27,9 @@ mod color;
 mod partial_min_max;
 mod row;
 
-pub const SHOW_SEARCH_PATH: bool = true;
-
 fn main() {
-    let width = 1000.;
-    let height = 800.;
+    let width = 2000.;
+    let height = 1600.;
 
     let window_mode = WindowMode {
         width,
@@ -45,6 +43,7 @@ fn main() {
         max_height: 0.,
         resizable: true,
         visible: true,
+        resize_on_scale_factor_change: false,
     };
 
     let window_setup = WindowSetup {
@@ -71,8 +70,8 @@ fn main() {
         .build()
         .unwrap();
 
-    ggez::graphics::set_screen_coordinates(&mut ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
-        .unwrap();
+    // ggez::graphics::set_screen_coordinates(&mut ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
+    //     .unwrap();
 
     run(ctx, event_loop, app)
 }

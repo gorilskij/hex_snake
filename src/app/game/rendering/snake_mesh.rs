@@ -16,6 +16,22 @@ use ggez::{
     graphics::{Color, DrawMode, Mesh, MeshBuilder},
     Context, GameResult,
 };
+use crate::app::snake::Snake;
+use crate::basic::{HexPoint, DrawStyle, CellDim, Point};
+use std::collections::vec_deque;
+
+const DRAW_WHITE_AURA: bool = false;
+
+fn build_hexagon_at(location: Point, cell_dim: CellDim, color: Color, builder: &mut MeshBuilder) -> GameResult {
+    let mut hexagon_points = render_hexagon(cell_dim);
+    translate(&mut hexagon_points, location);
+    builder.polygon(
+        DrawMode::fill(),
+        &hexagon_points,
+        color,
+    )?;
+    Ok(())
+}
 
 impl Game {
     pub(in crate::app::game) fn snake_mesh(
@@ -28,8 +44,11 @@ impl Game {
 
         let mut builder = MeshBuilder::new();
 
-        // to be drawn later (potentially on top of body segments)
-        let mut heads = vec![];
+
+        // Black holes and crashed heads are drawn later, on top of
+        // body segments
+        let mut black_holes = vec![];
+        let mut crashed_heads = vec![];
 
         let frame_frac = self.control.frame_fraction();
 
@@ -37,13 +56,13 @@ impl Game {
         for snake_idx in 0..self.snakes.len() {
             let (snake, other_snakes) = Self::split_snakes_mut(&mut self.snakes, snake_idx);
 
-            // desired total number of subsegments for the whole snake
-            //  smaller snakes have higher resolution to show more detail
-            //  (this is intended to work with rainbows)
+            // Desired total number of subsegments for the whole snake
+            // smaller snakes have higher resolution to show more detail
+            // (this is intended to work with rainbows)
             const TOTAL_SUBSEGMENTS: usize = 250;
 
-            // some bounds on the number of subsegments per segment
-            //  to avoid very high numbers of polygons or empty segments
+            // Bounds on the number of subsegments per segment to avoid
+            // very high numbers of polygons or empty segments
             const MIN_SUBSEGMENTS: usize = 1;
             const MAX_SUBSEGMENTS: usize = 20;
 
@@ -53,8 +72,8 @@ impl Game {
                 x => x,
             };
 
-            if subsegments_per_segment > stats.subsegments_per_segment {
-                stats.subsegments_per_segment = subsegments_per_segment;
+            if subsegments_per_segment > stats.max_subsegments_per_segment {
+                stats.max_subsegments_per_segment = subsegments_per_segment;
             }
 
             // update the direction of the snake early
@@ -65,49 +84,42 @@ impl Game {
 
             let len = snake.len();
 
-            // draw white aura around snake heads (debug)
-            // for pos in snake.reachable(7, self.dim) {
-            //     let dest = pos.to_point(self.cell_dim);
-            //     let mut points = render_hexagon(self.cell_dim);
-            //     translate(&mut points, dest);
-            //     builder.polygon(DrawMode::fill(), &points, Color::WHITE)?;
-            // }
+
+            // If the snake is guided by a search algorithm, draw the cells
+            // that were searched and the path that is being followed
+            if let Some(search_trace) = &snake.body.search_trace {
+                let searched_cell_color = Color::from_rgb(130, 47, 5);
+                let current_path_color = Color::from_rgb(97, 128, 11);
+                for &point in &search_trace.cells_searched {
+                    build_hexagon_at(point.to_point(self.cell_dim), self.cell_dim, searched_cell_color, &mut builder)?;
+                }
+                for &point in &search_trace.current_path {
+                    build_hexagon_at(point.to_point(self.cell_dim), self.cell_dim, current_path_color, &mut builder)?;
+                }
+                stats.polygons += search_trace.cells_searched.len() + search_trace.current_path.len();
+            }
+
+
+            // Draw white aura around snake heads (debug)
+            if DRAW_WHITE_AURA {
+                for point in snake.reachable(7, self.dim) {
+                    build_hexagon_at(point.to_point(self.cell_dim), self.cell_dim, Color::WHITE, &mut builder)?;
+                    stats.polygons += 1;
+                }
+            }
+
 
             let segment_styles = snake.palette.segment_styles(&snake.body, frame_frac);
             for (seg_idx, segment) in snake.body.cells.iter().enumerate() {
-                // previous = towards head
-                // next = towards tail
-
                 let coming_from = segment.coming_from;
                 let going_to = seg_idx
                     .checked_sub(1)
                     .map(|prev_idx| -snake.body.cells[prev_idx].coming_from)
-                    .unwrap_or_else(|| snake.dir());
+                    .unwrap_or(snake.dir());
 
-                if seg_idx == 0 && matches!(snake.state, SnakeState::Crashed | SnakeState::Dying) {
-                    assert!(
-                        matches!(segment.typ, SegmentType::Crashed | SegmentType::BlackHole),
-                        "head of type {:?} in snake in state {:?}",
-                        segment.typ,
-                        snake.state
-                    );
-
-                    let turn_transition = snake.body.turn_start.map(|(_, start_frame_frac)| {
-                        let max = 1. - start_frame_frac;
-                        let done = frame_frac - start_frame_frac;
-                        done / max
-                    }).unwrap_or(1.);
-
-                    // draw head separately
-                    heads.push((
-                        *segment,
-                        coming_from,
-                        going_to,
-                        segment_styles[seg_idx],
-                        subsegments_per_segment,
-                        turn_transition,
-                    ));
-                    continue;
+                if coming_from == going_to {
+                    // TODO: diagnose this bug
+                    panic!("180° turn ({:?} -> {:?}) at idx {} of snake at idx {}, segment_type: {:?}", coming_from, going_to, seg_idx, snake_idx, segment.typ);
                 }
 
                 let location = segment.pos.to_point(self.cell_dim);
@@ -126,7 +138,7 @@ impl Game {
                     _ => SegmentFraction::solid(),
                 };
 
-                let segment = SegmentDescription {
+                let segment_description = SegmentDescription {
                     destination: location,
                     turn: TurnDescription { coming_from, going_to },
                     fraction,
@@ -135,85 +147,30 @@ impl Game {
                     cell_dim: self.cell_dim,
                 };
 
-                // turn transition for all non-head segments is 1
-                for (color, points) in segment.render(subsegments_per_segment, 1.) {
-                    builder.polygon(DrawMode::fill(), &points, color)?;
-                    stats.total_subsegments += 1;
+                match segment.typ {
+                    SegmentType::BlackHole => black_holes.push((segment_description, subsegments_per_segment)),
+                    SegmentType::Crashed => crashed_heads.push((segment_description, subsegments_per_segment)),
+                    // turn transition for all non-head segments is 1
+                    _ => stats.polygons += segment_description.build(&mut builder, subsegments_per_segment, 1.)?,
                 }
             }
         }
 
-        // draw heads
-        for (
-            segment,
-            coming_from,
-            going_to,
-            seg_style,
-            subsegments_per_segment,
-            turn_transition,
-        ) in heads {
-            let Segment { pos, typ, .. } = segment;
-            let location = pos.to_point(self.cell_dim);
 
-            let segment_color = match seg_style {
-                SegmentStyle::Solid(color) => color,
-                _ => unimplemented!(),
-            };
-
-            let head_description = SegmentDescription {
-                destination: location,
-                turn: TurnDescription { coming_from, going_to },
-                fraction: SegmentFraction::appearing(0.5),
-                draw_style: self.prefs.draw_style,
-                segment_style: SegmentStyle::Solid(segment_color),
-                cell_dim: self.cell_dim,
-            };
-            match typ {
-                SegmentType::BlackHole => {
-                    let hexagon_color = Color::from_rgb(1, 36, 92);
-                    let mut hexagon_points = render_hexagon(self.cell_dim);
-                    translate(&mut hexagon_points, location);
-                    builder.polygon(DrawMode::fill(), &hexagon_points, hexagon_color)?;
-                    head_description.build(&mut builder, subsegments_per_segment, turn_transition)?;
-                }
-                SegmentType::Crashed => {
-                    head_description.build(&mut builder, subsegments_per_segment, turn_transition)?;
-                }
-                _ => unreachable!(
-                    "head segment of type {:?} should not have been queued to be drawn separately",
-                    typ
-                ),
-            }
+        // Draw black holes and crashed heads
+        let black_hole_color = Color::from_rgb(1, 36, 92);
+        for (segment_description, subsegments_per_segment) in black_holes {
+            build_hexagon_at(
+                segment_description.destination,
+                self.cell_dim,
+                black_hole_color,
+                &mut builder,
+            )?;
+            stats.polygons += 1;
+            stats.polygons += segment_description.build(&mut builder, subsegments_per_segment)?;
         }
-
-        // draw A* plan
-        #[cfg(feature = "show_search_path")]
-        unsafe {
-            if let Some(seen) = &crate::app::snake::controller::ETHEREAL_SEEN {
-                for point in seen {
-                    let mut hexagon_points = render_hexagon(self.cell_dim);
-                    let location = point.to_point(self.cell_dim);
-                    translate(&mut hexagon_points, location);
-                    builder.polygon(
-                        DrawMode::fill(),
-                        &hexagon_points,
-                        Color::from_rgb(130, 47, 5),
-                    )?;
-                }
-            }
-
-            if let Some(path) = &crate::app::snake::controller::ETHEREAL_PATH {
-                for point in path {
-                    let mut hexagon_points = render_hexagon(self.cell_dim);
-                    let location = point.to_point(self.cell_dim);
-                    translate(&mut hexagon_points, location);
-                    builder.polygon(
-                        DrawMode::fill(),
-                        &hexagon_points,
-                        Color::from_rgb(97, 128, 11),
-                    )?;
-                }
-            }
+        for (segment_description, subsegments_per_segment) in crashed_heads {
+            stats.polygons += segment_description.build(&mut builder, subsegments_per_segment)?;
         }
 
         builder.build(ctx)

@@ -76,7 +76,7 @@ impl SnakeDemo {
     }
 }
 
-impl EventHandler for SnakeDemo {
+impl EventHandler<ggez::GameError> for SnakeDemo {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         self.snake.advance(OtherSnakes::empty(), &[], self.dim);
         Ok(())
@@ -121,7 +121,7 @@ impl StartScreen {
     }
 }
 
-impl EventHandler for StartScreen {
+impl EventHandler<ggez::GameError> for StartScreen {
     fn update(&mut self, ctx: &mut Context) -> GameResult {
         self.player1_demo.update(ctx)?;
         Ok(())

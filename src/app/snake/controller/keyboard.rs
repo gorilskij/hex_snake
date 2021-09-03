@@ -24,7 +24,7 @@ impl Keyboard {
 }
 
 impl Controller for Keyboard {
-    fn next_dir(&mut self, _: &SnakeBody, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
+    fn next_dir(&mut self, _: &mut SnakeBody, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = queue_dir;
             Some(self.dir)

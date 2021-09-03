@@ -9,9 +9,6 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 
-#[cfg(feature = "show_search_path")]
-use crate::app::snake::controller::{ETHEREAL_PATH, ETHEREAL_SEEN};
-
 use itertools::Itertools;
 use std::{
     cmp::{max, min},
@@ -181,7 +178,7 @@ impl AStar {
 impl Controller for AStar {
     fn next_dir(
         &mut self,
-        snake_body: &SnakeBody,
+        snake_body: &mut SnakeBody,
         other_snakes: OtherSnakes,
         apples: &[Apple],
         board_dim: HexDim,
@@ -203,15 +200,11 @@ impl Controller for AStar {
         }
         self.steps_since_update += 1;
 
-        #[cfg(feature = "show_search_path")]
-        unsafe {
-            match &mut ETHEREAL_PATH {
-                Some(v) if !v.is_empty() => drop(v.remove(0)),
-                _ => ETHEREAL_PATH = None,
-            }
-            match &mut ETHEREAL_SEEN {
-                Some(h) => drop(h.remove(&snake_body[0].pos)),
-                _ => {}
+        let head_pos = snake_body[0].pos;
+        if let Some(search_trace) = &mut snake_body.search_trace {
+            search_trace.cells_searched.remove(&head_pos);
+            if !search_trace.current_path.is_empty() {
+                search_trace.current_path.remove(0);
             }
         }
 
@@ -220,16 +213,6 @@ impl Controller for AStar {
             Some(dir)
         } else {
             Self::least_damage(snake_body[0].pos, snake_body, other_snakes, board_dim)
-        }
-    }
-}
-
-#[cfg(feature = "show_search_path")]
-impl Drop for AStar {
-    fn drop(&mut self) {
-        unsafe {
-            ETHEREAL_PATH = None;
-            ETHEREAL_SEEN = None;
         }
     }
 }
