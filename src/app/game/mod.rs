@@ -923,10 +923,6 @@ impl EventHandler<ggez::GameError> for Game {
                 let text;
                 match self.prefs.draw_style {
                     DrawStyle::Hexagon => {
-                        self.prefs.draw_style = DrawStyle::Rough;
-                        text = "draw style: rough";
-                    }
-                    DrawStyle::Rough => {
                         self.prefs.draw_style = DrawStyle::Smooth;
                         text = "draw style: smooth";
                     }

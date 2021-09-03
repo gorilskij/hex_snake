@@ -11,7 +11,6 @@ use crate::{
         rendering::{
             descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
             hexagon_segments::HexagonSegments,
-            rough_segments::RoughSegments,
             smooth_segments::SmoothSegments,
         },
     },
@@ -160,7 +159,6 @@ impl SegmentDescription {
                 let color = subsegment.unwrap_solid_color();
                 let points = match subsegment.draw_style {
                     DrawStyle::Hexagon => HexagonSegments::render_segment(subsegment, turn),
-                    DrawStyle::Rough => RoughSegments::render_segment(subsegment, turn),
                     DrawStyle::Smooth => SmoothSegments::render_segment(subsegment, turn),
                 };
                 (color, points)

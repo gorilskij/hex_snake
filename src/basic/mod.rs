@@ -20,6 +20,5 @@ pub enum Side {
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum DrawStyle {
     Hexagon,
-    Rough,
     Smooth,
 }

@@ -3,7 +3,6 @@ use crate::basic::*;
 pub mod descriptions;
 mod hexagon_segments;
 pub mod point_factory;
-mod rough_segments;
 mod smooth_segments;
 
 pub fn render_hexagon(CellDim { side, sin, cos }: CellDim) -> Vec<Point> {
