@@ -20,7 +20,7 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use std::{collections::VecDeque, f32::consts::PI};
-use crate::app::game::FrameStamp;
+
 
 mod a_star;
 mod competitor1;
@@ -46,10 +46,6 @@ pub enum ControllerTemplate {
 pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);
 
 impl<'a> OtherSnakes<'a> {
-    pub fn empty() -> Self {
-        Self(&[], &[])
-    }
-
     pub fn new(a: &'a [Snake], b: &'a [Snake]) -> Self {
         Self(a, b)
     }
@@ -64,13 +60,6 @@ impl<'a> OtherSnakes<'a> {
 
     pub fn iter_segments(&self) -> impl Iterator<Item = &Segment> {
         self.iter_bodies().flat_map(|body| body.cells.iter())
-    }
-
-    pub fn contains(&self, point: HexPoint) -> bool {
-        self.0
-            .iter()
-            .chain(self.1.iter())
-            .any(|snake| snake.body.cells.iter().any(|segment| segment.pos == point))
     }
 }
 

@@ -460,11 +460,6 @@ impl Palette for OkLabGradient {
                     // invert lightness twice
                     let start_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, start_hue);
                     let end_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, end_hue);
-                    HSL {
-                        h: end_hue,
-                        s: 1.,
-                        l: 1. - self.eaten_lightness,
-                    };
                     styles.push(SegmentStyle::RGBGradient {
                         start_rgb: invert_rgb(start_okl.to_rgb()),
                         end_rgb: invert_rgb(end_okl.to_rgb()),
@@ -551,13 +546,13 @@ impl Palette for Alternating {
             // How far along the snake we currently are (in units of segments)
             let r = (i + body.missing_front) as f32 + frame_frac;
 
-            let color = match seg.typ {
+            let _color = match seg.typ {
                 Normal | BlackHole => {
                     // Check whether there is a minimum or maximum within this segment
                     use std::f32::consts::PI;
                     if r % PI <= PI && r % PI + 1. >= PI {
                         let diff = PI - r % PI;
-                        let cutoff = r + diff;
+                        let _cutoff = r + diff;
 
                         unimplemented!();
                     }

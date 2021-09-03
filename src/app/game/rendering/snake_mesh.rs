@@ -2,12 +2,10 @@ use crate::{
     app::{
         game::{Game, Stats},
         snake::{
-            palette::SegmentStyle,
             rendering::{
                 descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
                 render_hexagon,
-            },
-            Segment, SegmentType, SnakeState,
+            }, SegmentType,
         },
     },
     basic::transformations::translate,
@@ -16,10 +14,10 @@ use ggez::{
     graphics::{Color, DrawMode, Mesh, MeshBuilder},
     Context, GameResult,
 };
-use crate::app::snake::Snake;
-use crate::basic::{HexPoint, DrawStyle, CellDim, Point};
-use std::collections::vec_deque;
-use crate::app::game::FrameStamp;
+
+use crate::basic::{CellDim, Point};
+
+
 
 const DRAW_WHITE_AURA: bool = false;
 

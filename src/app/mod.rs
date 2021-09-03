@@ -94,7 +94,7 @@ impl App {
         let seeds: Vec<_> = players
             .into_iter()
             .map(|cs| SnakeSeed {
-                snake_type: SnakeType::PlayerSnake,
+                snake_type: SnakeType::Player,
                 eat_mechanics: EatMechanics {
                     eat_self: EatBehavior::Cut,
                     eat_other: hash_map! {},

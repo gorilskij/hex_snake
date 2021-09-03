@@ -1,7 +1,6 @@
 use crate::{
     app::snake::rendering::{
         descriptions::SegmentFraction, point_factory::SegmentRenderer,
-        rough_segments::RoughSegments,
     },
     basic::{CellDim, Point},
 };

@@ -208,7 +208,7 @@ impl Game {
             if self
                 .snakes
                 .iter()
-                .any(|s| s.snake_type == SnakeType::PlayerSnake && !new_dim.contains(s.head().pos))
+                .any(|s| s.snake_type == SnakeType::Player && !new_dim.contains(s.head().pos))
             {
                 println!("warning: player snake outside of board, restarting");
                 self.restart();
@@ -238,7 +238,7 @@ impl Game {
         let unpositioned = self
             .seeds
             .iter()
-            .filter(|seed| !matches!(seed.snake_type, SnakeType::SimulatedSnake { .. }))
+            .filter(|seed| !matches!(seed.snake_type, SnakeType::Simulated { .. }))
             .count();
 
         let mut unpositioned_dir = Dir::U;
@@ -260,7 +260,7 @@ impl Game {
 
         for seed in self.seeds.iter() {
             match seed.snake_type {
-                SnakeType::SimulatedSnake { start_pos, start_dir, start_grow } => {
+                SnakeType::Simulated { start_pos, start_dir, start_grow } => {
                     self.snakes
                         .push(Snake::from_seed(seed, start_pos, start_dir, start_grow));
                 }
@@ -331,7 +331,7 @@ impl Game {
             match self.rng.gen::<f32>() {
                 x if x < 0.025 => {
                     AppleType::SpawnSnake(SnakeSeed {
-                        snake_type: SnakeType::CompetitorSnake { life: Some(200) },
+                        snake_type: SnakeType::Competitor { life: Some(200) },
                         eat_mechanics: EatMechanics::always(EatBehavior::Die),
                         palette: PaletteTemplate::pastel_rainbow(true),
                         controller: ControllerTemplate::AStar,
@@ -341,13 +341,13 @@ impl Game {
                     if !self
                         .snakes
                         .iter()
-                        .any(|s| s.snake_type == SnakeType::PlayerSnake)
+                        .any(|s| s.snake_type == SnakeType::Player)
                     {
                         println!("warning: didn't spawn killer snake apple because there is no player snake");
                         AppleType::Normal(1)
                     } else {
                         AppleType::SpawnSnake(SnakeSeed {
-                            snake_type: SnakeType::KillerSnake { life: Some(200) },
+                            snake_type: SnakeType::Killer { life: Some(200) },
                             eat_mechanics: EatMechanics::always(EatBehavior::Die),
                             palette: PaletteTemplate::dark_blue_to_red(false),
                             controller: ControllerTemplate::Killer,
@@ -384,7 +384,7 @@ impl Game {
             let apple_pos = match &mut self.apple_spawn_strategy {
                 AppleSpawnStrategy::Random { apple_count } => {
                     let apple_pos =
-                        match Self::random_free_spot(&occupied_cells, self.dim, &mut self.rng) {
+                        match Self::random_free_spot(occupied_cells, self.dim, &mut self.rng) {
                             Some(pos) => pos,
                             None => {
                                 println!(
@@ -436,12 +436,6 @@ impl Game {
     /// snakes in a special struct to avoid building
     /// unnecessary vecs all the time (OtherSnakes is always
     /// immutable)
-    fn split_snakes(snakes: &[Snake], idx: usize) -> (&Snake, OtherSnakes) {
-        let (other_snakes1, rest) = snakes.split_at(idx);
-        let (snake, other_snakes2) = rest.split_first().unwrap();
-        (snake, OtherSnakes::new(other_snakes1, other_snakes2))
-    }
-
     fn split_snakes_mut(snakes: &mut [Snake], idx: usize) -> (&mut Snake, OtherSnakes) {
         let (other_snakes1, rest) = snakes.split_at_mut(idx);
         let (snake, other_snakes2) = rest.split_first_mut().unwrap();
@@ -453,8 +447,8 @@ impl Game {
         for snake_idx in 0..self.snakes.len() {
             // set snake to die if it ran out of life
             match &mut self.snakes[snake_idx].snake_type {
-                SnakeType::CompetitorSnake { life: Some(life) }
-                | SnakeType::KillerSnake { life: Some(life) } => {
+                SnakeType::Competitor { life: Some(life) }
+                | SnakeType::Killer { life: Some(life) } => {
                     if *life == 0 {
                         self.snakes[snake_idx].die();
                     } else {
@@ -485,8 +479,8 @@ impl Game {
             matches!(snake.state, SnakeState::Dying)
                 || matches!(
                     snake.snake_type,
-                    SnakeType::CompetitorSnake { life: Some(_) }
-                        | SnakeType::KillerSnake { life: Some(_) }
+                    SnakeType::Competitor { life: Some(_) }
+                        | SnakeType::Killer { life: Some(_) }
                 )
         };
         if self.snakes.iter().all(dying_or_ephemeral) {
@@ -622,7 +616,7 @@ impl Game {
             for snake in self
                 .snakes
                 .iter()
-                .filter(|s| s.snake_type == SnakeType::PlayerSnake)
+                .filter(|s| s.snake_type == SnakeType::Player)
             {
                 let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.dim);
                 occupied_cells.extend_from_slice(&neighborhood);
@@ -698,7 +692,7 @@ impl Game {
         };
 
         self.messages.insert(
-            MessageID::FPS,
+            MessageID::Fps,
             Message::default_top_left(
                 format!("u: {:.2} g: {:.2}", game_fps, graphics_fps),
                 color,
@@ -847,7 +841,7 @@ impl EventHandler<ggez::GameError> for Game {
             F => {
                 self.prefs.display_fps = !self.prefs.display_fps;
                 if !self.prefs.display_fps {
-                    self.messages.remove(&MessageID::FPS);
+                    self.messages.remove(&MessageID::Fps);
                     self.draw_cache_invalid = 5;
                 }
             }
@@ -868,7 +862,7 @@ impl EventHandler<ggez::GameError> for Game {
                         let player_snake = self
                             .snakes
                             .iter_mut()
-                            .find(|snake| snake.snake_type == SnakeType::PlayerSnake)
+                            .find(|snake| snake.snake_type == SnakeType::Player)
                             .unwrap();
 
                         let text = match &STASHED_CONTROLLER {

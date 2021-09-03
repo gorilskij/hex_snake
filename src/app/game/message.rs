@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 pub enum MessageID {
     /// Persistent fps view
-    FPS,
+    Fps,
     /// Temporary info when resizing window,
     /// toggling grid, or other notifications
     Notification,

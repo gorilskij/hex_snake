@@ -8,7 +8,7 @@ use ggez::{
 
 use crate::{
     app::{
-        snake::{controller::OtherSnakes, palette::PaletteTemplate, Segment, SegmentType, Snake},
+        snake::{palette::PaletteTemplate, Segment, SegmentType, Snake},
         Screen,
     },
     basic::{CellDim, Dir, HexDim, HexPoint},

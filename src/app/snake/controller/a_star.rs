@@ -34,10 +34,9 @@ impl PathNode {
     fn to_dir_vec(&self, board_dim: HexDim) -> Vec<Dir> {
         let mut vec = vec![Dir::U; self.length];
         // fill vec in reverse order
-        let mut latter = None;
         let mut former = Some(self);
         for i in (0..self.length).rev() {
-            latter = former;
+            let latter = former;
             former = former.and_then(|n| n.parent.as_ref().map(Rc::as_ref));
             vec[i] = former
                 .unwrap()

@@ -27,16 +27,16 @@ pub enum SnakeState {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum SnakeType {
-    PlayerSnake,
-    SimulatedSnake {
+    Player,
+    Simulated {
         start_pos: HexPoint,
         start_dir: Dir,
         start_grow: usize,
     },
-    CompetitorSnake {
+    Competitor {
         life: Option<Frames>,
     },
-    KillerSnake {
+    Killer {
         life: Option<Frames>,
     },
 }

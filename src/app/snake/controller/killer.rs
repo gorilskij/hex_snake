@@ -83,7 +83,7 @@ impl Controller for Killer {
     ) -> Option<Dir> {
         let player_snake = other_snakes
             .iter_snakes()
-            .filter(|s| s.snake_type == SnakeType::PlayerSnake)
+            .filter(|s| s.snake_type == SnakeType::Player)
             .min_by_key(|s| s.head().pos.manhattan_distance(snake_body.cells[0].pos))
             .expect("no player snake found");
 

@@ -16,12 +16,11 @@ use crate::{
         },
     },
     basic::{
-        transformations::{flip_horizontally, rotate_clockwise, translate},
-        CellDim, Dir, DrawStyle, Point,
+        transformations::{flip_horizontally, rotate_clockwise, translate}, Dir, DrawStyle, Point,
     },
     color::oklab::OkLab,
 };
-use std::cmp::max;
+
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
