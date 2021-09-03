@@ -47,7 +47,6 @@ impl SegmentRenderer for SmoothSegments {
         } = description;
 
         let CellDim { side, sin: _, cos } = *cell_dim;
-        let SegmentFraction { start, end } = *fraction;
 
         // distance of the pivot from where it is for a sharp turn
         let pivot_dist = 2. * cos * (1. / turn - 1.);
@@ -66,8 +65,8 @@ impl SegmentRenderer for SmoothSegments {
         let num_angle_segments = max(1, (NUM_ANGLE_SEGMENTS as f32 * fraction_size) as usize);
 
         let mut points = Vec::with_capacity(num_angle_segments * 2 + 2);
-        let start_angle = start * total_angle;
-        let end_angle = end * total_angle;
+        let start_angle = fraction.start * total_angle;
+        let end_angle = fraction.end * total_angle;
         let angle_diff = end_angle - start_angle;
 
         let inner_line = (0..=num_angle_segments).map(move |i| {

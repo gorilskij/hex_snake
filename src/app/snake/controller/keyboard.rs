@@ -38,7 +38,7 @@ impl Controller for Keyboard {
         self.dir = dir;
     }
 
-    fn key_pressed(&mut self, key: KeyCode, frame_stamp: FrameStamp) {
+    fn key_pressed(&mut self, key: KeyCode) {
         use Dir::*;
         let new_dir = match key {
             k if k == self.controls.u => U,

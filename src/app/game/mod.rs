@@ -994,7 +994,7 @@ impl EventHandler<ggez::GameError> for Game {
             k => {
                 if self.control.state() == GameState::Playing {
                     for snake in &mut self.snakes {
-                        snake.controller.key_pressed(k, self.control.frame_stamp())
+                        snake.controller.key_pressed(k)
                     }
                 }
             }

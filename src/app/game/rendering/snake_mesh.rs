@@ -147,9 +147,15 @@ impl Game {
                     cell_dim: self.cell_dim,
                 };
 
+                let turn = snake.body.turn_start.map(|(_, start_frame_frac)| {
+                    let max = 1. - start_frame_frac;
+                    let done = frame_frac - start_frame_frac;
+                    done / max
+                }).unwrap_or(1.);
+
                 match segment.typ {
-                    SegmentType::BlackHole => black_holes.push((segment_description, subsegments_per_segment)),
-                    SegmentType::Crashed => crashed_heads.push((segment_description, subsegments_per_segment)),
+                    SegmentType::BlackHole => black_holes.push((segment_description, subsegments_per_segment, turn)),
+                    SegmentType::Crashed => crashed_heads.push((segment_description, subsegments_per_segment, turn)),
                     // turn transition for all non-head segments is 1
                     _ => stats.polygons += segment_description.build(&mut builder, subsegments_per_segment, 1.)?,
                 }
@@ -159,7 +165,7 @@ impl Game {
 
         // Draw black holes and crashed heads
         let black_hole_color = Color::from_rgb(1, 36, 92);
-        for (segment_description, subsegments_per_segment) in black_holes {
+        for (segment_description, subsegments_per_segment, turn) in black_holes {
             build_hexagon_at(
                 segment_description.destination,
                 self.cell_dim,
@@ -167,10 +173,10 @@ impl Game {
                 &mut builder,
             )?;
             stats.polygons += 1;
-            stats.polygons += segment_description.build(&mut builder, subsegments_per_segment)?;
+            stats.polygons += segment_description.build(&mut builder, subsegments_per_segment, turn)?;
         }
-        for (segment_description, subsegments_per_segment) in crashed_heads {
-            stats.polygons += segment_description.build(&mut builder, subsegments_per_segment)?;
+        for (segment_description, subsegments_per_segment, turn) in crashed_heads {
+            stats.polygons += segment_description.build(&mut builder, subsegments_per_segment, turn)?;
         }
 
         builder.build(ctx)

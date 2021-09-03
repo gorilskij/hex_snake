@@ -42,7 +42,7 @@ impl Controller for KeyboardClock {
         self.dir = Dir12::Single(dir);
     }
 
-    fn key_pressed(&mut self, key: KeyCode, _: FrameStamp) {
+    fn key_pressed(&mut self, key: KeyCode) {
         match key {
             KeyCode::Left => self.dir -= 1,
             KeyCode::Right => self.dir += 1,

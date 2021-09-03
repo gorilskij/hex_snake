@@ -8,43 +8,39 @@ pub struct RoughSegments;
 
 impl SegmentRenderer for RoughSegments {
     fn render_straight_segment(description: &SegmentDescription) -> Vec<Point> {
-        unreachable!()
+        let CellDim { side, sin, cos } = description.cell_dim;
+        let SegmentFraction { start, end } = description.fraction;
+
+        // top-left, top-right, bottom-right, bottom-left
+        vec![
+            Point { x: cos, y: end * 2. * sin },
+            Point { x: cos + side, y: end * 2. * sin },
+            Point { x: cos + side, y: start * 2. * sin },
+            Point { x: cos, y: start * 2. * sin },
+        ]
     }
 
     fn render_curved_segment(description: &SegmentDescription, turn: f32) -> Vec<Point> {
         unreachable!()
     }
-    // fn render_default_straight(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
-    //     let CellDim { side, sin, cos } = cell_dim;
-    //     let SegmentFraction { start, end } = fraction;
-    //
-    //     // top-left, top-right, bottom-right, bottom-left
-    //     vec![
-    //         Point { x: cos, y: end * 2. * sin },
-    //         Point { x: cos + side, y: end * 2. * sin },
-    //         Point { x: cos + side, y: start * 2. * sin },
-    //         Point { x: cos, y: start * 2. * sin },
-    //     ]
-    // }
-    //
-    // fn render_default_blunt(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
-    //     let CellDim { side, sin, cos } = cell_dim;
-    //     let SegmentFraction { start, end } = fraction;
-    //
-    //     // The segment is defined by two parallel lines, A and B
-    //     let a_start = Point { x: cos, y: 0. };
-    //     let a_end = Point { x: cos + side, y: 2. * sin };
-    //     let b_start = Point { x: cos + side, y: 0. };
-    //     let b_end = Point { x: 2. * cos + side, y: sin };
-    //
-    //     vec![
-    //         (1. - start) * a_start + start * a_end,
-    //         (1. - start) * b_start + start * b_end,
-    //         (1. - end) * b_start + end * b_end,
-    //         (1. - end) * a_start + end * a_end,
-    //     ]
-    // }
-    //
+
+// fn render_default_blunt(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
+//     let CellDim { side, sin, cos } = cell_dim;
+//     let SegmentFraction { start, end } = fraction;
+//
+//     // The segment is defined by two parallel lines, A and B
+//     let a_start = Point { x: cos, y: 0. };
+//     let a_end = Point { x: cos + side, y: 2. * sin };
+//     let b_start = Point { x: cos + side, y: 0. };
+//     let b_end = Point { x: 2. * cos + side, y: sin };
+//
+//     vec![
+//         (1. - start) * a_start + start * a_end,
+//         (1. - start) * b_start + start * b_end,
+//         (1. - end) * b_start + end * b_end,
+//         (1. - end) * a_start + end * a_end,
+//     ]
+
     // fn render_default_sharp(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
     //     let CellDim { side, sin, cos } = cell_dim;
     //     let SegmentFraction { start, end } = fraction;
