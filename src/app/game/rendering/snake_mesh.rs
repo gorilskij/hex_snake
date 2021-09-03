@@ -20,6 +20,7 @@ use ggez::{
 impl Game {
     pub(in crate::app::game) fn snake_mesh(
         &mut self,
+        frame_frac: f32,
         ctx: &mut Context,
         stats: &mut Stats,
     ) -> GameResult<Mesh> {
@@ -90,6 +91,13 @@ impl Game {
                         segment.typ,
                         snake.state
                     );
+
+                    let turn_transition = snake.body.turn_start.map(|(_, start_frame_frac)| {
+                        let max = 1. - start_frame_frac;
+                        let done = frame_frac - start_frame_frac;
+                        done / max
+                    }).unwrap_or(1.);
+
                     // draw head separately
                     heads.push((
                         *segment,
@@ -97,7 +105,7 @@ impl Game {
                         going_to,
                         segment_styles[seg_idx],
                         subsegments_per_segment,
-                        snake.body.turn_transition,
+                        turn_transition,
                     ));
                     continue;
                 }

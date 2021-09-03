@@ -98,9 +98,6 @@ pub struct SnakeBody {
     /// a segment appearing, the transition needs to be
     /// done smoothly, this indicates at which frame and
     /// frame_frac the transition was started
-    /// Note that this is a purely graphical phenomenon
-    /// and is handled by the graphics code, not by the
-    /// game code, this has no effect on gameplay.
     pub turn_start: Option<(usize, f32)>,
 
     /// When `Snake::update_dir` is called from a draw method

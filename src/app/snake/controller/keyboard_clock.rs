@@ -9,6 +9,7 @@ use crate::{
     basic::{Dir, Dir12, HexDim},
 };
 use ggez::event::KeyCode;
+use crate::app::game::FrameStamp;
 
 // joke controller with 12 directions allowing the player to rotate between them using left and right, surprising horizontal teleportation
 // looks pretty cool with the sharp drawing style
@@ -41,7 +42,7 @@ impl Controller for KeyboardClock {
         self.dir = Dir12::Single(dir);
     }
 
-    fn key_pressed(&mut self, key: KeyCode) {
+    fn key_pressed(&mut self, key: KeyCode, _: FrameStamp) {
         match key {
             KeyCode::Left => self.dir -= 1,
             KeyCode::Right => self.dir += 1,

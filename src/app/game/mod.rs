@@ -742,7 +742,7 @@ impl EventHandler for Game {
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
 
-            snake_mesh = Some(ROw::Owned(self.snake_mesh(ctx, &mut stats)?));
+            snake_mesh = Some(ROw::Owned(self.snake_mesh(self.control.frame_fraction(), ctx, &mut stats)?));
             apple_mesh = Some(ROw::Owned(self.apple_mesh(ctx, &mut stats)?));
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
@@ -765,7 +765,7 @@ impl EventHandler for Game {
             }
 
             if self.cached_snake_mesh.is_none() {
-                self.cached_snake_mesh = Some(self.snake_mesh(ctx, &mut stats)?);
+                self.cached_snake_mesh = Some(self.snake_mesh(self.control.frame_fraction(), ctx, &mut stats)?);
                 update = true;
             }
 
