@@ -50,12 +50,10 @@ impl SegmentRenderer for SmoothSegments {
 
         // distance of the pivot from where it is for a sharp turn
         let pivot_dist = 2. * cos * (1. / turn - 1.);
-
         // too straight to be drawn as curved, default to straight drawing
         if pivot_dist.is_infinite() {
             return Self::render_straight_segment(description);
         }
-
         let pivot = Point { x: side + cos + pivot_dist, y: 0. };
 
         let inner_line_start = Point { x: cos + side, y: 0. };

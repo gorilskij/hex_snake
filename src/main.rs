@@ -18,7 +18,6 @@ use crate::{
 };
 use ggez::{
     conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
-    graphics::Rect,
 };
 
 mod app;
