@@ -151,7 +151,9 @@ impl Game {
                     let turn = snake.body.turn_start.map(|(_, start_frame_frac)| {
                         let max = 1. - start_frame_frac;
                         let covered = frame_frac - start_frame_frac;
-                        covered / max
+                        let linear = covered / max;
+                        // apply easing
+                        ezing::sine_inout(linear)
                     }).unwrap_or(1.);
 
                     match segment.typ {
