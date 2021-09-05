@@ -15,11 +15,11 @@ use crate::{
             Segment, Snake, SnakeBody,
         },
     },
-    basic::{Dir, Dir12, HexDim, HexPoint, Side},
+    basic::{Dir, Dir12, HexDim, Side},
     partial_min_max::{partial_max, partial_min},
 };
 use ggez::event::KeyCode;
-use std::{collections::VecDeque, f32::consts::PI};
+use std::{collections::VecDeque, f32::consts::TAU};
 
 
 mod a_star;
@@ -148,7 +148,7 @@ impl ControllerTemplate {
 fn angle_distance(a1: f32, a2: f32) -> f32 {
     let d1 = (a1 - a2).abs();
     // add 2pi to the smaller of the two angles and consider that distance as well
-    let b1 = partial_min(a1, a2).unwrap() + 2. * PI;
+    let b1 = partial_min(a1, a2).unwrap() + TAU;
     let b2 = partial_max(a1, a2).unwrap();
     let d2 = (b1 - b2).abs();
     partial_min(d1, d2).unwrap()

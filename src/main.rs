@@ -1,5 +1,5 @@
 #![deny(unused_must_use)]
-#![feature(stmt_expr_attributes)] // for rustfmt::skip on expressions
+#![feature(stmt_expr_attributes)]
 #![feature(if_let_guard)]
 
 #[macro_use]

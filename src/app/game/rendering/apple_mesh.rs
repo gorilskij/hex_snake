@@ -40,6 +40,7 @@ impl Game {
                 let dest = apple.pos.to_point(self.cell_dim) + self.cell_dim.center();
                 builder.circle(DrawMode::fill(), dest, self.cell_dim.side / 1.5, 0.1, color)?;
             }
+            stats.polygons += 1;
         }
 
         builder.build(ctx)

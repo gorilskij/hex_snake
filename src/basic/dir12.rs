@@ -1,7 +1,7 @@
 use crate::basic::Dir;
 use std::{
     cmp::Ordering,
-    f32::consts::PI,
+    f32::consts::TAU,
     ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
 use Dir::*;
@@ -10,47 +10,48 @@ use Dir12::*;
 // includes directions between the usual 6
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Dir12 {
+    /// A direction equivalent to the contained `Dir`
     Single(Dir),
-    // the two directions must be in clockwise order
-    // except if it's (UL, U) (clockwise but not Ord)
-    // this variant shouldn't be constructed manually
+    /// A direction between the first and second `Dir`,
+    /// the two `Dir`s must be in clockwise order including
+    /// `Combined(UL, U)`, this variant shouldn't be
+    /// constructed manually
     Combined(Dir, Dir),
 }
 
 impl Dir12 {
     // angles of directions, clockwise from U
-    #[rustfmt::skip]
-    #[allow(clippy::eq_op)]
+    // #[allow(clippy::eq_op)]
     pub const ANGLES: [(Dir12, f32); 12] = [
-        (  Single(U),      3. / 6. * PI),
-        (Combined(U, UR),  2. / 6. * PI),
-        (  Single(UR),     1. / 6. * PI),
-        (Combined(UR, DR), 0. / 6. * PI),
-        (  Single(DR),    11. / 6. * PI),
-        (Combined(DR, D), 10. / 6. * PI),
-        (  Single(D),      9. / 6. * PI),
-        (Combined(D, DL),  8. / 6. * PI),
-        (  Single(DL),     7. / 6. * PI),
-        (Combined(DL, UL), 6. / 6. * PI),
-        (  Single(UL),     5. / 6. * PI),
-        (Combined(UL, U),  4. / 6. * PI),
+        (Single(U), 3. / 12. * TAU),
+        (Combined(U, Ur), 2. / 12. * TAU),
+        (Single(Ur), 1. / 12. * TAU),
+        (Combined(Ur, Dr), 0. / 12. * TAU),
+        (Single(Dr), 11. / 12. * TAU),
+        (Combined(Dr, D), 10. / 12. * TAU),
+        (Single(D), 9. / 12. * TAU),
+        (Combined(D, Dl), 8. / 12. * TAU),
+        (Single(Dl), 7. / 12. * TAU),
+        (Combined(Dl, Ul), 6. / 12. * TAU),
+        (Single(Ul), 5. / 12. * TAU),
+        (Combined(Ul, U), 4. / 12. * TAU),
     ];
 
     // clockwise from U
     pub fn iter() -> impl Iterator<Item = Self> {
         [
             Single(U),
-            Combined(U, UR),
-            Single(UR),
-            Combined(UR, DR),
-            Single(DR),
-            Combined(DR, D),
+            Combined(U, Ur),
+            Single(Ur),
+            Combined(Ur, Dr),
+            Single(Dr),
+            Combined(Dr, D),
             Single(D),
-            Combined(D, DL),
-            Single(DL),
-            Combined(DL, UL),
-            Single(UL),
-            Combined(UL, U),
+            Combined(D, Dl),
+            Single(Dl),
+            Combined(Dl, Ul),
+            Single(Ul),
+            Combined(Ul, U),
         ]
         .iter()
         .copied()

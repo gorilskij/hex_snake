@@ -6,7 +6,7 @@ use crate::{
 };
 use std::cmp::max;
 use crate::app::snake::rendering::descriptions::{SegmentDescription, TurnType};
-use std::f32::consts::{FRAC_PI_3, TAU};
+use std::f32::consts::TAU;
 
 pub struct SmoothSegments;
 
@@ -37,7 +37,7 @@ fn upper_intersection_point(
 }
 
 impl SegmentRenderer for SmoothSegments {
-    fn render_straight_segment(description: &SegmentDescription) -> Vec<Point> {
+    fn render_default_straight_segment(description: &SegmentDescription) -> Vec<Point> {
         let SegmentDescription {
             cell_dim,
             fraction,
@@ -56,12 +56,11 @@ impl SegmentRenderer for SmoothSegments {
         ]
     }
 
-    fn render_curved_segment(description: &SegmentDescription, mut turn: f32) -> Vec<Point> {
+    fn render_default_curved_segment(description: &SegmentDescription, mut turn: f32) -> Vec<Point> {
+        // a blunt turn is equivalent to half a sharp turn
         if let TurnType::Blunt(_) = description.turn.turn_type() {
             turn /= 2.;
         }
-
-        // let total_angle = turn * TAU / 3.;
 
         let SegmentDescription {
             cell_dim,
@@ -75,37 +74,39 @@ impl SegmentRenderer for SmoothSegments {
         let pivot_dist = 2. * cos * (1. / turn - 1.);
         // too straight to be drawn as curved, default to straight drawing
         if pivot_dist.is_infinite() {
-            return Self::render_straight_segment(description);
+            return Self::render_default_straight_segment(description);
         }
         let pivot = Point { x: side + cos + pivot_dist, y: 0. };
 
-        let inner_line_start = Point { x: cos + side, y: 0. };
-        let outer_line_start = Point { x: cos, y: 0. };
 
-
-        // TODO: add fast shortcut for when turn == 1
         // We imagine a circle in which the cell's hexagon is inscribed,
         // we also imagine a circle around the pivot tracing the outer path,
         // we find the intersection between these circles to determine the
         // angle (amount of path) to actually trace.
         // The angle is the same for both inner and outer circles, the
         // calculation would be equivalent for the inner circle.
-
-        // find the (upper) intersection point between the two circles
-        let p0 = Point { x: cos + side / 2., y: sin };
-        let r0 = ((side / 2.).powi(2) + sin.powi(2)).sqrt();
-        let r1 = side + pivot_dist;
-        let intersection_point = upper_intersection_point(p0, r0, pivot, r1);
-
-        // TODO: use atan2
-        // find the angle around the pivot for when the pivot is right of
-        // the intersection point or when it's left of the intersection_point
-        let total_angle = if intersection_point.x <= pivot.x {
-            (intersection_point.y / (pivot.x - intersection_point.x)).atan()
+        let total_angle = if (turn - 1.).abs() < f32::EPSILON {
+            // shortcut for a complete turn
+            TAU / 3.
         } else {
-            TAU / 2. - (intersection_point.y / (intersection_point.x - pivot.x)).atan()
+            // find the (upper) intersection point between the two circles
+            let p0 = Point { x: cos + side / 2., y: sin };
+            let r0 = ((side / 2.).powi(2) + sin.powi(2)).sqrt();
+            let r1 = side + pivot_dist;
+            let intersection_point = upper_intersection_point(p0, r0, pivot, r1);
+
+            // find the angle around the pivot for when the pivot is right or left
+            // of the intersection point
+            if intersection_point.x <= pivot.x {
+                (intersection_point.y / (pivot.x - intersection_point.x)).atan()
+            } else {
+                TAU / 2. - (intersection_point.y / (intersection_point.x - pivot.x)).atan()
+            }
         };
 
+
+        let inner_line_start = Point { x: cos + side, y: 0. };
+        let outer_line_start = Point { x: cos, y: 0. };
 
         let fraction_size = fraction.end - fraction.start;
         let num_angle_segments = NUM_ANGLE_SEGMENTS as f32 * fraction_size;
@@ -132,10 +133,10 @@ impl SegmentRenderer for SmoothSegments {
         points.extend(inner_line);
         points.extend(outer_line);
 
-        // hacky
+        // TODO: if this appears again, just forgo drawing the segment
         if points.len() < 3 {
             assert_eq!(points.len(), 2);
-            points.push((*points.last().unwrap() + *points.first().unwrap()) / 2.);
+            panic!("segment with only 2 points");
         }
 
         points

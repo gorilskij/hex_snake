@@ -179,36 +179,31 @@ impl SegmentDescription {
 
 /// The `render_default_*` functions are without position or rotation, they simply generate the points that correspond to a type of turn (straight, blunt, or sharp)
 pub trait SegmentRenderer {
-    // /// Default straight segment coming from above (U) and going down (D)
-    // fn render_default_straight(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
-    //
-    // /// Default blunt segment coming from above (U) and going down-right (DR)
-    // fn render_default_blunt(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
-    //
-    // /// Default sharp segment coming from above (U) and going up-right (UR)
-    // fn render_default_sharp(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point>;
+    /// Render a straight segment in the default orientation,
+    /// coming from above (U) and going down (D)
+    fn render_default_straight_segment(description: &SegmentDescription) -> Vec<Point>;
 
-    fn render_straight_segment(description: &SegmentDescription) -> Vec<Point>;
+    /// Render a curved segment in the default orientation,
+    /// a blunt segment coming from above (U) and going down-right (DR)
+    /// or a sharp segment coming from above (U) and going up-right (UR)
+    ///
+    /// `turn` describes how far along the segment is on its turn,
+    /// a value of 0 means the segment is straight, a value of 1 means
+    /// the turn is complete
+    fn render_default_curved_segment(description: &SegmentDescription, turn: f32) -> Vec<Point>;
 
-    /// Turns a default segment into one that is ready to be printed
-    /// adding position and rotating and reflecting to fit the desired
-    /// from and to directions.
-    /// Turn describes how far along the segment is on the D -> DR -> UR progression
-    /// (coming from U) (0 = D, 1 = UR)
-    fn render_curved_segment(description: &SegmentDescription, turn: f32) -> Vec<Point>;
-
-    // account for rotation and translation
+    /// Render a segment, rotate it and reflect it to match the desired
+    /// coming-from and going-to directions, and translate it to match
+    /// the desired position
     fn render_segment(description: SegmentDescription, turn: f32) -> Vec<Point> {
         use TurnDirection::*;
         use TurnType::*;
 
-        // let mut segment = Self::render_default_segment(&description, turn);
-
         let mut segment;
         match description.turn.turn_type() {
-            Straight => segment = Self::render_straight_segment(&description),
+            Straight => segment = Self::render_default_straight_segment(&description),
             Blunt(turn_direction) | Sharp(turn_direction) => {
-                segment = Self::render_curved_segment(&description, turn);
+                segment = Self::render_default_curved_segment(&description, turn);
                 if turn_direction == Clockwise {
                     flip_horizontally(&mut segment, description.cell_dim.center().x);
                 }

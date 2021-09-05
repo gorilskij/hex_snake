@@ -1,5 +1,5 @@
 use ggez::mint::Point2;
-use std::ops::{Div, Mul, Sub};
+use std::ops::{Div, Mul};
 
 /// A more convenient version of mint::Point2<f32>
 #[derive(Copy, Clone, Debug, Add, AddAssign, Sub, SubAssign)]

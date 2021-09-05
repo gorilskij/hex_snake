@@ -14,10 +14,10 @@ pub struct HexagonSegments;
 /// shouldn't be used directly outside of `render_segment` and instead implements
 /// `render_segment` directly
 impl SegmentRenderer for HexagonSegments {
-    fn render_straight_segment(_: &SegmentDescription) -> Vec<Point> {
+    fn render_default_straight_segment(_: &SegmentDescription) -> Vec<Point> {
         unreachable!()
     }
-    fn render_curved_segment(_: &SegmentDescription, _turn: f32) -> Vec<Point> {
+    fn render_default_curved_segment(_: &SegmentDescription, _turn: f32) -> Vec<Point> {
         unreachable!()
     }
 

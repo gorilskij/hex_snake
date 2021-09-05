@@ -44,14 +44,14 @@ impl HexPoint {
                 // going up
                 let dv = dh - (dh + self.h % 2) / 2;
                 if other.v == self.v - dv {
-                    return Some(if self.h > other.h { UL } else { UR });
+                    return Some(if self.h > other.h { Ul } else { Ur });
                 }
             } else if self.v < other.v || self.v == other.v && self.h % 2 == 0 {
                 // going down
                 let dv = dh - (dh + (self.h + 1) % 2) / 2;
                 let expected_v = self.v + dv;
                 if expected_v == other.v {
-                    return Some(if self.h > other.h { DL } else { DR });
+                    return Some(if self.h > other.h { Dl } else { Dr });
                 }
             }
         }
@@ -143,25 +143,25 @@ impl HexPoint {
         match dir {
             U => new_pos.v -= dh,
             D => new_pos.v += dh,
-            UL => {
+            Ul => {
                 let adjustment = (dh + (self.h % 2).abs()) / 2;
                 let dv = dh - adjustment;
                 new_pos.h -= dh;
                 new_pos.v -= dv;
             }
-            UR => {
+            Ur => {
                 let adjustment = (dh + (self.h % 2).abs()) / 2;
                 let dv = dh - adjustment;
                 new_pos.h += dh;
                 new_pos.v -= dv;
             }
-            DL => {
+            Dl => {
                 let adjustment = (dh + 1 - (self.h % 2).abs()) / 2;
                 let dv = dh - adjustment;
                 new_pos.h -= dh;
                 new_pos.v += dv;
             }
-            DR => {
+            Dr => {
                 let adjustment = (dh + 1 - (self.h % 2).abs()) / 2;
                 let dv = dh - adjustment;
                 new_pos.h += dh;
@@ -185,8 +185,8 @@ impl HexPoint {
             #[rustfmt::skip]
                 let dir = match axis {
                     UD => if self.v < 0 { U } else { D },
-                    ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
-                    URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
+                    UlDr => if self.v < 0 || self.h < 0 { Ul } else { Dr },
+                    UrDl => if self.v < 0 || self.h >= board_dim.h { Ur } else { Dl },
                 };
 
             // check if the point is salvageable, otherwise return None

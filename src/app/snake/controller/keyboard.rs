@@ -43,10 +43,10 @@ impl Controller for Keyboard {
         let new_dir = match key {
             k if k == self.controls.u => U,
             k if k == self.controls.d => D,
-            k if k == self.controls.ul => UL,
-            k if k == self.controls.ur => UR,
-            k if k == self.controls.dl => DL,
-            k if k == self.controls.dr => DR,
+            k if k == self.controls.ul => Ul,
+            k if k == self.controls.ur => Ur,
+            k if k == self.controls.dl => Dl,
+            k if k == self.controls.dr => Dr,
             _ => return,
         };
 

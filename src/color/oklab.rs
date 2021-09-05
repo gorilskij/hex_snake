@@ -15,6 +15,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::f64::consts::TAU;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OkLab {
     pub l: f64,
@@ -49,7 +51,7 @@ impl From<(u8, u8, u8)> for OkLab {
 impl OkLab {
     pub fn from_lch(lightness: f64, chroma: f64, hue: f64) -> Self {
         // deg -> rad
-        let hue = hue / 360. * 2. * std::f64::consts::PI;
+        let hue = hue / 360. * TAU;
         Self {
             l: lightness,
             a: chroma * hue.cos(),
@@ -61,7 +63,7 @@ impl OkLab {
         (
             self.l,
             (self.a * self.a + self.b * self.b).sqrt(),
-            self.b.atan2(self.a) / (2. * std::f64::consts::PI) * 360.,
+            self.b.atan2(self.a) / TAU * 360.,
         )
     }
 
