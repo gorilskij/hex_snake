@@ -6,11 +6,35 @@ use crate::{
 };
 use std::cmp::max;
 use crate::app::snake::rendering::descriptions::{SegmentDescription, TurnType};
-use std::f32::consts::FRAC_PI_3;
+use std::f32::consts::{FRAC_PI_3, TAU};
 
 pub struct SmoothSegments;
 
+/// Number of segments for a full turn, a lower number results
+/// in a lower resolution, i.e. jagged edges
 const NUM_ANGLE_SEGMENTS: usize = 10;
+
+/// Return the upper intersection point between two circles
+///  - p0, p1 are the centers of the circles
+///  - r0, r1 are the radii
+///  - p3, p4 are the intersection points
+///  - p2 is the intersection between the lines p0-p1 and p3-p4
+///  - d is the distance p0-p1
+///  - a is the distance p0-p2
+///  - h is the distance p2-p3 (equal to p2-p4)
+fn upper_intersection_point(
+    p0: Point, r0: f32, p1: Point, r1: f32,
+) -> Point {
+    let d: f32 = (p0 - p1).magnitude();
+    let a = (r0.powi(2) - r1.powi(2) + d.powi(2)) / (2. * d);
+    let p2: Point = p0 + (a / d) * (p1 - p0);
+    let h = (r0.powi(2) - a.powi(2)).sqrt();
+    let p3 = Point {
+        x: p2.x - (h / d) * (p1.y - p0.y),
+        y: p2.y + (h / d) * (p1.x - p0.x),
+    };
+    p3
+}
 
 impl SegmentRenderer for SmoothSegments {
     fn render_straight_segment(description: &SegmentDescription) -> Vec<Point> {
@@ -37,7 +61,7 @@ impl SegmentRenderer for SmoothSegments {
             turn /= 2.;
         }
 
-        let total_angle = turn * 2. * FRAC_PI_3;
+        // let total_angle = turn * TAU / 3.;
 
         let SegmentDescription {
             cell_dim,
@@ -45,7 +69,7 @@ impl SegmentRenderer for SmoothSegments {
             ..
         } = description;
 
-        let CellDim { side, sin: _, cos } = *cell_dim;
+        let CellDim { side, sin, cos } = *cell_dim;
 
         // distance of the pivot from where it is for a sharp turn
         let pivot_dist = 2. * cos * (1. / turn - 1.);
@@ -58,8 +82,34 @@ impl SegmentRenderer for SmoothSegments {
         let inner_line_start = Point { x: cos + side, y: 0. };
         let outer_line_start = Point { x: cos, y: 0. };
 
+
+        // TODO: add fast shortcut for when turn == 1
+        // We imagine a circle in which the cell's hexagon is inscribed,
+        // we also imagine a circle around the pivot tracing the outer path,
+        // we find the intersection between these circles to determine the
+        // angle (amount of path) to actually trace.
+        // The angle is the same for both inner and outer circles, the
+        // calculation would be equivalent for the inner circle.
+
+        // find the (upper) intersection point between the two circles
+        let p0 = Point { x: cos + side / 2., y: sin };
+        let r0 = ((side / 2.).powi(2) + sin.powi(2)).sqrt();
+        let r1 = side + pivot_dist;
+        let intersection_point = upper_intersection_point(p0, r0, pivot, r1);
+
+        // TODO: use atan2
+        // find the angle around the pivot for when the pivot is right of
+        // the intersection point or when it's left of the intersection_point
+        let total_angle = if intersection_point.x <= pivot.x {
+            (intersection_point.y / (pivot.x - intersection_point.x)).atan()
+        } else {
+            TAU / 2. - (intersection_point.y / (intersection_point.x - pivot.x)).atan()
+        };
+
+
         let fraction_size = fraction.end - fraction.start;
-        let num_angle_segments = max(1, (NUM_ANGLE_SEGMENTS as f32 * fraction_size) as usize);
+        let num_angle_segments = NUM_ANGLE_SEGMENTS as f32 * fraction_size;
+        let num_angle_segments = max(1, num_angle_segments as usize);
 
         let mut points = Vec::with_capacity(num_angle_segments * 2 + 2);
         let start_angle = fraction.start * total_angle;

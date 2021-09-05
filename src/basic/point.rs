@@ -1,5 +1,5 @@
 use ggez::mint::Point2;
-use std::ops::{Div, Mul};
+use std::ops::{Div, Mul, Sub};
 
 /// A more convenient version of mint::Point2<f32>
 #[derive(Copy, Clone, Debug, Add, AddAssign, Sub, SubAssign)]
@@ -59,5 +59,10 @@ impl Point {
     #[must_use]
     pub fn rotate_counterclockwise(self, origin: Self, angle: f32) -> Self {
         self.rotate_clockwise(origin, -angle)
+    }
+
+    #[must_use]
+    pub fn magnitude(self) -> f32 {
+        (self.x.powi(2) + self.y.powi(2)).sqrt()
     }
 }
