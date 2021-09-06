@@ -5,7 +5,6 @@ use crate::{
         screen::game::{Apple, FrameStamp},
         snake::{
             controller::{Controller, ControllerTemplate},
-            palette::{Palette, PaletteTemplate},
             utils::OtherSnakes,
         },
         Frames,
@@ -14,8 +13,10 @@ use crate::{
 };
 use std::ops::Deref;
 
+pub use palette::{Palette, PaletteTemplate};
+
 pub mod controller;
-pub mod palette;
+mod palette;
 pub mod rendering;
 pub mod utils;
 
@@ -251,8 +252,8 @@ impl Snake {
     ) {
         if !self.body.dir_grace && self.state == State::Living {
             if let Some(new_dir) =
-                self.controller
-                    .next_dir(&mut self.body, other_snakes, apples, board_dim)
+            self.controller
+                .next_dir(&mut self.body, other_snakes, apples, board_dim)
             {
                 self.body.dir = new_dir;
                 self.body.dir_grace = true;
@@ -305,6 +306,19 @@ impl Snake {
             self.body.grow -= 1;
         } else {
             self.body.cells.pop_back();
+        }
+    }
+
+    /// Cut the snake starting from (and including) segment_index
+    pub fn cut_at(&mut self, segment_index: usize) {
+        let _ = self.body.cells.drain(segment_index..);
+
+        // ensure a length of at least 2 to avoid weird animation,
+        // otherwise, stop any previous growth
+        if self.len() < 2 {
+            self.body.grow = 2 - self.len();
+        } else {
+            self.body.grow = 0;
         }
     }
 

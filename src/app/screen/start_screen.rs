@@ -9,7 +9,6 @@ use crate::{
         },
         snake::{
             controller::{programmed::Move, ControllerTemplate},
-            palette::PaletteTemplate,
             utils::OtherSnakes,
             Body, EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeType, State,
         },
@@ -21,10 +20,10 @@ use ggez::graphics::Color;
 use std::slice;
 use crate::app::snake::SnakeSeed;
 use crate::app::screen::rendering::grid_mesh::{get_grid_mesh, get_border_mesh};
-use crate::app::palette::Palette;
+use crate::app;
 use crate::app::screen::game::{FrameStamp, Apple, AppleType};
 use crate::basic::DrawStyle;
-use crate::app::snake::palette::{Palette as SnakePalette, PaletteTemplate as SnakePaletteTemplate};
+use crate::app::snake;
 use ggez::event::{MouseButton, KeyMods, Button, GamepadId, Axis, ErrorOrigin, KeyCode};
 use crate::app::apple_spawn_strategy::{AppleSpawnStrategy, AppleSpawn};
 use crate::app::screen::rendering::apple_mesh::get_apple_mesh;
@@ -37,7 +36,7 @@ struct SnakeDemo {
     apples: Vec<Apple>,
     apple_spawn_strategy: AppleSpawnStrategy,
     snake: Snake,
-    palettes: Vec<SnakePaletteTemplate>,
+    palettes: Vec<snake::PaletteTemplate>,
     current_palette: usize,
 }
 
@@ -69,7 +68,7 @@ impl SnakeDemo {
                 default: EatBehavior::Cut,
             },
             // placeholder, updated immediately
-            palette: PaletteTemplate::Solid {
+            palette: snake::PaletteTemplate::Solid {
                 color: Color::RED,
                 eaten: Color::RED,
             },
@@ -77,13 +76,13 @@ impl SnakeDemo {
         };
 
         let palettes = vec![
-            SnakePaletteTemplate::solid_white_red(),
-            // SnakePaletteTemplate::rainbow(false),
-            SnakePaletteTemplate::rainbow(true),
-            SnakePaletteTemplate::alternating_white(),
-            SnakePaletteTemplate::gray_gradient(false),
-            SnakePaletteTemplate::green_to_red(false),
-            // SnakePaletteTemplate::zebra(),
+            snake::PaletteTemplate::solid_white_red(),
+            // snake::PaletteTemplate::rainbow(false),
+            snake::PaletteTemplate::rainbow(true),
+            snake::PaletteTemplate::alternating_white(),
+            snake::PaletteTemplate::gray_gradient(false),
+            snake::PaletteTemplate::green_to_red(false),
+            // snake::PaletteTemplate::zebra(),
         ];
         seed.palette = palettes[0];
 
@@ -179,7 +178,7 @@ impl SnakeDemo {
         self.spawn_apples();
     }
 
-    fn draw(&mut self, ctx: &mut Context, cell_dim: CellDim, frame_stamp: FrameStamp, draw_style: DrawStyle, palette: &Palette, stats: &mut Stats) -> GameResult {
+    fn draw(&mut self, ctx: &mut Context, cell_dim: CellDim, frame_stamp: FrameStamp, draw_style: DrawStyle, palette: &app::Palette, stats: &mut Stats) -> GameResult {
         self.snake.update_dir(
             OtherSnakes::empty(),
             &[],
@@ -218,7 +217,7 @@ impl SnakeDemo {
 pub struct StartScreen {
     control: Control,
     cell_dim: CellDim,
-    palettes: Vec<Palette>,
+    palettes: Vec<app::Palette>,
     current_palette: usize,
     prefs: Prefs,
     stats: Stats,
@@ -232,7 +231,7 @@ impl StartScreen {
         Self {
             control: Control::new(7.),
             cell_dim,
-            palettes: vec![Palette::dark()],
+            palettes: vec![app::Palette::dark()],
             current_palette: 0,
             prefs: Default::default(),
             stats: Default::default(),

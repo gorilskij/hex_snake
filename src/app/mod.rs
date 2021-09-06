@@ -13,11 +13,12 @@ use snake::{EatMechanics, SnakeSeed};
 
 use crate::app::{
     keyboard_control::ControlSetup,
-    snake::{controller::ControllerTemplate, palette::PaletteTemplate, EatBehavior, SnakeType},
+    snake::{controller::ControllerTemplate, EatBehavior, SnakeType},
 };
 use crate::app::apple_spawn_strategy::AppleSpawnStrategy;
-use crate::app::palette::Palette;
 use crate::basic::CellDim;
+
+pub use palette::Palette;
 
 macro_rules! hash_map {
     {} => {
@@ -36,6 +37,7 @@ mod snake;
 #[macro_use]
 mod apple_spawn_strategy;
 mod screen;
+mod collision_detection;
 
 pub type Frames = u64;
 
@@ -99,7 +101,7 @@ impl App {
                     eat_other: hash_map! {},
                     default: EatBehavior::Crash,
                 },
-                palette: PaletteTemplate::rainbow(true),
+                palette: snake::PaletteTemplate::rainbow(true),
                 // palette: PaletteTemplate::dark_blue_to_red(false),
                 // palette: PaletteTemplate::zebra(),
                 controller: ControllerTemplate::Keyboard(cs),
@@ -109,15 +111,15 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
-            screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            // screen: Screen::Game(Game::new(
-            //     cell_dim,
-            //     7.,
-            //     seeds,
-            //     Palette::dark(),
-            //     AppleSpawnStrategy::Random { apple_count: 5 },
-            //     window_mode,
-            // )),
+            // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
+            screen: Screen::Game(Game::new(
+                cell_dim,
+                7.,
+                seeds,
+                Palette::dark(),
+                AppleSpawnStrategy::Random { apple_count: 5 },
+                window_mode,
+            )),
             window_mode,
             window_setup,
         }
