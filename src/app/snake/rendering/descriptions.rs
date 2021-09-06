@@ -61,7 +61,10 @@ pub struct TurnDescription {
 
 impl Default for TurnDescription {
     fn default() -> Self {
-        Self { coming_from: Dir::D, going_to: Dir::U }
+        Self {
+            coming_from: Dir::D,
+            going_to: Dir::U,
+        }
     }
 }
 

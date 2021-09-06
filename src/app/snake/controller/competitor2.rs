@@ -1,5 +1,6 @@
 use crate::{
     app::{
+        screen::game::Apple,
         snake::{
             controller::{angle_distance, Controller, OtherSnakes},
             Body,
@@ -10,7 +11,6 @@ use crate::{
 };
 use itertools::Itertools;
 use std::f32::consts::PI;
-use crate::app::screen::game::Apple;
 
 pub struct Competitor2 {
     pub dir_state: bool, // Dir12 flip-flop state

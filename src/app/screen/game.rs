@@ -10,27 +10,26 @@ use rand::prelude::*;
 use crate::{
     app::{
         apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
+        palette::Palette,
         screen::{
             control::{Control, GameState},
             message::{Message, MessageID},
+            prefs::{Food, Prefs},
+            rendering::{
+                apple_mesh::get_apple_mesh, grid_mesh::get_grid_mesh, snake_mesh::get_snake_mesh,
+            },
+            stats::Stats,
         },
-        palette::Palette,
         snake::{
             controller::{Controller, ControllerTemplate},
             palette::PaletteTemplate,
-            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, State,
-            SnakeType,
+            utils::split_snakes_mut,
+            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeType, State,
         },
     },
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
 };
-use std::{collections::HashMap};
-use crate::app::snake::utils::split_snakes_mut;
-use crate::app::screen::prefs::{Prefs, Food};
-use crate::app::screen::stats::Stats;
-use crate::app::screen::rendering::snake_mesh::get_snake_mesh;
-use crate::app::screen::rendering::apple_mesh::get_apple_mesh;
-use crate::app::screen::rendering::grid_mesh::get_grid_mesh;
+use std::collections::HashMap;
 
 /// Represents (graphics frame number, frame fraction)
 pub(crate) type FrameStamp = (usize, f32);
@@ -268,14 +267,12 @@ impl Game {
     fn generate_apple(&mut self, apple_pos: HexPoint) {
         let apple_type = if self.prefs.special_apples {
             match self.rng.gen::<f32>() {
-                x if x < 0.025 => {
-                    AppleType::SpawnSnake(SnakeSeed {
-                        snake_type: SnakeType::Competitor { life: Some(200) },
-                        eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                        palette: PaletteTemplate::pastel_rainbow(true),
-                        controller: ControllerTemplate::AStar,
-                    })
-                }
+                x if x < 0.025 => AppleType::SpawnSnake(SnakeSeed {
+                    snake_type: SnakeType::Competitor { life: Some(200) },
+                    eat_mechanics: EatMechanics::always(EatBehavior::Die),
+                    palette: PaletteTemplate::pastel_rainbow(true),
+                    controller: ControllerTemplate::AStar,
+                }),
                 x if x < 0.040 => {
                     if !self
                         .snakes
@@ -327,9 +324,9 @@ impl Game {
                             Some(pos) => pos,
                             None => {
                                 println!(
-                                    "warning: no space left for new apples ({} apples will be missing)",
-                                    *apple_count - self.apples.len()
-                                );
+                                "warning: no space left for new apples ({} apples will be missing)",
+                                *apple_count - self.apples.len()
+                            );
                                 return;
                             }
                         };
@@ -390,7 +387,12 @@ impl Game {
             let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, snake_idx);
 
             // advance the snake
-            snake.advance(other_snakes, &self.apples, self.dim, self.control.frame_stamp());
+            snake.advance(
+                other_snakes,
+                &self.apples,
+                self.dim,
+                self.control.frame_stamp(),
+            );
 
             // remove snake if it ran out of body
             if snake.len() == 0 {
@@ -408,8 +410,7 @@ impl Game {
             matches!(snake.state, State::Dying)
                 || matches!(
                     snake.snake_type,
-                    SnakeType::Competitor { life: Some(_) }
-                        | SnakeType::Killer { life: Some(_) }
+                    SnakeType::Competitor { life: Some(_) } | SnakeType::Killer { life: Some(_) }
                 )
         };
         if self.snakes.iter().all(dying_or_ephemeral) {
@@ -681,11 +682,28 @@ impl EventHandler<ggez::GameError> for Game {
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
 
-            snake_mesh = Some(ROw::Owned(get_snake_mesh(&mut self.snakes, &self.control, self.dim, self.cell_dim, self.prefs.draw_style, ctx, &mut stats)?));
-            apple_mesh = Some(ROw::Owned(get_apple_mesh(&self.apples, &self.control, self.cell_dim, self.prefs.draw_style, &self.palette, ctx, &mut stats)?));
+            snake_mesh = Some(ROw::Owned(get_snake_mesh(
+                &mut self.snakes,
+                &self.control,
+                self.dim,
+                self.cell_dim,
+                self.prefs.draw_style,
+                ctx,
+                &mut stats,
+            )?));
+            apple_mesh = Some(ROw::Owned(get_apple_mesh(
+                &self.apples,
+                &self.control,
+                self.cell_dim,
+                self.prefs.draw_style,
+                &self.palette,
+                ctx,
+                &mut stats,
+            )?));
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
-                    self.grid_mesh = Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
+                    self.grid_mesh =
+                        Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
                 };
                 grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
             }
@@ -695,16 +713,32 @@ impl EventHandler<ggez::GameError> for Game {
             // update apples if there are any animated ones
             if self.cached_apple_mesh.is_none()
                 || self
-                .apples
-                .iter()
-                .any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_)))
+                    .apples
+                    .iter()
+                    .any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_)))
             {
-                self.cached_apple_mesh = Some(get_apple_mesh(&self.apples, &self.control, self.cell_dim, self.prefs.draw_style, &self.palette, ctx, &mut stats)?);
+                self.cached_apple_mesh = Some(get_apple_mesh(
+                    &self.apples,
+                    &self.control,
+                    self.cell_dim,
+                    self.prefs.draw_style,
+                    &self.palette,
+                    ctx,
+                    &mut stats,
+                )?);
                 update = true;
             }
 
             if self.cached_snake_mesh.is_none() {
-                self.cached_snake_mesh = Some(get_snake_mesh(&mut self.snakes, &self.control, self.dim, self.cell_dim, self.prefs.draw_style, ctx, &mut stats)?);
+                self.cached_snake_mesh = Some(get_snake_mesh(
+                    &mut self.snakes,
+                    &self.control,
+                    self.dim,
+                    self.cell_dim,
+                    self.prefs.draw_style,
+                    ctx,
+                    &mut stats,
+                )?);
                 update = true;
             }
 
@@ -720,7 +754,8 @@ impl EventHandler<ggez::GameError> for Game {
             if update {
                 if self.prefs.draw_grid {
                     if self.grid_mesh.is_none() {
-                        self.grid_mesh = Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
+                        self.grid_mesh =
+                            Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
                     };
                     grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
                 }

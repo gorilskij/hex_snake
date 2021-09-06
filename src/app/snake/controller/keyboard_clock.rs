@@ -1,5 +1,6 @@
 use crate::{
     app::{
+        screen::game::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,
@@ -8,8 +9,6 @@ use crate::{
     basic::{Dir, Dir12, HexDim},
 };
 use ggez::event::KeyCode;
-use crate::app::screen::game::Apple;
-
 
 // joke controller with 12 directions allowing the player to rotate between them using left and right, surprising horizontal teleportation
 // looks pretty cool with the sharp drawing style

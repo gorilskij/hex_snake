@@ -1,5 +1,6 @@
 use crate::{
     app::{
+        screen::game::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,
@@ -7,7 +8,6 @@ use crate::{
     },
     basic::{Dir, HexPoint},
 };
-use crate::app::screen::game::Apple;
 #[allow(unused_macros)]
 macro_rules! move_sequence {
     (@ turn($dir:expr) ) => {

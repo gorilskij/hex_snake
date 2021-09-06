@@ -15,11 +15,11 @@ use crate::{
         },
     },
     basic::{
-        transformations::{flip_horizontally, rotate_clockwise, translate}, Dir, DrawStyle, Point,
+        transformations::{flip_horizontally, rotate_clockwise, translate},
+        Dir, DrawStyle, Point,
     },
     color::oklab::OkLab,
 };
-
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
@@ -167,7 +167,12 @@ impl SegmentDescription {
     }
 
     /// Returns number of polygons built
-    pub fn build(self, builder: &mut MeshBuilder, subsegments_per_segment: usize, turn: f32) -> GameResult<usize> {
+    pub fn build(
+        self,
+        builder: &mut MeshBuilder,
+        subsegments_per_segment: usize,
+        turn: f32,
+    ) -> GameResult<usize> {
         let mut polygons = 0;
         for (color, points) in self.render(subsegments_per_segment, turn) {
             builder.polygon(DrawMode::fill(), &points, color)?;

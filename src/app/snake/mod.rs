@@ -1,18 +1,18 @@
-use std::collections::{HashMap, VecDeque, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     app::{
+        screen::game::{Apple, FrameStamp},
         snake::{
             controller::{Controller, ControllerTemplate},
             palette::{Palette, PaletteTemplate},
+            utils::OtherSnakes,
         },
         Frames,
     },
     basic::{Dir, HexDim, HexPoint},
 };
 use std::ops::Deref;
-use crate::app::snake::utils::OtherSnakes;
-use crate::app::screen::game::{Apple, FrameStamp};
 
 pub mod controller;
 pub mod palette;
@@ -241,7 +241,13 @@ impl Snake {
         out
     }
 
-    pub fn update_dir(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim, frame_stamp: FrameStamp) {
+    pub fn update_dir(
+        &mut self,
+        other_snakes: OtherSnakes,
+        apples: &[Apple],
+        board_dim: HexDim,
+        frame_stamp: FrameStamp,
+    ) {
         if !self.body.dir_grace && self.state == State::Living {
             if let Some(new_dir) =
                 self.controller
@@ -254,7 +260,13 @@ impl Snake {
         }
     }
 
-    pub fn advance(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim, frame_stamp: FrameStamp) {
+    pub fn advance(
+        &mut self,
+        other_snakes: OtherSnakes,
+        apples: &[Apple],
+        board_dim: HexDim,
+        frame_stamp: FrameStamp,
+    ) {
         let last_idx = self.len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].typ {
             if *food_left == 0 {

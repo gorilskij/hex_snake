@@ -1,10 +1,12 @@
-use crate::app::snake::{Snake, Body, Segment};
+use crate::app::snake::{Body, Segment, Snake};
 
 #[derive(Copy, Clone)]
 pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);
 
 impl<'a> OtherSnakes<'a> {
-    pub fn empty() -> Self { Self(&[], &[]) }
+    pub fn empty() -> Self {
+        Self(&[], &[])
+    }
 
     pub fn new(a: &'a [Snake], b: &'a [Snake]) -> Self {
         Self(a, b)

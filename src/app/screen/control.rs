@@ -1,9 +1,9 @@
+use crate::app::screen::game::FrameStamp;
 use std::{
     cmp::max,
     collections::VecDeque,
     time::{Duration, Instant},
 };
-use crate::app::screen::game::FrameStamp;
 
 struct FPSCounter {
     step: usize, // record once every 'step' frames

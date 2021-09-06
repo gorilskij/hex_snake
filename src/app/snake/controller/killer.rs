@@ -1,15 +1,15 @@
 use crate::{
     app::{
+        screen::game::Apple,
         snake::{
             controller::{angle_distance, Controller, OtherSnakes},
-            Segment, Body, SnakeType,
+            Body, Segment, SnakeType,
         },
     },
     basic::{CellDim, Dir, HexDim, HexPoint},
     partial_min_max::PartialMinMax,
 };
 use std::f32::consts::PI;
-use crate::app::screen::game::Apple;
 
 // tries to kill player
 pub struct Killer;
@@ -92,12 +92,6 @@ impl Controller for Killer {
         for _ in 0..1 {
             target = target.wrapping_translate(player_snake.dir(), 1, board_dim);
         }
-        rough_direction(
-            body.cells[0].pos,
-            target,
-            body,
-            other_snakes,
-            board_dim,
-        )
+        rough_direction(body.cells[0].pos, target, body, other_snakes, board_dim)
     }
 }

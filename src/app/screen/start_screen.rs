@@ -2,25 +2,27 @@ use std::collections::VecDeque;
 
 use ggez::{
     event::EventHandler,
-    graphics::{clear, draw, present, DrawParam, MeshBuilder},
+    graphics::{clear, draw, present, DrawParam},
     Context, GameResult,
 };
 
 use crate::{
     app::{
-        snake::{palette::PaletteTemplate, Segment, SegmentType, Snake, SnakeType, controller::{ControllerTemplate, programmed::Move}},
+        screen::{
+            control::Control, prefs::Prefs, rendering::snake_mesh::get_snake_mesh, stats::Stats,
+        },
+        snake::{
+            controller::{programmed::Move, ControllerTemplate},
+            palette::PaletteTemplate,
+            utils::OtherSnakes,
+            Body, EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeType, State,
+        },
         Screen,
     },
     basic::{CellDim, Dir, HexDim, HexPoint},
 };
 use ggez::graphics::Color;
-use crate::app::snake::{EatMechanics, EatBehavior, Body, State};
-use crate::app::screen::rendering::snake_mesh::get_snake_mesh;
 use std::slice;
-use crate::app::screen::prefs::Prefs;
-use crate::app::screen::stats::Stats;
-use crate::app::screen::control::Control;
-use crate::app::snake::utils::OtherSnakes;
 
 struct SnakeDemo {
     control: Control,
@@ -71,7 +73,7 @@ impl SnakeDemo {
                     turn_start: None,
                     dir_grace: false,
                     grow: 10,
-                    search_trace: None
+                    search_trace: None,
                 },
                 state: State::Living,
 
@@ -88,7 +90,11 @@ impl SnakeDemo {
                     Move::Wait(5),
                 ])
                 .into_controller(dir),
-                palette: PaletteTemplate::Solid { color: Color::WHITE, eaten: Color::RED }.into(),
+                palette: PaletteTemplate::Solid {
+                    color: Color::WHITE,
+                    eaten: Color::RED,
+                }
+                .into(),
             },
             prefs: Default::default(),
             stats: Default::default(),
@@ -99,13 +105,31 @@ impl SnakeDemo {
 impl EventHandler<ggez::GameError> for SnakeDemo {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         // self.snake.advance(OtherSnakes::empty(), &[], self.dim);
-        self.snake.advance(OtherSnakes::empty(), &[], self.dim, self.control.frame_stamp());
+        self.snake.advance(
+            OtherSnakes::empty(),
+            &[],
+            self.dim,
+            self.control.frame_stamp(),
+        );
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        self.snake.update_dir(OtherSnakes::empty(), &[], self.dim, self.control.frame_stamp());
-        let mesh = get_snake_mesh(slice::from_mut(&mut self.snake), &self.control, self.dim, self.cell_dim, self.prefs.draw_style, ctx, &mut self.stats)?;
+        self.snake.update_dir(
+            OtherSnakes::empty(),
+            &[],
+            self.dim,
+            self.control.frame_stamp(),
+        );
+        let mesh = get_snake_mesh(
+            slice::from_mut(&mut self.snake),
+            &self.control,
+            self.dim,
+            self.cell_dim,
+            self.prefs.draw_style,
+            ctx,
+            &mut self.stats,
+        )?;
         draw(ctx, &mesh, DrawParam::default())?;
         Ok(())
     }

@@ -1,12 +1,11 @@
 use crate::{
     app::snake::rendering::{
-        descriptions::SegmentFraction, point_factory::SegmentRenderer,
+        descriptions::{SegmentDescription, SegmentFraction, TurnType},
+        point_factory::SegmentRenderer,
     },
     basic::{CellDim, Point},
 };
-use std::cmp::max;
-use crate::app::snake::rendering::descriptions::{SegmentDescription, TurnType};
-use std::f32::consts::TAU;
+use std::{cmp::max, f32::consts::TAU};
 
 pub struct SmoothSegments;
 
@@ -22,9 +21,7 @@ const NUM_ANGLE_SEGMENTS: usize = 10;
 ///  - d is the distance p0-p1
 ///  - a is the distance p0-p2
 ///  - h is the distance p2-p3 (equal to p2-p4)
-fn upper_intersection_point(
-    p0: Point, r0: f32, p1: Point, r1: f32,
-) -> Point {
+fn upper_intersection_point(p0: Point, r0: f32, p1: Point, r1: f32) -> Point {
     let d: f32 = (p0 - p1).magnitude();
     let a = (r0.powi(2) - r1.powi(2) + d.powi(2)) / (2. * d);
     let p2: Point = p0 + (a / d) * (p1 - p0);
@@ -38,11 +35,7 @@ fn upper_intersection_point(
 
 impl SegmentRenderer for SmoothSegments {
     fn render_default_straight_segment(description: &SegmentDescription) -> Vec<Point> {
-        let SegmentDescription {
-            cell_dim,
-            fraction,
-            ..
-        } = description;
+        let SegmentDescription { cell_dim, fraction, .. } = description;
 
         let CellDim { side, sin, cos } = *cell_dim;
         let SegmentFraction { start, end } = *fraction;
@@ -56,17 +49,16 @@ impl SegmentRenderer for SmoothSegments {
         ]
     }
 
-    fn render_default_curved_segment(description: &SegmentDescription, mut turn: f32) -> Vec<Point> {
+    fn render_default_curved_segment(
+        description: &SegmentDescription,
+        mut turn: f32,
+    ) -> Vec<Point> {
         // a blunt turn is equivalent to half a sharp turn
         if let TurnType::Blunt(_) = description.turn.turn_type() {
             turn /= 2.;
         }
 
-        let SegmentDescription {
-            cell_dim,
-            fraction,
-            ..
-        } = description;
+        let SegmentDescription { cell_dim, fraction, .. } = description;
 
         let CellDim { side, sin, cos } = *cell_dim;
 
@@ -77,7 +69,6 @@ impl SegmentRenderer for SmoothSegments {
             return Self::render_default_straight_segment(description);
         }
         let pivot = Point { x: side + cos + pivot_dist, y: 0. };
-
 
         // We imagine a circle in which the cell's hexagon is inscribed,
         // we also imagine a circle around the pivot tracing the outer path,
@@ -103,7 +94,6 @@ impl SegmentRenderer for SmoothSegments {
                 TAU / 2. - (intersection_point.y / (intersection_point.x - pivot.x)).atan()
             }
         };
-
 
         let inner_line_start = Point { x: cos + side, y: 0. };
         let outer_line_start = Point { x: cos, y: 0. };

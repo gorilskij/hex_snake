@@ -2,21 +2,18 @@ use std::ops::{Deref, DerefMut};
 
 use ggez::{
     conf::{WindowMode, WindowSetup},
-    Context,
     event::{EventHandler, KeyCode, KeyMods},
-    GameResult, graphics::Rect,
+    graphics::Rect,
+    Context, GameResult,
 };
 use itertools::Itertools;
 
-use palette::Palette;
-use screen::game::Game;
-use screen::start_screen::StartScreen;
+use screen::{game::Game, start_screen::StartScreen};
 use snake::{EatMechanics, SnakeSeed};
 
 use crate::app::{
-    apple_spawn_strategy::AppleSpawnStrategy,
     keyboard_control::ControlSetup,
-    snake::{controller::ControllerTemplate, EatBehavior, palette::PaletteTemplate, SnakeType},
+    snake::{controller::ControllerTemplate, palette::PaletteTemplate, EatBehavior, SnakeType},
 };
 
 macro_rules! hash_map {
@@ -30,9 +27,9 @@ macro_rules! hash_map {
     }};
 }
 
-mod screen;
 pub mod keyboard_control;
 mod palette;
+mod screen;
 mod snake;
 #[macro_use]
 mod apple_spawn_strategy;
@@ -90,7 +87,7 @@ impl App {
             "found multiple players on the same side of the keyboard"
         );
 
-        let seeds: Vec<_> = players
+        let _seeds: Vec<_> = players
             .into_iter()
             .map(|cs| SnakeSeed {
                 snake_type: SnakeType::Player,

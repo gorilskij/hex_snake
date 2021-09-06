@@ -1,6 +1,7 @@
 use crate::{
     app::{
         keyboard_control::Controls,
+        screen::game::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,
@@ -10,8 +11,6 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use std::collections::VecDeque;
-use crate::app::screen::game::Apple;
-
 
 pub struct Keyboard {
     pub controls: Controls,

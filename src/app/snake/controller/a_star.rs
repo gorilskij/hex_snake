@@ -1,20 +1,18 @@
 use crate::{
-    app::{
-        snake::{
-            controller::{Controller, OtherSnakes},
-            Body,
-        },
+    app::snake::{
+        controller::{Controller, OtherSnakes},
+        Body,
     },
     basic::{Dir, HexDim, HexPoint},
 };
 
+use crate::app::screen::game::Apple;
 use itertools::Itertools;
 use std::{
     cmp::{max, min},
     collections::HashSet,
     rc::Rc,
 };
-use crate::app::screen::game::Apple;
 
 pub struct AStar {
     pub target: Option<HexPoint>,
@@ -80,12 +78,7 @@ impl AStar {
         }
     }
 
-    fn recalculate_path(
-        &mut self,
-        body: &Body,
-        other_snakes: OtherSnakes,
-        board_dim: HexDim,
-    ) {
+    fn recalculate_path(&mut self, body: &Body, other_snakes: OtherSnakes, board_dim: HexDim) {
         let target = match self.target {
             Some(p) => p,
             None => {

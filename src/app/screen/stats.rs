@@ -1,6 +1,5 @@
-use crate::app::screen::message::{Message, MessageID};
+use crate::app::screen::message::Message;
 use ggez::graphics::Color;
-use crate::app::screen::game::Game;
 
 /// Collect statistics about the current game state
 #[derive(Default)]

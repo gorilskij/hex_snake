@@ -1,6 +1,7 @@
 use crate::{
     app::{
         keyboard_control::ControlSetup,
+        screen::game::Apple,
         snake::{
             controller::{
                 a_star::AStar,
@@ -11,7 +12,8 @@ use crate::{
                 killer::Killer,
                 programmed::{Move, Programmed},
             },
-            Segment, Snake, Body,
+            utils::OtherSnakes,
+            Body,
         },
     },
     basic::{Dir, Dir12, HexDim, Side},
@@ -19,9 +21,6 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use std::{collections::VecDeque, f32::consts::TAU};
-use crate::app::snake::utils::OtherSnakes;
-use crate::app::screen::game::Apple;
-
 
 mod a_star;
 mod competitor1;

@@ -16,9 +16,7 @@ use crate::{
     },
     basic::Side,
 };
-use ggez::{
-    conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
-};
+use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 
 mod app;
 mod basic;

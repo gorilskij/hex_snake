@@ -1,8 +1,6 @@
 use crate::{
     app::snake::rendering::{
-        descriptions::SegmentDescription,
-        point_factory::SegmentRenderer,
-        render_hexagon,
+        descriptions::SegmentDescription, point_factory::SegmentRenderer, render_hexagon,
     },
     basic::{transformations::translate, Point},
 };

@@ -4,7 +4,7 @@ use hsl::HSL;
 use SegmentType::*;
 
 use crate::{
-    app::snake::{SegmentType, Body},
+    app::snake::{Body, SegmentType},
     basic::HexPoint,
     color::oklab::OkLab,
 };
@@ -85,7 +85,7 @@ pub enum PaletteTemplate {
     Alternating {
         color1: Color,
         color2: Color,
-    }
+    },
 }
 
 // TODO: write a builder
@@ -194,7 +194,10 @@ impl PaletteTemplate {
     }
 
     pub fn zebra() -> Self {
-        Self::Alternating { color1: Color::WHITE, color2: Color { r: 0., g: 0., b: 0., a: 0. } }
+        Self::Alternating {
+            color1: Color::WHITE,
+            color2: Color { r: 0., g: 0., b: 0., a: 0. },
+        }
     }
 }
 
@@ -242,11 +245,7 @@ pub trait Palette {
 impl From<PaletteTemplate> for Box<dyn Palette> {
     fn from(template: PaletteTemplate) -> Self {
         match template {
-            PaletteTemplate::Solid { color, eaten } => {
-                Box::new(Solid {
-                    color, eaten,
-                })
-            }
+            PaletteTemplate::Solid { color, eaten } => Box::new(Solid { color, eaten }),
             PaletteTemplate::RGBGradient { head, tail, eaten, persistent } => {
                 Box::new(RGBGradient {
                     head,
@@ -287,10 +286,9 @@ impl From<PaletteTemplate> for Box<dyn Palette> {
                 iteration: true,
                 last_head: None,
             }),
-            PaletteTemplate::Alternating { color1, color2 } => Box::new(Alternating {
-                color1,
-                color2,
-            }),
+            PaletteTemplate::Alternating { color1, color2 } => {
+                Box::new(Alternating { color1, color2 })
+            }
         }
     }
 }
@@ -342,7 +340,6 @@ fn correct_len(len: usize, body: &Body, frame_frac: f64) -> f64 {
     }
 }
 
-
 // The palettes...
 
 pub struct Solid {
@@ -351,7 +348,7 @@ pub struct Solid {
 }
 
 impl Palette for Solid {
-    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, _frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         for segment in body.iter() {
@@ -366,7 +363,6 @@ impl Palette for Solid {
         styles
     }
 }
-
 
 pub struct RGBGradient {
     head: Color,
@@ -407,7 +403,6 @@ impl Palette for RGBGradient {
         styles
     }
 }
-
 
 pub struct HSLGradient {
     head_hue: f64,
@@ -465,7 +460,6 @@ impl Palette for HSLGradient {
     }
 }
 
-
 pub struct OkLabGradient {
     head_hue: f64,
     tail_hue: f64,
@@ -510,7 +504,6 @@ impl Palette for OkLabGradient {
     }
 }
 
-
 pub struct AlternatingFixed {
     color1: Color,
     color2: Color,
@@ -552,7 +545,6 @@ impl Palette for AlternatingFixed {
         styles
     }
 }
-
 
 pub struct Alternating {
     color1: Color,
@@ -608,10 +600,13 @@ impl Palette for Alternating {
                         mul_color(self.color2, 1. - ratio1_end),
                     );
 
-                    styles.push(SegmentStyle::RGBGradient { start_rgb: start_color.to_rgb(), end_rgb: end_color.to_rgb() });
+                    styles.push(SegmentStyle::RGBGradient {
+                        start_rgb: start_color.to_rgb(),
+                        end_rgb: end_color.to_rgb(),
+                    });
                 }
                 Eaten { .. } => {
-                        styles.push(SegmentStyle::Solid(*DEFAULT_EATEN_COLOR));
+                    styles.push(SegmentStyle::Solid(*DEFAULT_EATEN_COLOR));
                 }
                 Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
             };

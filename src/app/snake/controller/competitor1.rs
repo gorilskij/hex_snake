@@ -1,5 +1,6 @@
 use crate::{
     app::{
+        screen::game::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,
@@ -8,7 +9,6 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 use std::iter::once;
-use crate::app::screen::game::Apple;
 
 pub struct Competitor1;
 

@@ -1,7 +1,7 @@
 pub mod control;
-mod message;
-mod rendering;
 pub mod game;
+mod message;
+mod prefs;
+mod rendering;
 pub mod start_screen;
 pub mod stats;
-mod prefs;
