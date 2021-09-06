@@ -100,7 +100,7 @@ impl Game {
 
             window_dim: Point { x: wm.width, y: wm.height },
 
-            dim: HexDim { h: 0, v: 0 }, // placeholder
+            dim: HexDim { h: 0, v: 0 }, // gets updated immediately after creation
             seeds: seeds.into_iter().map(Into::into).collect(),
             snakes: vec![],
             apples: vec![],

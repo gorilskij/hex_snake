@@ -38,6 +38,14 @@ impl Add<u8> for Dir {
     }
 }
 
+impl Add<Self> for Dir {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self + rhs as u8
+    }
+}
+
 impl AddAssign<u8> for Dir {
     fn add_assign(&mut self, rhs: u8) {
         *self = *self + rhs;
@@ -107,6 +115,10 @@ impl Dir {
     // clockwise order starting from U
     pub fn iter() -> impl Iterator<Item = Self> {
         [U, Ur, Dr, D, Dl, Ul].iter().copied()
+    }
+
+    pub fn iter_from(start: Self) -> impl Iterator<Item = Self> {
+        Self::iter().map(move |dir| dir + start)
     }
 
     pub fn axis(self) -> Axis {

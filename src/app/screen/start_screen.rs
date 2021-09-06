@@ -23,6 +23,7 @@ use crate::{
 };
 use ggez::graphics::Color;
 use std::slice;
+use crate::app::snake::SnakeSeed;
 
 struct SnakeDemo {
     control: Control,
@@ -36,85 +37,61 @@ struct SnakeDemo {
 
 impl SnakeDemo {
     fn new(top_left: HexPoint, cell_dim: CellDim) -> Self {
-        let dir = Dir::U;
-
-        let pos = top_left + HexPoint { h: 0, v: -5 };
-        let head = Segment {
-            typ: SegmentType::Normal,
-            pos,
-            coming_from: -dir,
-            teleported: None,
+        let start_dir = Dir::U;
+        let start_pos = top_left + HexPoint { h: 0, v: -5 };
+        let board_dim = HexPoint { h: 50, v: 50 };
+        let seed = SnakeSeed {
+            snake_type: SnakeType::Simulated {
+                start_pos,
+                start_dir,
+                start_grow: 5,
+            },
+            eat_mechanics: EatMechanics {
+                eat_self: EatBehavior::Cut,
+                eat_other: hash_map! {},
+                default: EatBehavior::Cut,
+            },
+            palette: PaletteTemplate::Solid {
+                color: Color::WHITE,
+                eaten: Color::RED,
+            }.into(),
+            controller: ControllerTemplate::demo_infinity_pattern(1),
         };
-        let mut body = VecDeque::new();
-        body.push_back(head);
-        let board_dim = HexPoint { h: 20, v: 20 };
 
         Self {
-            control: Control::new(3.),
+            control: Control::new(7.),
             top_left,
             dim: board_dim,
             cell_dim,
-            snake: Snake {
-                snake_type: SnakeType::Simulated {
-                    start_pos: HexPoint { h: 10, v: 10 },
-                    start_dir: Dir::U,
-                    start_grow: 5,
-                },
-                eat_mechanics: EatMechanics {
-                    eat_self: EatBehavior::Cut,
-                    eat_other: hash_map! {},
-                    default: EatBehavior::Cut,
-                },
-
-                body: Body {
-                    cells: body,
-                    missing_front: 0,
-                    dir,
-                    turn_start: None,
-                    dir_grace: false,
-                    grow: 10,
-                    search_trace: None,
-                },
-                state: State::Living,
-
-                controller: ControllerTemplate::Programmed(vec![
-                    Move::Turn(Dir::Ur),
-                    Move::Wait(5),
-                    Move::Turn(Dir::Dr),
-                    Move::Wait(5),
-                    Move::Turn(Dir::D),
-                    Move::Wait(5),
-                    Move::Turn(Dir::Dl),
-                    Move::Wait(5),
-                    Move::Turn(Dir::Ul),
-                    Move::Wait(5),
-                ])
-                .into_controller(dir),
-                palette: PaletteTemplate::Solid {
-                    color: Color::WHITE,
-                    eaten: Color::RED,
-                }
-                .into(),
-            },
+            snake: Snake::from_seed(&seed, start_pos, start_dir, 5),
             prefs: Default::default(),
             stats: Default::default(),
         }
     }
 }
 
-impl EventHandler<ggez::GameError> for SnakeDemo {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        // self.snake.advance(OtherSnakes::empty(), &[], self.dim);
+impl SnakeDemo {
+    fn advance_snakes(&mut self) {
         self.snake.advance(
             OtherSnakes::empty(),
             &[],
             self.dim,
             self.control.frame_stamp(),
-        );
+        )
+    }
+}
+
+impl EventHandler<ggez::GameError> for SnakeDemo {
+    fn update(&mut self, _ctx: &mut Context) -> GameResult {
+        while self.control.can_update() {
+            self.advance_snakes();
+        }
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
+        self.control.graphics_frame();
+
         self.snake.update_dir(
             OtherSnakes::empty(),
             &[],
@@ -157,7 +134,7 @@ impl StartScreen {
             player1_palette_idx: 0,
             player2_palette_idx: 0,
 
-            player1_demo: SnakeDemo::new(HexPoint { h: 10, v: 10 }, CellDim::from(10.)),
+            player1_demo: SnakeDemo::new(HexPoint { h: 10, v: 10 }, CellDim::from(30.)),
             player2_demo: None,
         }
     }

@@ -11,7 +11,7 @@ mod hex_point;
 mod point;
 pub mod transformations;
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Side {
     Left,
     Right,

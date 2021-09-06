@@ -30,6 +30,7 @@ pub enum State {
 pub enum SnakeType {
     Player,
     Simulated {
+        // TODO: check if these are redundant
         start_pos: HexPoint,
         start_dir: Dir,
         start_grow: usize,
