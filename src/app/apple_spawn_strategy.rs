@@ -4,7 +4,7 @@ use crate::basic::HexPoint;
 macro_rules! spawn_schedule {
     (@ spawn($h:expr, $v:expr) ) => {
         crate::app::apple_spawn_strategy::AppleSpawn::Spawn(
-            crate::app::hex::HexPoint { h: $h, v: $v }
+            crate::basic::HexPoint { h: $h, v: $v }
         )
     };
     (@ wait($t:expr) ) => {

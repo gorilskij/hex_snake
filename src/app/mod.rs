@@ -17,6 +17,7 @@ use crate::app::{
 };
 use crate::app::apple_spawn_strategy::AppleSpawnStrategy;
 use crate::app::palette::Palette;
+use crate::basic::CellDim;
 
 macro_rules! hash_map {
     {} => {
@@ -31,10 +32,10 @@ macro_rules! hash_map {
 
 pub mod keyboard_control;
 mod palette;
-mod screen;
 mod snake;
 #[macro_use]
 mod apple_spawn_strategy;
+mod screen;
 
 pub type Frames = u64;
 
@@ -106,16 +107,17 @@ impl App {
             })
             .collect();
 
+        let cell_dim = CellDim::from(30.);
         Self {
-            // screen: Screen::StartScreen(StartScreen::new()),
-            screen: Screen::Game(Game::new(
-                30.,
-                7.,
-                seeds,
-                Palette::dark(),
-                AppleSpawnStrategy::Random { apple_count: 5 },
-                window_mode,
-            )),
+            screen: Screen::StartScreen(StartScreen::new(cell_dim)),
+            // screen: Screen::Game(Game::new(
+            //     cell_dim,
+            //     7.,
+            //     seeds,
+            //     Palette::dark(),
+            //     AppleSpawnStrategy::Random { apple_count: 5 },
+            //     window_mode,
+            // )),
             window_mode,
             window_setup,
         }

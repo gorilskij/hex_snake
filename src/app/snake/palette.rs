@@ -26,7 +26,7 @@ lazy_static! {
     // static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgb(245, 192, 64);
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum EatenColor {
     Fixed(Color),
     RGBInverted,
@@ -49,7 +49,7 @@ impl EatenColor {
     }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum PaletteTemplate {
     Solid {
         color: Color,
@@ -91,6 +91,10 @@ pub enum PaletteTemplate {
 // TODO: write a builder
 #[allow(dead_code)]
 impl PaletteTemplate {
+    pub fn solid_white_red() -> Self {
+        Self::Solid { color: Color::WHITE, eaten: Color::RED }
+    }
+
     pub fn rgb_gradient(head: Color, tail: Color, eaten: Option<Color>, persistent: bool) -> Self {
         Self::RGBGradient {
             head,

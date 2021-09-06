@@ -35,6 +35,7 @@ use crate::app::screen::rendering::grid_mesh::get_border_mesh;
 /// Represents (graphics frame number, frame fraction)
 pub(crate) type FrameStamp = (usize, f32);
 
+#[derive(Debug)]
 pub enum AppleType {
     Normal(Food),
     SpawnSnake(SnakeSeed),
@@ -667,6 +668,7 @@ impl EventHandler<ggez::GameError> for Game {
         let mut snake_mesh = None;
         let mut apple_mesh = None;
 
+        let frame_stamp = self.control.frame_stamp();
         let mut stats = Stats::default();
 
         if self.control.state() == GameState::Playing {
@@ -675,7 +677,6 @@ impl EventHandler<ggez::GameError> for Game {
             // this could happen in the middle of a
             // game frame. Repeated updates during the
             // same game frame are blocked
-            let frame_stamp = self.control.frame_stamp();
             for idx in 0..self.snakes.len() {
                 let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, idx);
                 snake.update_dir(other_snakes, &self.apples, self.dim, frame_stamp);
@@ -686,7 +687,7 @@ impl EventHandler<ggez::GameError> for Game {
 
             snake_mesh = Some(ROw::Owned(get_snake_mesh(
                 &mut self.snakes,
-                &self.control,
+                frame_stamp,
                 self.dim,
                 self.cell_dim,
                 self.prefs.draw_style,
@@ -695,7 +696,7 @@ impl EventHandler<ggez::GameError> for Game {
             )?));
             apple_mesh = Some(ROw::Owned(get_apple_mesh(
                 &self.apples,
-                &self.control,
+                frame_stamp,
                 self.cell_dim,
                 self.prefs.draw_style,
                 &self.palette,
@@ -728,7 +729,7 @@ impl EventHandler<ggez::GameError> for Game {
             {
                 self.cached_apple_mesh = Some(get_apple_mesh(
                     &self.apples,
-                    &self.control,
+                    frame_stamp,
                     self.cell_dim,
                     self.prefs.draw_style,
                     &self.palette,
@@ -741,7 +742,7 @@ impl EventHandler<ggez::GameError> for Game {
             if self.cached_snake_mesh.is_none() {
                 self.cached_snake_mesh = Some(get_snake_mesh(
                     &mut self.snakes,
-                    &self.control,
+                    frame_stamp,
                     self.dim,
                     self.cell_dim,
                     self.prefs.draw_style,
@@ -957,12 +958,12 @@ impl EventHandler<ggez::GameError> for Game {
             let new_food = idx as Food + 1;
             self.prefs.apple_food = new_food;
             // change existing apples
-            for apple in &mut self.apples {
+            for apple in & mut self.apples {
             if let AppleType::Normal(food) = &mut apple.typ {
-            *food = new_food;
+            * food = new_food;
             }
             }
-            self.display_notification(format!("Apple food: {}", new_food));
+            self.display_notification(format ! ("Apple food: {}", new_food));
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };

@@ -20,6 +20,7 @@ use crate::{
     },
     basic::{CellDim, DrawStyle, HexDim, Point},
 };
+use crate::app::screen::game::FrameStamp;
 
 const DRAW_WHITE_AURA: bool = false;
 
@@ -37,7 +38,7 @@ fn build_hexagon_at(
 
 pub(in crate::app::screen) fn get_snake_mesh(
     snakes: &mut [Snake],
-    control: &Control,
+    frame_stamp: FrameStamp,
     board_dim: HexDim,
     cell_dim: CellDim,
     draw_style: DrawStyle,
@@ -46,6 +47,8 @@ pub(in crate::app::screen) fn get_snake_mesh(
 ) -> GameResult<Mesh> {
     stats.redrawing_snakes = true;
 
+    let frame_frac = frame_stamp.1;
+
     let mut builder = MeshBuilder::new();
 
     // Black holes and other heads on top of body segments,
@@ -53,9 +56,6 @@ pub(in crate::app::screen) fn get_snake_mesh(
     // drawn on top of black holes
     let mut black_holes = vec![];
     let mut other_heads = vec![];
-
-    let frame_stamp = control.frame_stamp();
-    let frame_frac = frame_stamp.1;
 
     // Draw bodies
     for snake in snakes {
@@ -86,7 +86,7 @@ pub(in crate::app::screen) fn get_snake_mesh(
             let current_path_color = Color::from_rgb(97, 128, 11);
             for &point in &search_trace.cells_searched {
                 build_hexagon_at(
-                    point.to_point(cell_dim),
+                    point.to_cartesian(cell_dim),
                     cell_dim,
                     searched_cell_color,
                     &mut builder,
@@ -94,7 +94,7 @@ pub(in crate::app::screen) fn get_snake_mesh(
             }
             for &point in &search_trace.current_path {
                 build_hexagon_at(
-                    point.to_point(cell_dim),
+                    point.to_cartesian(cell_dim),
                     cell_dim,
                     current_path_color,
                     &mut builder,
@@ -107,7 +107,7 @@ pub(in crate::app::screen) fn get_snake_mesh(
         if DRAW_WHITE_AURA {
             for point in snake.reachable(7, board_dim) {
                 build_hexagon_at(
-                    point.to_point(cell_dim),
+                    point.to_cartesian(cell_dim),
                     cell_dim,
                     Color::WHITE,
                     &mut builder,
@@ -132,7 +132,7 @@ pub(in crate::app::screen) fn get_snake_mesh(
                 );
             }
 
-            let location = segment.pos.to_point(cell_dim);
+            let location = segment.pos.to_cartesian(cell_dim);
 
             let fraction = match segment_idx {
                 // head

@@ -16,7 +16,7 @@ pub struct HexPoint {
 pub type HexDim = HexPoint;
 
 impl HexPoint {
-    pub fn to_point(self, cell_dim: CellDim) -> Point {
+    pub fn to_cartesian(self, cell_dim: CellDim) -> Point {
         let Self { h, v } = self;
         let CellDim { side, sin, cos } = cell_dim;
         Point {

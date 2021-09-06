@@ -26,7 +26,7 @@ pub enum State {
     Crashed,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum SnakeType {
     Player,
     Simulated {
@@ -61,14 +61,14 @@ pub struct Segment {
     pub teleported: Option<Dir>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum EatBehavior {
     Cut,   // cut the other snake's tail off
     Crash, // stop the game
     Die,   // disappear
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EatMechanics {
     pub eat_self: EatBehavior,
     pub eat_other: HashMap<SnakeType, EatBehavior>,
@@ -139,7 +139,7 @@ pub struct Snake {
     pub palette: Box<dyn Palette>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SnakeSeed {
     pub snake_type: SnakeType,
     pub eat_mechanics: EatMechanics,
