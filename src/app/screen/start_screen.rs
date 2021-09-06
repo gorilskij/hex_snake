@@ -49,7 +49,7 @@ impl SnakeDemo {
 
         let spawn_schedule = spawn_schedule![
             spawn(6, 2),
-            wait(10),
+            wait(40),
         ];
         let apple_spawn_strategy = AppleSpawnStrategy::ScheduledOnEat {
             apple_count: 1,
@@ -107,7 +107,11 @@ impl SnakeDemo {
 
     fn spawn_apples(&mut self) {
         let apple = match &mut self.apple_spawn_strategy {
-            AppleSpawnStrategy::ScheduledOnEat { spawns, next_index, .. } => {
+            AppleSpawnStrategy::ScheduledOnEat { apple_count, spawns, next_index } => {
+                if self.apples.len() >= *apple_count {
+                    return
+                }
+
                 let len = spawns.len();
                 match &mut spawns[*next_index] {
                     AppleSpawn::Wait { total, current } => {
@@ -129,7 +133,7 @@ impl SnakeDemo {
         };
 
         if let Some(pos) = apple {
-            self.apples.push(Apple { pos, typ: AppleType::Normal(5) })
+            self.apples.push(Apple { pos, typ: AppleType::Normal(2) })
         }
     }
 
@@ -140,6 +144,20 @@ impl SnakeDemo {
             self.dim,
             frame_stamp,
         );
+
+
+        // TODO: refactor snake cutting behavior out of StartScreen and Game
+        let head_pos = self.snake.head().pos;
+        let mut cut = None;
+        for (segment_idx, segment) in self.snake.body.iter().enumerate().skip(1) {
+            if segment.pos == head_pos {
+                cut = Some(segment_idx);
+                break;
+            }
+        }
+        if let Some(idx) = cut {
+            let _ = self.snake.body.cells.drain(idx..);
+        }
 
         // TODO: refactor apple spawning and eating code out of StartScreen and Game
         // check apple eating
