@@ -10,27 +10,27 @@ use rand::prelude::*;
 use crate::{
     app::{
         apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
-        game::{
-            game_control::{GameControl, GameState},
+        screen::{
+            control::{Control, GameState},
             message::{Message, MessageID},
         },
-        palette::GamePalette,
+        palette::Palette,
         snake::{
-            controller::{Controller, ControllerTemplate, OtherSnakes},
+            controller::{Controller, ControllerTemplate},
             palette::PaletteTemplate,
-            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeState,
+            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, State,
             SnakeType,
         },
     },
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
 };
-use std::{collections::HashMap, time::Duration};
-
-mod game_control;
-mod message;
-mod rendering;
-
-type Food = u32;
+use std::{collections::HashMap};
+use crate::app::snake::utils::split_snakes_mut;
+use crate::app::screen::prefs::{Prefs, Food};
+use crate::app::screen::stats::Stats;
+use crate::app::screen::rendering::snake_mesh::get_snake_mesh;
+use crate::app::screen::rendering::apple_mesh::get_apple_mesh;
+use crate::app::screen::rendering::grid_mesh::get_grid_mesh;
 
 /// Represents (graphics frame number, frame fraction)
 pub(crate) type FrameStamp = (usize, f32);
@@ -45,69 +45,8 @@ pub struct Apple {
     pub typ: AppleType,
 }
 
-struct Prefs {
-    draw_grid: bool,
-    display_fps: bool,
-    display_stats: bool,
-    apple_food: Food,
-    message_duration: Duration,
-    draw_style: DrawStyle,
-    special_apples: bool,
-}
-
-impl Default for Prefs {
-    fn default() -> Self {
-        Self {
-            draw_grid: false,
-            display_fps: false,
-            display_stats: false,
-            apple_food: 1,
-            message_duration: Duration::from_secs(2),
-            draw_style: DrawStyle::Smooth,
-            special_apples: true,
-        }
-    }
-}
-
-/// Collect statistics about the current game state
-#[derive(Default)]
-pub struct Stats {
-    /// Total number of graphical (sub)segments
-    /// currently visible
-    polygons: usize,
-    /// Number of subsegments per segment (note
-    /// that head and tail will have fewer).
-    /// Maximum in the case of multiple snakes
-    max_subsegments_per_segment: usize,
-    redrawing_apples: bool,
-    redrawing_snakes: bool,
-}
-
-impl Stats {
-    fn show_message(&self, game: &mut Game) {
-        let text = format!(
-            "total polygons: {}\nmax subsegments: {}\nredrawing apples: {}\nredrawing snakes: {}",
-            self.polygons,
-            self.max_subsegments_per_segment,
-            self.redrawing_apples,
-            self.redrawing_snakes,
-        );
-        let message = Message {
-            text,
-            left: true,
-            top: true,
-            h_margin: Message::DEFAULT_MARGIN,
-            v_margin: Message::DEFAULT_MARGIN * 2. + Message::DEFAULT_FONT_SIZE,
-            font_size: Message::DEFAULT_FONT_SIZE,
-            color: Color::WHITE,
-            disappear: None,
-        };
-        game.messages.insert(MessageID::Stats, message);
-    }
-}
-
 pub struct Game {
-    control: GameControl,
+    control: Control,
 
     window_dim: Point,
 
@@ -119,7 +58,7 @@ pub struct Game {
     apple_spawn_strategy: AppleSpawnStrategy,
 
     cell_dim: CellDim,
-    palette: GamePalette,
+    palette: Palette,
 
     rng: ThreadRng,
 
@@ -149,7 +88,7 @@ impl Game {
         cell_side_len: f32,
         starting_fps: f64,
         seeds: Vec<SnakeSeed>,
-        palette: GamePalette,
+        palette: Palette,
         apple_spawn_strategy: AppleSpawnStrategy,
         wm: WindowMode,
     ) -> Self {
@@ -158,7 +97,7 @@ impl Game {
         let cell_dim = CellDim::from(cell_side_len);
 
         let mut game = Self {
-            control: GameControl::new(starting_fps),
+            control: Control::new(starting_fps),
 
             window_dim: Point { x: wm.width, y: wm.height },
 
@@ -388,9 +327,9 @@ impl Game {
                             Some(pos) => pos,
                             None => {
                                 println!(
-                                "warning: no space left for new apples ({} apples will be missing)",
-                                *apple_count - self.apples.len()
-                            );
+                                    "warning: no space left for new apples ({} apples will be missing)",
+                                    *apple_count - self.apples.len()
+                                );
                                 return;
                             }
                         };
@@ -432,16 +371,6 @@ impl Game {
         }
     }
 
-    /// Extract one snake at `idx` and return all other
-    /// snakes in a special struct to avoid building
-    /// unnecessary vecs all the time (OtherSnakes is always
-    /// immutable)
-    fn split_snakes_mut(snakes: &mut [Snake], idx: usize) -> (&mut Snake, OtherSnakes) {
-        let (other_snakes1, rest) = snakes.split_at_mut(idx);
-        let (snake, other_snakes2) = rest.split_first_mut().unwrap();
-        (snake, OtherSnakes::new(other_snakes1, other_snakes2))
-    }
-
     fn advance_snakes(&mut self) {
         let mut remove_snakes = vec![];
         for snake_idx in 0..self.snakes.len() {
@@ -458,7 +387,7 @@ impl Game {
                 _ => (),
             }
 
-            let (snake, other_snakes) = Self::split_snakes_mut(&mut self.snakes, snake_idx);
+            let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, snake_idx);
 
             // advance the snake
             snake.advance(other_snakes, &self.apples, self.dim, self.control.frame_stamp());
@@ -476,7 +405,7 @@ impl Game {
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
-            matches!(snake.state, SnakeState::Dying)
+            matches!(snake.state, State::Dying)
                 || matches!(
                     snake.snake_type,
                     SnakeType::Competitor { life: Some(_) }
@@ -504,7 +433,7 @@ impl Game {
             .snakes
             .iter()
             .enumerate()
-            .filter(|(_, s)| !matches!(s.state, SnakeState::Crashed | SnakeState::Dying))
+            .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying))
         {
             for (j, other) in self.snakes.iter().enumerate() {
                 // check head-head crash
@@ -586,7 +515,7 @@ impl Game {
         for snake in self
             .snakes
             .iter_mut()
-            .filter(|snake| snake.state == SnakeState::Living)
+            .filter(|snake| snake.state == State::Living)
         {
             k += 1;
             for i in (0..self.apples.len()).rev() {
@@ -738,14 +667,25 @@ impl EventHandler<ggez::GameError> for Game {
         let mut stats = Stats::default();
 
         if self.control.state() == GameState::Playing {
+            // Update the direction of the snake early
+            // to see it turning as soon as possible,
+            // this could happen in the middle of a
+            // game frame. Repeated updates during the
+            // same game frame are blocked
+            let frame_stamp = self.control.frame_stamp();
+            for idx in 0..self.snakes.len() {
+                let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, idx);
+                snake.update_dir(other_snakes, &self.apples, self.dim, frame_stamp);
+            }
+
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
 
-            snake_mesh = Some(ROw::Owned(self.snake_mesh(ctx, &mut stats)?));
-            apple_mesh = Some(ROw::Owned(self.apple_mesh(ctx, &mut stats)?));
+            snake_mesh = Some(ROw::Owned(get_snake_mesh(&mut self.snakes, &self.control, self.dim, self.cell_dim, self.prefs.draw_style, ctx, &mut stats)?));
+            apple_mesh = Some(ROw::Owned(get_apple_mesh(&self.apples, &self.control, self.cell_dim, self.prefs.draw_style, &self.palette, ctx, &mut stats)?));
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
-                    self.grid_mesh = Some(self.grid_mesh(ctx)?);
+                    self.grid_mesh = Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
                 };
                 grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
             }
@@ -755,16 +695,16 @@ impl EventHandler<ggez::GameError> for Game {
             // update apples if there are any animated ones
             if self.cached_apple_mesh.is_none()
                 || self
-                    .apples
-                    .iter()
-                    .any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_)))
+                .apples
+                .iter()
+                .any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_)))
             {
-                self.cached_apple_mesh = Some(self.apple_mesh(ctx, &mut stats)?);
+                self.cached_apple_mesh = Some(get_apple_mesh(&self.apples, &self.control, self.cell_dim, self.prefs.draw_style, &self.palette, ctx, &mut stats)?);
                 update = true;
             }
 
             if self.cached_snake_mesh.is_none() {
-                self.cached_snake_mesh = Some(self.snake_mesh(ctx, &mut stats)?);
+                self.cached_snake_mesh = Some(get_snake_mesh(&mut self.snakes, &self.control, self.dim, self.cell_dim, self.prefs.draw_style, ctx, &mut stats)?);
                 update = true;
             }
 
@@ -780,7 +720,7 @@ impl EventHandler<ggez::GameError> for Game {
             if update {
                 if self.prefs.draw_grid {
                     if self.grid_mesh.is_none() {
-                        self.grid_mesh = Some(self.grid_mesh(ctx)?);
+                        self.grid_mesh = Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
                     };
                     grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
                 }
@@ -802,7 +742,8 @@ impl EventHandler<ggez::GameError> for Game {
             }
 
             if self.prefs.display_stats {
-                stats.show_message(self);
+                let message = stats.get_stats_message();
+                self.messages.insert(MessageID::Stats, message);
             }
 
             self.draw_messages(ctx)?;
@@ -959,15 +900,15 @@ impl EventHandler<ggez::GameError> for Game {
                 self.display_notification(text);
             }
             k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
-                let new_food = idx as Food + 1;
-                self.prefs.apple_food = new_food;
-                // change existing apples
-                for apple in &mut self.apples {
-                    if let AppleType::Normal(food) = &mut apple.typ {
-                        *food = new_food;
-                    }
-                }
-                self.display_notification(format!("Apple food: {}", new_food));
+            let new_food = idx as Food + 1;
+            self.prefs.apple_food = new_food;
+            // change existing apples
+            for apple in &mut self.apples {
+            if let AppleType::Normal(food) = &mut apple.typ {
+            *food = new_food;
+            }
+            }
+            self.display_notification(format!("Apple food: {}", new_food));
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };

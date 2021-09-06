@@ -1,14 +1,14 @@
 use crate::{
     app::{
-        game::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
-            SnakeBody,
+            Body,
         },
     },
     basic::{Dir, Dir12, HexDim},
 };
 use ggez::event::KeyCode;
+use crate::app::screen::game::Apple;
 
 
 // joke controller with 12 directions allowing the player to rotate between them using left and right, surprising horizontal teleportation
@@ -20,7 +20,7 @@ pub struct KeyboardClock {
 }
 
 impl Controller for KeyboardClock {
-    fn next_dir(&mut self, _: &mut SnakeBody, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
+    fn next_dir(&mut self, _: &mut Body, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
         if let Some(new_dir) = self.next_dir.take() {
             self.dir = new_dir;
             self.alternation = false;

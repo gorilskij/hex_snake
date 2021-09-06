@@ -1,9 +1,8 @@
 use crate::{
     app::{
-        game::Apple,
         snake::{
             controller::{angle_distance, Controller, OtherSnakes},
-            SnakeBody,
+            Body,
         },
     },
     basic::{CellDim, Dir, Dir12, HexDim, HexPoint},
@@ -11,6 +10,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::f32::consts::PI;
+use crate::app::screen::game::Apple;
 
 pub struct Competitor2 {
     pub dir_state: bool, // Dir12 flip-flop state
@@ -25,7 +25,7 @@ impl Competitor2 {
 impl Controller for Competitor2 {
     fn next_dir(
         &mut self,
-        snake_body: &mut SnakeBody,
+        body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
         _board_dim: HexDim,
@@ -36,7 +36,7 @@ impl Controller for Competitor2 {
         }
         self.frames_since_update += 1;
 
-        let head_pos = snake_body.cells[0].pos;
+        let head_pos = body.cells[0].pos;
         if let Some(pos) = self.target_apple {
             if pos == head_pos {
                 // apple eaten
@@ -69,7 +69,7 @@ impl Controller for Competitor2 {
         let dy = -dv as f32 / y_step; // convert to y going up
         let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
 
-        let mut forbidden_directions = snake_body
+        let mut forbidden_directions = body
             .cells
             .iter()
             .chain(other_snakes.iter_segments())
@@ -81,10 +81,10 @@ impl Controller for Competitor2 {
                     .unwrap_or_else(|| panic!("no direction from {:?} to {:?}", head_pos, pos))
             })
             .collect_vec();
-        forbidden_directions.push(-snake_body.dir);
+        forbidden_directions.push(-body.dir);
 
         // let dir_is_safe = |dir: Dir12| {
-        //     if dir == Single(-snake_body.dir) {
+        //     if dir == Single(-body.dir) {
         //         return false;
         //     }
         //     let translate_dir = dir.to_dir(self.dir_state);

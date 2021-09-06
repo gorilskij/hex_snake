@@ -2,9 +2,8 @@ use std::collections::{HashMap, VecDeque, HashSet};
 
 use crate::{
     app::{
-        game::Apple,
         snake::{
-            controller::{Controller, ControllerTemplate, OtherSnakes},
+            controller::{Controller, ControllerTemplate},
             palette::{Palette, PaletteTemplate},
         },
         Frames,
@@ -12,14 +11,16 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 use std::ops::Deref;
-use crate::app::game::FrameStamp;
+use crate::app::snake::utils::OtherSnakes;
+use crate::app::screen::game::{Apple, FrameStamp};
 
 pub mod controller;
 pub mod palette;
 pub mod rendering;
+pub mod utils;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum SnakeState {
+pub enum State {
     Living,
     Dying,
     Crashed,
@@ -88,7 +89,7 @@ pub struct SearchTrace {
     pub current_path: Vec<HexPoint>,
 }
 
-pub struct SnakeBody {
+pub struct Body {
     pub cells: VecDeque<Segment>,
 
     /// When a snake is being destroyed from the front
@@ -118,7 +119,7 @@ pub struct SnakeBody {
     pub search_trace: Option<SearchTrace>,
 }
 
-impl Deref for SnakeBody {
+impl Deref for Body {
     type Target = VecDeque<Segment>;
 
     fn deref(&self) -> &Self::Target {
@@ -130,8 +131,8 @@ pub struct Snake {
     pub snake_type: SnakeType,
     pub eat_mechanics: EatMechanics,
 
-    pub body: SnakeBody,
-    pub state: SnakeState,
+    pub body: Body,
+    pub state: State,
 
     pub controller: Box<dyn Controller>,
     pub palette: Box<dyn Palette>,
@@ -168,7 +169,7 @@ impl Snake {
             snake_type,
             eat_mechanics,
 
-            body: SnakeBody {
+            body: Body {
                 cells: body,
                 missing_front: 0,
                 dir,
@@ -177,7 +178,7 @@ impl Snake {
                 grow,
                 search_trace: None,
             },
-            state: SnakeState::Living,
+            state: State::Living,
 
             controller: controller.into_controller(dir),
             palette: palette.into(),
@@ -241,7 +242,7 @@ impl Snake {
     }
 
     pub fn update_dir(&mut self, other_snakes: OtherSnakes, apples: &[Apple], board_dim: HexDim, frame_stamp: FrameStamp) {
-        if !self.body.dir_grace && self.state == SnakeState::Living {
+        if !self.body.dir_grace && self.state == State::Living {
             if let Some(new_dir) =
                 self.controller
                     .next_dir(&mut self.body, other_snakes, apples, board_dim)
@@ -265,8 +266,8 @@ impl Snake {
         }
 
         match &mut self.state {
-            SnakeState::Dying => self.body.missing_front += 1,
-            SnakeState::Living => {
+            State::Dying => self.body.missing_front += 1,
+            State::Living => {
                 self.update_dir(other_snakes, apples, board_dim, frame_stamp);
 
                 // create new head for snake
@@ -281,7 +282,7 @@ impl Snake {
                 };
                 self.body.cells.push_front(new_head);
             }
-            SnakeState::Crashed => panic!("called advance() on a crashed snake"),
+            State::Crashed => panic!("called advance() on a crashed snake"),
         }
 
         self.body.dir_grace = false;
@@ -295,15 +296,15 @@ impl Snake {
     }
 
     pub fn crash(&mut self) {
-        if !matches!(self.state, SnakeState::Crashed) {
-            self.state = SnakeState::Crashed;
+        if !matches!(self.state, State::Crashed) {
+            self.state = State::Crashed;
             self.body.cells[0].typ = SegmentType::Crashed;
         }
     }
 
     pub fn die(&mut self) {
-        if !matches!(self.state, SnakeState::Dying) {
-            self.state = SnakeState::Dying;
+        if !matches!(self.state, State::Dying) {
+            self.state = State::Dying;
             self.body.cells[0].typ = SegmentType::BlackHole;
         }
     }

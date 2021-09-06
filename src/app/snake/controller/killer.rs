@@ -1,15 +1,15 @@
 use crate::{
     app::{
-        game::Apple,
         snake::{
             controller::{angle_distance, Controller, OtherSnakes},
-            Segment, SnakeBody, SnakeType,
+            Segment, Body, SnakeType,
         },
     },
     basic::{CellDim, Dir, HexDim, HexPoint},
     partial_min_max::PartialMinMax,
 };
 use std::f32::consts::PI;
+use crate::app::screen::game::Apple;
 
 // tries to kill player
 pub struct Killer;
@@ -24,7 +24,7 @@ pub struct Killer;
 fn rough_direction(
     from: HexPoint,
     to: HexPoint,
-    snake_body: &SnakeBody,
+    body: &Body,
     other_snakes: OtherSnakes,
     board_dim: HexDim,
 ) -> Option<Dir> {
@@ -36,15 +36,15 @@ fn rough_direction(
     let dy = -(to.v - from.v) as f32 / (2. * sin);
     let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
 
-    let head_pos = snake_body.cells[0].pos;
+    let head_pos = body.cells[0].pos;
 
     // this could probably be done with math
     Dir::ANGLES
         .iter()
         .copied()
-        .filter(|(d, _)| *d != -snake_body.dir)
+        .filter(|(d, _)| *d != -body.dir)
         .filter(|(d, _)| {
-            distance_to_snake(head_pos, *d, snake_body, other_snakes, board_dim, Some(2)) > 1
+            distance_to_snake(head_pos, *d, body, other_snakes, board_dim, Some(2)) > 1
         })
         .partial_min_by_key(|(_, a)| angle_distance(angle, *a))
         .take()
@@ -54,7 +54,7 @@ fn rough_direction(
 fn distance_to_snake(
     mut point: HexPoint,
     dir: Dir,
-    snake_body: &SnakeBody,
+    body: &Body,
     other_snakes: OtherSnakes,
     board_dim: HexDim,
     max_dist: Option<usize>, // if not within max_dist, returns max_dist
@@ -64,7 +64,7 @@ fn distance_to_snake(
     for distance in 1..=upper_bound {
         point = point.wrapping_translate(dir, 1, board_dim);
 
-        for Segment { pos, .. } in snake_body.cells.iter().chain(other_snakes.iter_segments()) {
+        for Segment { pos, .. } in body.cells.iter().chain(other_snakes.iter_segments()) {
             if *pos == point {
                 return distance;
             }
@@ -76,7 +76,7 @@ fn distance_to_snake(
 impl Controller for Killer {
     fn next_dir(
         &mut self,
-        snake_body: &mut SnakeBody,
+        body: &mut Body,
         other_snakes: OtherSnakes,
         _apples: &[Apple],
         board_dim: HexDim,
@@ -84,7 +84,7 @@ impl Controller for Killer {
         let player_snake = other_snakes
             .iter_snakes()
             .filter(|s| s.snake_type == SnakeType::Player)
-            .min_by_key(|s| s.head().pos.manhattan_distance(snake_body.cells[0].pos))
+            .min_by_key(|s| s.head().pos.manhattan_distance(body.cells[0].pos))
             .expect("no player snake found");
 
         let mut target = player_snake.head().pos;
@@ -93,9 +93,9 @@ impl Controller for Killer {
             target = target.wrapping_translate(player_snake.dir(), 1, board_dim);
         }
         rough_direction(
-            snake_body.cells[0].pos,
+            body.cells[0].pos,
             target,
-            snake_body,
+            body,
             other_snakes,
             board_dim,
         )

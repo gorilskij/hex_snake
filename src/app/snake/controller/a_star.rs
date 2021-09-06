@@ -1,9 +1,8 @@
 use crate::{
     app::{
-        game::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
-            SnakeBody,
+            Body,
         },
     },
     basic::{Dir, HexDim, HexPoint},
@@ -15,6 +14,7 @@ use std::{
     collections::HashSet,
     rc::Rc,
 };
+use crate::app::screen::game::Apple;
 
 pub struct AStar {
     pub target: Option<HexPoint>,
@@ -82,7 +82,7 @@ impl AStar {
 
     fn recalculate_path(
         &mut self,
-        snake_body: &SnakeBody,
+        body: &Body,
         other_snakes: OtherSnakes,
         board_dim: HexDim,
     ) {
@@ -96,7 +96,7 @@ impl AStar {
 
         // A* search
 
-        let head = snake_body[0].pos;
+        let head = body[0].pos;
 
         let mut seen = HashSet::new();
         seen.insert(head);
@@ -107,7 +107,7 @@ impl AStar {
             parent: None,
         }];
 
-        let forbidden_positions = snake_body
+        let forbidden_positions = body
             .iter()
             .chain(other_snakes.iter_segments())
             .map(|seg| seg.pos)
@@ -155,16 +155,16 @@ impl AStar {
     // if there's no best path, at least avoid running into something
     fn least_damage(
         head: HexPoint,
-        snake_body: &SnakeBody,
+        body: &Body,
         other_snakes: OtherSnakes,
         board_dim: HexDim,
     ) -> Option<Dir> {
-        let forbidden = snake_body
+        let forbidden = body
             .iter()
             .chain(other_snakes.iter_segments())
             .map(|seg| seg.pos)
             .collect::<HashSet<_>>();
-        let next = head.wrapping_translate(snake_body.dir, 1, board_dim);
+        let next = head.wrapping_translate(body.dir, 1, board_dim);
         if forbidden.contains(&next) {
             Dir::iter()
                 .find(|dir| !forbidden.contains(&head.wrapping_translate(*dir, 1, board_dim)))
@@ -177,13 +177,13 @@ impl AStar {
 impl Controller for AStar {
     fn next_dir(
         &mut self,
-        snake_body: &mut SnakeBody,
+        body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
         board_dim: HexDim,
     ) -> Option<Dir> {
         if let Some(p) = self.target {
-            if p == snake_body[0].pos {
+            if p == body[0].pos {
                 // apple eaten
                 self.target = None;
             }
@@ -193,14 +193,14 @@ impl Controller for AStar {
             || self.path.is_empty()
             || self.steps_since_update >= Self::UPDATE_EVERY_N_STEPS
         {
-            self.recalculate_target(snake_body[0].pos, apples, board_dim);
-            self.recalculate_path(snake_body, other_snakes, board_dim);
+            self.recalculate_target(body[0].pos, apples, board_dim);
+            self.recalculate_path(body, other_snakes, board_dim);
             self.steps_since_update = 0;
         }
         self.steps_since_update += 1;
 
-        let head_pos = snake_body[0].pos;
-        if let Some(search_trace) = &mut snake_body.search_trace {
+        let head_pos = body[0].pos;
+        if let Some(search_trace) = &mut body.search_trace {
             search_trace.cells_searched.remove(&head_pos);
             if !search_trace.current_path.is_empty() {
                 search_trace.current_path.remove(0);
@@ -211,7 +211,7 @@ impl Controller for AStar {
             let dir = self.path.remove(0);
             Some(dir)
         } else {
-            Self::least_damage(snake_body[0].pos, snake_body, other_snakes, board_dim)
+            Self::least_damage(body[0].pos, body, other_snakes, board_dim)
         }
     }
 }

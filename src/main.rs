@@ -69,6 +69,8 @@ fn main() {
         .build()
         .unwrap();
 
+    eprintln!("start");
+
     // ggez::graphics::set_screen_coordinates(&mut ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
     //     .unwrap();
 

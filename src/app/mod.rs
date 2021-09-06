@@ -2,21 +2,21 @@ use std::ops::{Deref, DerefMut};
 
 use ggez::{
     conf::{WindowMode, WindowSetup},
+    Context,
     event::{EventHandler, KeyCode, KeyMods},
-    graphics::Rect,
-    Context, GameResult,
+    GameResult, graphics::Rect,
 };
 use itertools::Itertools;
 
-use game::Game;
-use palette::GamePalette;
+use palette::Palette;
+use screen::game::Game;
+use screen::start_screen::StartScreen;
 use snake::{EatMechanics, SnakeSeed};
-use start_screen::StartScreen;
 
 use crate::app::{
     apple_spawn_strategy::AppleSpawnStrategy,
     keyboard_control::ControlSetup,
-    snake::{controller::ControllerTemplate, palette::PaletteTemplate, EatBehavior, SnakeType},
+    snake::{controller::ControllerTemplate, EatBehavior, palette::PaletteTemplate, SnakeType},
 };
 
 macro_rules! hash_map {
@@ -30,11 +30,10 @@ macro_rules! hash_map {
     }};
 }
 
-mod game;
+mod screen;
 pub mod keyboard_control;
 mod palette;
 mod snake;
-mod start_screen;
 #[macro_use]
 mod apple_spawn_strategy;
 
@@ -109,15 +108,15 @@ impl App {
             .collect();
 
         Self {
-            // screen: Screen::StartScreen(StartScreen::new()),
-            screen: Screen::Game(Game::new(
-                30.,
-                7.,
-                seeds,
-                GamePalette::dark(),
-                AppleSpawnStrategy::Random { apple_count: 5 },
-                window_mode,
-            )),
+            screen: Screen::StartScreen(StartScreen::new()),
+            // screen: Screen::Game(Game::new(
+            //     30.,
+            //     7.,
+            //     seeds,
+            //     GamePalette::dark(),
+            //     AppleSpawnStrategy::Random { apple_count: 5 },
+            //     window_mode,
+            // )),
             window_mode,
             window_setup,
         }

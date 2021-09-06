@@ -11,7 +11,7 @@ macro_rules! gray {
     };
 }
 
-pub struct GamePalette {
+pub struct Palette {
     pub grid_thickness: f32,
     pub border_thickness: f32,
 
@@ -22,7 +22,7 @@ pub struct GamePalette {
 }
 
 #[allow(dead_code)]
-impl GamePalette {
+impl Palette {
     pub fn light() -> Self {
         todo!()
         // Self {

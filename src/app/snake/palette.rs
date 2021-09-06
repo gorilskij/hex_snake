@@ -4,7 +4,7 @@ use hsl::HSL;
 use SegmentType::*;
 
 use crate::{
-    app::snake::{SegmentType, SnakeBody},
+    app::snake::{SegmentType, Body},
     basic::HexPoint,
     color::oklab::OkLab,
 };
@@ -51,6 +51,10 @@ impl EatenColor {
 
 #[derive(Clone)]
 pub enum PaletteTemplate {
+    Solid {
+        color: Color,
+        eaten: Color,
+    },
     RGBGradient {
         head: Color,
         tail: Color,
@@ -229,7 +233,7 @@ impl SegmentStyle {
 }
 
 pub trait Palette {
-    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle>;
+    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle>;
     // TODO: refactor as
     //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_frac: f32) -> Color;
     //  this avoids unnecessary work for hex palette and is called exactly as many times as needed
@@ -238,6 +242,11 @@ pub trait Palette {
 impl From<PaletteTemplate> for Box<dyn Palette> {
     fn from(template: PaletteTemplate) -> Self {
         match template {
+            PaletteTemplate::Solid { color, eaten } => {
+                Box::new(Solid {
+                    color, eaten,
+                })
+            }
             PaletteTemplate::RGBGradient { head, tail, eaten, persistent } => {
                 Box::new(RGBGradient {
                     head,
@@ -281,7 +290,7 @@ impl From<PaletteTemplate> for Box<dyn Palette> {
             PaletteTemplate::Alternating { color1, color2 } => Box::new(Alternating {
                 color1,
                 color2,
-            })
+            }),
         }
     }
 }
@@ -307,7 +316,7 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
 /// Correct an integer snake length to an f64 length
 /// that accounts for fractional segments, eaten segments
 /// and growing
-fn correct_len(len: usize, body: &SnakeBody, frame_frac: f64) -> f64 {
+fn correct_len(len: usize, body: &Body, frame_frac: f64) -> f64 {
     let len = len as f64;
     if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].typ {
         // Correct for eaten segment at the tail and
@@ -333,6 +342,32 @@ fn correct_len(len: usize, body: &SnakeBody, frame_frac: f64) -> f64 {
     }
 }
 
+
+// The palettes...
+
+pub struct Solid {
+    color: Color,
+    eaten: Color,
+}
+
+impl Palette for Solid {
+    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
+        let mut styles = Vec::with_capacity(body.len());
+
+        for segment in body.iter() {
+            let color = match segment.typ {
+                Normal | BlackHole => self.color,
+                Eaten { .. } => self.eaten,
+                Crashed => *DEFAULT_CRASHED_COLOR,
+            };
+            styles.push(SegmentStyle::Solid(color));
+        }
+
+        styles
+    }
+}
+
+
 pub struct RGBGradient {
     head: Color,
     tail: Color,
@@ -341,7 +376,7 @@ pub struct RGBGradient {
 }
 
 impl Palette for RGBGradient {
-    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
@@ -373,6 +408,7 @@ impl Palette for RGBGradient {
     }
 }
 
+
 pub struct HSLGradient {
     head_hue: f64,
     tail_hue: f64,
@@ -382,7 +418,7 @@ pub struct HSLGradient {
 }
 
 impl Palette for HSLGradient {
-    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
@@ -429,6 +465,7 @@ impl Palette for HSLGradient {
     }
 }
 
+
 pub struct OkLabGradient {
     head_hue: f64,
     tail_hue: f64,
@@ -438,7 +475,7 @@ pub struct OkLabGradient {
 }
 
 impl Palette for OkLabGradient {
-    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let frame_frac = frame_frac as f64;
@@ -473,6 +510,7 @@ impl Palette for OkLabGradient {
     }
 }
 
+
 pub struct AlternatingFixed {
     color1: Color,
     color2: Color,
@@ -481,7 +519,7 @@ pub struct AlternatingFixed {
 }
 
 impl Palette for AlternatingFixed {
-    fn segment_styles(&mut self, body: &SnakeBody, _frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, _frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let head = Some(body[0].pos);
@@ -515,6 +553,7 @@ impl Palette for AlternatingFixed {
     }
 }
 
+
 pub struct Alternating {
     color1: Color,
     color2: Color,
@@ -539,7 +578,7 @@ fn add_colors(color1: Color, color2: Color) -> Color {
 }
 
 impl Palette for Alternating {
-    fn segment_styles(&mut self, body: &SnakeBody, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         for (i, seg) in body.iter().enumerate() {

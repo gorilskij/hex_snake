@@ -1,14 +1,14 @@
 use crate::{
     app::{
-        game::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
-            SnakeBody,
+            Body,
         },
     },
     basic::{Dir, HexDim, HexPoint},
 };
 use std::iter::once;
+use crate::app::screen::game::Apple;
 
 pub struct Competitor1;
 
@@ -41,29 +41,29 @@ fn dir_score(
 impl Controller for Competitor1 {
     fn next_dir(
         &mut self,
-        snake_body: &mut SnakeBody,
+        body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
         board_dim: HexDim,
     ) -> Option<Dir> {
         // all turns
-        let available_directions: Vec<_> = once(snake_body.dir)
-            .chain(snake_body.dir.blunt_turns().iter().copied())
-            .chain(snake_body.dir.sharp_turns().iter().copied())
+        let available_directions: Vec<_> = once(body.dir)
+            .chain(body.dir.blunt_turns().iter().copied())
+            .chain(body.dir.sharp_turns().iter().copied())
             .collect();
 
         // only blunt turns
-        // let available_directions: Vec<_> = once(snake_body.dir)
-        //     .chain(snake_body.dir.blunt_turns().iter().copied())
+        // let available_directions: Vec<_> = once(body.dir)
+        //     .chain(body.dir.blunt_turns().iter().copied())
         //     .collect();
 
         // only sharp turns
-        // let available_directions: Vec<_> = once(snake_body.dir)
-        //     .chain(snake_body.dir.sharp_turns().iter().copied())
+        // let available_directions: Vec<_> = once(body.dir)
+        //     .chain(body.dir.sharp_turns().iter().copied())
         //     .collect();
 
         let apple_positions: Vec<_> = apples.iter().map(|a| a.pos).collect();
-        let snake_positions: Vec<_> = once(&*snake_body)
+        let snake_positions: Vec<_> = once(&*body)
             .chain(other_snakes.iter_bodies())
             .flat_map(|b| b.cells.iter().map(|h| h.pos))
             .collect();
@@ -72,7 +72,7 @@ impl Controller for Competitor1 {
             .iter()
             .max_by_key(|&&dir| {
                 dir_score(
-                    snake_body.cells[0].pos,
+                    body.cells[0].pos,
                     dir,
                     board_dim,
                     &snake_positions,

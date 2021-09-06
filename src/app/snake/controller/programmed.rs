@@ -1,13 +1,13 @@
 use crate::{
     app::{
-        game::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
-            SnakeBody,
+            Body,
         },
     },
     basic::{Dir, HexPoint},
 };
+use crate::app::screen::game::Apple;
 #[allow(unused_macros)]
 macro_rules! move_sequence {
     (@ turn($dir:expr) ) => {
@@ -37,7 +37,7 @@ pub struct Programmed {
 }
 
 impl Controller for Programmed {
-    fn next_dir(&mut self, _: &mut SnakeBody, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
+    fn next_dir(&mut self, _: &mut Body, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
         } else {

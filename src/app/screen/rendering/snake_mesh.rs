@@ -1,6 +1,5 @@
 use crate::{
     app::{
-        game::{Game, Stats},
         snake::{
             rendering::{
                 descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
@@ -15,9 +14,10 @@ use ggez::{
     Context, GameResult,
 };
 
-use crate::basic::{CellDim, Point};
-
-
+use crate::basic::{CellDim, Point, HexDim, DrawStyle};
+use crate::app::snake::Snake;
+use crate::app::screen::control::Control;
+use crate::app::screen::stats::Stats;
 
 const DRAW_WHITE_AURA: bool = false;
 
@@ -32,9 +32,12 @@ fn build_hexagon_at(location: Point, cell_dim: CellDim, color: Color, builder: &
     Ok(())
 }
 
-impl Game {
-    pub(in crate::app::game) fn snake_mesh(
-        &mut self,
+    pub(in crate::app::screen) fn get_snake_mesh(
+        snakes: &mut [Snake],
+        control: &Control,
+        board_dim: HexDim,
+        cell_dim: CellDim,
+        draw_style: DrawStyle,
         ctx: &mut Context,
         stats: &mut Stats,
     ) -> GameResult<Mesh> {
@@ -48,13 +51,11 @@ impl Game {
         let mut black_holes = vec![];
         let mut other_heads = vec![];
 
-        let frame_stamp = self.control.frame_stamp();
+        let frame_stamp = control.frame_stamp();
         let frame_frac = frame_stamp.1;
 
         // Draw bodies
-        for snake_idx in 0..self.snakes.len() {
-            let (snake, other_snakes) = Self::split_snakes_mut(&mut self.snakes, snake_idx);
-
+        for snake in snakes {
             // Desired total number of subsegments for the whole snake
             // smaller snakes have higher resolution to show more detail
             // (this is intended to work with rainbows)
@@ -75,22 +76,16 @@ impl Game {
                 stats.max_subsegments_per_segment = subsegments_per_segment;
             }
 
-            // update the direction of the snake early
-            // to see it turning as soon as possible,
-            // this could happen in the middle of a
-            // game frame
-            snake.update_dir(other_snakes, &self.apples, self.dim, frame_stamp);
-
             // If the snake is guided by a search algorithm, draw the cells
             // that were searched and the path that is being followed
             if let Some(search_trace) = &snake.body.search_trace {
                 let searched_cell_color = Color::from_rgb(130, 47, 5);
                 let current_path_color = Color::from_rgb(97, 128, 11);
                 for &point in &search_trace.cells_searched {
-                    build_hexagon_at(point.to_point(self.cell_dim), self.cell_dim, searched_cell_color, &mut builder)?;
+                    build_hexagon_at(point.to_point(cell_dim), cell_dim, searched_cell_color, &mut builder)?;
                 }
                 for &point in &search_trace.current_path {
-                    build_hexagon_at(point.to_point(self.cell_dim), self.cell_dim, current_path_color, &mut builder)?;
+                    build_hexagon_at(point.to_point(cell_dim), cell_dim, current_path_color, &mut builder)?;
                 }
                 stats.polygons += search_trace.cells_searched.len() + search_trace.current_path.len();
             }
@@ -98,8 +93,8 @@ impl Game {
 
             // Draw white aura around snake heads (debug)
             if DRAW_WHITE_AURA {
-                for point in snake.reachable(7, self.dim) {
-                    build_hexagon_at(point.to_point(self.cell_dim), self.cell_dim, Color::WHITE, &mut builder)?;
+                for point in snake.reachable(7, board_dim) {
+                    build_hexagon_at(point.to_point(cell_dim), cell_dim, Color::WHITE, &mut builder)?;
                     stats.polygons += 1;
                 }
             }
@@ -115,10 +110,10 @@ impl Game {
 
                 if coming_from == going_to {
                     // TODO: diagnose this bug
-                    panic!("180° turn ({:?} -> {:?}) at idx {} of snake at idx {}, segment_type: {:?}", coming_from, going_to, segment_idx, snake_idx, segment.typ);
+                    panic!("180° turn ({:?} -> {:?}) at idx {}, segment_type: {:?}", coming_from, going_to, segment_idx, segment.typ);
                 }
 
-                let location = segment.pos.to_point(self.cell_dim);
+                let location = segment.pos.to_point(cell_dim);
 
                 let fraction = match segment_idx {
                     // head
@@ -141,9 +136,9 @@ impl Game {
                     destination: location,
                     turn: TurnDescription { coming_from, going_to },
                     fraction,
-                    draw_style: self.prefs.draw_style,
+                    draw_style,
                     segment_style: segment_styles[segment_idx],
-                    cell_dim: self.cell_dim,
+                    cell_dim,
                 };
 
                 if segment_idx == 0 {
@@ -173,7 +168,7 @@ impl Game {
         for (segment_description, subsegments_per_segment, turn) in black_holes {
             build_hexagon_at(
                 segment_description.destination,
-                self.cell_dim,
+                cell_dim,
                 black_hole_color,
                 &mut builder,
             )?;
@@ -186,4 +181,3 @@ impl Game {
 
         builder.build(ctx)
     }
-}

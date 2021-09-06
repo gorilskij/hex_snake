@@ -1,6 +1,5 @@
 use crate::{
     app::{
-        game::Apple,
         keyboard_control::ControlSetup,
         snake::{
             controller::{
@@ -12,7 +11,7 @@ use crate::{
                 killer::Killer,
                 programmed::{Move, Programmed},
             },
-            Segment, Snake, SnakeBody,
+            Segment, Snake, Body,
         },
     },
     basic::{Dir, Dir12, HexDim, Side},
@@ -20,6 +19,8 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use std::{collections::VecDeque, f32::consts::TAU};
+use crate::app::snake::utils::OtherSnakes;
+use crate::app::screen::game::Apple;
 
 
 mod a_star;
@@ -28,7 +29,7 @@ mod competitor2;
 mod keyboard;
 mod keyboard_clock;
 mod killer;
-mod programmed;
+pub mod programmed;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -42,34 +43,13 @@ pub enum ControllerTemplate {
     AStar,
 }
 
-#[derive(Copy, Clone)]
-pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);
-
-impl<'a> OtherSnakes<'a> {
-    pub fn new(a: &'a [Snake], b: &'a [Snake]) -> Self {
-        Self(a, b)
-    }
-
-    pub fn iter_snakes(&self) -> impl Iterator<Item = &Snake> {
-        self.0.iter().chain(self.1.iter())
-    }
-
-    pub fn iter_bodies(&self) -> impl Iterator<Item = &SnakeBody> {
-        self.iter_snakes().map(|Snake { body, .. }| body)
-    }
-
-    pub fn iter_segments(&self) -> impl Iterator<Item = &Segment> {
-        self.iter_bodies().flat_map(|body| body.cells.iter())
-    }
-}
-
 pub trait Controller {
     // NOTE: there is a difference between returning None and the same dir
     //  returning None will cause the snake to query again on the
     //  next graphics frame, otherwise it will wait until the next game frame
     fn next_dir(
         &mut self,
-        snake_body: &mut SnakeBody,
+        body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
         board_dim: HexDim,
