@@ -18,7 +18,7 @@ use crate::{
 };
 use ggez::graphics::Color;
 use std::slice;
-use crate::app::snake::SnakeSeed;
+use crate::app::snake::Seed;
 use crate::app::screen::rendering::grid_mesh::{get_grid_mesh, get_border_mesh};
 use crate::app;
 use crate::app::screen::game::{FrameStamp, Apple, AppleType};
@@ -27,6 +27,7 @@ use crate::app::snake;
 use ggez::event::{MouseButton, KeyMods, Button, GamepadId, Axis, ErrorOrigin, KeyCode};
 use crate::app::apple_spawn_strategy::{AppleSpawnStrategy, AppleSpawn};
 use crate::app::screen::rendering::apple_mesh::get_apple_mesh;
+use crate::app::collisions::{find_collisions, handle_collisions};
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -56,7 +57,7 @@ impl SnakeDemo {
             next_index: 0,
         };
 
-        let mut seed = SnakeSeed {
+        let mut seed = Seed {
             snake_type: SnakeType::Simulated {
                 start_pos,
                 start_dir,
@@ -144,35 +145,13 @@ impl SnakeDemo {
             frame_stamp,
         );
 
+        let collisions = find_collisions(slice::from_ref(&self.snake), &self.apples);
+        let (spawn_snakes, remove_apples, game_over) = handle_collisions(&collisions, slice::from_mut(&mut self.snake), &self.apples);
 
-        // TODO: refactor snake cutting behavior out of StartScreen and Game
-        let head_pos = self.snake.head().pos;
-        let mut cut = None;
-        for (segment_idx, segment) in self.snake.body.iter().enumerate().skip(1) {
-            if segment.pos == head_pos {
-                cut = Some(segment_idx);
-                break;
-            }
-        }
-        if let Some(idx) = cut {
-            let _ = self.snake.body.cells.drain(idx..);
-        }
-
-        // TODO: refactor apple spawning and eating code out of StartScreen and Game
-        // check apple eating
-        for i in (0..self.apples.len()).rev() {
-            if self.snake.head().pos == self.apples[i].pos {
-                let Apple { typ, .. } = self.apples.remove(i);
-                match typ {
-                    AppleType::Normal(food) => {
-                        self.snake.body.cells[0].typ = SegmentType::Eaten {
-                            original_food: food,
-                            food_left: food,
-                        }
-                    }
-                    apple => panic!("unexpected apple {:?}", apple),
-                }
-            }
+        assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
+        assert_eq!(game_over, false, "unexpected game over");
+        for apple_index in remove_apples.into_iter().rev() {
+            self.apples.remove(apple_index);
         }
 
         self.spawn_apples();

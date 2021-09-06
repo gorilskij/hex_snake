@@ -9,7 +9,7 @@ use ggez::{
 use itertools::Itertools;
 
 use screen::{game::Game, start_screen::StartScreen};
-use snake::{EatMechanics, SnakeSeed};
+use snake::{EatMechanics, Seed};
 
 use crate::app::{
     keyboard_control::ControlSetup,
@@ -37,7 +37,7 @@ mod snake;
 #[macro_use]
 mod apple_spawn_strategy;
 mod screen;
-mod collision_detection;
+mod collisions;
 
 pub type Frames = u64;
 
@@ -94,7 +94,7 @@ impl App {
 
         let seeds: Vec<_> = players
             .into_iter()
-            .map(|cs| SnakeSeed {
+            .map(|cs| Seed {
                 snake_type: SnakeType::Player,
                 eat_mechanics: EatMechanics {
                     eat_self: EatBehavior::Cut,
@@ -111,15 +111,15 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
-            // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            screen: Screen::Game(Game::new(
-                cell_dim,
-                7.,
-                seeds,
-                Palette::dark(),
-                AppleSpawnStrategy::Random { apple_count: 5 },
-                window_mode,
-            )),
+            screen: Screen::StartScreen(StartScreen::new(cell_dim)),
+            // screen: Screen::Game(Game::new(
+            //     cell_dim,
+            //     7.,
+            //     seeds,
+            //     Palette::dark(),
+            //     AppleSpawnStrategy::Random { apple_count: 5 },
+            //     window_mode,
+            // )),
             window_mode,
             window_setup,
         }

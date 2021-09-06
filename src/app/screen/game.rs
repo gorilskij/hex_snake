@@ -24,14 +24,14 @@ use crate::{
             self,
             controller::{Controller, ControllerTemplate},
             utils::split_snakes_mut,
-            EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeSeed, SnakeType, State,
+            EatBehavior, EatMechanics, Segment, SegmentType, Snake, Seed, SnakeType, State,
         },
     },
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
 };
 use std::collections::HashMap;
 use crate::app::screen::rendering::grid_mesh::get_border_mesh;
-use crate::app::collision_detection::{find_collisions, Collision};
+use crate::app::collisions::{find_collisions, Collision, handle_collisions};
 
 /// Represents (graphics frame number, frame fraction)
 pub(crate) type FrameStamp = (usize, f32);
@@ -39,7 +39,7 @@ pub(crate) type FrameStamp = (usize, f32);
 #[derive(Debug)]
 pub enum AppleType {
     Normal(Food),
-    SpawnSnake(SnakeSeed),
+    SpawnSnake(Seed),
 }
 
 pub struct Apple {
@@ -53,7 +53,7 @@ pub struct Game {
     window_dim: Point,
 
     dim: HexDim,
-    seeds: Vec<SnakeSeed>,
+    seeds: Vec<Seed>,
     snakes: Vec<Snake>,
     apples: Vec<Apple>,
 
@@ -89,7 +89,7 @@ impl Game {
     pub fn new(
         cell_dim: CellDim,
         starting_fps: f64,
-        seeds: Vec<SnakeSeed>,
+        seeds: Vec<Seed>,
         palette: Palette,
         apple_spawn_strategy: AppleSpawnStrategy,
         wm: WindowMode,
@@ -268,7 +268,7 @@ impl Game {
     fn generate_apple(&mut self, apple_pos: HexPoint) {
         let apple_type = if self.prefs.special_apples {
             match self.rng.gen::<f32>() {
-                x if x < 0.025 => AppleType::SpawnSnake(SnakeSeed {
+                x if x < 0.025 => AppleType::SpawnSnake(Seed {
                     snake_type: SnakeType::Competitor { life: Some(200) },
                     eat_mechanics: EatMechanics::always(EatBehavior::Die),
                     palette: snake::PaletteTemplate::pastel_rainbow(true),
@@ -283,7 +283,7 @@ impl Game {
                         println!("warning: didn't spawn killer snake apple because there is no player snake");
                         AppleType::Normal(1)
                     } else {
-                        AppleType::SpawnSnake(SnakeSeed {
+                        AppleType::SpawnSnake(Seed {
                             snake_type: SnakeType::Killer { life: Some(200) },
                             eat_mechanics: EatMechanics::always(EatBehavior::Die),
                             palette: snake::PaletteTemplate::dark_blue_to_red(false),
@@ -428,55 +428,10 @@ impl Game {
 
 
         let collisions = find_collisions(&self.snakes, &self.apples);
+        let (spawn_snakes, remove_apples, game_over) = handle_collisions(&collisions, &mut self.snakes, &self.apples);
 
-        let mut spawn_snakes = vec![];
-        let mut remove_apples = vec![];
-        for collision in collisions {
-
-            match collision {
-                Collision::Apple { snake_index, apple_index } => {
-                    remove_apples.push(apple_index);
-                    match &self.apples[apple_index].typ {
-                        AppleType::Normal(food) => {
-                            self.snakes[snake_index].body.cells[0].typ = SegmentType::Eaten {
-                                original_food: *food,
-                                food_left: *food,
-                            }
-                        }
-                        AppleType::SpawnSnake(seed) => spawn_snakes.push(seed),
-                    }
-                }
-                Collision::Snake { snake1_index, snake2_index, snake2_segment_index } => {
-                    let behavior = if snake2_segment_index == 0 {
-                        // special case for head-head collision (always crash)
-                        EatBehavior::Crash
-                    } else {
-                        let mechanics = &self.snakes[snake1_index].eat_mechanics;
-                        mechanics.eat_other.get(&self.snakes[snake2_index].snake_type).copied().unwrap_or(mechanics.default)
-                    };
-                    match behavior {
-                        EatBehavior::Cut => self.snakes[snake2_index].cut_at(snake2_segment_index),
-                        EatBehavior::Crash => {
-                            self.snakes[snake1_index].crash();
-                            self.control.game_over();
-                            self.draw_cache_invalid = 5;
-                        }
-                        EatBehavior::Die => self.snakes[snake1_index].die(),
-                    }
-                }
-                Collision::Itself { snake_index, snake_segment_index } => {
-                    let behavior = self.snakes[snake_index].eat_mechanics.eat_self;
-                    match behavior {
-                        EatBehavior::Cut => self.snakes[snake_index].cut_at(snake_segment_index),
-                        EatBehavior::Crash => {
-                            self.snakes[snake_index].crash();
-                            self.control.game_over();
-                            self.draw_cache_invalid = 5;
-                        }
-                        EatBehavior::Die => self.snakes[snake_index].die(),
-                    }
-                }
-            }
+        if game_over {
+            self.control.game_over()
         }
 
         for seed in spawn_snakes {
@@ -503,7 +458,6 @@ impl Game {
             }
         }
 
-        remove_apples.sort_unstable();
         for apple_index in remove_apples.into_iter().rev() {
             self.apples.remove(apple_index);
         }

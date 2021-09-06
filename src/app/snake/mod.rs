@@ -141,7 +141,7 @@ pub struct Snake {
 }
 
 #[derive(Clone, Debug)]
-pub struct SnakeSeed {
+pub struct Seed {
     pub snake_type: SnakeType,
     pub eat_mechanics: EatMechanics,
     pub palette: PaletteTemplate,
@@ -149,8 +149,8 @@ pub struct SnakeSeed {
 }
 
 impl Snake {
-    pub fn from_seed(seed: &SnakeSeed, pos: HexPoint, dir: Dir, grow: usize) -> Self {
-        let SnakeSeed {
+    pub fn from_seed(seed: &Seed, pos: HexPoint, dir: Dir, grow: usize) -> Self {
+        let Seed {
             snake_type,
             eat_mechanics,
             palette,
