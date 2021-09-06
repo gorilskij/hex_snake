@@ -47,7 +47,7 @@ impl Palette {
 
     pub fn dark() -> Self {
         Self {
-            grid_thickness: 0.5,
+            grid_thickness: 1.,
             border_thickness: 3.,
 
             background_color: Color::BLACK,

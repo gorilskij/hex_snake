@@ -30,6 +30,7 @@ use crate::{
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
 };
 use std::collections::HashMap;
+use crate::app::screen::rendering::grid_mesh::get_border_mesh;
 
 /// Represents (graphics frame number, frame fraction)
 pub(crate) type FrameStamp = (usize, f32);
@@ -132,8 +133,8 @@ impl Game {
         let Point { x: width, y: height } = self.window_dim;
         let CellDim { side, sin, cos } = self.cell_dim;
         let new_dim = HexDim {
-            h: (width / (side + cos)) as isize,
-            v: (height / (2. * sin)) as isize - 1,
+            h: ((width - cos) / (side + cos)) as isize,
+            v: ((height - sin) / (2. * sin)) as isize,
         };
 
         // println!("w/h: {}/{}", width, height);
@@ -662,6 +663,7 @@ impl EventHandler<ggez::GameError> for Game {
 
         // selectively set to Some(_) if they need to be updated
         let mut grid_mesh = None;
+        let mut border_mesh = None;
         let mut snake_mesh = None;
         let mut apple_mesh = None;
 
@@ -706,6 +708,13 @@ impl EventHandler<ggez::GameError> for Game {
                         Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
                 };
                 grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
+            }
+            if self.prefs.draw_border {
+                if self.border_mesh.is_none() {
+                    self.border_mesh =
+                        Some(get_border_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
+                }
+                border_mesh = Some(self.border_mesh.as_ref().unwrap());
             }
         } else {
             let mut update = false;
@@ -759,14 +768,24 @@ impl EventHandler<ggez::GameError> for Game {
                     };
                     grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
                 }
+                if self.prefs.draw_border {
+                    if self.border_mesh.is_none() {
+                        self.border_mesh =
+                            Some(get_border_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
+                    }
+                    border_mesh = Some(self.border_mesh.as_ref().unwrap());
+                }
                 apple_mesh = Some(ROw::Ref(self.cached_apple_mesh.as_ref().unwrap()));
                 snake_mesh = Some(ROw::Ref(self.cached_snake_mesh.as_ref().unwrap()));
             }
         }
 
-        if grid_mesh.is_some() || apple_mesh.is_some() || snake_mesh.is_some() {
+        if grid_mesh.is_some() || border_mesh.is_some() || apple_mesh.is_some() || snake_mesh.is_some() {
             clear(ctx, self.palette.background_color);
             if let Some(mesh) = grid_mesh {
+                draw(ctx, mesh, DrawParam::default())?;
+            }
+            if let Some(mesh) = border_mesh {
                 draw(ctx, mesh, DrawParam::default())?;
             }
             if let Some(mesh) = apple_mesh {

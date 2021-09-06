@@ -17,6 +17,7 @@ use crate::{
     basic::Side,
 };
 use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
+use ggez::graphics::Rect;
 
 mod app;
 mod basic;
@@ -61,7 +62,7 @@ fn main() {
         window_setup,
     );
 
-    let (ctx, event_loop) = ContextBuilder::new("hex_snake", "gorilskij")
+    let (mut ctx, event_loop) = ContextBuilder::new("hex_snake", "gorilskij")
         .window_mode(app.wm())
         .window_setup(app.ws())
         .build()
@@ -69,7 +70,7 @@ fn main() {
 
     eprintln!("start");
 
-    // ggez::graphics::set_screen_coordinates(&mut ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
+    // ggez::graphics::set_screen_coordinates(&mut ctx, Rect { x: 0., y: 0., w: width, h: height })
     //     .unwrap();
 
     run(ctx, event_loop, app)

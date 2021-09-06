@@ -15,6 +15,8 @@ use crate::app::{
     keyboard_control::ControlSetup,
     snake::{controller::ControllerTemplate, palette::PaletteTemplate, EatBehavior, SnakeType},
 };
+use crate::app::apple_spawn_strategy::AppleSpawnStrategy;
+use crate::app::palette::Palette;
 
 macro_rules! hash_map {
     {} => {
@@ -87,7 +89,7 @@ impl App {
             "found multiple players on the same side of the keyboard"
         );
 
-        let _seeds: Vec<_> = players
+        let seeds: Vec<_> = players
             .into_iter()
             .map(|cs| SnakeSeed {
                 snake_type: SnakeType::Player,
@@ -105,15 +107,15 @@ impl App {
             .collect();
 
         Self {
-            screen: Screen::StartScreen(StartScreen::new()),
-            // screen: Screen::Game(Game::new(
-            //     30.,
-            //     7.,
-            //     seeds,
-            //     GamePalette::dark(),
-            //     AppleSpawnStrategy::Random { apple_count: 5 },
-            //     window_mode,
-            // )),
+            // screen: Screen::StartScreen(StartScreen::new()),
+            screen: Screen::Game(Game::new(
+                30.,
+                7.,
+                seeds,
+                Palette::dark(),
+                AppleSpawnStrategy::Random { apple_count: 5 },
+                window_mode,
+            )),
             window_mode,
             window_setup,
         }
@@ -218,13 +220,13 @@ impl EventHandler<ggez::GameError> for App {
             Rect {
                 x: 0.0,
                 y: 0.0,
-                w: width / 2.,
-                h: height / 2.,
+                w: width,
+                h: height,
             },
         )
         .unwrap();
 
         // TODO: hacky fix for ggez bug, remove /2
-        self.screen.resize_event(ctx, width / 2., height / 2.);
+        self.screen.resize_event(ctx, width, height);
     }
 }

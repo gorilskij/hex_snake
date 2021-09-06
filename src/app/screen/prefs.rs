@@ -5,6 +5,7 @@ pub type Food = u32;
 
 pub struct Prefs {
     pub draw_grid: bool,
+    pub draw_border: bool,
     pub display_fps: bool,
     pub display_stats: bool,
     pub apple_food: Food,
@@ -16,7 +17,8 @@ pub struct Prefs {
 impl Default for Prefs {
     fn default() -> Self {
         Self {
-            draw_grid: false,
+            draw_grid: true,
+            draw_border: true,
             display_fps: false,
             display_stats: false,
             apple_food: 1,
