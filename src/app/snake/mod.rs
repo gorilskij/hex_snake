@@ -252,8 +252,8 @@ impl Snake {
     ) {
         if !self.body.dir_grace && self.state == State::Living {
             if let Some(new_dir) =
-            self.controller
-                .next_dir(&mut self.body, other_snakes, apples, board_dim)
+                self.controller
+                    .next_dir(&mut self.body, other_snakes, apples, board_dim)
             {
                 self.body.dir = new_dir;
                 self.body.dir_grace = true;

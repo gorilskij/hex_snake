@@ -1,7 +1,10 @@
-use crate::app::snake::{Snake, SegmentType, EatBehavior};
-use crate::app::screen::game::{Apple, AppleType};
-use crate::app::snake::{self, State};
-use crate::app::screen::control::Control;
+use crate::app::{
+    screen::{
+        control::Control,
+        game::{Apple, AppleType},
+    },
+    snake::{self, EatBehavior, SegmentType, Snake, State},
+};
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -19,14 +22,13 @@ pub enum Collision {
     Itself {
         snake_index: usize,
         snake_segment_index: usize,
-    }
+    },
 }
 
 pub fn find_collisions(snakes: &[Snake], apples: &[Apple]) -> Vec<Collision> {
     let mut collisions = vec![];
 
-    // checks if snake i crashed into snake j
-    // crashed and dying snakes can be ignored for i
+    // check whether snake1 collided with an apple or with snake2
     'outer: for (snake1_index, snake1) in snakes
         .iter()
         .enumerate()
@@ -34,21 +36,52 @@ pub fn find_collisions(snakes: &[Snake], apples: &[Apple]) -> Vec<Collision> {
     {
         for (apple_index, apple) in apples.iter().enumerate() {
             if snake1.head().pos == apple.pos {
-                collisions.push(Collision::Apple { snake_index: snake1_index, apple_index })
+                collisions.push(Collision::Apple {
+                    snake_index: snake1_index,
+                    apple_index,
+                })
             }
         }
 
         for (snake2_index, other) in snakes.iter().enumerate() {
             let mut iter = other.body.cells.iter().enumerate();
-            // ignore own head-head collision
-            if snake1_index == snake2_index { let _ = iter.next(); }
+
+            // ignore head-head collision with itself
+            if snake1_index == snake2_index {
+                let _ = iter.next();
+            }
+
             for (segment_idx, segment) in iter {
                 if snake1.head().pos == segment.pos {
-                    // avoid duplicate head-head collision
-                    if segment_idx == 0 && collisions.iter().any(|collision| matches!(collision, Collision::Snake {snake1_index: snake2_index, snake2_index: snake1_index, snake2_segment_index: 0})) {
+                    // prevent duplicate head-head collision
+                    if segment_idx == 0
+                        && collisions.iter().any(|collision| {
+                            matches!(
+                                collision,
+                                Collision::Snake {
+                                    snake1_index: snake2_index,
+                                    snake2_index: snake1_index,
+                                    snake2_segment_index: 0
+                                }
+                            )
+                        })
+                    {
                         continue 'outer;
                     }
-                    collisions.push(Collision::Snake {snake1_index,snake2_index,snake2_segment_index:segment_idx});
+
+                    if snake1_index == snake2_index {
+                        collisions.push(Collision::Itself {
+                            snake_index: snake1_index,
+                            snake_segment_index: segment_idx,
+                        })
+                    } else {
+                        collisions.push(Collision::Snake {
+                            snake1_index,
+                            snake2_index,
+                            snake2_segment_index: segment_idx,
+                        });
+                    }
+
                     continue 'outer;
                 }
             }
@@ -59,7 +92,11 @@ pub fn find_collisions(snakes: &[Snake], apples: &[Apple]) -> Vec<Collision> {
 }
 
 /// The third return value indicates whether it's game over (whether a snake has crashed)
-pub fn handle_collisions<'a>(collisions: &[Collision], snakes: &mut [Snake], apples: &'a [Apple]) -> (Vec<&'a snake::Seed>, Vec<usize>, bool) {
+pub fn handle_collisions<'a>(
+    collisions: &[Collision],
+    snakes: &mut [Snake],
+    apples: &'a [Apple],
+) -> (Vec<&'a snake::Seed>, Vec<usize>, bool) {
     let mut spawn_snakes = vec![];
     let mut remove_apples = vec![];
     let mut game_over = false;
@@ -77,13 +114,21 @@ pub fn handle_collisions<'a>(collisions: &[Collision], snakes: &mut [Snake], app
                     AppleType::SpawnSnake(seed) => spawn_snakes.push(seed),
                 }
             }
-            Collision::Snake { snake1_index, snake2_index, snake2_segment_index } => {
+            Collision::Snake {
+                snake1_index,
+                snake2_index,
+                snake2_segment_index,
+            } => {
                 let behavior = if snake2_segment_index == 0 {
                     // special case for head-head collision (always crash)
                     EatBehavior::Crash
                 } else {
                     let mechanics = &snakes[snake1_index].eat_mechanics;
-                    mechanics.eat_other.get(&snakes[snake2_index].snake_type).copied().unwrap_or(mechanics.default)
+                    mechanics
+                        .eat_other
+                        .get(&snakes[snake2_index].snake_type)
+                        .copied()
+                        .unwrap_or(mechanics.default)
                 };
                 match behavior {
                     EatBehavior::Cut => snakes[snake2_index].cut_at(snake2_segment_index),

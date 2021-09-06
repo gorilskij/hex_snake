@@ -128,14 +128,16 @@ pub(in crate::app::screen) fn get_border_mesh(
         builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
     }
 
-
     let mut hline = vec![];
     for h in 0..board_dim.h / 2 {
         let dh = 2. * (side + cos) * h as f32;
         hline.push(Point { x: dh + cos, y: 0. });
         hline.push(Point { x: dh + side + cos, y: 0. });
         hline.push(Point { x: dh + side + 2. * cos, y: sin });
-        hline.push(Point { x: dh + 2. * side + 2. * cos, y: sin });
+        hline.push(Point {
+            x: dh + 2. * side + 2. * cos,
+            y: sin,
+        });
     }
     if board_dim.h.is_odd() {
         let dh = 2. * (side + cos) * (board_dim.h / 2) as f32;

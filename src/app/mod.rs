@@ -11,12 +11,14 @@ use itertools::Itertools;
 use screen::{game::Game, start_screen::StartScreen};
 use snake::{EatMechanics, Seed};
 
-use crate::app::{
-    keyboard_control::ControlSetup,
-    snake::{controller::ControllerTemplate, EatBehavior, SnakeType},
+use crate::{
+    app::{
+        apple_spawn_strategy::AppleSpawnStrategy,
+        keyboard_control::ControlSetup,
+        snake::{controller::ControllerTemplate, EatBehavior, SnakeType},
+    },
+    basic::CellDim,
 };
-use crate::app::apple_spawn_strategy::AppleSpawnStrategy;
-use crate::basic::CellDim;
 
 pub use palette::Palette;
 
@@ -36,8 +38,8 @@ mod palette;
 mod snake;
 #[macro_use]
 mod apple_spawn_strategy;
-mod screen;
 mod collisions;
+mod screen;
 
 pub type Frames = u64;
 
@@ -111,15 +113,15 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
-            screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            // screen: Screen::Game(Game::new(
-            //     cell_dim,
-            //     7.,
-            //     seeds,
-            //     Palette::dark(),
-            //     AppleSpawnStrategy::Random { apple_count: 5 },
-            //     window_mode,
-            // )),
+            // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
+            screen: Screen::Game(Game::new(
+                cell_dim,
+                7.,
+                seeds,
+                Palette::dark(),
+                AppleSpawnStrategy::Random { apple_count: 5 },
+                window_mode,
+            )),
             window_mode,
             window_setup,
         }
@@ -219,16 +221,8 @@ impl EventHandler<ggez::GameError> for App {
     }
 
     fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        ggez::graphics::set_screen_coordinates(
-            ctx,
-            Rect {
-                x: 0.0,
-                y: 0.0,
-                w: width,
-                h: height,
-            },
-        )
-        .unwrap();
+        ggez::graphics::set_screen_coordinates(ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
+            .unwrap();
 
         // TODO: hacky fix for ggez bug, remove /2
         self.screen.resize_event(ctx, width, height);

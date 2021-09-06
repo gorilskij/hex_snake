@@ -10,13 +10,16 @@ use rand::prelude::*;
 use crate::{
     app::{
         apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
+        collisions::{find_collisions, handle_collisions, Collision},
         palette::Palette,
         screen::{
             control::{Control, GameState},
             message::{Message, MessageID},
             prefs::{Food, Prefs},
             rendering::{
-                apple_mesh::get_apple_mesh, grid_mesh::get_grid_mesh, snake_mesh::get_snake_mesh,
+                apple_mesh::get_apple_mesh,
+                grid_mesh::{get_border_mesh, get_grid_mesh},
+                snake_mesh::get_snake_mesh,
             },
             stats::Stats,
         },
@@ -24,14 +27,12 @@ use crate::{
             self,
             controller::{Controller, ControllerTemplate},
             utils::split_snakes_mut,
-            EatBehavior, EatMechanics, Segment, SegmentType, Snake, Seed, SnakeType, State,
+            EatBehavior, EatMechanics, Seed, Segment, SegmentType, Snake, SnakeType, State,
         },
     },
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
 };
 use std::collections::HashMap;
-use crate::app::screen::rendering::grid_mesh::get_border_mesh;
-use crate::app::collisions::{find_collisions, Collision, handle_collisions};
 
 /// Represents (graphics frame number, frame fraction)
 pub(crate) type FrameStamp = (usize, f32);
@@ -426,9 +427,9 @@ impl Game {
             return;
         }
 
-
         let collisions = find_collisions(&self.snakes, &self.apples);
-        let (spawn_snakes, remove_apples, game_over) = handle_collisions(&collisions, &mut self.snakes, &self.apples);
+        let (spawn_snakes, remove_apples, game_over) =
+            handle_collisions(&collisions, &mut self.snakes, &self.apples);
 
         if game_over {
             self.control.game_over()
@@ -610,8 +611,12 @@ impl EventHandler<ggez::GameError> for Game {
             }
             if self.prefs.draw_border {
                 if self.border_mesh.is_none() {
-                    self.border_mesh =
-                        Some(get_border_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
+                    self.border_mesh = Some(get_border_mesh(
+                        self.dim,
+                        self.cell_dim,
+                        &self.palette,
+                        ctx,
+                    )?);
                 }
                 border_mesh = Some(self.border_mesh.as_ref().unwrap());
             }
@@ -669,8 +674,12 @@ impl EventHandler<ggez::GameError> for Game {
                 }
                 if self.prefs.draw_border {
                     if self.border_mesh.is_none() {
-                        self.border_mesh =
-                            Some(get_border_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
+                        self.border_mesh = Some(get_border_mesh(
+                            self.dim,
+                            self.cell_dim,
+                            &self.palette,
+                            ctx,
+                        )?);
                     }
                     border_mesh = Some(self.border_mesh.as_ref().unwrap());
                 }
@@ -679,7 +688,11 @@ impl EventHandler<ggez::GameError> for Game {
             }
         }
 
-        if grid_mesh.is_some() || border_mesh.is_some() || apple_mesh.is_some() || snake_mesh.is_some() {
+        if grid_mesh.is_some()
+            || border_mesh.is_some()
+            || apple_mesh.is_some()
+            || snake_mesh.is_some()
+        {
             clear(ctx, self.palette.background_color);
             if let Some(mesh) = grid_mesh {
                 draw(ctx, mesh, DrawParam::default())?;

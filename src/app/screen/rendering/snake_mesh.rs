@@ -15,12 +15,11 @@ use ggez::{
 
 use crate::{
     app::{
-        screen::{control::Control, stats::Stats},
+        screen::{control::Control, game::FrameStamp, stats::Stats},
         snake::Snake,
     },
     basic::{CellDim, DrawStyle, HexDim, Point},
 };
-use crate::app::screen::game::FrameStamp;
 
 const DRAW_WHITE_AURA: bool = false;
 

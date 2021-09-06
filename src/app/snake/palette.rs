@@ -92,7 +92,10 @@ pub enum PaletteTemplate {
 #[allow(dead_code)]
 impl PaletteTemplate {
     pub fn solid_white_red() -> Self {
-        Self::Solid { color: Color::WHITE, eaten: Color::RED }
+        Self::Solid {
+            color: Color::WHITE,
+            eaten: Color::RED,
+        }
     }
 
     pub fn rgb_gradient(head: Color, tail: Color, eaten: Option<Color>, persistent: bool) -> Self {

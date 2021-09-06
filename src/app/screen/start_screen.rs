@@ -1,33 +1,42 @@
 use std::collections::VecDeque;
 
-use ggez::{event::EventHandler, graphics::{clear, draw, present, DrawParam}, Context, GameResult, GameError};
+use ggez::{
+    event::EventHandler,
+    graphics::{clear, draw, present, DrawParam},
+    Context, GameError, GameResult,
+};
 
 use crate::{
+    app,
     app::{
+        apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
+        collisions::{find_collisions, handle_collisions},
         screen::{
-            control::Control, prefs::Prefs, rendering::snake_mesh::get_snake_mesh, stats::Stats,
+            control::Control,
+            game::{Apple, AppleType, FrameStamp},
+            prefs::Prefs,
+            rendering::{
+                apple_mesh::get_apple_mesh,
+                grid_mesh::{get_border_mesh, get_grid_mesh},
+                snake_mesh::get_snake_mesh,
+            },
+            stats::Stats,
         },
+        snake,
         snake::{
             controller::{programmed::Move, ControllerTemplate},
             utils::OtherSnakes,
-            Body, EatBehavior, EatMechanics, Segment, SegmentType, Snake, SnakeType, State,
+            Body, EatBehavior, EatMechanics, Seed, Segment, SegmentType, Snake, SnakeType, State,
         },
         Screen,
     },
-    basic::{CellDim, Dir, HexDim, HexPoint},
+    basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint},
 };
-use ggez::graphics::Color;
+use ggez::{
+    event::{Axis, Button, ErrorOrigin, GamepadId, KeyCode, KeyMods, MouseButton},
+    graphics::Color,
+};
 use std::slice;
-use crate::app::snake::Seed;
-use crate::app::screen::rendering::grid_mesh::{get_grid_mesh, get_border_mesh};
-use crate::app;
-use crate::app::screen::game::{FrameStamp, Apple, AppleType};
-use crate::basic::DrawStyle;
-use crate::app::snake;
-use ggez::event::{MouseButton, KeyMods, Button, GamepadId, Axis, ErrorOrigin, KeyCode};
-use crate::app::apple_spawn_strategy::{AppleSpawnStrategy, AppleSpawn};
-use crate::app::screen::rendering::apple_mesh::get_apple_mesh;
-use crate::app::collisions::{find_collisions, handle_collisions};
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -47,10 +56,7 @@ impl SnakeDemo {
         let start_pos = HexPoint { h: 1, v: 4 };
         let board_dim = HexPoint { h: 11, v: 8 };
 
-        let spawn_schedule = spawn_schedule![
-            spawn(6, 2),
-            wait(40),
-        ];
+        let spawn_schedule = spawn_schedule![spawn(6, 2), wait(40),];
         let apple_spawn_strategy = AppleSpawnStrategy::ScheduledOnEat {
             apple_count: 1,
             spawns: spawn_schedule,
@@ -58,11 +64,7 @@ impl SnakeDemo {
         };
 
         let mut seed = Seed {
-            snake_type: SnakeType::Simulated {
-                start_pos,
-                start_dir,
-                start_grow: 5,
-            },
+            snake_type: SnakeType::Simulated { start_pos, start_dir, start_grow: 5 },
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Cut,
                 eat_other: hash_map! {},
@@ -109,7 +111,7 @@ impl SnakeDemo {
         let apple = match &mut self.apple_spawn_strategy {
             AppleSpawnStrategy::ScheduledOnEat { apple_count, spawns, next_index } => {
                 if self.apples.len() >= *apple_count {
-                    return
+                    return;
                 }
 
                 let len = spawns.len();
@@ -138,15 +140,12 @@ impl SnakeDemo {
     }
 
     fn advance_snakes(&mut self, frame_stamp: FrameStamp) {
-        self.snake.advance(
-            OtherSnakes::empty(),
-            &self.apples,
-            self.dim,
-            frame_stamp,
-        );
+        self.snake
+            .advance(OtherSnakes::empty(), &self.apples, self.dim, frame_stamp);
 
         let collisions = find_collisions(slice::from_ref(&self.snake), &self.apples);
-        let (spawn_snakes, remove_apples, game_over) = handle_collisions(&collisions, slice::from_mut(&mut self.snake), &self.apples);
+        let (spawn_snakes, remove_apples, game_over) =
+            handle_collisions(&collisions, slice::from_mut(&mut self.snake), &self.apples);
 
         assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
         assert_eq!(game_over, false, "unexpected game over");
@@ -157,13 +156,17 @@ impl SnakeDemo {
         self.spawn_apples();
     }
 
-    fn draw(&mut self, ctx: &mut Context, cell_dim: CellDim, frame_stamp: FrameStamp, draw_style: DrawStyle, palette: &app::Palette, stats: &mut Stats) -> GameResult {
-        self.snake.update_dir(
-            OtherSnakes::empty(),
-            &[],
-            self.dim,
-            frame_stamp,
-        );
+    fn draw(
+        &mut self,
+        ctx: &mut Context,
+        cell_dim: CellDim,
+        frame_stamp: FrameStamp,
+        draw_style: DrawStyle,
+        palette: &app::Palette,
+        stats: &mut Stats,
+    ) -> GameResult {
+        self.snake
+            .update_dir(OtherSnakes::empty(), &[], self.dim, frame_stamp);
 
         let draw_param = DrawParam::default().dest(self.location.to_cartesian(cell_dim));
 
@@ -185,7 +188,15 @@ impl SnakeDemo {
         draw(ctx, &snake_mesh, draw_param)?;
 
         if !self.apples.is_empty() {
-            let apple_mesh = get_apple_mesh(&self.apples, frame_stamp, cell_dim, draw_style, palette, ctx, stats)?;
+            let apple_mesh = get_apple_mesh(
+                &self.apples,
+                frame_stamp,
+                cell_dim,
+                draw_style,
+                palette,
+                ctx,
+                stats,
+            )?;
             draw(ctx, &apple_mesh, draw_param)?;
         }
 
@@ -237,13 +248,33 @@ impl EventHandler<ggez::GameError> for StartScreen {
         clear(ctx, Color::BLACK);
 
         let palette = &self.palettes[self.current_palette];
-        self.player1_demo.draw(ctx, self.cell_dim, frame_stamp, self.prefs.draw_style, palette, &mut self.stats)?;
-        self.player2_demo.draw(ctx, self.cell_dim, frame_stamp, self.prefs.draw_style, palette, &mut self.stats)?;
+        self.player1_demo.draw(
+            ctx,
+            self.cell_dim,
+            frame_stamp,
+            self.prefs.draw_style,
+            palette,
+            &mut self.stats,
+        )?;
+        self.player2_demo.draw(
+            ctx,
+            self.cell_dim,
+            frame_stamp,
+            self.prefs.draw_style,
+            palette,
+            &mut self.stats,
+        )?;
 
         present(ctx)
     }
 
-    fn key_down_event(&mut self, _ctx: &mut Context, keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {
+    fn key_down_event(
+        &mut self,
+        _ctx: &mut Context,
+        keycode: KeyCode,
+        _keymods: KeyMods,
+        _repeat: bool,
+    ) {
         match keycode {
             KeyCode::Left => self.player1_demo.next_palette(),
             KeyCode::Right => self.player2_demo.next_palette(),
