@@ -51,9 +51,13 @@ pub struct Apple {
 pub struct Game {
     control: Control,
 
+    /// Dimension of the window
     window_dim: Point,
+    /// Hex-dimension of the grid
+    board_dim: HexDim,
+    /// Offset to center the grid in the window
+    offset: Point,
 
-    dim: HexDim,
     seeds: Vec<Seed>,
     snakes: Vec<Snake>,
     apples: Vec<Apple>,
@@ -101,8 +105,11 @@ impl Game {
             control: Control::new(starting_fps),
 
             window_dim: Point { x: wm.width, y: wm.height },
+            // board_dim and offset get updated immediately after creation
+            // by calling update_dim()
+            board_dim: HexDim { h: 0, v: 0 },
+            offset: Point { x: 0., y: 0. },
 
-            dim: HexDim { h: 0, v: 0 }, // gets updated immediately after creation
             seeds: seeds.into_iter().map(Into::into).collect(),
             snakes: vec![],
             apples: vec![],
@@ -133,32 +140,29 @@ impl Game {
     fn update_dim(&mut self) {
         let Point { x: width, y: height } = self.window_dim;
         let CellDim { side, sin, cos } = self.cell_dim;
-        let new_dim = HexDim {
+        let new_board_dim = HexDim {
             h: ((width - cos) / (side + cos)) as isize,
             v: ((height - sin) / (2. * sin)) as isize,
         };
 
-        // println!("w/h: {}/{}", width, height);
-        // println!("new dim: {:?}", new_dim);
-
-        if self.dim != new_dim {
-            self.dim = new_dim;
+        if self.board_dim != new_board_dim {
+            self.board_dim = new_board_dim;
 
             // restart if player snake head has left board limits
             if self
                 .snakes
                 .iter()
-                .any(|s| s.snake_type == SnakeType::Player && !new_dim.contains(s.head().pos))
+                .any(|s| s.snake_type == SnakeType::Player && !new_board_dim.contains(s.head().pos))
             {
                 println!("warning: player snake outside of board, restarting");
                 self.restart();
             } else {
                 // remove snakes outside of board limits
                 self.snakes
-                    .retain(move |snake| new_dim.contains(snake.head().pos));
+                    .retain(move |snake| new_board_dim.contains(snake.head().pos));
 
                 // remove apples outside of board limits
-                self.apples.retain(move |apple| new_dim.contains(apple.pos));
+                self.apples.retain(move |apple| new_board_dim.contains(apple.pos));
                 self.spawn_apples();
             }
 
@@ -168,6 +172,12 @@ impl Game {
             self.cached_apple_mesh = None;
             self.cached_snake_mesh = None;
         }
+
+        let board_cartesian_dim = Point {
+            x: new_board_dim.h as f32 * (side + cos) + cos,
+            y: new_board_dim.v as f32 * 2. * sin + sin,
+        };
+        self.offset = (self.window_dim - board_cartesian_dim) / 2.;
     }
 
     fn restart(&mut self) {
@@ -186,10 +196,10 @@ impl Game {
             const DISTANCE_BETWEEN_SNAKES: isize = 1;
 
             let total_width = (unpositioned - 1) as isize * DISTANCE_BETWEEN_SNAKES + 1;
-            assert!(total_width < self.dim.h, "snakes spread too wide");
+            assert!(total_width < self.board_dim.h, "snakes spread too wide");
 
             let half = total_width / 2;
-            let middle = self.dim.h / 2;
+            let middle = self.board_dim.h / 2;
             let start = middle - half;
             let end = start + total_width - 1;
 
@@ -209,7 +219,7 @@ impl Game {
                         seed,
                         HexPoint {
                             h: unpositioned_h_pos.next().unwrap(),
-                            v: self.dim.v / 2,
+                            v: self.board_dim.v / 2,
                         },
                         unpositioned_dir,
                         10,
@@ -322,7 +332,7 @@ impl Game {
             let apple_pos = match &mut self.apple_spawn_strategy {
                 AppleSpawnStrategy::Random { apple_count } => {
                     let apple_pos =
-                        match Self::random_free_spot(occupied_cells, self.dim, &mut self.rng) {
+                        match Self::random_free_spot(occupied_cells, self.board_dim, &mut self.rng) {
                             Some(pos) => pos,
                             None => {
                                 println!(
@@ -392,7 +402,7 @@ impl Game {
             snake.advance(
                 other_snakes,
                 &self.apples,
-                self.dim,
+                self.board_dim,
                 self.control.frame_stamp(),
             );
 
@@ -445,13 +455,13 @@ impl Game {
                 .iter()
                 .filter(|s| s.snake_type == SnakeType::Player)
             {
-                let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.dim);
+                let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.board_dim);
                 occupied_cells.extend_from_slice(&neighborhood);
             }
             occupied_cells.sort_unstable();
             occupied_cells.dedup();
 
-            if let Some(pos) = Self::random_free_spot(&occupied_cells, self.dim, &mut self.rng) {
+            if let Some(pos) = Self::random_free_spot(&occupied_cells, self.board_dim, &mut self.rng) {
                 self.snakes
                     .push(Snake::from_seed(&seed, pos, Dir::random(&mut self.rng), 10))
             } else {
@@ -561,6 +571,8 @@ impl EventHandler<ggez::GameError> for Game {
         //     L = Some(Instant::now());
         // }
 
+        // TODO: fix this mess, reintroduce a short grace period after
+        //  game over for all the graphics to properly update
         // selectively set to Some(_) if they need to be updated
         let mut grid_mesh = None;
         let mut border_mesh = None;
@@ -578,7 +590,7 @@ impl EventHandler<ggez::GameError> for Game {
             // same game frame are blocked
             for idx in 0..self.snakes.len() {
                 let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, idx);
-                snake.update_dir(other_snakes, &self.apples, self.dim, frame_stamp);
+                snake.update_dir(other_snakes, &self.apples, self.board_dim, frame_stamp);
             }
 
             self.cached_snake_mesh = None;
@@ -587,7 +599,7 @@ impl EventHandler<ggez::GameError> for Game {
             snake_mesh = Some(ROw::Owned(get_snake_mesh(
                 &mut self.snakes,
                 frame_stamp,
-                self.dim,
+                self.board_dim,
                 self.cell_dim,
                 self.prefs.draw_style,
                 ctx,
@@ -605,14 +617,14 @@ impl EventHandler<ggez::GameError> for Game {
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
                     self.grid_mesh =
-                        Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
+                        Some(get_grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?);
                 };
                 grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
             }
             if self.prefs.draw_border {
                 if self.border_mesh.is_none() {
                     self.border_mesh = Some(get_border_mesh(
-                        self.dim,
+                        self.board_dim,
                         self.cell_dim,
                         &self.palette,
                         ctx,
@@ -646,7 +658,7 @@ impl EventHandler<ggez::GameError> for Game {
                 self.cached_snake_mesh = Some(get_snake_mesh(
                     &mut self.snakes,
                     frame_stamp,
-                    self.dim,
+                    self.board_dim,
                     self.cell_dim,
                     self.prefs.draw_style,
                     ctx,
@@ -668,14 +680,14 @@ impl EventHandler<ggez::GameError> for Game {
                 if self.prefs.draw_grid {
                     if self.grid_mesh.is_none() {
                         self.grid_mesh =
-                            Some(get_grid_mesh(self.dim, self.cell_dim, &self.palette, ctx)?);
+                            Some(get_grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?);
                     };
                     grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
                 }
                 if self.prefs.draw_border {
                     if self.border_mesh.is_none() {
                         self.border_mesh = Some(get_border_mesh(
-                            self.dim,
+                            self.board_dim,
                             self.cell_dim,
                             &self.palette,
                             ctx,
@@ -688,23 +700,26 @@ impl EventHandler<ggez::GameError> for Game {
             }
         }
 
+        let draw_param = DrawParam::default().dest(self.offset);
+
         if grid_mesh.is_some()
             || border_mesh.is_some()
             || apple_mesh.is_some()
             || snake_mesh.is_some()
         {
             clear(ctx, self.palette.background_color);
+
             if let Some(mesh) = grid_mesh {
-                draw(ctx, mesh, DrawParam::default())?;
-            }
-            if let Some(mesh) = border_mesh {
-                draw(ctx, mesh, DrawParam::default())?;
-            }
-            if let Some(mesh) = apple_mesh {
-                draw(ctx, mesh.get(), DrawParam::default())?;
+                draw(ctx, mesh, draw_param)?;
             }
             if let Some(mesh) = snake_mesh {
-                draw(ctx, mesh.get(), DrawParam::default())?;
+                draw(ctx, mesh.get(), draw_param)?;
+            }
+            if let Some(mesh) = apple_mesh {
+                draw(ctx, mesh.get(), draw_param)?;
+            }
+            if let Some(mesh) = border_mesh {
+                draw(ctx, mesh, draw_param)?;
             }
 
             if self.prefs.display_stats {
@@ -902,7 +917,7 @@ impl EventHandler<ggez::GameError> for Game {
     fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
         self.window_dim = Point { x: width, y: height };
         self.update_dim();
-        let HexDim { h, v } = self.dim;
+        let HexDim { h, v } = self.board_dim;
         self.display_notification(format!("{}x{}", h, v));
     }
 }
