@@ -18,7 +18,6 @@ use crate::{
 };
 use ggez::{
     conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
-    graphics::Rect,
 };
 use crate::keyboard::Layout;
 
@@ -72,7 +71,7 @@ fn main() {
         window_setup,
     );
 
-    let (mut ctx, event_loop) = ContextBuilder::new("hex_snake", "gorilskij")
+    let (ctx, event_loop) = ContextBuilder::new("hex_snake", "gorilskij")
         .window_mode(app.wm())
         .window_setup(app.ws())
         .build()

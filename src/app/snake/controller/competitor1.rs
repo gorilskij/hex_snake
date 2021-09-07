@@ -1,6 +1,6 @@
 use crate::{
     app::{
-        screen::game::Apple,
+        screen::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,

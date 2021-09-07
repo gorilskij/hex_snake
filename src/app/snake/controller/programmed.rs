@@ -1,6 +1,6 @@
 use crate::{
     app::{
-        screen::game::Apple,
+        screen::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,
@@ -41,7 +41,7 @@ impl Controller for Programmed {
         if self.wait > 0 {
             self.wait -= 1;
         } else {
-            match self.move_sequence[self.next_move_idx] {
+            match *self.move_sequence.get(self.next_move_idx)? {
                 Move::Wait(wait) => self.wait = wait - 1,
                 Move::Turn(new_dir) => self.dir = new_dir,
             };

@@ -1,7 +1,7 @@
 use crate::{
     app::{
         keyboard_control::Controls,
-        screen::game::Apple,
+        screen::Apple,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,

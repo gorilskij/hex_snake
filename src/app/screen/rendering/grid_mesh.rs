@@ -6,7 +6,7 @@ use ggez::{
 use num_integer::Integer;
 
 use crate::{app::palette::Palette, basic::HexDim};
-use std::ops::IndexMut;
+
 
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh

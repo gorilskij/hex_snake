@@ -1,7 +1,6 @@
 use crate::app::{
     screen::{
-        control::Control,
-        game::{Apple, AppleType},
+        Apple, AppleType,
     },
     snake::{self, EatBehavior, SegmentType, Snake, State},
 };
@@ -59,8 +58,8 @@ pub fn find_collisions(snakes: &[Snake], apples: &[Apple]) -> Vec<Collision> {
                             matches!(
                                 collision,
                                 Collision::Snake {
-                                    snake1_index: snake2_index,
-                                    snake2_index: snake1_index,
+                                    snake1_index: _snake2_index,
+                                    snake2_index: _snake1_index,
                                     snake2_segment_index: 0
                                 }
                             )

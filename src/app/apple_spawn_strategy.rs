@@ -28,6 +28,7 @@ pub enum AppleSpawn {
 }
 
 pub enum AppleSpawnStrategy {
+    None, // no apples
     Random {
         apple_count: usize,
     },

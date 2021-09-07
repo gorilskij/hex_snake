@@ -2,8 +2,7 @@ use crate::{
     app::{
         palette::Palette,
         screen::{
-            control::Control,
-            game::{Apple, AppleType, FrameStamp},
+            {Apple, AppleType},
             stats::Stats,
         },
         snake::rendering::render_hexagon,
@@ -15,6 +14,7 @@ use ggez::{
     Context, GameResult,
 };
 use hsl::HSL;
+use crate::app::screen::control::FrameStamp;
 
 pub(in crate::app::screen) fn get_apple_mesh(
     apples: &[Apple],

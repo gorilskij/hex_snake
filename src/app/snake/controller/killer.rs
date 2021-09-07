@@ -1,9 +1,9 @@
 use crate::{
     app::{
-        screen::game::Apple,
+        screen::Apple,
         snake::{
             controller::{angle_distance, Controller, OtherSnakes},
-            Body, Segment, SnakeType,
+            Body, Segment, Type,
         },
     },
     basic::{CellDim, Dir, HexDim, HexPoint},
@@ -83,7 +83,7 @@ impl Controller for Killer {
     ) -> Option<Dir> {
         let player_snake = other_snakes
             .iter_snakes()
-            .filter(|s| s.snake_type == SnakeType::Player)
+            .filter(|s| s.snake_type == Type::Player)
             .min_by_key(|s| s.head().pos.manhattan_distance(body.cells[0].pos))
             .expect("no player snake found");
 

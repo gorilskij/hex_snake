@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     app::{
-        screen::game::{Apple, FrameStamp},
+        screen::{Apple},
         snake::{
             controller::{Controller, ControllerTemplate},
             utils::OtherSnakes,
@@ -14,6 +14,7 @@ use crate::{
 use std::ops::Deref;
 
 pub use palette::{Palette, PaletteTemplate};
+use crate::app::screen::control::FrameStamp;
 
 pub mod controller;
 mod palette;
@@ -28,7 +29,7 @@ pub enum State {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub enum SnakeType {
+pub enum Type {
     Player,
     Simulated {
         // TODO: check if these are redundant
@@ -72,7 +73,7 @@ pub enum EatBehavior {
 #[derive(Clone, Debug)]
 pub struct EatMechanics {
     pub eat_self: EatBehavior,
-    pub eat_other: HashMap<SnakeType, EatBehavior>,
+    pub eat_other: HashMap<Type, EatBehavior>,
     pub default: EatBehavior,
 }
 
@@ -130,7 +131,7 @@ impl Deref for Body {
 }
 
 pub struct Snake {
-    pub snake_type: SnakeType,
+    pub snake_type: Type,
     pub eat_mechanics: EatMechanics,
 
     pub body: Body,
@@ -142,7 +143,7 @@ pub struct Snake {
 
 #[derive(Clone, Debug)]
 pub struct Seed {
-    pub snake_type: SnakeType,
+    pub snake_type: Type,
     pub eat_mechanics: EatMechanics,
     pub palette: PaletteTemplate,
     pub controller: ControllerTemplate,

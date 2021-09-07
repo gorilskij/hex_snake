@@ -8,19 +8,20 @@ use ggez::{
 };
 use itertools::Itertools;
 
-use screen::{game::Game, start_screen::StartScreen};
+use screen::{Game, StartScreen};
 use snake::{EatMechanics, Seed};
 
 use crate::{
     app::{
         apple_spawn_strategy::AppleSpawnStrategy,
         keyboard_control::ControlSetup,
-        snake::{controller::ControllerTemplate, EatBehavior, SnakeType},
+        snake::{controller::ControllerTemplate, EatBehavior, Type},
     },
     basic::CellDim,
 };
 
 pub use palette::Palette;
+use crate::app::screen::DebugScenario;
 
 macro_rules! hash_map {
     {} => {
@@ -44,6 +45,7 @@ mod screen;
 pub type Frames = u64;
 
 pub enum Screen {
+    DebugScenario(DebugScenario),
     StartScreen(StartScreen),
     Game(Game),
 }
@@ -54,6 +56,7 @@ impl Deref for Screen {
     fn deref(&self) -> &Self::Target {
         use Screen::*;
         match self {
+            DebugScenario(x) => x,
             StartScreen(x) => x,
             Game(x) => x,
         }
@@ -64,6 +67,7 @@ impl DerefMut for Screen {
     fn deref_mut(&mut self) -> &mut Self::Target {
         use Screen::*;
         match self {
+            DebugScenario(x) => x,
             StartScreen(x) => x,
             Game(x) => x,
         }
@@ -97,7 +101,7 @@ impl App {
         let seeds: Vec<_> = players
             .into_iter()
             .map(|cs| Seed {
-                snake_type: SnakeType::Player,
+                snake_type: Type::Player,
                 eat_mechanics: EatMechanics {
                     eat_self: EatBehavior::Cut,
                     eat_other: hash_map! {},
@@ -113,15 +117,16 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
+            screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
             // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            screen: Screen::Game(Game::new(
-                cell_dim,
-                7.,
-                seeds,
-                Palette::dark(),
-                AppleSpawnStrategy::Random { apple_count: 5 },
-                window_mode,
-            )),
+            // screen: Screen::Game(Game::new(
+            //     cell_dim,
+            //     7.,
+            //     seeds,
+            //     Palette::dark(),
+            //     AppleSpawnStrategy::Random { apple_count: 5 },
+            //     window_mode,
+            // )),
             window_mode,
             window_setup,
         }

@@ -1,9 +1,9 @@
-use std::collections::VecDeque;
+
 
 use ggez::{
     event::EventHandler,
     graphics::{clear, draw, present, DrawParam},
-    Context, GameError, GameResult,
+    Context, GameResult,
 };
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
         collisions::{find_collisions, handle_collisions},
         screen::{
             control::Control,
-            game::{Apple, AppleType, FrameStamp},
+            {Apple, AppleType},
             prefs::Prefs,
             rendering::{
                 apple_mesh::get_apple_mesh,
@@ -24,25 +24,25 @@ use crate::{
         },
         snake,
         snake::{
-            controller::{programmed::Move, ControllerTemplate},
-            utils::OtherSnakes,
-            Body, EatBehavior, EatMechanics, Seed, Segment, SegmentType, Snake, SnakeType, State,
+            controller::{ControllerTemplate},
+            utils::OtherSnakes, EatBehavior, EatMechanics, Seed, Snake, Type,
         },
         Screen,
     },
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint},
 };
 use ggez::{
-    event::{Axis, Button, ErrorOrigin, GamepadId, KeyCode, KeyMods, MouseButton},
+    event::{KeyCode, KeyMods},
     graphics::Color,
 };
 use std::slice;
+use crate::app::screen::control::FrameStamp;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
 struct SnakeDemo {
     location: HexPoint, // top-left
-    dim: HexDim,
+    board_dim: HexDim,
     apples: Vec<Apple>,
     apple_spawn_strategy: AppleSpawnStrategy,
     snake: Snake,
@@ -64,7 +64,7 @@ impl SnakeDemo {
         };
 
         let mut seed = Seed {
-            snake_type: SnakeType::Simulated { start_pos, start_dir, start_grow: 5 },
+            snake_type: Type::Simulated { start_pos, start_dir, start_grow: 5 },
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Cut,
                 eat_other: hash_map! {},
@@ -91,7 +91,7 @@ impl SnakeDemo {
 
         Self {
             location,
-            dim: board_dim,
+            board_dim: board_dim,
             apples: vec![],
             apple_spawn_strategy,
             snake: Snake::from_seed(&seed, start_pos, start_dir, 5),
@@ -141,7 +141,7 @@ impl SnakeDemo {
 
     fn advance_snakes(&mut self, frame_stamp: FrameStamp) {
         self.snake
-            .advance(OtherSnakes::empty(), &self.apples, self.dim, frame_stamp);
+            .advance(OtherSnakes::empty(), &self.apples, self.board_dim, frame_stamp);
 
         let collisions = find_collisions(slice::from_ref(&self.snake), &self.apples);
         let (spawn_snakes, remove_apples, game_over) =
@@ -166,20 +166,20 @@ impl SnakeDemo {
         stats: &mut Stats,
     ) -> GameResult {
         self.snake
-            .update_dir(OtherSnakes::empty(), &[], self.dim, frame_stamp);
+            .update_dir(OtherSnakes::empty(), &[], self.board_dim, frame_stamp);
 
         let draw_param = DrawParam::default().dest(self.location.to_cartesian(cell_dim));
 
-        let grid_mesh = get_grid_mesh(self.dim, cell_dim, palette, ctx)?;
+        let grid_mesh = get_grid_mesh(self.board_dim, cell_dim, palette, ctx)?;
         draw(ctx, &grid_mesh, draw_param)?;
 
-        let border_mesh = get_border_mesh(self.dim, cell_dim, palette, ctx)?;
+        let border_mesh = get_border_mesh(self.board_dim, cell_dim, palette, ctx)?;
         draw(ctx, &border_mesh, draw_param)?;
 
         let snake_mesh = get_snake_mesh(
             slice::from_mut(&mut self.snake),
             frame_stamp,
-            self.dim,
+            self.board_dim,
             cell_dim,
             draw_style,
             ctx,
