@@ -11,7 +11,7 @@ use ggez::{event::run, ContextBuilder};
 
 use crate::{
     app::{
-        keyboard_control::{ControlSetup, KeyboardLayout},
+        keyboard_control::{ControlSetup},
         App,
     },
     basic::Side,
@@ -20,17 +20,18 @@ use ggez::{
     conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
     graphics::Rect,
 };
+use crate::keyboard::Layout;
 
 mod app;
 mod basic;
 mod color;
 mod partial_min_max;
 mod row;
+mod keyboard;
 
 // TODO
 //  - if a frame is nearing its end, delay turning until the next frame to avoid choppy animation
 //  - make border toggleable
-//  - transform dvorak bindings to any other keyboard layout
 //  - smooth animation when cutting
 //  - diagnose high cpu use when paused
 
@@ -63,7 +64,7 @@ fn main() {
 
     let app = App::new(
         vec![ControlSetup {
-            layout: KeyboardLayout::Dvorak,
+            layout: Layout::Dvorak,
             keyboard_side: Side::Right,
             hand: Side::Right,
         }],

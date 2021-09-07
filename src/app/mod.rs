@@ -217,6 +217,7 @@ impl EventHandler<ggez::GameError> for App {
     }
 
     fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, mods: KeyMods, repeat: bool) {
+        println!("pressed {:?}", key);
         self.screen.key_down_event(ctx, key, mods, repeat)
     }
 
