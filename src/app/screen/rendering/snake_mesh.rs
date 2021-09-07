@@ -1,3 +1,8 @@
+use ggez::{
+    Context,
+    GameResult, graphics::{Color, DrawMode, Mesh, MeshBuilder},
+};
+
 use crate::{
     app::snake::{
         rendering::{
@@ -8,19 +13,12 @@ use crate::{
     },
     basic::transformations::translate,
 };
-use ggez::{
-    graphics::{Color, DrawMode, Mesh, MeshBuilder},
-    Context, GameResult,
-};
-
 use crate::{
-    app::{
-        screen::{ stats::Stats},
-        snake::Snake,
-    },
+    app::snake::Snake,
     basic::{CellDim, DrawStyle, HexDim, Point},
 };
-use crate::app::screen::control::FrameStamp;
+use crate::app::control::FrameStamp;
+use crate::app::stats::Stats;
 
 const DRAW_WHITE_AURA: bool = false;
 

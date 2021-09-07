@@ -1,9 +1,13 @@
 use crate::app::{
     screen::{
-        Apple, AppleType,
+        Apple, Type,
     },
     snake::{self, EatBehavior, SegmentType, Snake, State},
 };
+use crate::app::utils::{get_occupied_cells, random_free_spot};
+use crate::basic::{HexDim, Dir};
+use crate::app::snake::Seed;
+use rand::Rng;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -103,14 +107,14 @@ pub fn handle_collisions<'a>(
         match collision {
             Collision::Apple { snake_index, apple_index } => {
                 remove_apples.push(apple_index);
-                match &apples[apple_index].typ {
-                    AppleType::Normal(food) => {
+                match &apples[apple_index].apple_type {
+                    Type::Normal(food) => {
                         snakes[snake_index].body.cells[0].typ = SegmentType::Eaten {
                             original_food: *food,
                             food_left: *food,
                         }
                     }
-                    AppleType::SpawnSnake(seed) => spawn_snakes.push(seed),
+                    Type::SpawnSnake(seed) => spawn_snakes.push(seed),
                 }
             }
             Collision::Snake {
@@ -154,4 +158,30 @@ pub fn handle_collisions<'a>(
 
     remove_apples.sort_unstable();
     (spawn_snakes, remove_apples, game_over)
+}
+
+// this is here because it's a result of collision handling
+pub fn spawn_snakes(seeds: Vec<&Seed>, snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexDim, rng: &mut impl Rng) {
+    for seed in seeds {
+        // avoid spawning too close to player snake heads
+        const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
+
+        let mut occupied_cells = get_occupied_cells(snakes, apples);
+        for snake in snakes
+            .iter()
+            .filter(|s| s.snake_type == snake::Type::Player)
+        {
+            let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, board_dim);
+            occupied_cells.extend_from_slice(&neighborhood);
+        }
+        occupied_cells.sort_unstable();
+        occupied_cells.dedup();
+
+        if let Some(pos) = random_free_spot(&occupied_cells, board_dim, rng) {
+            snakes
+                .push(Snake::from_seed(&seed, pos, Dir::random(rng), 10))
+        } else {
+            eprintln!("warning: failed to spawn snake, no free spaces left")
+        }
+    }
 }

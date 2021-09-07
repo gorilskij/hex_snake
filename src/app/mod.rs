@@ -2,26 +2,25 @@ use std::ops::{Deref, DerefMut};
 
 use ggez::{
     conf::{WindowMode, WindowSetup},
+    Context,
     event::{EventHandler, KeyCode, KeyMods},
-    graphics::Rect,
-    Context, GameResult,
+    GameResult, graphics::Rect,
 };
 use itertools::Itertools;
 
+use apple::spawning::SpawnPolicy;
+pub use palette::Palette;
 use screen::{Game, StartScreen};
 use snake::{EatMechanics, Seed};
 
 use crate::{
     app::{
-        apple_spawn_strategy::AppleSpawnStrategy,
         keyboard_control::ControlSetup,
         snake::{controller::ControllerTemplate, EatBehavior, Type},
     },
     basic::CellDim,
 };
-
-pub use palette::Palette;
-use crate::app::screen::DebugScenario;
+use crate::app::screen::{DebugScenario, Screen};
 
 macro_rules! hash_map {
     {} => {
@@ -37,18 +36,15 @@ macro_rules! hash_map {
 pub mod keyboard_control;
 mod palette;
 mod snake;
-#[macro_use]
-mod apple_spawn_strategy;
 mod collisions;
+#[macro_use]
+mod apple;
 mod screen;
-
-pub type Frames = u64;
-
-pub enum Screen {
-    DebugScenario(DebugScenario),
-    StartScreen(StartScreen),
-    Game(Game),
-}
+mod utils;
+mod prefs;
+pub mod stats;
+mod message;
+pub mod control;
 
 impl Deref for Screen {
     type Target = dyn EventHandler<ggez::GameError>;
@@ -117,14 +113,14 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
-            screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
-            // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
+            // screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
+            screen: Screen::StartScreen(StartScreen::new(cell_dim)),
             // screen: Screen::Game(Game::new(
             //     cell_dim,
             //     7.,
             //     seeds,
             //     Palette::dark(),
-            //     AppleSpawnStrategy::Random { apple_count: 5 },
+            //     AppleSpawnPolicy::Random { apple_count: 5 },
             //     window_mode,
             // )),
             window_mode,
@@ -148,7 +144,7 @@ impl App {
         //         12.,
         //         seeds,
         //         GamePalette::dark(),
-        //         AppleSpawnStrategy::ScheduledOnEat {
+        //         AppleSpawnPolicy::ScheduledOnEat {
         //             apple_count: 1,
         //             spawns: spawn_schedule![spawn(10, 9), wait(10),],
         //             next_index: 0,
@@ -190,7 +186,7 @@ impl App {
         //         12.,
         //         seeds,
         //         GamePalette::dark(),
-        //         AppleSpawnStrategy::Random { apple_count: 1 },
+        //         AppleSpawnPolicy::Random { apple_count: 1 },
         //         window_mode,
         //     )),
         //     window_mode,

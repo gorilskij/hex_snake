@@ -1,20 +1,21 @@
 use crate::basic::{HexDim, HexPoint, Dir, Point, CellDim};
 use crate::app::screen::Apple;
-use crate::app::apple_spawn_strategy::AppleSpawnStrategy;
+use crate::app::apple::spawning::{SpawnPolicy, spawn_apples};
 use crate::app::snake::{self, Snake, EatMechanics, EatBehavior};
 use crate::app::snake::controller::ControllerTemplate;
 use ggez::graphics::{Color, clear, present, DrawParam, draw};
 use ggez::event::EventHandler;
 use ggez::{Context, GameError, GameResult};
-use crate::app::screen::control::{Control, FrameStamp};
+use crate::app::control::{Control, FrameStamp};
 use crate::app::snake::utils::split_snakes_mut;
 use crate::app::collisions::{find_collisions, handle_collisions};
 use crate::app::screen::rendering::grid_mesh::{get_grid_mesh, get_border_mesh};
 use crate::app::screen::rendering::snake_mesh::get_snake_mesh;
 use crate::app::screen::rendering::apple_mesh::get_apple_mesh;
 use crate::app;
-use crate::app::screen::prefs::Prefs;
-use crate::app::screen::stats::Stats;
+use crate::app::prefs::Prefs;
+use crate::app::stats::Stats;
+use rand::prelude::*;
 
 pub struct DebugScenario {
     control: Control,
@@ -30,10 +31,12 @@ pub struct DebugScenario {
     stats: Stats,
 
     apples: Vec<Apple>,
-    apple_spawn_strategy: AppleSpawnStrategy,
+    apple_spawn_policy: SpawnPolicy,
 
     seeds: Vec<snake::Seed>,
     snakes: Vec<Snake>,
+
+    rng: ThreadRng,
 }
 
 impl DebugScenario {
@@ -96,15 +99,18 @@ impl DebugScenario {
             stats: Default::default(),
 
             apples: vec![],
-            apple_spawn_strategy: AppleSpawnStrategy::None,
+            apple_spawn_policy: SpawnPolicy::None,
 
             seeds: vec![seed1, seed2],
             snakes: vec![snake1, snake2],
+
+            rng: thread_rng(),
         }
     }
 
     fn spawn_apples(&mut self) {
-        // TODO
+        let new_apples = spawn_apples(&mut self.apple_spawn_policy, self.board_dim, &self.snakes, &self.apples, &self.prefs, &mut self.rng);
+        self.apples.extend(new_apples.into_iter())
     }
 
     fn advance_snakes(&mut self, frame_stamp: FrameStamp) {

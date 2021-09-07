@@ -1,42 +1,43 @@
-
+use std::slice;
 
 use ggez::{
+    Context,
     event::EventHandler,
-    graphics::{clear, draw, present, DrawParam},
-    Context, GameResult,
-};
-
-use crate::{
-    app,
-    app::{
-        apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
-        collisions::{find_collisions, handle_collisions},
-        screen::{
-            control::Control,
-            {Apple, AppleType},
-            prefs::Prefs,
-            rendering::{
-                apple_mesh::get_apple_mesh,
-                grid_mesh::{get_border_mesh, get_grid_mesh},
-                snake_mesh::get_snake_mesh,
-            },
-            stats::Stats,
-        },
-        snake,
-        snake::{
-            controller::{ControllerTemplate},
-            utils::OtherSnakes, EatBehavior, EatMechanics, Seed, Snake, Type,
-        },
-        Screen,
-    },
-    basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint},
+    GameResult, graphics::{clear, draw, DrawParam, present},
 };
 use ggez::{
     event::{KeyCode, KeyMods},
     graphics::Color,
 };
-use std::slice;
-use crate::app::screen::control::FrameStamp;
+
+use crate::{
+    app,
+    app::{
+        collisions::{find_collisions, handle_collisions},
+        screen::{
+            {Apple, Type},
+            rendering::{
+                apple_mesh::get_apple_mesh,
+                grid_mesh::{get_border_mesh, get_grid_mesh},
+                snake_mesh::get_snake_mesh,
+            },
+        },
+        Screen,
+        snake,
+        snake::{
+            controller::ControllerTemplate,
+            EatBehavior, EatMechanics, Seed, Snake, utils::OtherSnakes,
+        },
+    },
+    basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint},
+};
+use crate::app::apple::spawning::{ScheduledSpawn, SpawnPolicy, spawn_apples};
+use crate::app::control::Control;
+use crate::app::control::FrameStamp;
+use crate::app::prefs::Prefs;
+use crate::app::stats::Stats;
+use rand::prelude::*;
+use rand::rngs::ThreadRng;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -44,7 +45,7 @@ struct SnakeDemo {
     location: HexPoint, // top-left
     board_dim: HexDim,
     apples: Vec<Apple>,
-    apple_spawn_strategy: AppleSpawnStrategy,
+    apple_spawn_policy: SpawnPolicy,
     snake: Snake,
     palettes: Vec<snake::PaletteTemplate>,
     current_palette: usize,
@@ -57,14 +58,14 @@ impl SnakeDemo {
         let board_dim = HexPoint { h: 11, v: 8 };
 
         let spawn_schedule = spawn_schedule![spawn(6, 2), wait(40),];
-        let apple_spawn_strategy = AppleSpawnStrategy::ScheduledOnEat {
+        let apple_spawn_policy = SpawnPolicy::ScheduledOnEat {
             apple_count: 1,
             spawns: spawn_schedule,
             next_index: 0,
         };
 
         let mut seed = Seed {
-            snake_type: Type::Simulated { start_pos, start_dir, start_grow: 5 },
+            snake_type: snake::Type::Simulated { start_pos, start_dir, start_grow: 5 },
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Cut,
                 eat_other: hash_map! {},
@@ -91,9 +92,9 @@ impl SnakeDemo {
 
         Self {
             location,
-            board_dim: board_dim,
+            board_dim,
             apples: vec![],
-            apple_spawn_strategy,
+            apple_spawn_policy,
             snake: Snake::from_seed(&seed, start_pos, start_dir, 5),
             palettes,
             current_palette: 0,
@@ -107,39 +108,12 @@ impl SnakeDemo {
         self.snake.palette = self.palettes[self.current_palette].into();
     }
 
-    fn spawn_apples(&mut self) {
-        let apple = match &mut self.apple_spawn_strategy {
-            AppleSpawnStrategy::ScheduledOnEat { apple_count, spawns, next_index } => {
-                if self.apples.len() >= *apple_count {
-                    return;
-                }
-
-                let len = spawns.len();
-                match &mut spawns[*next_index] {
-                    AppleSpawn::Wait { total, current } => {
-                        if *current == *total - 1 {
-                            *current = 0;
-                            *next_index = (*next_index + 1) % len;
-                        } else {
-                            *current += 1;
-                        }
-                        None
-                    }
-                    AppleSpawn::Spawn(pos) => {
-                        *next_index = (*next_index + 1) % len;
-                        Some(*pos)
-                    }
-                }
-            }
-            _ => unimplemented!(),
-        };
-
-        if let Some(pos) = apple {
-            self.apples.push(Apple { pos, typ: AppleType::Normal(2) })
-        }
+    fn spawn_apples(&mut self, prefs: &Prefs, rng: &mut impl Rng) {
+        let new_apples = spawn_apples(&mut self.apple_spawn_policy, self.board_dim, slice::from_ref(&self.snake), &self.apples, prefs, rng);
+        self.apples.extend(new_apples.into_iter());
     }
 
-    fn advance_snakes(&mut self, frame_stamp: FrameStamp) {
+    fn advance_snakes(&mut self, frame_stamp: FrameStamp, prefs: &Prefs, rng: &mut impl Rng) {
         self.snake
             .advance(OtherSnakes::empty(), &self.apples, self.board_dim, frame_stamp);
 
@@ -153,7 +127,7 @@ impl SnakeDemo {
             self.apples.remove(apple_index);
         }
 
-        self.spawn_apples();
+        self.spawn_apples(prefs, rng);
     }
 
     fn draw(
@@ -207,13 +181,17 @@ impl SnakeDemo {
 pub struct StartScreen {
     control: Control,
     cell_dim: CellDim,
+
     palettes: Vec<app::Palette>,
     current_palette: usize,
+
     prefs: Prefs,
     stats: Stats,
 
     player1_demo: SnakeDemo,
     player2_demo: SnakeDemo,
+
+    rng: ThreadRng,
 }
 
 impl StartScreen {
@@ -221,12 +199,17 @@ impl StartScreen {
         Self {
             control: Control::new(7.),
             cell_dim,
+
             palettes: vec![app::Palette::dark()],
             current_palette: 0,
-            prefs: Default::default(),
+
+            prefs: Prefs::default().apple_food(2),
             stats: Default::default(),
+
             player1_demo: SnakeDemo::new(HexPoint { h: 1, v: 5 }),
             player2_demo: SnakeDemo::new(HexPoint { h: 15, v: 5 }),
+
+            rng: thread_rng(),
         }
     }
 }
@@ -235,8 +218,8 @@ impl EventHandler<ggez::GameError> for StartScreen {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         while self.control.can_update() {
             let frame_stamp = self.control.frame_stamp();
-            self.player1_demo.advance_snakes(frame_stamp);
-            self.player2_demo.advance_snakes(frame_stamp);
+            self.player1_demo.advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
+            self.player2_demo.advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
         }
         Ok(())
     }

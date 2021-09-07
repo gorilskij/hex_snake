@@ -7,14 +7,14 @@ use crate::{
             controller::{Controller, ControllerTemplate},
             utils::OtherSnakes,
         },
-        Frames,
     },
     basic::{Dir, HexDim, HexPoint},
 };
 use std::ops::Deref;
 
 pub use palette::{Palette, PaletteTemplate};
-use crate::app::screen::control::FrameStamp;
+use crate::app::control::FrameStamp;
+use crate::app::utils::Frames;
 
 pub mod controller;
 mod palette;

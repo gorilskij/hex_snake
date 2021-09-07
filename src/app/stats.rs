@@ -1,4 +1,4 @@
-use crate::app::screen::message::Message;
+use crate::app::message::Message;
 use ggez::graphics::Color;
 
 /// Collect statistics about the current game state

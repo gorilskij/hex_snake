@@ -1,20 +1,21 @@
+use ggez::{
+    Context,
+    GameResult, graphics::{Color, DrawMode, Mesh, MeshBuilder},
+};
+use hsl::HSL;
+
 use crate::{
     app::{
         palette::Palette,
         screen::{
-            {Apple, AppleType},
-            stats::Stats,
+            {Apple, Type},
         },
         snake::rendering::render_hexagon,
     },
-    basic::{transformations::translate, CellDim, DrawStyle},
+    basic::{CellDim, DrawStyle, transformations::translate},
 };
-use ggez::{
-    graphics::{Color, DrawMode, Mesh, MeshBuilder},
-    Context, GameResult,
-};
-use hsl::HSL;
-use crate::app::screen::control::FrameStamp;
+use crate::app::control::FrameStamp;
+use crate::app::stats::Stats;
 
 pub(in crate::app::screen) fn get_apple_mesh(
     apples: &[Apple],
@@ -34,9 +35,9 @@ pub(in crate::app::screen) fn get_apple_mesh(
     let mut builder = MeshBuilder::new();
 
     for apple in apples {
-        let color = match apple.typ {
-            AppleType::Normal(_) => palette.apple_color,
-            AppleType::SpawnSnake(_) => {
+        let color = match apple.apple_type {
+            Type::Normal(_) => palette.apple_color,
+            Type::SpawnSnake(_) => {
                 let hue = 360. * (frame_stamp.0 as f64 / 60. % 1.);
                 let hsl = HSL { h: hue, s: 1., l: 0.3 };
                 Color::from(hsl.to_rgb())

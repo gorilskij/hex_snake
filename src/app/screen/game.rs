@@ -1,39 +1,42 @@
-use crate::row::ROw;
+use std::collections::HashMap;
+
 use ggez::{
     conf::WindowMode,
+    Context,
     event::{EventHandler, KeyCode, KeyMods},
-    graphics::{clear, draw, present, Color, DrawParam, Mesh},
-    Context, GameResult,
+    GameResult, graphics::{clear, Color, draw, DrawParam, Mesh, present},
 };
 use rand::prelude::*;
 
 use crate::{
     app::{
-        apple_spawn_strategy::{AppleSpawn, AppleSpawnStrategy},
         collisions::{find_collisions, handle_collisions},
         palette::Palette,
         screen::{
-            control::{Control, GameState},
-            message::{Message, MessageID},
-            prefs::{Food, Prefs},
             rendering::{
                 apple_mesh::get_apple_mesh,
                 grid_mesh::{get_border_mesh, get_grid_mesh},
                 snake_mesh::get_snake_mesh,
             },
-            stats::Stats,
         },
         snake::{
             self,
             controller::{Controller, ControllerTemplate},
-            utils::split_snakes_mut,
-            EatBehavior, EatMechanics, Seed, Snake, Type, State,
+            EatBehavior,
+            EatMechanics, Seed, Snake, State, Type, utils::split_snakes_mut,
         },
     },
     basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
 };
-use std::collections::HashMap;
-use crate::app::screen::{Apple, AppleType};
+use crate::app::apple::{self, Apple};
+use crate::app::apple::spawning::{ScheduledSpawn, spawn_apples, SpawnPolicy};
+use crate::app::control::{Control, GameState};
+use crate::app::message::{Message, MessageID};
+use crate::app::prefs::{ Prefs};
+use crate::app::{stats::Stats, utils::Food};
+use crate::row::ROw;
+use crate::app::utils::{get_occupied_cells, random_free_spot};
+use crate::app::collisions::spawn_snakes;
 
 pub struct Game {
     control: Control,
@@ -49,7 +52,7 @@ pub struct Game {
     snakes: Vec<Snake>,
     apples: Vec<Apple>,
 
-    apple_spawn_strategy: AppleSpawnStrategy,
+    apple_spawn_policy: SpawnPolicy,
 
     cell_dim: CellDim,
     palette: Palette,
@@ -83,7 +86,7 @@ impl Game {
         starting_fps: f64,
         seeds: Vec<Seed>,
         palette: Palette,
-        apple_spawn_strategy: AppleSpawnStrategy,
+        apple_spawn_policy: SpawnPolicy,
         wm: WindowMode,
     ) -> Self {
         assert!(!seeds.is_empty(), "No players specified");
@@ -101,7 +104,7 @@ impl Game {
             snakes: vec![],
             apples: vec![],
 
-            apple_spawn_strategy,
+            apple_spawn_policy,
 
             cell_dim,
             palette,
@@ -224,151 +227,6 @@ impl Game {
         self.spawn_apples();
     }
 
-    fn occupied_cells(&self) -> Vec<HexPoint> {
-        // upper bound
-        let max_occupied_cells =
-            self.snakes.iter().map(|snake| snake.len()).sum::<usize>() + self.apples.len();
-        let mut occupied_cells = Vec::with_capacity(max_occupied_cells);
-        occupied_cells.extend(self.apples.iter().map(|Apple { pos, .. }| pos));
-        for snake in &self.snakes {
-            occupied_cells.extend(snake.body.cells.iter().map(|hex| hex.pos));
-        }
-        occupied_cells.sort_unstable();
-        occupied_cells.dedup();
-        occupied_cells
-    }
-
-    fn random_free_spot(
-        occupied_cells: &[HexPoint],
-        board_dim: HexDim,
-        rng: &mut impl Rng,
-    ) -> Option<HexPoint> {
-        let free_spaces = (board_dim.h * board_dim.v) as usize - occupied_cells.len();
-        if free_spaces == 0 {
-            return None;
-        }
-
-        let mut new_idx = rng.gen_range(0, free_spaces);
-        for HexPoint { h, v } in occupied_cells {
-            let idx = (v * board_dim.h + h) as usize;
-            if idx <= new_idx {
-                new_idx += 1;
-            }
-        }
-
-        assert!(new_idx < (board_dim.h * board_dim.v) as usize);
-        Some(HexPoint {
-            h: new_idx as isize % board_dim.h,
-            v: new_idx as isize / board_dim.h,
-        })
-    }
-
-    fn generate_apple(&mut self, apple_pos: HexPoint) {
-        let apple_type = if self.prefs.special_apples {
-            match self.rng.gen::<f32>() {
-                x if x < 0.025 => AppleType::SpawnSnake(Seed {
-                    snake_type: Type::Competitor { life: Some(200) },
-                    eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                    palette: snake::PaletteTemplate::pastel_rainbow(true),
-                    controller: ControllerTemplate::AStar,
-                }),
-                x if x < 0.040 => {
-                    if !self
-                        .snakes
-                        .iter()
-                        .any(|s| s.snake_type == Type::Player)
-                    {
-                        println!("warning: didn't spawn killer snake apple because there is no player snake");
-                        AppleType::Normal(1)
-                    } else {
-                        AppleType::SpawnSnake(Seed {
-                            snake_type: Type::Killer { life: Some(200) },
-                            eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                            palette: snake::PaletteTemplate::dark_blue_to_red(false),
-                            controller: ControllerTemplate::Killer,
-                        })
-                    }
-                }
-                _ => AppleType::Normal(self.prefs.apple_food),
-            }
-        } else {
-            AppleType::Normal(self.prefs.apple_food)
-        };
-
-        self.apples.push(Apple { pos: apple_pos, typ: apple_type });
-    }
-
-    pub fn spawn_apples(&mut self) {
-        // lazy
-        let mut occupied_cells = None;
-
-        loop {
-            let can_spawn = match self.apple_spawn_strategy {
-                AppleSpawnStrategy::None => false,
-                AppleSpawnStrategy::Random { apple_count } => self.apples.len() < apple_count,
-                AppleSpawnStrategy::ScheduledOnEat { apple_count, .. } => {
-                    self.apples.len() < apple_count
-                }
-            };
-
-            if !can_spawn {
-                break;
-            }
-
-            let occupied_cells = occupied_cells.get_or_insert_with(|| self.occupied_cells());
-
-            let apple_pos = match &mut self.apple_spawn_strategy {
-                AppleSpawnStrategy::None => panic!("shouldn't be spawning with AppleSpawnStrategy::None"),
-                AppleSpawnStrategy::Random { apple_count } => {
-                    let apple_pos =
-                        match Self::random_free_spot(occupied_cells, self.board_dim, &mut self.rng) {
-                            Some(pos) => pos,
-                            None => {
-                                println!(
-                                "warning: no space left for new apples ({} apples will be missing)",
-                                *apple_count - self.apples.len()
-                            );
-                                return;
-                            }
-                        };
-
-                    // insert at sorted position
-                    match occupied_cells.binary_search(&apple_pos) {
-                        Ok(idx) => {
-                            panic!("Spawned apple at occupied cell {:?}", occupied_cells[idx])
-                        }
-                        Err(idx) => occupied_cells.insert(idx, apple_pos),
-                    }
-
-                    Some(apple_pos)
-                }
-                AppleSpawnStrategy::ScheduledOnEat { spawns, next_index, .. } => {
-                    let len = spawns.len();
-                    match &mut spawns[*next_index] {
-                        AppleSpawn::Wait { total, current } => {
-                            if *current == *total - 1 {
-                                *current = 0;
-                                *next_index = (*next_index + 1) % len;
-                            } else {
-                                *current += 1;
-                            }
-                            None
-                        }
-                        AppleSpawn::Spawn(pos) => {
-                            *next_index = (*next_index + 1) % len;
-                            Some(*pos)
-                        }
-                    }
-                }
-            };
-
-            match apple_pos {
-                Some(pos) => self.generate_apple(pos),
-                None => break,
-            }
-        }
-    }
-
     fn advance_snakes(&mut self) {
         let mut remove_snakes = vec![];
         for snake_idx in 0..self.snakes.len() {
@@ -427,36 +285,14 @@ impl Game {
         }
 
         let collisions = find_collisions(&self.snakes, &self.apples);
-        let (spawn_snakes, remove_apples, game_over) =
+        let (seeds, remove_apples, game_over) =
             handle_collisions(&collisions, &mut self.snakes, &self.apples);
 
         if game_over {
             self.control.game_over()
         }
 
-        for seed in spawn_snakes {
-            // avoid spawning too close to player snake heads
-            const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
-
-            let mut occupied_cells = self.occupied_cells();
-            for snake in self
-                .snakes
-                .iter()
-                .filter(|s| s.snake_type == Type::Player)
-            {
-                let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, self.board_dim);
-                occupied_cells.extend_from_slice(&neighborhood);
-            }
-            occupied_cells.sort_unstable();
-            occupied_cells.dedup();
-
-            if let Some(pos) = Self::random_free_spot(&occupied_cells, self.board_dim, &mut self.rng) {
-                self.snakes
-                    .push(Snake::from_seed(&seed, pos, Dir::random(&mut self.rng), 10))
-            } else {
-                eprintln!("warning: failed to spawn snake, no free spaces left")
-            }
-        }
+        spawn_snakes(seeds, &mut self.snakes, &self.apples, self.board_dim, &mut self.rng);
 
         for apple_index in remove_apples.into_iter().rev() {
             self.apples.remove(apple_index);
@@ -468,6 +304,11 @@ impl Game {
     /// Bounds for the length of one of the six sides of a cell
     const CELL_SIDE_MIN: f32 = 5.;
     const CELL_SIDE_MAX: f32 = 50.;
+
+    fn spawn_apples(&mut self) {
+        let new_apples = spawn_apples(&mut self.apple_spawn_policy, self.board_dim, &self.snakes, &self.apples, &self.prefs, &mut self.rng);
+        self.apples.extend(new_apples.into_iter())
+    }
 
     fn draw_messages(&mut self, ctx: &mut Context) -> GameResult {
         // draw messages and remove the ones that have
@@ -629,7 +470,7 @@ impl EventHandler<ggez::GameError> for Game {
                 || self
                     .apples
                     .iter()
-                    .any(|apple| matches!(apple.typ, AppleType::SpawnSnake(_)))
+                    .any(|apple| matches!(apple.apple_type, apple::Type::SpawnSnake(_)))
             {
                 self.cached_apple_mesh = Some(get_apple_mesh(
                     &self.apples,
@@ -857,10 +698,10 @@ impl EventHandler<ggez::GameError> for Game {
                     // replace special apples with normal apples
                     let apple_food = self.prefs.apple_food;
                     self.apples.iter_mut().for_each(|apple| {
-                        if !matches!(apple.typ, AppleType::Normal(_)) {
+                        if !matches!(apple.apple_type, apple::Type::Normal(_)) {
                             *apple = Apple {
                                 pos: apple.pos,
-                                typ: AppleType::Normal(apple_food),
+                                apple_type: apple::Type::Normal(apple_food),
                             }
                         }
                     });
@@ -874,7 +715,7 @@ impl EventHandler<ggez::GameError> for Game {
             self.prefs.apple_food = new_food;
             // change existing apples
             for apple in & mut self.apples {
-            if let AppleType::Normal(food) = &mut apple.typ {
+            if let apple::Type::Normal(food) = & mut apple.apple_type {
             * food = new_food;
             }
             }
@@ -885,7 +726,7 @@ impl EventHandler<ggez::GameError> for Game {
                 let mut new_side_length = self.cell_dim.side * factor;
                 if new_side_length < Self::CELL_SIDE_MIN {
                     new_side_length = Self::CELL_SIDE_MIN
-                } else if new_side_length > Self::CELL_SIDE_MAX{
+                } else if new_side_length > Self::CELL_SIDE_MAX {
                     new_side_length = Self::CELL_SIDE_MAX
                 }
                 self.cell_dim = CellDim::from(new_side_length);
