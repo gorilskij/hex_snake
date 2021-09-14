@@ -114,15 +114,15 @@ impl App {
         let cell_dim = CellDim::from(30.);
         Self {
             // screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
-            screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            // screen: Screen::Game(Game::new(
-            //     cell_dim,
-            //     7.,
-            //     seeds,
-            //     Palette::dark(),
-            //     AppleSpawnPolicy::Random { apple_count: 5 },
-            //     window_mode,
-            // )),
+            // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
+            screen: Screen::Game(Game::new(
+                cell_dim,
+                7.,
+                seeds,
+                Palette::dark(),
+                SpawnPolicy::Random { apple_count: 5 },
+                window_mode,
+            )),
             window_mode,
             window_setup,
         }

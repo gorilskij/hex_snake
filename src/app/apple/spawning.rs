@@ -84,8 +84,8 @@ pub fn spawn_apples(policy: &mut SpawnPolicy, board_dim: HexDim, snakes: &[Snake
     loop {
         let can_spawn = match policy {
             SpawnPolicy::None => false,
-            SpawnPolicy::Random { apple_count } => apples.len() < *apple_count,
-            SpawnPolicy::ScheduledOnEat { apple_count, .. } => apples.len() < *apple_count,
+            SpawnPolicy::Random { apple_count } => apples.len() + spawn.len() < *apple_count,
+            SpawnPolicy::ScheduledOnEat { apple_count, .. } => apples.len() + spawn.len() < *apple_count,
         };
 
         if !can_spawn { break; }
