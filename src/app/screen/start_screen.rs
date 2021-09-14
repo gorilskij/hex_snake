@@ -3,25 +3,21 @@ use std::slice;
 use ggez::{
     Context,
     event::EventHandler,
-    GameResult, graphics::{clear, draw, DrawParam, present},
+    GameResult, graphics::{self, DrawParam},
 };
 use ggez::{
     event::{KeyCode, KeyMods},
     graphics::Color,
 };
+use rand::prelude::*;
+use rand::rngs::ThreadRng;
 
 use crate::{
     app,
     app::{
-        collisions::{find_collisions, handle_collisions},
-        screen::{
-            {Apple, Type},
-            rendering::{
-                apple_mesh::get_apple_mesh,
-                grid_mesh::{get_border_mesh, get_grid_mesh},
-                snake_mesh::get_snake_mesh,
-            },
+        apple::{self, Apple
         },
+        collisions::{find_collisions, handle_collisions},
         Screen,
         snake,
         snake::{
@@ -29,15 +25,14 @@ use crate::{
             EatBehavior, EatMechanics, Seed, Snake, utils::OtherSnakes,
         },
     },
-    basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint},
+    basic::{CellDim, Dir, HexDim, HexPoint},
 };
-use crate::app::apple::spawning::{ScheduledSpawn, SpawnPolicy, spawn_apples};
+use crate::app::apple::spawn::{ScheduledSpawn, spawn_apples, SpawnPolicy};
 use crate::app::control::Control;
-use crate::app::control::FrameStamp;
 use crate::app::prefs::Prefs;
+use crate::app::rendering;
 use crate::app::stats::Stats;
-use rand::prelude::*;
-use rand::rngs::ThreadRng;
+use crate::basic::FrameStamp;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -135,7 +130,7 @@ impl SnakeDemo {
         ctx: &mut Context,
         cell_dim: CellDim,
         frame_stamp: FrameStamp,
-        draw_style: DrawStyle,
+        draw_style: rendering::Style,
         palette: &app::Palette,
         stats: &mut Stats,
     ) -> GameResult {
@@ -144,13 +139,13 @@ impl SnakeDemo {
 
         let draw_param = DrawParam::default().dest(self.location.to_cartesian(cell_dim));
 
-        let grid_mesh = get_grid_mesh(self.board_dim, cell_dim, palette, ctx)?;
-        draw(ctx, &grid_mesh, draw_param)?;
+        let grid_mesh = rendering::grid_mesh(self.board_dim, cell_dim, palette, ctx)?;
+        graphics::draw(ctx, &grid_mesh, draw_param)?;
 
-        let border_mesh = get_border_mesh(self.board_dim, cell_dim, palette, ctx)?;
-        draw(ctx, &border_mesh, draw_param)?;
+        let border_mesh = rendering::border_mesh(self.board_dim, cell_dim, palette, ctx)?;
+        graphics::draw(ctx, &border_mesh, draw_param)?;
 
-        let snake_mesh = get_snake_mesh(
+        let snake_mesh = rendering::snake_mesh(
             slice::from_mut(&mut self.snake),
             frame_stamp,
             self.board_dim,
@@ -159,10 +154,10 @@ impl SnakeDemo {
             ctx,
             stats,
         )?;
-        draw(ctx, &snake_mesh, draw_param)?;
+        graphics::draw(ctx, &snake_mesh, draw_param)?;
 
         if !self.apples.is_empty() {
-            let apple_mesh = get_apple_mesh(
+            let apple_mesh = rendering::apple_mesh(
                 &self.apples,
                 frame_stamp,
                 cell_dim,
@@ -171,7 +166,7 @@ impl SnakeDemo {
                 ctx,
                 stats,
             )?;
-            draw(ctx, &apple_mesh, draw_param)?;
+            graphics::draw(ctx, &apple_mesh, draw_param)?;
         }
 
         Ok(())
@@ -228,7 +223,7 @@ impl EventHandler<ggez::GameError> for StartScreen {
         self.control.graphics_frame();
         let frame_stamp = self.control.frame_stamp();
 
-        clear(ctx, Color::BLACK);
+        graphics::clear(ctx, Color::BLACK);
 
         let palette = &self.palettes[self.current_palette];
         self.player1_demo.draw(
@@ -248,7 +243,7 @@ impl EventHandler<ggez::GameError> for StartScreen {
             &mut self.stats,
         )?;
 
-        present(ctx)
+        graphics::present(ctx)
     }
 
     fn key_down_event(

@@ -1,7 +1,7 @@
 use crate::{
     app::{
         keyboard_control::ControlSetup,
-        screen::Apple,
+        apple::Apple,
         snake::{
             controller::{
                 a_star::AStar,

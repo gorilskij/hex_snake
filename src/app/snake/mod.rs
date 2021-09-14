@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     app::{
-        screen::{Apple},
+        apple::{self, Apple},
         snake::{
             controller::{Controller, ControllerTemplate},
             utils::OtherSnakes,
@@ -13,12 +13,12 @@ use crate::{
 use std::ops::Deref;
 
 pub use palette::{Palette, PaletteTemplate};
-use crate::app::control::FrameStamp;
+use crate::basic::FrameStamp;
 use crate::app::utils::Frames;
 
 pub mod controller;
 mod palette;
-pub mod rendering;
+pub mod render;
 pub mod utils;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

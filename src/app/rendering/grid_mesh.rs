@@ -11,7 +11,7 @@ use crate::{app::palette::Palette, basic::HexDim};
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh
 //  when border is drawn separately
-pub(in crate::app::screen) fn get_grid_mesh(
+pub fn grid_mesh(
     board_dim: HexDim,
     cell_dim: CellDim,
     palette: &Palette,
@@ -87,7 +87,7 @@ pub(in crate::app::screen) fn get_grid_mesh(
     builder.build(ctx)
 }
 
-pub(in crate::app::screen) fn get_border_mesh(
+pub fn border_mesh(
     board_dim: HexDim,
     cell_dim: CellDim,
     palette: &Palette,

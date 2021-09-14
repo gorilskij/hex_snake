@@ -3,44 +3,49 @@ use std::{
     collections::VecDeque,
     time::{Duration, Instant},
 };
+use crate::basic::FrameStamp;
 
-/// Represents (graphics frame number, frame fraction)
-pub(crate) type FrameStamp = (usize, f32);
-
-struct FPSCounter {
-    step: usize, // record once every 'step' frames
-    n: usize,    // counts down to recording the next frame
+/// Objective measurement of framerate based on periodic calls
+/// to [`FpsCounter::register_frame`], completely detached from any
+/// framerate-regulation mechanism
+struct FpsCounter {
+    /// An `Instant` is stored every `step` frames. This isn't
+    /// done every frame because calling `Instant::now()` produces
+    /// a syscall which is slow.
+    step: usize,
+    /// Counts down from `step` to 0 to tell when the next
+    /// `Instant` should be stored
+    n: usize,
+    /// A queue of `Instant`s
     buffer: VecDeque<Instant>,
 }
 
-impl FPSCounter {
-    const LEN: usize = 10; // number of frame batches to store
+impl FpsCounter {
+    /// Number of `Instant`s to store in `buffer`
+    const LEN: usize = 10;
 
-    fn new(fps: f64) -> Self {
+    fn new(expected_fps: f64) -> Self {
         let mut counter = Self {
             step: 0,
             n: 0,
             buffer: VecDeque::with_capacity(Self::LEN),
         };
-        counter.set_expected_fps(fps);
+        counter.set_expected_fps(expected_fps);
         counter
     }
 
-    // Counting parameters depend on the expected fps
-    // (very high fps won't be updated as often)
-    fn set_expected_fps(&mut self, fps: f64) {
-        self.step = max(1, (3. * fps / Self::LEN as f64) as usize);
-        // debug
-        // println!(
-        //     "FPSCounter: fps = {}, step = {}, len = {}, frames = {}",
-        //     fps,
-        //     self.step,
-        //     Self::LEN,
-        //     self.step * Self::LEN as Frames
-        // );
+    /// `FpsCounter` knows about the expected framerate to adjust
+    /// how often it stores an `Instant`, for low framerates this
+    /// is done every few frames but for higher framerates, it's
+    /// much rarer to avoid thousands of syscalls per second
+    fn set_expected_fps(&mut self, expected_fps: f64) {
+        // store an instant ~every N seconds, but at most every frame
+        const N: f64 = 1.;
+        self.step = max(1, (expected_fps * N) as usize);
         self.reset();
     }
 
+    /// Called at every frame
     fn register_frame(&mut self) {
         if self.n == 0 {
             if self.buffer.len() >= Self::LEN {
@@ -58,10 +63,13 @@ impl FPSCounter {
         self.n = 0;
     }
 
+    /// The framerate is calculated as the inverse of the
+    /// average frame duration
     fn fps(&self) -> f64 {
         if self.buffer.len() >= 2 {
-            ((self.buffer.len() - 1) as f64 * self.step as f64)
-                / (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64()
+            let total_buffer_duration = (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64();
+            let num_frames = ((self.buffer.len() - 1) * self.step) as f64;
+            num_frames / total_buffer_duration
         } else {
             0.
         }
@@ -69,7 +77,7 @@ impl FPSCounter {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum GameState {
+pub enum State {
     Playing,
     Paused,
     GameOver,
@@ -96,10 +104,10 @@ pub struct Control {
 
     // empirical measurement of framerates unrelated to
     // control mechanism
-    measured_game_fps: FPSCounter,
-    measured_graphics_fps: FPSCounter,
+    measured_game_fps: FpsCounter,
+    measured_graphics_fps: FpsCounter,
 
-    game_state: GameState,
+    game_state: State,
 
     // used to store the frame fraction when the game is paused
     frozen_frame_fraction: Option<f32>,
@@ -117,10 +125,10 @@ impl Control {
 
             graphics_frame_num: 0,
 
-            measured_game_fps: FPSCounter::new(fps),
-            measured_graphics_fps: FPSCounter::new(60.),
+            measured_game_fps: FpsCounter::new(fps),
+            measured_graphics_fps: FpsCounter::new(60.),
 
-            game_state: GameState::Playing,
+            game_state: State::Playing,
             frozen_frame_fraction: None,
         }
     }
@@ -164,7 +172,7 @@ impl Control {
     //  this can cause strong lag a high framerates
     // TODO: automatically lower game framerate to keep up graphics framerate
     pub fn can_update(&mut self) -> bool {
-        if self.game_state != GameState::Playing {
+        if self.game_state != State::Playing {
             return false;
         }
 
@@ -210,12 +218,12 @@ impl Control {
         self.graphics_frame_num += 1;
     }
 
-    pub fn state(&self) -> GameState {
+    pub fn state(&self) -> State {
         self.game_state
     }
 
     pub fn play(&mut self) {
-        self.game_state = GameState::Playing;
+        self.game_state = State::Playing;
         self.measured_game_fps.reset();
         match self.frozen_frame_fraction.take() {
             None => (),
@@ -224,13 +232,13 @@ impl Control {
     }
 
     pub fn pause(&mut self) {
-        self.game_state = GameState::Paused;
+        self.game_state = State::Paused;
         self.frozen_frame_fraction = Some(self.frame_fraction());
         self.missed_updates = None;
     }
 
     pub fn game_over(&mut self) {
-        self.game_state = GameState::GameOver;
+        self.game_state = State::GameOver;
         self.frozen_frame_fraction = Some(self.frame_fraction());
     }
 

@@ -11,14 +11,19 @@ mod hex_point;
 mod point;
 pub mod transformations;
 
+macro_rules! hash_map {
+    { $($key:expr => $value:expr),* $(,)? } => {{
+        let mut map = ::std::collections::HashMap::new();
+        $( m.insert($key, $value); )*
+        map
+    }};
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Side {
     Left,
     Right,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum DrawStyle {
-    Hexagon,
-    Smooth,
-}
+/// (graphics frame number, frame fraction)
+pub type FrameStamp = (usize, f32);

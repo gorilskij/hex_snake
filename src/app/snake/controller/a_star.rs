@@ -6,7 +6,7 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 
-use crate::app::screen::Apple;
+use crate::app::apple::Apple;
 use itertools::Itertools;
 use std::{
     cmp::{max, min},

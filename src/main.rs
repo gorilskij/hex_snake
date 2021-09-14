@@ -21,8 +21,9 @@ use ggez::{
 };
 use crate::keyboard::Layout;
 
-mod app;
+#[macro_use]
 mod basic;
+mod app;
 mod color;
 mod partial_min_max;
 mod row;

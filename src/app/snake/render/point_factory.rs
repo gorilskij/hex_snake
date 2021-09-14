@@ -8,7 +8,7 @@ use itertools::Itertools;
 use crate::{
     app::snake::{
         palette::SegmentStyle,
-        rendering::{
+        render::{
             descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
             hexagon_segments::HexagonSegments,
             smooth_segments::SmoothSegments,
@@ -16,10 +16,11 @@ use crate::{
     },
     basic::{
         transformations::{flip_horizontally, rotate_clockwise, translate},
-        Dir, DrawStyle, Point,
+        Dir, Point,
     },
     color::oklab::OkLab,
 };
+use crate::app::rendering;
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
@@ -140,7 +141,7 @@ impl SegmentDescription {
     /// there should be (longer snakes have lower subsegment
     /// resolution)
     pub fn render(mut self, subsegments_per_segment: usize, turn: f32) -> Vec<(Color, Vec<Point>)> {
-        let subsegments = if self.draw_style == DrawStyle::Hexagon {
+        let subsegments = if self.draw_style == rendering::Style::Hexagon {
             // hexagon segments don't support gradients
             self.fraction = SegmentFraction::solid();
             self.segment_style = self.segment_style.into_solid();
@@ -158,8 +159,8 @@ impl SegmentDescription {
             .map(|subsegment| {
                 let color = subsegment.unwrap_solid_color();
                 let points = match subsegment.draw_style {
-                    DrawStyle::Hexagon => HexagonSegments::render_segment(subsegment, turn),
-                    DrawStyle::Smooth => SmoothSegments::render_segment(subsegment, turn),
+                    rendering::Style::Hexagon => HexagonSegments::render_segment(subsegment, turn),
+                    rendering::Style::Smooth => SmoothSegments::render_segment(subsegment, turn),
                 };
                 (color, points)
             })

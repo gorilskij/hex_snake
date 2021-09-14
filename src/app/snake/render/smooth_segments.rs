@@ -1,5 +1,5 @@
 use crate::{
-    app::snake::rendering::{
+    app::snake::render::{
         descriptions::{SegmentDescription, SegmentFraction, TurnType},
         point_factory::SegmentRenderer,
     },

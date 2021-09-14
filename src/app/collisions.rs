@@ -1,7 +1,5 @@
 use crate::app::{
-    screen::{
-        Apple, Type,
-    },
+    apple::{self, Apple},
     snake::{self, EatBehavior, SegmentType, Snake, State},
 };
 use crate::app::utils::{get_occupied_cells, random_free_spot};
@@ -108,13 +106,13 @@ pub fn handle_collisions<'a>(
             Collision::Apple { snake_index, apple_index } => {
                 remove_apples.push(apple_index);
                 match &apples[apple_index].apple_type {
-                    Type::Normal(food) => {
+                    apple::Type::Normal(food) => {
                         snakes[snake_index].body.cells[0].typ = SegmentType::Eaten {
                             original_food: *food,
                             food_left: *food,
                         }
                     }
-                    Type::SpawnSnake(seed) => spawn_snakes.push(seed),
+                    apple::Type::SpawnSnake(seed) => spawn_snakes.push(seed),
                 }
             }
             Collision::Snake {

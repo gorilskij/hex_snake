@@ -1,21 +1,21 @@
-use crate::basic::{HexDim, HexPoint, Dir, Point, CellDim};
-use crate::app::screen::Apple;
-use crate::app::apple::spawning::{SpawnPolicy, spawn_apples};
-use crate::app::snake::{self, Snake, EatMechanics, EatBehavior};
-use crate::app::snake::controller::ControllerTemplate;
-use ggez::graphics::{Color, clear, present, DrawParam, draw};
+use ggez::{Context, GameResult};
 use ggez::event::EventHandler;
-use ggez::{Context, GameError, GameResult};
-use crate::app::control::{Control, FrameStamp};
-use crate::app::snake::utils::split_snakes_mut;
-use crate::app::collisions::{find_collisions, handle_collisions};
-use crate::app::screen::rendering::grid_mesh::{get_grid_mesh, get_border_mesh};
-use crate::app::screen::rendering::snake_mesh::get_snake_mesh;
-use crate::app::screen::rendering::apple_mesh::get_apple_mesh;
-use crate::app;
-use crate::app::prefs::Prefs;
-use crate::app::stats::Stats;
+use ggez::graphics::{self, Color, DrawParam};
 use rand::prelude::*;
+
+use crate::app;
+use crate::app::apple::spawn::{spawn_apples, SpawnPolicy};
+use crate::app::collisions::{find_collisions, handle_collisions};
+use crate::app::control::Control;
+use crate::app::prefs::Prefs;
+use crate::app::rendering;
+use crate::app::apple::Apple;
+use crate::app::snake::{self, EatBehavior, EatMechanics, Snake};
+use crate::app::snake::controller::ControllerTemplate;
+use crate::app::snake::utils::split_snakes_mut;
+use crate::app::stats::Stats;
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
+use crate::basic::FrameStamp;
 
 pub struct DebugScenario {
     control: Control,
@@ -60,7 +60,7 @@ impl DebugScenario {
             },
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Crash,
-                eat_other: hash_map![],
+                eat_other: hash_map! {},
                 default: EatBehavior::Crash,
             },
             palette: snake::PaletteTemplate::solid_white_red(),
@@ -75,7 +75,7 @@ impl DebugScenario {
             },
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Crash,
-                eat_other: hash_map![],
+                eat_other: hash_map! {},
                 default: EatBehavior::Crash,
             },
             palette: snake::PaletteTemplate::Solid { color: Color::RED, eaten: Color::WHITE },
@@ -150,22 +150,22 @@ impl EventHandler<ggez::GameError> for DebugScenario {
         self.control.graphics_frame();
         let frame_stamp = self.control.frame_stamp();
 
-        clear(ctx, Color::BLACK);
+        graphics::clear(ctx, Color::BLACK);
 
         let draw_param = DrawParam::default().dest(self.offset);
 
-        let grid_mesh = get_grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?;
-        draw(ctx, &grid_mesh, draw_param)?;
+        let grid_mesh = rendering::grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?;
+        graphics::draw(ctx, &grid_mesh, draw_param)?;
 
-        let border_mesh = get_border_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?;
-        draw(ctx, &border_mesh, draw_param)?;
+        let border_mesh = rendering::border_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?;
+        graphics::draw(ctx, &border_mesh, draw_param)?;
 
         for snake_index in 0..self.snakes.len() {
             let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, snake_index);
             snake.update_dir(other_snakes, &self.apples, self.board_dim, frame_stamp);
         }
 
-        let snake_mesh = get_snake_mesh(
+        let snake_mesh = rendering::snake_mesh(
             &mut self.snakes,
             frame_stamp,
             self.board_dim,
@@ -174,10 +174,10 @@ impl EventHandler<ggez::GameError> for DebugScenario {
             ctx,
             &mut self.stats,
         )?;
-        draw(ctx, &snake_mesh, draw_param)?;
+        graphics::draw(ctx, &snake_mesh, draw_param)?;
 
         if !self.apples.is_empty() {
-            let apple_mesh = get_apple_mesh(
+            let apple_mesh = rendering::apple_mesh(
                 &self.apples,
                 frame_stamp,
                 self.cell_dim,
@@ -186,9 +186,9 @@ impl EventHandler<ggez::GameError> for DebugScenario {
                 ctx,
                 &mut self.stats,
             )?;
-            draw(ctx, &apple_mesh, draw_param)?;
+            graphics::draw(ctx, &apple_mesh, draw_param)?;
         }
 
-        present(ctx)
+        graphics::present(ctx)
     }
 }

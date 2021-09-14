@@ -1,6 +1,6 @@
-use crate::basic::DrawStyle;
 use std::time::Duration;
 use crate::app::utils::Food;
+use crate::app::rendering;
 
 pub struct Prefs {
     pub draw_grid: bool,
@@ -15,7 +15,7 @@ pub struct Prefs {
     pub prob_spawn_competitor: f32,
     pub prob_spawn_killer: f32,
 
-    pub draw_style: DrawStyle,
+    pub draw_style: rendering::Style,
 }
 
 impl Default for Prefs {
@@ -33,7 +33,7 @@ impl Default for Prefs {
             prob_spawn_competitor: 0.025,
             prob_spawn_killer: 0.015,
 
-            draw_style: DrawStyle::Smooth,
+            draw_style: rendering::Style::Smooth,
         }
     }
 }

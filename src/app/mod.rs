@@ -4,11 +4,12 @@ use ggez::{
     conf::{WindowMode, WindowSetup},
     Context,
     event::{EventHandler, KeyCode, KeyMods},
-    GameResult, graphics::Rect,
+    GameResult, graphics,
+    graphics::Rect,
 };
 use itertools::Itertools;
 
-use apple::spawning::SpawnPolicy;
+use apple::spawn::SpawnPolicy;
 pub use palette::Palette;
 use screen::{Game, StartScreen};
 use snake::{EatMechanics, Seed};
@@ -22,17 +23,6 @@ use crate::{
 };
 use crate::app::screen::{DebugScenario, Screen};
 
-macro_rules! hash_map {
-    {} => {
-        ::std::collections::HashMap::new()
-    };
-    { $($key:expr => $value:expr),+ } => {{
-        let mut map = ::std::collections::HashMap::new();
-        $( m.insert($key, $value); )+
-        map
-    }};
-}
-
 pub mod keyboard_control;
 mod palette;
 mod snake;
@@ -45,6 +35,7 @@ mod prefs;
 pub mod stats;
 mod message;
 pub mod control;
+mod rendering;
 
 impl Deref for Screen {
     type Target = dyn EventHandler<ggez::GameError>;
@@ -223,10 +214,9 @@ impl EventHandler<ggez::GameError> for App {
     }
 
     fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        ggez::graphics::set_screen_coordinates(ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
+        graphics::set_screen_coordinates(ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
             .unwrap();
 
-        // TODO: hacky fix for ggez bug, remove /2
         self.screen.resize_event(ctx, width, height);
     }
 }

@@ -1,8 +1,5 @@
 use crate::basic::Point;
-use ggez::{
-    graphics::{Color, DrawParam, Font, PxScale, Text},
-    Context, GameResult,
-};
+use ggez::{graphics::{Color, DrawParam, Font, PxScale, Text, self}, Context, GameResult};
 use std::time::{Duration, Instant};
 
 /// Finite number of possible messages
@@ -66,7 +63,7 @@ impl Message {
         let mut text = Text::new(self.text.as_str());
         text.set_font(Font::default(), PxScale::from(self.font_size));
 
-        let (width, height) = ggez::graphics::drawable_size(ctx);
+        let (width, height) = graphics::drawable_size(ctx);
 
         let x = if self.left {
             self.h_margin

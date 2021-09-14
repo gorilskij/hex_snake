@@ -1,11 +1,9 @@
-use spawning::SpawnPolicy;
-
 use crate::app::snake;
 use crate::basic::HexPoint;
 use crate::app::utils::Food;
 
 #[macro_use]
-pub mod spawning;
+pub mod spawn;
 
 #[derive(Debug)]
 pub enum Type {

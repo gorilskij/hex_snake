@@ -5,7 +5,7 @@ use ggez::{
 
 use crate::{
     app::snake::{
-        rendering::{
+        render::{
             descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
             render_hexagon,
         },
@@ -15,10 +15,11 @@ use crate::{
 };
 use crate::{
     app::snake::Snake,
-    basic::{CellDim, DrawStyle, HexDim, Point},
+    basic::{CellDim, HexDim, Point},
 };
-use crate::app::control::FrameStamp;
+use crate::basic::FrameStamp;
 use crate::app::stats::Stats;
+use crate::app::rendering;
 
 const DRAW_WHITE_AURA: bool = false;
 
@@ -34,12 +35,12 @@ fn build_hexagon_at(
     Ok(())
 }
 
-pub(in crate::app::screen) fn get_snake_mesh(
+pub fn snake_mesh(
     snakes: &mut [Snake],
     frame_stamp: FrameStamp,
     board_dim: HexDim,
     cell_dim: CellDim,
-    draw_style: DrawStyle,
+    draw_style: rendering::Style,
     ctx: &mut Context,
     stats: &mut Stats,
 ) -> GameResult<Mesh> {

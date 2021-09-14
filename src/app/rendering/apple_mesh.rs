@@ -7,21 +7,22 @@ use hsl::HSL;
 use crate::{
     app::{
         palette::Palette,
-        screen::{
-            {Apple, Type},
+        apple::{
+            {self, Apple},
         },
-        snake::rendering::render_hexagon,
+        snake::render::render_hexagon,
     },
-    basic::{CellDim, DrawStyle, transformations::translate},
+    basic::{CellDim, transformations::translate},
 };
-use crate::app::control::FrameStamp;
+use crate::basic::FrameStamp;
 use crate::app::stats::Stats;
+use crate::app::rendering;
 
-pub(in crate::app::screen) fn get_apple_mesh(
+pub fn apple_mesh(
     apples: &[Apple],
     frame_stamp: FrameStamp,
     cell_dim: CellDim,
-    draw_style: DrawStyle,
+    draw_style: rendering::Style,
     palette: &Palette,
     ctx: &mut Context,
     stats: &mut Stats,
@@ -36,15 +37,15 @@ pub(in crate::app::screen) fn get_apple_mesh(
 
     for apple in apples {
         let color = match apple.apple_type {
-            Type::Normal(_) => palette.apple_color,
-            Type::SpawnSnake(_) => {
+            apple::Type::Normal(_) => palette.apple_color,
+            apple::Type::SpawnSnake(_) => {
                 let hue = 360. * (frame_stamp.0 as f64 / 60. % 1.);
                 let hsl = HSL { h: hue, s: 1., l: 0.3 };
                 Color::from(hsl.to_rgb())
             }
         };
 
-        if draw_style == DrawStyle::Hexagon {
+        if draw_style == rendering::Style::Hexagon {
             let dest = apple.pos.to_cartesian(cell_dim);
             let mut points = render_hexagon(cell_dim);
             translate(&mut points, dest);

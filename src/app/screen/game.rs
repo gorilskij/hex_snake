@@ -4,7 +4,7 @@ use ggez::{
     conf::WindowMode,
     Context,
     event::{EventHandler, KeyCode, KeyMods},
-    GameResult, graphics::{clear, Color, draw, DrawParam, Mesh, present},
+    GameResult, graphics::{self, Color, DrawParam, Mesh},
 };
 use rand::prelude::*;
 
@@ -12,31 +12,21 @@ use crate::{
     app::{
         collisions::{find_collisions, handle_collisions},
         palette::Palette,
-        screen::{
-            rendering::{
-                apple_mesh::get_apple_mesh,
-                grid_mesh::{get_border_mesh, get_grid_mesh},
-                snake_mesh::get_snake_mesh,
-            },
-        },
         snake::{
             self,
-            controller::{Controller, ControllerTemplate},
-            EatBehavior,
-            EatMechanics, Seed, Snake, State, Type, utils::split_snakes_mut,
+            controller::{Controller, ControllerTemplate}, Snake, utils::split_snakes_mut,
         },
     },
-    basic::{CellDim, Dir, DrawStyle, HexDim, HexPoint, Point},
+    basic::{CellDim, Dir, HexDim, HexPoint, Point},
 };
+use crate::app::{rendering, stats::Stats, utils::Food};
 use crate::app::apple::{self, Apple};
-use crate::app::apple::spawning::{ScheduledSpawn, spawn_apples, SpawnPolicy};
-use crate::app::control::{Control, GameState};
-use crate::app::message::{Message, MessageID};
-use crate::app::prefs::{ Prefs};
-use crate::app::{stats::Stats, utils::Food};
-use crate::row::ROw;
-use crate::app::utils::{get_occupied_cells, random_free_spot};
+use crate::app::apple::spawn::{ScheduledSpawn, spawn_apples, SpawnPolicy};
 use crate::app::collisions::spawn_snakes;
+use crate::app::control::{self, Control};
+use crate::app::message::{Message, MessageID};
+use crate::app::prefs::Prefs;
+use crate::row::ROw;
 
 pub struct Game {
     control: Control,
@@ -48,7 +38,7 @@ pub struct Game {
     /// Offset to center the grid in the window
     offset: Point,
 
-    seeds: Vec<Seed>,
+    seeds: Vec<snake::Seed>,
     snakes: Vec<Snake>,
     apples: Vec<Apple>,
 
@@ -84,7 +74,7 @@ impl Game {
     pub fn new(
         cell_dim: CellDim,
         starting_fps: f64,
-        seeds: Vec<Seed>,
+        seeds: Vec<snake::Seed>,
         palette: Palette,
         apple_spawn_policy: SpawnPolicy,
         wm: WindowMode,
@@ -142,7 +132,7 @@ impl Game {
             if self
                 .snakes
                 .iter()
-                .any(|s| s.snake_type == Type::Player && !new_board_dim.contains(s.head().pos))
+                .any(|s| s.snake_type == snake::Type::Player && !new_board_dim.contains(s.head().pos))
             {
                 println!("warning: player snake outside of board, restarting");
                 self.restart();
@@ -178,9 +168,10 @@ impl Game {
         let unpositioned = self
             .seeds
             .iter()
-            .filter(|seed| !matches!(seed.snake_type, Type::Simulated { .. }))
+            .filter(|seed| !matches!(seed.snake_type, snake::Type::Simulated { .. }))
             .count();
 
+        // TODO: clean this mess
         let mut unpositioned_dir = Dir::U;
         let mut unpositioned_h_pos: Box<dyn Iterator<Item = isize>> = if unpositioned > 0 {
             const DISTANCE_BETWEEN_SNAKES: isize = 1;
@@ -200,7 +191,7 @@ impl Game {
 
         for seed in self.seeds.iter() {
             match seed.snake_type {
-                Type::Simulated { start_pos, start_dir, start_grow } => {
+                snake::Type::Simulated { start_pos, start_dir, start_grow } => {
                     self.snakes
                         .push(Snake::from_seed(seed, start_pos, start_dir, start_grow));
                 }
@@ -232,8 +223,8 @@ impl Game {
         for snake_idx in 0..self.snakes.len() {
             // set snake to die if it ran out of life
             match &mut self.snakes[snake_idx].snake_type {
-                Type::Competitor { life: Some(life) }
-                | Type::Killer { life: Some(life) } => {
+                snake::Type::Competitor { life: Some(life) }
+                | snake::Type::Killer { life: Some(life) } => {
                     if *life == 0 {
                         self.snakes[snake_idx].die();
                     } else {
@@ -266,10 +257,10 @@ impl Game {
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
-            matches!(snake.state, State::Dying)
+            matches!(snake.state, snake::State::Dying)
                 || matches!(
                     snake.snake_type,
-                    Type::Competitor { life: Some(_) } | Type::Killer { life: Some(_) }
+                    snake::Type::Competitor { life: Some(_) } | snake::Type::Killer { life: Some(_) }
                 )
         };
         if self.snakes.iter().all(dying_or_ephemeral) {
@@ -412,7 +403,7 @@ impl EventHandler<ggez::GameError> for Game {
         let frame_stamp = self.control.frame_stamp();
         let mut stats = Stats::default();
 
-        if self.control.state() == GameState::Playing {
+        if self.control.state() == control::State::Playing {
             // Update the direction of the snake early
             // to see it turning as soon as possible,
             // this could happen in the middle of a
@@ -426,7 +417,7 @@ impl EventHandler<ggez::GameError> for Game {
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
 
-            snake_mesh = Some(ROw::Owned(get_snake_mesh(
+            snake_mesh = Some(ROw::Owned(rendering::snake_mesh(
                 &mut self.snakes,
                 frame_stamp,
                 self.board_dim,
@@ -435,7 +426,7 @@ impl EventHandler<ggez::GameError> for Game {
                 ctx,
                 &mut stats,
             )?));
-            apple_mesh = Some(ROw::Owned(get_apple_mesh(
+            apple_mesh = Some(ROw::Owned(rendering::apple_mesh(
                 &self.apples,
                 frame_stamp,
                 self.cell_dim,
@@ -447,13 +438,13 @@ impl EventHandler<ggez::GameError> for Game {
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
                     self.grid_mesh =
-                        Some(get_grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?);
+                        Some(rendering::grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?);
                 };
                 grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
             }
             if self.prefs.draw_border {
                 if self.border_mesh.is_none() {
-                    self.border_mesh = Some(get_border_mesh(
+                    self.border_mesh = Some(rendering::border_mesh(
                         self.board_dim,
                         self.cell_dim,
                         &self.palette,
@@ -472,7 +463,7 @@ impl EventHandler<ggez::GameError> for Game {
                     .iter()
                     .any(|apple| matches!(apple.apple_type, apple::Type::SpawnSnake(_)))
             {
-                self.cached_apple_mesh = Some(get_apple_mesh(
+                self.cached_apple_mesh = Some(rendering::apple_mesh(
                     &self.apples,
                     frame_stamp,
                     self.cell_dim,
@@ -485,7 +476,7 @@ impl EventHandler<ggez::GameError> for Game {
             }
 
             if self.cached_snake_mesh.is_none() {
-                self.cached_snake_mesh = Some(get_snake_mesh(
+                self.cached_snake_mesh = Some(rendering::snake_mesh(
                     &mut self.snakes,
                     frame_stamp,
                     self.board_dim,
@@ -510,13 +501,13 @@ impl EventHandler<ggez::GameError> for Game {
                 if self.prefs.draw_grid {
                     if self.grid_mesh.is_none() {
                         self.grid_mesh =
-                            Some(get_grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?);
+                            Some(rendering::grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?);
                     };
                     grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
                 }
                 if self.prefs.draw_border {
                     if self.border_mesh.is_none() {
-                        self.border_mesh = Some(get_border_mesh(
+                        self.border_mesh = Some(rendering::border_mesh(
                             self.board_dim,
                             self.cell_dim,
                             &self.palette,
@@ -537,19 +528,19 @@ impl EventHandler<ggez::GameError> for Game {
             || apple_mesh.is_some()
             || snake_mesh.is_some()
         {
-            clear(ctx, self.palette.background_color);
+            graphics::clear(ctx, self.palette.background_color);
 
             if let Some(mesh) = grid_mesh {
-                draw(ctx, mesh, draw_param)?;
+                graphics::draw(ctx, mesh, draw_param)?;
             }
             if let Some(mesh) = snake_mesh {
-                draw(ctx, mesh.get(), draw_param)?;
+                graphics::draw(ctx, mesh.get(), draw_param)?;
             }
             if let Some(mesh) = apple_mesh {
-                draw(ctx, mesh.get(), draw_param)?;
+                graphics::draw(ctx, mesh.get(), draw_param)?;
             }
             if let Some(mesh) = border_mesh {
-                draw(ctx, mesh, draw_param)?;
+                graphics::draw(ctx, mesh, draw_param)?;
             }
 
             if self.prefs.display_stats {
@@ -560,7 +551,7 @@ impl EventHandler<ggez::GameError> for Game {
             self.draw_messages(ctx)?;
         }
 
-        present(ctx)
+        graphics::present(ctx)
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
@@ -571,15 +562,15 @@ impl EventHandler<ggez::GameError> for Game {
         // TODO: also tie these to a keymap (dvorak-centric for now)
         match key {
             Space => match self.control.state() {
-                GameState::GameOver => {
+                control::State::GameOver => {
                     self.restart();
                     self.control.play();
                 }
-                GameState::Playing => {
+                control::State::Playing => {
                     self.control.pause();
                     self.draw_cache_invalid = 5;
                 },
-                GameState::Paused => self.control.play(),
+                control::State::Paused => self.control.play(),
             },
             G => {
                 self.prefs.draw_grid = !self.prefs.draw_grid;
@@ -614,7 +605,7 @@ impl EventHandler<ggez::GameError> for Game {
                         let player_snake = self
                             .snakes
                             .iter_mut()
-                            .find(|snake| snake.snake_type == Type::Player)
+                            .find(|snake| snake.snake_type == snake::Type::Player)
                             .unwrap();
 
                         let text = match &STASHED_CONTROLLER {
@@ -674,17 +665,17 @@ impl EventHandler<ggez::GameError> for Game {
             Escape => {
                 let text;
                 match self.prefs.draw_style {
-                    DrawStyle::Hexagon => {
-                        self.prefs.draw_style = DrawStyle::Smooth;
+                    rendering::Style::Hexagon => {
+                        self.prefs.draw_style = rendering::Style::Smooth;
                         text = "draw style: smooth";
                     }
-                    DrawStyle::Smooth => {
-                        self.prefs.draw_style = DrawStyle::Hexagon;
+                    rendering::Style::Smooth => {
+                        self.prefs.draw_style = rendering::Style::Hexagon;
                         text = "draw style: hexagon";
                     }
                 }
                 self.display_notification(text);
-                if self.control.state() != GameState::Playing {
+                if self.control.state() != control::State::Playing {
                     self.draw_cache_invalid = 5;
                     self.cached_snake_mesh = None;
                     self.cached_apple_mesh = None;
@@ -734,7 +725,7 @@ impl EventHandler<ggez::GameError> for Game {
                 self.display_notification(format!("Cell side: {}", new_side_length));
             }
             k => {
-                if self.control.state() == GameState::Playing {
+                if self.control.state() == control::State::Playing {
                     for snake in &mut self.snakes {
                         snake.controller.key_pressed(k)
                     }

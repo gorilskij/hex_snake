@@ -10,12 +10,12 @@ use crate::app::utils::{get_occupied_cells, random_free_spot};
 #[allow(unused_macros)]
 macro_rules! spawn_schedule {
     (@ spawn($h:expr, $v:expr) ) => {
-        crate::app::apple::spawning::ScheduledSpawn::Spawn(
+        crate::app::apple::spawn::ScheduledSpawn::Spawn(
             crate::basic::HexPoint { h: $h, v: $v }
         )
     };
     (@ wait($t:expr) ) => {
-        crate::app::apple::spawning::ScheduledSpawn::Wait {
+        crate::app::apple::spawn::ScheduledSpawn::Wait {
             total: $t,
             current: 0,
         }
