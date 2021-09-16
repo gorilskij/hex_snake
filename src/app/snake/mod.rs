@@ -51,7 +51,7 @@ pub enum SegmentType {
     Eaten { original_food: u32, food_left: u32 },
     Crashed,
     // does not advance, sucks the rest of the snake in
-    BlackHole,
+    BlackHole { just_created: bool },
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -333,7 +333,7 @@ impl Snake {
     pub fn die(&mut self) {
         if !matches!(self.state, State::Dying) {
             self.state = State::Dying;
-            self.body.cells[0].segment_type = SegmentType::BlackHole;
+            self.body.cells[0].segment_type = SegmentType::BlackHole { just_created: true };
         }
     }
 }

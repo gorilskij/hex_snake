@@ -1,6 +1,7 @@
 use crate::basic::Point;
+use std::ops::Mul;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Mul)]
 pub struct CellDim {
     pub side: f32,
     // sin is longer than cos

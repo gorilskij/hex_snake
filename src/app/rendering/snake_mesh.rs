@@ -20,6 +20,8 @@ use crate::{
 use crate::basic::FrameStamp;
 use crate::app::stats::Stats;
 use crate::app::rendering;
+use std::cmp::min;
+use crate::partial_min_max::{partial_min, partial_max};
 
 const DRAW_WHITE_AURA: bool = false;
 
@@ -46,7 +48,7 @@ pub fn snake_mesh(
 ) -> GameResult<Mesh> {
     stats.redrawing_snakes = true;
 
-    let frame_frac = frame_stamp.1;
+    let frame_fraction = frame_stamp.1;
 
     let mut builder = MeshBuilder::new();
 
@@ -115,7 +117,7 @@ pub fn snake_mesh(
             }
         }
 
-        let segment_styles = snake.palette.segment_styles(&snake.body, frame_frac);
+        let segment_styles = snake.palette.segment_styles(&snake.body, frame_fraction);
         for (segment_idx, segment) in snake.body.cells.iter().enumerate() {
             let coming_from = segment.coming_from;
             let going_to = segment_idx
@@ -135,15 +137,29 @@ pub fn snake_mesh(
 
             let fraction = match segment_idx {
                 // head
-                0 => SegmentFraction::appearing(frame_frac),
+                0 => {
+                    if let SegmentType::BlackHole { just_created } = segment.segment_type {
+                        // never exceed 0.5 into a black hole, stay there once you get there
+                        if snake.len() == 1 {
+                            // also tail
+                            SegmentFraction { start: partial_min(frame_fraction, 0.5).unwrap(), end: 0.5 }
+                        } else if snake.body.missing_front > 0 {
+                            SegmentFraction::appearing(0.5)
+                        } else {
+                            SegmentFraction::appearing(partial_min(frame_fraction, 0.5).unwrap())
+                        }
+                    } else {
+                        SegmentFraction::appearing(frame_fraction)
+                    }
+                },
                 // tail
                 i if i == snake.len() - 1 && snake.body.grow == 0 => {
                     if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
-                        let frac = ((original_food - food_left) as f32 + frame_frac)
+                        let frac = ((original_food - food_left) as f32 + frame_fraction)
                             / (original_food + 1) as f32;
                         SegmentFraction::disappearing(frac)
                     } else {
-                        SegmentFraction::disappearing(frame_frac)
+                        SegmentFraction::disappearing(frame_fraction)
                     }
                 }
                 // body
@@ -164,9 +180,9 @@ pub fn snake_mesh(
                 let turn = snake
                     .body
                     .turn_start
-                    .map(|(_, start_frame_frac)| {
-                        let max = 1. - start_frame_frac;
-                        let covered = frame_frac - start_frame_frac;
+                    .map(|(_, start_frame_fraction)| {
+                        let max = 1. - start_frame_fraction;
+                        let covered = frame_fraction - start_frame_fraction;
                         let linear = covered / max;
                         // apply easing
                         ezing::sine_inout(linear)
@@ -174,8 +190,8 @@ pub fn snake_mesh(
                     .unwrap_or(1.);
 
                 match segment.segment_type {
-                    SegmentType::BlackHole => {
-                        black_holes.push((segment_description, subsegments_per_segment, turn))
+                    SegmentType::BlackHole { .. } => {
+                        black_holes.push((segment_description, subsegments_per_segment, turn, frame_fraction))
                     }
                     _ => other_heads.push((segment_description, subsegments_per_segment, turn)),
                 }
@@ -189,13 +205,25 @@ pub fn snake_mesh(
 
     // Draw black holes and crashed heads
     let black_hole_color = Color::from_rgb(1, 36, 92);
-    for (segment_description, subsegments_per_segment, turn) in black_holes {
-        build_hexagon_at(
-            segment_description.destination,
-            cell_dim,
-            black_hole_color,
-            &mut builder,
-        )?;
+    for (mut segment_description, subsegments_per_segment, turn, frame_fraction) in black_holes {
+        if segment_description.fraction.start == segment_description.fraction.end {
+            // snake has died, animate black hole out
+            assert!(frame_fraction >= 0.5, "{} < 0.5", frame_fraction);
+            let animation_fraction = frame_fraction - 0.5;
+            build_hexagon_at(
+                segment_description.destination + cell_dim.center() * animation_fraction,
+                cell_dim * (1. - animation_fraction),
+                black_hole_color,
+                &mut builder,
+            )?;
+        } else {
+            build_hexagon_at(
+                segment_description.destination,
+                cell_dim,
+                black_hole_color,
+                &mut builder,
+            )?;
+        }
         stats.polygons += 1;
         stats.polygons += segment_description.build(&mut builder, subsegments_per_segment, turn)?;
     }
