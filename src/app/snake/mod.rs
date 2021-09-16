@@ -56,7 +56,7 @@ pub enum SegmentType {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Segment {
-    pub typ: SegmentType,
+    pub segment_type: SegmentType,
     pub pos: HexPoint,
     /// Direction from this segment to the next one (towards the tail)
     pub coming_from: Dir,
@@ -159,7 +159,7 @@ impl Snake {
         } = (*seed).clone();
 
         let head = Segment {
-            typ: SegmentType::Normal,
+            segment_type: SegmentType::Normal,
             pos,
             coming_from: -dir,
             teleported: None,
@@ -271,9 +271,9 @@ impl Snake {
         frame_stamp: FrameStamp,
     ) {
         let last_idx = self.len() - 1;
-        if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].typ {
+        if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].segment_type {
             if *food_left == 0 {
-                self.body.cells[last_idx].typ = SegmentType::Normal;
+                self.body.cells[last_idx].segment_type = SegmentType::Normal;
             } else {
                 self.body.grow += 1;
                 *food_left -= 1;
@@ -288,7 +288,7 @@ impl Snake {
                 // create new head for snake
                 let dir = self.dir();
                 let new_head = Segment {
-                    typ: SegmentType::Normal,
+                    segment_type: SegmentType::Normal,
                     // this gets very interesting if you move 2 cells each time
                     // (porous snake)
                     pos: self.head().pos.wrapping_translate(dir, 1, board_dim),
@@ -326,14 +326,14 @@ impl Snake {
     pub fn crash(&mut self) {
         if !matches!(self.state, State::Crashed) {
             self.state = State::Crashed;
-            self.body.cells[0].typ = SegmentType::Crashed;
+            self.body.cells[0].segment_type = SegmentType::Crashed;
         }
     }
 
     pub fn die(&mut self) {
         if !matches!(self.state, State::Dying) {
             self.state = State::Dying;
-            self.body.cells[0].typ = SegmentType::BlackHole;
+            self.body.cells[0].segment_type = SegmentType::BlackHole;
         }
     }
 }

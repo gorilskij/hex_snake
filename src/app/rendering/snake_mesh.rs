@@ -127,7 +127,7 @@ pub fn snake_mesh(
                 // TODO: diagnose this bug
                 panic!(
                     "180° turn ({:?} -> {:?}) at idx {}, segment_type: {:?}",
-                    coming_from, going_to, segment_idx, segment.typ
+                    coming_from, going_to, segment_idx, segment.segment_type
                 );
             }
 
@@ -138,7 +138,7 @@ pub fn snake_mesh(
                 0 => SegmentFraction::appearing(frame_frac),
                 // tail
                 i if i == snake.len() - 1 && snake.body.grow == 0 => {
-                    if let SegmentType::Eaten { original_food, food_left } = segment.typ {
+                    if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
                         let frac = ((original_food - food_left) as f32 + frame_frac)
                             / (original_food + 1) as f32;
                         SegmentFraction::disappearing(frac)
@@ -173,7 +173,7 @@ pub fn snake_mesh(
                     })
                     .unwrap_or(1.);
 
-                match segment.typ {
+                match segment.segment_type {
                     SegmentType::BlackHole => {
                         black_holes.push((segment_description, subsegments_per_segment, turn))
                     }

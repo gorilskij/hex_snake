@@ -1,12 +1,12 @@
-use ggez::{Context, GameResult};
-use ggez::event::EventHandler;
+use ggez::{Context, GameResult, GameError};
+use ggez::event::{EventHandler, MouseButton, KeyMods, Button, GamepadId, Axis, ErrorOrigin, KeyCode};
 use ggez::graphics::{self, Color, DrawParam};
 use rand::prelude::*;
 
 use crate::app;
 use crate::app::apple::spawn::{spawn_apples, SpawnPolicy};
-use crate::app::collisions::{find_collisions, handle_collisions};
-use crate::app::control::Control;
+use crate::app::snake_management::{find_collisions, handle_collisions, advance_snakes};
+use crate::app::control::{self, Control};
 use crate::app::prefs::Prefs;
 use crate::app::rendering;
 use crate::app::apple::Apple;
@@ -76,7 +76,7 @@ impl DebugScenario {
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Crash,
                 eat_other: hash_map! {},
-                default: EatBehavior::Crash,
+                default: EatBehavior::Die,
             },
             palette: snake::PaletteTemplate::Solid { color: Color::RED, eaten: Color::WHITE },
             controller: ControllerTemplate::Programmed(vec![]),
@@ -85,8 +85,8 @@ impl DebugScenario {
         let snake1 = Snake::from_seed(&seed1, snake1_start_pos, snake1_start_dir, snake1_start_grow);
         let snake2 = Snake::from_seed(&seed2, snake2_start_pos, snake2_start_dir, snake2_start_grow);
 
-        Self {
-            control: Control::new(7.),
+        let mut this = Self {
+            control: Control::new(3.),
 
             cell_dim,
 
@@ -105,7 +105,9 @@ impl DebugScenario {
             snakes: vec![snake1, snake2],
 
             rng: thread_rng(),
-        }
+        };
+        this.control.pause();
+        this
     }
 
     fn spawn_apples(&mut self) {
@@ -114,24 +116,19 @@ impl DebugScenario {
     }
 
     fn advance_snakes(&mut self, frame_stamp: FrameStamp) {
-        for snake_index in 0..self.snakes.len() {
-            let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, snake_index);
-            snake.advance(other_snakes, &self.apples, self.board_dim, frame_stamp);
-        }
+        advance_snakes(&mut self.snakes, &self.apples, self.board_dim, self.control.frame_stamp());
 
         let collisions = find_collisions(&self.snakes, &self.apples);
         let (spawn_snakes, remove_apples, game_over) =
             handle_collisions(&collisions, &mut self.snakes, &self.apples);
 
-        if game_over {
-            self.control.game_over();
-        }
-
-        assert!(spawn_snakes.is_empty(), "unimplemented");
+        if game_over { self.control.game_over(); }
 
         for apple_index in remove_apples.into_iter().rev() {
             self.apples.remove(apple_index);
         }
+
+        assert!(spawn_snakes.is_empty(), "unimplemented");
 
         self.spawn_apples();
     }
@@ -190,5 +187,15 @@ impl EventHandler<ggez::GameError> for DebugScenario {
         }
 
         graphics::present(ctx)
+    }
+
+    fn key_down_event(&mut self, _ctx: &mut Context, keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {
+        if keycode == KeyCode::Space {
+            match self.control.state() {
+                control::State::Playing => { self.control.pause() }
+                control::State::Paused => { self.control.play() }
+                control::State::GameOver => {}
+            }
+        }
     }
 }

@@ -10,7 +10,7 @@ use rand::prelude::*;
 
 use crate::{
     app::{
-        collisions::{find_collisions, handle_collisions},
+        snake_management::{find_collisions, handle_collisions},
         palette::Palette,
         snake::{
             self,
@@ -22,7 +22,7 @@ use crate::{
 use crate::app::{rendering, stats::Stats, utils::Food};
 use crate::app::apple::{self, Apple};
 use crate::app::apple::spawn::{ScheduledSpawn, spawn_apples, SpawnPolicy};
-use crate::app::collisions::spawn_snakes;
+use crate::app::snake_management::{spawn_snakes, advance_snakes};
 use crate::app::control::{self, Control};
 use crate::app::message::{Message, MessageID};
 use crate::app::prefs::Prefs;
@@ -63,6 +63,7 @@ pub struct Game {
     cached_snake_mesh: Option<Mesh>,
     cached_apple_mesh: Option<Mesh>,
 
+    // TODO: move this mechanism to Control
     /// Consider the draw cache invalid for the
     /// next n frames, forces a redraw even if
     /// nothing changed, this is necessary to
@@ -219,41 +220,7 @@ impl Game {
     }
 
     fn advance_snakes(&mut self) {
-        let mut remove_snakes = vec![];
-        for snake_idx in 0..self.snakes.len() {
-            // set snake to die if it ran out of life
-            match &mut self.snakes[snake_idx].snake_type {
-                snake::Type::Competitor { life: Some(life) }
-                | snake::Type::Killer { life: Some(life) } => {
-                    if *life == 0 {
-                        self.snakes[snake_idx].die();
-                    } else {
-                        *life -= 1;
-                    }
-                }
-                _ => (),
-            }
-
-            let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, snake_idx);
-
-            // advance the snake
-            snake.advance(
-                other_snakes,
-                &self.apples,
-                self.board_dim,
-                self.control.frame_stamp(),
-            );
-
-            // remove snake if it ran out of body
-            if snake.len() == 0 {
-                remove_snakes.push(snake_idx);
-            }
-        }
-
-        remove_snakes.sort_unstable();
-        for snake_idx in remove_snakes.into_iter().rev() {
-            self.snakes.remove(snake_idx);
-        }
+        advance_snakes(&mut self.snakes, &self.apples, self.board_dim, self.control.frame_stamp());
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
@@ -283,11 +250,11 @@ impl Game {
             self.control.game_over()
         }
 
-        spawn_snakes(seeds, &mut self.snakes, &self.apples, self.board_dim, &mut self.rng);
-
         for apple_index in remove_apples.into_iter().rev() {
             self.apples.remove(apple_index);
         }
+
+        spawn_snakes(seeds, &mut self.snakes, &self.apples, self.board_dim, &mut self.rng);
     }
 }
 

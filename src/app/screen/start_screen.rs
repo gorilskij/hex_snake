@@ -17,7 +17,7 @@ use crate::{
     app::{
         apple::{self, Apple
         },
-        collisions::{find_collisions, handle_collisions},
+        snake_management::{find_collisions, handle_collisions},
         Screen,
         snake,
         snake::{

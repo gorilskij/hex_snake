@@ -11,22 +11,18 @@ use itertools::Itertools;
 
 use apple::spawn::SpawnPolicy;
 pub use palette::Palette;
-use screen::{Game, StartScreen};
+use screen::{Screen, Game, StartScreen, DebugScenario};
 use snake::{EatMechanics, Seed};
-
+use keyboard_control::ControlSetup;
+use snake::{controller::ControllerTemplate, EatBehavior};
 use crate::{
-    app::{
-        keyboard_control::ControlSetup,
-        snake::{controller::ControllerTemplate, EatBehavior, Type},
-    },
     basic::CellDim,
 };
-use crate::app::screen::{DebugScenario, Screen};
 
 pub mod keyboard_control;
 mod palette;
 mod snake;
-mod collisions;
+mod snake_management;
 #[macro_use]
 mod apple;
 mod screen;
@@ -88,7 +84,7 @@ impl App {
         let seeds: Vec<_> = players
             .into_iter()
             .map(|cs| Seed {
-                snake_type: Type::Player,
+                snake_type: snake::Type::Player,
                 eat_mechanics: EatMechanics {
                     eat_self: EatBehavior::Cut,
                     eat_other: hash_map! {},
@@ -104,16 +100,16 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
-            // screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
+            screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
             // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            screen: Screen::Game(Game::new(
-                cell_dim,
-                7.,
-                seeds,
-                Palette::dark(),
-                SpawnPolicy::Random { apple_count: 5 },
-                window_mode,
-            )),
+            // screen: Screen::Game(Game::new(
+            //     cell_dim,
+            //     7.,
+            //     seeds,
+            //     Palette::dark(),
+            //     SpawnPolicy::Random { apple_count: 5 },
+            //     window_mode,
+            // )),
             window_mode,
             window_setup,
         }

@@ -1,11 +1,15 @@
+//! Functions that are common to all [`Screen`]s for
+//! collision detection and snake management
+
 use crate::app::{
     apple::{self, Apple},
     snake::{self, EatBehavior, SegmentType, Snake, State},
 };
 use crate::app::utils::{get_occupied_cells, random_free_spot};
-use crate::basic::{HexDim, Dir};
+use crate::basic::{HexDim, Dir, FrameStamp};
 use crate::app::snake::Seed;
 use rand::Rng;
+use crate::app::snake::utils::split_snakes_mut;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -92,12 +96,18 @@ pub fn find_collisions(snakes: &[Snake], apples: &[Apple]) -> Vec<Collision> {
     collisions
 }
 
-/// The third return value indicates whether it's game over (whether a snake has crashed)
-pub fn handle_collisions<'a>(
+/// Returns `(spawn_snakes, remove_apples, game_over)` where
+///  - `spawn_snakes` describes the new snakes to spawn
+/// (competitors, killers, etc.)
+///  - `remove_apples` are the indices of apples to be removed
+/// (e.g. because they've been eaten)
+///  - `game_over` tells whether a snake crashed and ended the game
+#[must_use]
+pub fn handle_collisions(
     collisions: &[Collision],
     snakes: &mut [Snake],
-    apples: &'a [Apple],
-) -> (Vec<&'a snake::Seed>, Vec<usize>, bool) {
+    apples: &[Apple],
+) -> (Vec<snake::Seed>, Vec<usize>, bool) {
     let mut spawn_snakes = vec![];
     let mut remove_apples = vec![];
     let mut game_over = false;
@@ -107,12 +117,12 @@ pub fn handle_collisions<'a>(
                 remove_apples.push(apple_index);
                 match &apples[apple_index].apple_type {
                     apple::Type::Normal(food) => {
-                        snakes[snake_index].body.cells[0].typ = SegmentType::Eaten {
+                        snakes[snake_index].body.cells[0].segment_type = SegmentType::Eaten {
                             original_food: *food,
                             food_left: *food,
                         }
                     }
-                    apple::Type::SpawnSnake(seed) => spawn_snakes.push(seed),
+                    apple::Type::SpawnSnake(seed) => spawn_snakes.push(seed.clone()),
                 }
             }
             Collision::Snake {
@@ -158,8 +168,7 @@ pub fn handle_collisions<'a>(
     (spawn_snakes, remove_apples, game_over)
 }
 
-// this is here because it's a result of collision handling
-pub fn spawn_snakes(seeds: Vec<&Seed>, snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexDim, rng: &mut impl Rng) {
+pub fn spawn_snakes(seeds: Vec<Seed>, snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexDim, rng: &mut impl Rng) {
     for seed in seeds {
         // avoid spawning too close to player snake heads
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
@@ -182,4 +191,42 @@ pub fn spawn_snakes(seeds: Vec<&Seed>, snakes: &mut Vec<Snake>, apples: &[Apple]
             eprintln!("warning: failed to spawn snake, no free spaces left")
         }
     }
+}
+
+/// Returns the indices of snakes to be deleted (in reverse order so they
+/// can be deleted straight away)
+pub fn advance_snakes(snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexDim, frame_stamp: FrameStamp) {
+    let mut remove_snakes = vec![];
+    for snake_idx in 0..snakes.len() {
+        // set snake to die if it ran out of life
+        match &mut snakes[snake_idx].snake_type {
+            snake::Type::Competitor { life: Some(life) }
+            | snake::Type::Killer { life: Some(life) } => {
+                if *life == 0 {
+                    snakes[snake_idx].die();
+                } else {
+                    *life -= 1;
+                }
+            }
+            _ => (),
+        }
+
+        let (snake, other_snakes) = split_snakes_mut(snakes, snake_idx);
+
+        // advance the snake
+        snake.advance(
+            other_snakes,
+            apples,
+            board_dim,
+            frame_stamp,
+        );
+
+        // remove snake if it ran out of body
+        if snake.len() == 0 {
+            remove_snakes.push(snake_idx);
+        }
+    }
+
+    remove_snakes.sort_unstable();
+    remove_snakes.into_iter().rev().for_each(|i| { snakes.remove(i); });
 }

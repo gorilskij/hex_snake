@@ -5,6 +5,9 @@ use std::{
 };
 use crate::basic::FrameStamp;
 
+/// Stores an instant along with the number of frames it represents
+struct NFrameInstant(usize, Instant);
+
 /// Objective measurement of framerate based on periodic calls
 /// to [`FpsCounter::register_frame`], completely detached from any
 /// framerate-regulation mechanism
@@ -16,8 +19,8 @@ struct FpsCounter {
     /// Counts down from `step` to 0 to tell when the next
     /// `Instant` should be stored
     n: usize,
-    /// A queue of `Instant`s
-    buffer: VecDeque<Instant>,
+    /// A queue of `NFrameInstant`s
+    buffer: VecDeque<NFrameInstant>,
 }
 
 impl FpsCounter {
@@ -45,16 +48,23 @@ impl FpsCounter {
         self.reset();
     }
 
-    /// Called at every frame
-    fn register_frame(&mut self) {
-        if self.n == 0 {
+    fn register_frames(&mut self, num_frames: usize) {
+        if self.n < num_frames {
             if self.buffer.len() >= Self::LEN {
                 self.buffer.pop_front();
             }
-            self.buffer.push_back(Instant::now());
+            self.buffer.push_back(NFrameInstant(self.step - self.n + num_frames - 1, Instant::now()));
             self.n = self.step - 1;
+
+        // if self.n == 0 {
+        //     if self.buffer.len() >= Self::LEN {
+        //         self.buffer.pop_front();
+        //     }
+        //     self.buffer.push_back(NFrameInstant(1, Instant::now()));
+        //     self.n = self.step - 1;
         } else {
-            self.n -= 1;
+            // self.n -= 1;
+            self.n -= num_frames;
         }
     }
 
@@ -67,8 +77,11 @@ impl FpsCounter {
     /// average frame duration
     fn fps(&self) -> f64 {
         if self.buffer.len() >= 2 {
-            let total_buffer_duration = (self.buffer[self.buffer.len() - 1] - self.buffer[0]).as_secs_f64();
-            let num_frames = ((self.buffer.len() - 1) * self.step) as f64;
+            let first_frame = self.buffer[0].1;
+            let last_frame = self.buffer[self.buffer.len() - 1].1;
+            let total_buffer_duration = (last_frame - first_frame).as_secs_f64();
+            // let num_frames = ((self.buffer.len() - 1) * self.step) as f64;
+            let num_frames = self.buffer.iter().skip(1).map(|nfi| nfi.0).sum::<usize>() as f64;
             num_frames / total_buffer_duration
         } else {
             0.
@@ -200,9 +213,10 @@ impl Control {
                     self.missed_updates = Some(missed_updates - 1);
 
                     // TODO: O(1)ize
-                    for _ in 0..missed_updates {
-                        self.measured_game_fps.register_frame();
-                    }
+                    // for _ in 0..missed_updates {
+                    //     self.measured_game_fps.register_frames();
+                    // }
+                    self.measured_game_fps.register_frames(missed_updates);
 
                     true
                 } else {
@@ -214,7 +228,7 @@ impl Control {
 
     // call in draw()
     pub fn graphics_frame(&mut self) {
-        self.measured_graphics_fps.register_frame();
+        self.measured_graphics_fps.register_frames(1);
         self.graphics_frame_num += 1;
     }
 
@@ -242,10 +256,6 @@ impl Control {
         self.frozen_frame_fraction = Some(self.frame_fraction());
     }
 
-    pub fn graphics_frame_num(&self) -> usize {
-        self.graphics_frame_num
-    }
-
     // fraction of the current game frame that has elapsed
     pub fn frame_fraction(&self) -> f32 {
         match self.frozen_frame_fraction {
@@ -255,6 +265,7 @@ impl Control {
                     / self.game_frame_duration.as_secs_f32()
                     + self.remainder as f32;
                 if frac > 1. {
+                    eprintln!("warning: frame fraction > 1 ({})", frac);
                     1.
                 } else {
                     frac

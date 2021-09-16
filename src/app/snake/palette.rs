@@ -323,7 +323,7 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
 /// and growing
 fn correct_len(len: usize, body: &Body, frame_frac: f64) -> f64 {
     let len = len as f64;
-    if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].typ {
+    if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].segment_type {
         // Correct for eaten segment at the tail and
         //  fractional segment at the head (the eaten
         //  segment reduces in size more slowly than
@@ -359,7 +359,7 @@ impl Palette for Solid {
         let mut styles = Vec::with_capacity(body.len());
 
         for segment in body.iter() {
-            let color = match segment.typ {
+            let color = match segment.segment_type {
                 Normal | BlackHole => self.color,
                 Eaten { .. } => self.eaten,
                 Crashed => *DEFAULT_CRASHED_COLOR,
@@ -385,7 +385,7 @@ impl Palette for RGBGradient {
         let len = and_update_max_len(&mut self.max_len, body.len());
         let len = correct_len(len, body, frame_frac as f64) as f32;
         for (i, seg) in body.iter().enumerate() {
-            let color = if seg.typ == Crashed {
+            let color = if seg.segment_type == Crashed {
                 *DEFAULT_CRASHED_COLOR
             } else {
                 let r = (i + body.missing_front) as f32 + frame_frac;
@@ -398,7 +398,7 @@ impl Palette for RGBGradient {
                     a: 1.,
                 };
 
-                match seg.typ {
+                match seg.segment_type {
                     Normal | BlackHole => normal_color,
                     Eaten { .. } => self.eaten.paint_segment(&normal_color),
                     Crashed => *DEFAULT_CRASHED_COLOR,
@@ -426,14 +426,14 @@ impl Palette for HSLGradient {
         let len = and_update_max_len(&mut self.max_len, body.len());
         let len = correct_len(len, body, frame_frac as f64);
         for (i, seg) in body.iter().enumerate() {
-            if seg.typ == Crashed {
+            if seg.segment_type == Crashed {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
             } else {
                 let r = (i + body.missing_front) as f64 + frame_frac as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
                 let end_hue =
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
-                match seg.typ {
+                match seg.segment_type {
                     Normal | BlackHole => {
                         styles.push(SegmentStyle::HSLGradient {
                             start_hue,
@@ -486,7 +486,7 @@ impl Palette for OkLabGradient {
             let r = (i + body.missing_front) as f64 + frame_frac;
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
-            match seg.typ {
+            match seg.segment_type {
                 Normal | BlackHole => {
                     styles.push(SegmentStyle::OkLabGradient {
                         start_hue,
@@ -529,7 +529,7 @@ impl Palette for AlternatingFixed {
         }
         let expected_mod = if self.iteration { 0 } else { 1 };
         for (i, seg) in body.iter().enumerate() {
-            let color = match seg.typ {
+            let color = match seg.segment_type {
                 Normal | BlackHole => {
                     if i % 2 == expected_mod {
                         self.color1
@@ -584,7 +584,7 @@ impl Palette for Alternating {
             // How far along the snake we currently are (in units of segments)
             let r = (i + body.missing_front) as f32 + frame_frac;
 
-            let _color = match seg.typ {
+            let _color = match seg.segment_type {
                 Normal | BlackHole => {
                     // Check whether there is a minimum or maximum within this segment
                     use std::f32::consts::PI;
