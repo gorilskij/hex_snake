@@ -23,6 +23,8 @@ use crate::{
     },
     basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
 };
+use crate::app::screen::Environment;
+use crate::app::snake::Seed;
 
 pub struct DebugScenario {
     control: Control,
@@ -84,8 +86,8 @@ impl DebugScenario {
             controller: Template::Programmed(vec![]),
         };
 
-        let snake1 = Snake::from_seed(&seed1);
-        let snake2 = Snake::from_seed(&seed2);
+        let snake1 = Snake::from(&seed1);
+        let snake2 = Snake::from(&seed2);
 
         let mut this = Self {
             control: Control::new(3.),
@@ -125,16 +127,11 @@ impl DebugScenario {
     }
 
     fn advance_snakes(&mut self, _frame_stamp: FrameStamp) {
-        advance_snakes(
-            &mut self.snakes,
-            &self.apples,
-            self.board_dim,
-            self.control.frame_stamp(),
-        );
+        advance_snakes(self);
 
-        let collisions = find_collisions(&self.snakes, &self.apples);
+        let collisions = find_collisions(self);
         let (spawn_snakes, remove_apples, game_over) =
-            handle_collisions(&collisions, &mut self.snakes, &self.apples);
+            handle_collisions(self, &collisions);
 
         if game_over {
             self.control.game_over();
@@ -220,5 +217,39 @@ impl EventHandler<ggez::GameError> for DebugScenario {
                 control::State::GameOver => {}
             }
         }
+    }
+}
+
+impl Environment for DebugScenario {
+    fn snakes(&self) -> &[Snake] {
+        &self.snakes
+    }
+
+    fn apples(&self) -> &[Apple] {
+        &self.apples
+    }
+
+    fn snakes_apples_mut(&mut self) -> (&mut [Snake], &mut [Apple]) {
+        (&mut self.snakes, &mut self.apples)
+    }
+
+    fn add_snake(&mut self, seed: &Seed) {
+        self.snakes.push(Snake::from(seed))
+    }
+
+    fn remove_snake(&mut self, index: usize) -> Snake {
+        self.snakes.remove(index)
+    }
+
+    fn board_dim(&self) -> HexDim {
+        self.board_dim
+    }
+
+    fn frame_stamp(&self) -> FrameStamp {
+        self.control.frame_stamp()
+    }
+
+    fn rng(&mut self) -> &mut ThreadRng {
+        &mut self.rng
     }
 }

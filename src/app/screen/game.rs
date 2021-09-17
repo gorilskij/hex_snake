@@ -33,6 +33,9 @@ use crate::{
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
     row::ROw,
 };
+use crate::app::screen::Environment;
+use crate::basic::FrameStamp;
+use crate::app::snake::Seed;
 
 pub struct Game {
     control: Control,
@@ -199,7 +202,7 @@ impl Game {
             match seed.snake_type {
                 snake::Type::Simulated => {
                     // expected to have initial position, direction, and length
-                    self.snakes.push(Snake::from_seed(&seed));
+                    self.snakes.push(Snake::from(&seed));
                 }
                 _ => {
                     seed.pos = Some(HexPoint {
@@ -208,7 +211,7 @@ impl Game {
                     });
                     seed.dir = Some(unpositioned_dir);
                     seed.len = Some(10);
-                    self.snakes.push(Snake::from_seed(&seed));
+                    self.snakes.push(Snake::from(&seed));
 
                     // alternate
                     unpositioned_dir = -unpositioned_dir;
@@ -223,12 +226,7 @@ impl Game {
     }
 
     fn advance_snakes(&mut self) {
-        advance_snakes(
-            &mut self.snakes,
-            &self.apples,
-            self.board_dim,
-            self.control.frame_stamp(),
-        );
+        advance_snakes(self);
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
@@ -251,9 +249,9 @@ impl Game {
             return;
         }
 
-        let collisions = find_collisions(&self.snakes, &self.apples);
+        let collisions = find_collisions(self);
         let (seeds, remove_apples, game_over) =
-            handle_collisions(&collisions, &mut self.snakes, &self.apples);
+            handle_collisions(self, &collisions);
 
         if game_over {
             self.control.game_over()
@@ -263,13 +261,7 @@ impl Game {
             self.apples.remove(apple_index);
         }
 
-        spawn_snakes(
-            seeds,
-            &mut self.snakes,
-            &self.apples,
-            self.board_dim,
-            &mut self.rng,
-        );
+        spawn_snakes(self, seeds);
     }
 }
 
@@ -737,5 +729,39 @@ impl EventHandler<ggez::GameError> for Game {
         self.update_dim();
         let HexDim { h, v } = self.board_dim;
         self.display_notification(format!("{}x{}", h, v));
+    }
+}
+
+impl Environment for Game {
+    fn snakes(&self) -> &[Snake] {
+        &self.snakes
+    }
+
+    fn apples(&self) -> &[Apple] {
+        &self.apples
+    }
+
+    fn snakes_apples_mut(&mut self) -> (&mut [Snake], &mut [Apple]) {
+        (&mut self.snakes, &mut self.apples)
+    }
+
+    fn add_snake(&mut self, seed: &Seed) {
+        self.snakes.push(Snake::from(seed))
+    }
+
+    fn remove_snake(&mut self, index: usize) -> Snake {
+        self.snakes.remove(index)
+    }
+
+    fn board_dim(&self) -> HexDim {
+        self.board_dim
+    }
+
+    fn frame_stamp(&self) -> FrameStamp {
+        self.control.frame_stamp()
+    }
+
+    fn rng(&mut self) -> &mut ThreadRng {
+        &mut self.rng
     }
 }

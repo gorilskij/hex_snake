@@ -139,8 +139,8 @@ pub struct Seed {
     pub len: Option<usize>,
 }
 
-impl Snake {
-    pub fn from_seed(seed: &Seed) -> Self {
+impl From<&Seed> for Snake {
+    fn from(seed: &Seed) -> Self {
         let Seed {
             snake_type,
             eat_mechanics,
@@ -184,7 +184,9 @@ impl Snake {
             palette: palette.into(),
         }
     }
+}
 
+impl Snake {
     pub fn len(&self) -> usize {
         self.body.cells.len()
     }

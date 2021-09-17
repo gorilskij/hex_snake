@@ -10,6 +10,7 @@ use crate::{
     basic::{Dir, FrameStamp, HexDim},
 };
 use rand::Rng;
+use crate::app::screen::Environment;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -30,7 +31,10 @@ pub enum Collision {
     },
 }
 
-pub fn find_collisions(snakes: &[Snake], apples: &[Apple]) -> Vec<Collision> {
+pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
+    let snakes = env.snakes();
+    let apples = env.apples();
+
     let mut collisions = vec![];
 
     // check whether snake1 collided with an apple or with snake2
@@ -103,11 +107,9 @@ pub fn find_collisions(snakes: &[Snake], apples: &[Apple]) -> Vec<Collision> {
 /// (e.g. because they've been eaten)
 ///  - `game_over` tells whether a snake crashed and ended the game
 #[must_use]
-pub fn handle_collisions(
-    collisions: &[Collision],
-    snakes: &mut [Snake],
-    apples: &[Apple],
-) -> (Vec<snake::Seed>, Vec<usize>, bool) {
+pub fn handle_collisions<E: Environment>(env: &mut E, collisions: &[Collision]) -> (Vec<snake::Seed>, Vec<usize>, bool) {
+    let (snakes, apples) = env.snakes_apples_mut();
+
     let mut spawn_snakes = vec![];
     let mut remove_apples = vec![];
     let mut game_over = false;
@@ -168,19 +170,15 @@ pub fn handle_collisions(
     (spawn_snakes, remove_apples, game_over)
 }
 
-pub fn spawn_snakes(
-    seeds: Vec<Seed>,
-    snakes: &mut Vec<Snake>,
-    apples: &[Apple],
-    board_dim: HexDim,
-    rng: &mut impl Rng,
-) {
+pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {
+    let board_dim = env.board_dim();
+
     for mut seed in seeds {
         // avoid spawning too close to player snake heads
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
 
-        let mut occupied_cells = get_occupied_cells(snakes, apples);
-        for snake in snakes
+        let mut occupied_cells = get_occupied_cells(env.snakes(), env.apples());
+        for snake in env.snakes()
             .iter()
             .filter(|s| s.snake_type == snake::Type::Player)
         {
@@ -190,11 +188,12 @@ pub fn spawn_snakes(
         occupied_cells.sort_unstable();
         occupied_cells.dedup();
 
+        let rng = env.rng();
         if let Some(pos) = random_free_spot(&occupied_cells, board_dim, rng) {
             seed.pos = Some(pos);
             seed.dir = Some(Dir::random(rng));
             seed.len = Some(rng.gen_range(7, 15));
-            snakes.push(Snake::from_seed(&seed))
+            env.add_snake(&seed);
         } else {
             eprintln!("warning: failed to spawn snake, no free spaces left")
         }
@@ -203,12 +202,11 @@ pub fn spawn_snakes(
 
 /// Returns the indices of snakes to be deleted (in reverse order so they
 /// can be deleted straight away)
-pub fn advance_snakes(
-    snakes: &mut Vec<Snake>,
-    apples: &[Apple],
-    board_dim: HexDim,
-    frame_stamp: FrameStamp,
-) {
+pub fn advance_snakes<E: Environment>(env: &mut E) {
+    let board_dim = env.board_dim();
+    let frame_stamp = env.frame_stamp();
+    let (snakes, apples) = env.snakes_apples_mut();
+
     let mut remove_snakes = vec![];
     for snake_idx in 0..snakes.len() {
         // set snake to die if it ran out of life
@@ -237,6 +235,6 @@ pub fn advance_snakes(
 
     remove_snakes.sort_unstable();
     remove_snakes.into_iter().rev().for_each(|i| {
-        snakes.remove(i);
+        env.remove_snake(i);
     });
 }

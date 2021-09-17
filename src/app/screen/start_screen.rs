@@ -24,6 +24,9 @@ use crate::{
     },
     basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint},
 };
+use crate::app::screen::Environment;
+use std::rc::{Weak, Rc};
+use std::cell::RefCell;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -35,10 +38,12 @@ struct SnakeDemo {
     snake: Snake,
     palettes: Vec<snake::PaletteTemplate>,
     current_palette: usize,
+
+    control: Weak<RefCell<Control>>,
 }
 
 impl SnakeDemo {
-    fn new(location: HexPoint) -> Self {
+    fn new(location: HexPoint, control: Weak<RefCell<Control>>) -> Self {
         let board_dim = HexPoint { h: 11, v: 8 };
         let start_pos = HexPoint { h: 1, v: 4 };
         let start_dir = Dir::U;
@@ -85,9 +90,11 @@ impl SnakeDemo {
             board_dim,
             apples: vec![],
             apple_spawn_policy,
-            snake: Snake::from_seed(&seed),
+            snake: Snake::from(&seed),
             palettes,
             current_palette: 0,
+
+            control,
         }
     }
 }
@@ -118,9 +125,9 @@ impl SnakeDemo {
             frame_stamp,
         );
 
-        let collisions = find_collisions(slice::from_ref(&self.snake), &self.apples);
+        let collisions = find_collisions(self);
         let (spawn_snakes, remove_apples, game_over) =
-            handle_collisions(&collisions, slice::from_mut(&mut self.snake), &self.apples);
+            handle_collisions(self, &collisions);
 
         assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
         assert_eq!(game_over, false, "unexpected game over");
@@ -179,8 +186,43 @@ impl SnakeDemo {
     }
 }
 
+impl Environment for SnakeDemo {
+    fn snakes(&self) -> &[Snake] {
+        slice::from_ref(&self.snake)
+    }
+
+    fn apples(&self) -> &[Apple] {
+        &self.apples
+    }
+
+    fn snakes_apples_mut(&mut self) -> (&mut [Snake], &mut [Apple]) {
+        (slice::from_mut(&mut self.snake), &mut self.apples)
+    }
+
+    fn add_snake(&mut self, seed: &Seed) {
+        panic!("tried to add snake to SnakeDemo: {:?}", seed)
+    }
+
+    fn remove_snake(&mut self, index: usize) -> Snake {
+        panic!("tried to remove snake at index {} in SnakeDemo", index)
+    }
+
+
+    fn board_dim(&self) -> HexDim {
+        self.board_dim
+    }
+
+    fn frame_stamp(&self) -> FrameStamp {
+        self.control.upgrade().expect("Weak pointer dropped").borrow().frame_stamp()
+    }
+
+    fn rng(&mut self) -> &mut ThreadRng {
+        panic!("tried to get rng of SnakeDemo")
+    }
+}
+
 pub struct StartScreen {
-    control: Control,
+    control: Rc<RefCell<Control>>,
     cell_dim: CellDim,
 
     palettes: Vec<app::Palette>,
@@ -197,8 +239,12 @@ pub struct StartScreen {
 
 impl StartScreen {
     pub fn new(cell_dim: CellDim) -> Self {
+        let control = Rc::new(RefCell::new(Control::new(7.)));
+        let weak1 = Rc::downgrade(&control);
+        let weak2 = Rc::downgrade(&control);
+
         Self {
-            control: Control::new(7.),
+            control,
             cell_dim,
 
             palettes: vec![app::Palette::dark()],
@@ -207,8 +253,8 @@ impl StartScreen {
             prefs: Prefs::default().apple_food(2),
             stats: Default::default(),
 
-            player1_demo: SnakeDemo::new(HexPoint { h: 1, v: 5 }),
-            player2_demo: SnakeDemo::new(HexPoint { h: 15, v: 5 }),
+            player1_demo: SnakeDemo::new(HexPoint { h: 1, v: 5 }, weak1),
+            player2_demo: SnakeDemo::new(HexPoint { h: 15, v: 5 }, weak2),
 
             rng: thread_rng(),
         }
@@ -217,8 +263,8 @@ impl StartScreen {
 
 impl EventHandler<ggez::GameError> for StartScreen {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        while self.control.can_update() {
-            let frame_stamp = self.control.frame_stamp();
+        while self.control.borrow_mut().can_update() {
+            let frame_stamp = self.control.borrow().frame_stamp();
             self.player1_demo
                 .advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
             self.player2_demo
@@ -228,8 +274,8 @@ impl EventHandler<ggez::GameError> for StartScreen {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        self.control.graphics_frame();
-        let frame_stamp = self.control.frame_stamp();
+        self.control.borrow_mut().graphics_frame();
+        let frame_stamp = self.control.borrow().frame_stamp();
 
         graphics::clear(ctx, Color::BLACK);
 
