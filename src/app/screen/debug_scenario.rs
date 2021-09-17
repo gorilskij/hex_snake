@@ -11,7 +11,7 @@ use crate::app::prefs::Prefs;
 use crate::app::rendering;
 use crate::app::apple::Apple;
 use crate::app::snake::{self, EatBehavior, EatMechanics, Snake};
-use crate::app::snake::controller::ControllerTemplate;
+use crate::app::snake::controller::Template;
 use crate::app::snake::utils::split_snakes_mut;
 use crate::app::stats::Stats;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
@@ -42,48 +42,40 @@ pub struct DebugScenario {
 impl DebugScenario {
     /// A snake crashes into another snake's body
     pub fn collision1(cell_dim: CellDim) -> Self {
-        // snake2 crashes into snake1
-
-        let snake1_start_pos = HexPoint { h: 5, v: 7 };
-        let snake1_start_dir = Dir::U;
-        let snake1_start_grow = 5;
-
-        let snake2_start_pos = HexPoint { h: 8, v: 7 };
-        let snake2_start_dir = Dir::Ul;
-        let snake2_start_grow = 5;
+        // snake2 crashes into snake1 coming from the bottom-right
 
         let seed1 = snake::Seed {
-            snake_type: snake::Type::Simulated {
-                start_pos: snake1_start_pos,
-                start_dir: snake1_start_dir,
-                start_grow: snake1_start_grow,
-            },
+            pos: Some(HexPoint { h: 5, v: 7 }),
+            dir: Some(Dir::U),
+            len: Some(5),
+
+            snake_type: snake::Type::Simulated,
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Crash,
                 eat_other: hash_map! {},
                 default: EatBehavior::Crash,
             },
             palette: snake::PaletteTemplate::solid_white_red(),
-            controller: ControllerTemplate::Programmed(vec![]),
+            controller: Template::Programmed(vec![]),
         };
 
         let seed2 = snake::Seed {
-            snake_type: snake::Type::Simulated {
-                start_pos: snake2_start_pos,
-                start_dir: snake2_start_dir,
-                start_grow: snake2_start_grow,
-            },
+            pos: Some(HexPoint { h: 8, v: 7 }),
+            dir: Some(Dir::Ul),
+            len: Some(5),
+
+            snake_type: snake::Type::Simulated,
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Crash,
                 eat_other: hash_map! {},
                 default: EatBehavior::Die,
             },
             palette: snake::PaletteTemplate::Solid { color: Color::RED, eaten: Color::WHITE },
-            controller: ControllerTemplate::Programmed(vec![]),
+            controller: Template::Programmed(vec![]),
         };
 
-        let snake1 = Snake::from_seed(&seed1, snake1_start_pos, snake1_start_dir, snake1_start_grow);
-        let snake2 = Snake::from_seed(&seed2, snake2_start_pos, snake2_start_dir, snake2_start_grow);
+        let snake1 = Snake::from_seed(&seed1);
+        let snake2 = Snake::from_seed(&seed2);
 
         let mut this = Self {
             control: Control::new(3.),

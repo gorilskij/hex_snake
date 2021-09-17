@@ -4,7 +4,7 @@ use crate::app::apple::{self, Apple};
 use crate::app::snake::{Snake, EatBehavior, EatMechanics, Seed};
 use crate::app::screen::Prefs;
 use crate::app::{snake};
-use crate::app::snake::controller::ControllerTemplate;
+use crate::app::snake::controller::Template;
 use crate::app::utils::{get_occupied_cells, random_free_spot};
 
 #[allow(unused_macros)]
@@ -58,14 +58,20 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 snake_type: snake::Type::Competitor { life: Some(200) },
                 eat_mechanics: EatMechanics::always(EatBehavior::Die),
                 palette: snake::PaletteTemplate::pastel_rainbow(true),
-                controller: ControllerTemplate::AStar,
+                controller: Template::AStar,
+                pos: None,
+                dir: None,
+                len: None
             })
         } else if rand < prefs.prob_spawn_competitor + prefs.prob_spawn_killer {
             apple::Type::SpawnSnake(Seed {
                 snake_type: snake::Type::Killer { life: Some(200) },
                 eat_mechanics: EatMechanics::always(EatBehavior::Die),
                 palette: snake::PaletteTemplate::dark_blue_to_red(false),
-                controller: ControllerTemplate::Killer,
+                controller: Template::Killer,
+                pos: None,
+                dir: None,
+                len: None
             })
         } else {
             apple::Type::Normal(prefs.apple_food)

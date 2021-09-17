@@ -14,7 +14,7 @@ pub enum Dir12 {
     Single(Dir),
     /// A direction between the first and second `Dir`,
     /// the two `Dir`s must be in clockwise order including
-    /// `Combined(UL, U)`, this variant shouldn't be
+    /// `Combined(Ul, U)`, this variant shouldn't be
     /// constructed manually
     Combined(Dir, Dir),
 }

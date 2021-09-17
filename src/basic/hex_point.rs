@@ -235,8 +235,8 @@ impl HexPoint {
             while !board_dim.contains(self) {
                 // let d2 = match axis {
                 //     UD => if self.v < 0 { U } else { D },
-                //     ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
-                //     URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
+                //     UlDr => if self.v < 0 || self.h < 0 { Ur } else { Dr },
+                //     UrDl => if self.v < 0 || self.h >= board_dim.h { Ur } else { Dl },
                 // };
                 // assert_eq!(dir, d2);
 

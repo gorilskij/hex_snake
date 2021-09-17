@@ -243,9 +243,9 @@ impl SegmentStyle {
 }
 
 pub trait Palette {
-    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle>;
+    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle>;
     // TODO: refactor as
-    //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_frac: f32) -> Color;
+    //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_fraction: f32) -> Color;
     //  this avoids unnecessary work for hex palette and is called exactly as many times as needed
 }
 
@@ -321,7 +321,7 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
 /// Correct an integer snake length to an f64 length
 /// that accounts for fractional segments, eaten segments
 /// and growing
-fn correct_len(len: usize, body: &Body, frame_frac: f64) -> f64 {
+fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
     let len = len as f64;
     if let SegmentType::Eaten { original_food, food_left } = body[body.len() - 1].segment_type {
         // Correct for eaten segment at the tail and
@@ -332,14 +332,14 @@ fn correct_len(len: usize, body: &Body, frame_frac: f64) -> f64 {
         // The actual visual length of the eaten segment
         //  at the tail of the snake
         let eaten_segment_frac =
-            (food_left as f64 + 1. - frame_frac as f64) / (original_food + 1) as f64;
+            (food_left as f64 + 1. - frame_fraction as f64) / (original_food + 1) as f64;
 
-        len - 1. + eaten_segment_frac + frame_frac
+        len - 1. + eaten_segment_frac + frame_fraction
     } else if body.grow > 0 {
         // If growth is happening for a reason other
         //  than eating (such as at the beginning of
         //  the game), correct only for the head
-        len + frame_frac as f64
+        len + frame_fraction as f64
     } else {
         // If the snake isn't growing, the head and
         //  tail corrections cancel out
@@ -355,7 +355,7 @@ pub struct Solid {
 }
 
 impl Palette for Solid {
-    fn segment_styles(&mut self, body: &Body, _frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, _frame_fraction: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         for segment in body.iter() {
@@ -379,16 +379,16 @@ pub struct RGBGradient {
 }
 
 impl Palette for RGBGradient {
-    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
-        let len = correct_len(len, body, frame_frac as f64) as f32;
+        let len = correct_len(len, body, frame_fraction as f64) as f32;
         for (i, seg) in body.iter().enumerate() {
             let color = if seg.segment_type == Crashed {
                 *DEFAULT_CRASHED_COLOR
             } else {
-                let r = (i + body.missing_front) as f32 + frame_frac;
+                let r = (i + body.missing_front) as f32 + frame_fraction;
                 let head_ratio = 1. - r / (len - 1.);
                 let tail_ratio = 1. - head_ratio;
                 let normal_color = Color {
@@ -420,16 +420,16 @@ pub struct HSLGradient {
 }
 
 impl Palette for HSLGradient {
-    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let len = and_update_max_len(&mut self.max_len, body.len());
-        let len = correct_len(len, body, frame_frac as f64);
+        let len = correct_len(len, body, frame_fraction as f64);
         for (i, seg) in body.iter().enumerate() {
             if seg.segment_type == Crashed {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
             } else {
-                let r = (i + body.missing_front) as f64 + frame_frac as f64;
+                let r = (i + body.missing_front) as f64 + frame_fraction as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
                 let end_hue =
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
@@ -476,14 +476,14 @@ pub struct OkLabGradient {
 }
 
 impl Palette for OkLabGradient {
-    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
-        let frame_frac = frame_frac as f64;
+        let frame_fraction = frame_fraction as f64;
         let len = and_update_max_len(&mut self.max_len, body.len());
-        let len = correct_len(len, body, frame_frac);
+        let len = correct_len(len, body, frame_fraction);
         for (i, seg) in body.iter().enumerate() {
-            let r = (i + body.missing_front) as f64 + frame_frac;
+            let r = (i + body.missing_front) as f64 + frame_fraction;
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
             match seg.segment_type {
@@ -519,7 +519,7 @@ pub struct AlternatingFixed {
 }
 
 impl Palette for AlternatingFixed {
-    fn segment_styles(&mut self, body: &Body, _frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, _frame_fraction: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         let head = Some(body[0].pos);
@@ -577,12 +577,12 @@ fn add_colors(color1: Color, color2: Color) -> Color {
 }
 
 impl Palette for Alternating {
-    fn segment_styles(&mut self, body: &Body, frame_frac: f32) -> Vec<SegmentStyle> {
+    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.len());
 
         for (i, seg) in body.iter().enumerate() {
             // How far along the snake we currently are (in units of segments)
-            let r = (i + body.missing_front) as f32 + frame_frac;
+            let r = (i + body.missing_front) as f32 + frame_fraction;
 
             let _color = match seg.segment_type {
                 Normal | BlackHole{..} => {

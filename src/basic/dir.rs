@@ -66,8 +66,8 @@ impl SubAssign<u8> for Dir {
     }
 }
 
-// U is the smallest, directions get bigger clockwise, UL is the largest
-// UL > U
+// U is the smallest, directions get bigger clockwise, Ul is the largest
+// Ul > U
 impl Ord for Dir {
     fn cmp(&self, other: &Self) -> Ordering {
         (*self as u8).cmp(&(*other as u8))

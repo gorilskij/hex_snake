@@ -169,7 +169,7 @@ pub fn handle_collisions(
 }
 
 pub fn spawn_snakes(seeds: Vec<Seed>, snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexDim, rng: &mut impl Rng) {
-    for seed in seeds {
+    for mut seed in seeds {
         // avoid spawning too close to player snake heads
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
 
@@ -185,8 +185,10 @@ pub fn spawn_snakes(seeds: Vec<Seed>, snakes: &mut Vec<Snake>, apples: &[Apple],
         occupied_cells.dedup();
 
         if let Some(pos) = random_free_spot(&occupied_cells, board_dim, rng) {
-            snakes
-                .push(Snake::from_seed(&seed, pos, Dir::random(rng), 10))
+            seed.pos = Some(pos);
+            seed.dir = Some(Dir::random(rng));
+            seed.len = Some(rng.gen_range(7, 15));
+            snakes.push(Snake::from_seed(&seed))
         } else {
             eprintln!("warning: failed to spawn snake, no free spaces left")
         }

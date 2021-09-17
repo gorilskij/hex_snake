@@ -14,7 +14,7 @@ pub use palette::Palette;
 use screen::{Screen, Game, StartScreen, DebugScenario};
 use snake::{EatMechanics, Seed};
 use keyboard_control::ControlSetup;
-use snake::{controller::ControllerTemplate, EatBehavior};
+use snake::{controller::Template, EatBehavior};
 use crate::{
     basic::CellDim,
 };
@@ -93,23 +93,26 @@ impl App {
                 palette: snake::PaletteTemplate::rainbow(true),
                 // palette: PaletteTemplate::dark_blue_to_red(false),
                 // palette: PaletteTemplate::zebra(),
-                controller: ControllerTemplate::Keyboard(cs),
+                controller: Template::Keyboard(cs),
                 // controller: SnakeControllerTemplate::PlayerController12,
+                pos: None,
+                dir: None,
+                len: None
             })
             .collect();
 
         let cell_dim = CellDim::from(30.);
         Self {
-            screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
+            // screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
             // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            // screen: Screen::Game(Game::new(
-            //     cell_dim,
-            //     7.,
-            //     seeds,
-            //     Palette::dark(),
-            //     SpawnPolicy::Random { apple_count: 5 },
-            //     window_mode,
-            // )),
+            screen: Screen::Game(Game::new(
+                cell_dim,
+                7.,
+                seeds,
+                Palette::dark(),
+                SpawnPolicy::Random { apple_count: 5 },
+                window_mode,
+            )),
             window_mode,
             window_setup,
         }
@@ -155,8 +158,8 @@ impl App {
         //     palette: SnakePaletteTemplate::rainbow(),
         //     controller: SnakeControllerTemplate::DemoController(vec![
         //         SimMove::Move(Dir::U),
-        //         SimMove::Move(Dir::DR),
-        //         SimMove::Move(Dir::DL),
+        //         SimMove::Move(Dir::Dr),
+        //         SimMove::Move(Dir::Dl),
         //     ]),
         // }];
 

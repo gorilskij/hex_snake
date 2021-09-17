@@ -153,7 +153,7 @@ impl Control {
     // adjust self.last_update to make it match the expected
     // frame_fraction, this is done when resuming a paused game
     // and when adjust fps to ensure smoothness
-    fn set_last_update_to_match_frame_frac(&mut self, frac: f32) {
+    fn set_last_update_to_match_frame_fraction(&mut self, frac: f32) {
         let mut elapsed = (frac - self.remainder as f32) * self.game_frame_duration.as_secs_f32();
         // slight tolerance
         if (-0.01..0.).contains(&elapsed) {
@@ -170,14 +170,15 @@ impl Control {
             return;
         }
 
-        let frac = self.frame_fraction();
+        // freeze frame fraction
+        let frame_fraction = self.frame_fraction();
 
         self.game_fps = fps;
         self.game_frame_duration = Duration::from_nanos((1_000_000_000.0 / fps) as u64);
         self.measured_game_fps.set_expected_fps(fps);
 
-        // keep frame_frac constant
-        self.set_last_update_to_match_frame_frac(frac);
+        // revert to saved frame fraction
+        self.set_last_update_to_match_frame_fraction(frame_fraction);
     }
 
     // repeatedly called in update() as while loop condition
@@ -212,10 +213,6 @@ impl Control {
 
                     self.missed_updates = Some(missed_updates - 1);
 
-                    // TODO: O(1)ize
-                    // for _ in 0..missed_updates {
-                    //     self.measured_game_fps.register_frames();
-                    // }
                     self.measured_game_fps.register_frames(missed_updates);
 
                     true
@@ -241,7 +238,7 @@ impl Control {
         self.measured_game_fps.reset();
         match self.frozen_frame_fraction.take() {
             None => (),
-            Some(frac) => self.set_last_update_to_match_frame_frac(frac),
+            Some(frac) => self.set_last_update_to_match_frame_fraction(frac),
         }
     }
 

@@ -33,7 +33,7 @@ pub mod programmed;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
-pub enum ControllerTemplate {
+pub enum Template {
     Keyboard(ControlSetup),
     KeyboardClock,
     Programmed(Vec<Move>),
@@ -78,7 +78,7 @@ fn simplify_pattern<I: IntoIterator<Item = Move>>(iter: I) -> impl Iterator<Item
 }
 
 #[allow(dead_code)]
-impl ControllerTemplate {
+impl Template {
     pub fn demo_hexagon_pattern(start_dir: Dir, side_len: usize) -> Self {
         let mut vec = Vec::with_capacity(12);
         for dir in Dir::iter_from(start_dir) {
@@ -150,30 +150,30 @@ impl ControllerTemplate {
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller> {
         match self {
-            ControllerTemplate::Keyboard(control_setup) => Box::new(Keyboard {
+            Template::Keyboard(control_setup) => Box::new(Keyboard {
                 controls: control_setup.into(),
                 control_queue: VecDeque::with_capacity(Keyboard::CTRL_QUEUE_LIMIT),
                 dir: start_dir,
             }),
-            ControllerTemplate::KeyboardClock => Box::new(KeyboardClock {
+            Template::KeyboardClock => Box::new(KeyboardClock {
                 dir: Dir12::Single(start_dir),
                 alternation: false,
                 next_dir: None,
             }),
-            ControllerTemplate::Programmed(move_sequence) => Box::new(Programmed {
+            Template::Programmed(move_sequence) => Box::new(Programmed {
                 move_sequence,
                 dir: start_dir,
                 next_move_idx: 0,
                 wait: 0,
             }),
-            ControllerTemplate::Competitor1 => Box::new(Competitor1),
-            ControllerTemplate::Competitor2 => Box::new(Competitor2 {
+            Template::Competitor1 => Box::new(Competitor1),
+            Template::Competitor2 => Box::new(Competitor2 {
                 dir_state: false,
                 target_apple: None,
                 frames_since_update: 0,
             }),
-            ControllerTemplate::Killer => Box::new(Killer),
-            ControllerTemplate::AStar => Box::new(AStar {
+            Template::Killer => Box::new(Killer),
+            Template::AStar => Box::new(AStar {
                 target: None,
                 path: vec![],
                 steps_since_update: 0,

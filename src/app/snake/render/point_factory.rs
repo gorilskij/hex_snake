@@ -183,15 +183,17 @@ impl SegmentDescription {
     }
 }
 
-/// The `render_default_*` functions are without position or rotation, they simply generate the points that correspond to a type of turn (straight, blunt, or sharp)
+/// The `render_default_*` functions are without position or rotation,
+/// they assume a default orientation and the transformation is performed
+/// afterwards
 pub trait SegmentRenderer {
     /// Render a straight segment in the default orientation,
     /// coming from above (U) and going down (D)
     fn render_default_straight_segment(description: &SegmentDescription) -> Vec<Point>;
 
     /// Render a curved segment in the default orientation,
-    /// a blunt segment coming from above (U) and going down-right (DR)
-    /// or a sharp segment coming from above (U) and going up-right (UR)
+    /// a blunt segment coming from above (U) and going down-right (Dr)
+    /// or a sharp segment coming from above (U) and going up-right (Ur)
     ///
     /// `turn` describes how far along the segment is on its turn,
     /// a value of 0 means the segment is straight, a value of 1 means

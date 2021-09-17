@@ -21,7 +21,7 @@ use crate::{
         Screen,
         snake,
         snake::{
-            controller::ControllerTemplate,
+            controller::Template,
             EatBehavior, EatMechanics, Seed, Snake, utils::OtherSnakes,
         },
     },
@@ -48,9 +48,10 @@ struct SnakeDemo {
 
 impl SnakeDemo {
     fn new(location: HexPoint) -> Self {
-        let start_dir = Dir::U;
-        let start_pos = HexPoint { h: 1, v: 4 };
         let board_dim = HexPoint { h: 11, v: 8 };
+        let start_pos = HexPoint { h: 1, v: 4 };
+        let start_dir = Dir::U;
+        let start_len = 5;
 
         let spawn_schedule = spawn_schedule![spawn(6, 2), wait(40),];
         let apple_spawn_policy = SpawnPolicy::ScheduledOnEat {
@@ -60,7 +61,7 @@ impl SnakeDemo {
         };
 
         let mut seed = Seed {
-            snake_type: snake::Type::Simulated { start_pos, start_dir, start_grow: 5 },
+            snake_type: snake::Type::Simulated,
             eat_mechanics: EatMechanics {
                 eat_self: EatBehavior::Cut,
                 eat_other: hash_map! {},
@@ -71,7 +72,10 @@ impl SnakeDemo {
                 color: Color::RED,
                 eaten: Color::RED,
             },
-            controller: ControllerTemplate::demo_infinity_pattern(1),
+            controller: Template::demo_infinity_pattern(1),
+            pos: Some(start_pos),
+            dir: Some(start_dir),
+            len: Some(start_len),
         };
 
         let palettes = vec![
@@ -90,7 +94,7 @@ impl SnakeDemo {
             board_dim,
             apples: vec![],
             apple_spawn_policy,
-            snake: Snake::from_seed(&seed, start_pos, start_dir, 5),
+            snake: Snake::from_seed(&seed),
             palettes,
             current_palette: 0,
         }

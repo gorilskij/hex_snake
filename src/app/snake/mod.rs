@@ -4,7 +4,7 @@ use crate::{
     app::{
         apple::{self, Apple},
         snake::{
-            controller::{Controller, ControllerTemplate},
+            controller::{Controller},
             utils::OtherSnakes,
         },
     },
@@ -31,12 +31,7 @@ pub enum State {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Type {
     Player,
-    Simulated {
-        // TODO: check if these are redundant
-        start_pos: HexPoint,
-        start_dir: Dir,
-        start_grow: usize,
-    },
+    Simulated,
     Competitor {
         life: Option<Frames>,
     },
@@ -107,8 +102,8 @@ pub struct Body {
     /// When a snake changes direction halfway through
     /// a segment appearing, the transition needs to be
     /// done smoothly, this indicates at which frame and
-    /// frame_frac the transition was started
-    pub turn_start: Option<(usize, f32)>,
+    /// frame fraction the transition was started
+    pub turn_start: Option<FrameStamp>,
 
     /// When `Snake::update_dir` is called from a draw method
     /// (this is done to show the snake turning as soon
@@ -146,17 +141,27 @@ pub struct Seed {
     pub snake_type: Type,
     pub eat_mechanics: EatMechanics,
     pub palette: PaletteTemplate,
-    pub controller: ControllerTemplate,
+    pub controller: controller::Template,
+    pub pos: Option<HexPoint>,
+    pub dir: Option<Dir>,
+    pub len: Option<usize>,
 }
 
 impl Snake {
-    pub fn from_seed(seed: &Seed, pos: HexPoint, dir: Dir, grow: usize) -> Self {
+    pub fn from_seed(seed: &Seed) -> Self {
         let Seed {
             snake_type,
             eat_mechanics,
             palette,
             controller,
+            pos,
+            dir,
+            len,
         } = (*seed).clone();
+
+        let pos = pos.expect("starting position not provided");
+        let dir = dir.expect("starting direction not provided");
+        let len = len.expect("starting length not provided");
 
         let head = Segment {
             segment_type: SegmentType::Normal,
@@ -178,7 +183,7 @@ impl Snake {
                 dir,
                 turn_start: None,
                 dir_grace: false,
-                grow,
+                grow: len,
                 search_trace: None,
             },
             state: State::Living,

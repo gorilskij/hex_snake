@@ -14,7 +14,7 @@ use crate::{
         palette::Palette,
         snake::{
             self,
-            controller::{Controller, ControllerTemplate}, Snake, utils::split_snakes_mut,
+            controller::{Controller, Template}, Snake, utils::split_snakes_mut,
         },
     },
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
@@ -190,22 +190,20 @@ impl Game {
             Box::new(std::iter::empty())
         };
 
-        for seed in self.seeds.iter() {
+        for mut seed in self.seeds.iter().cloned() {
             match seed.snake_type {
-                snake::Type::Simulated { start_pos, start_dir, start_grow } => {
-                    self.snakes
-                        .push(Snake::from_seed(seed, start_pos, start_dir, start_grow));
+                snake::Type::Simulated => {
+                    // expected to have initial position, direction, and length
+                    self.snakes.push(Snake::from_seed(&seed));
                 }
                 _ => {
-                    self.snakes.push(Snake::from_seed(
-                        seed,
-                        HexPoint {
-                            h: unpositioned_h_pos.next().unwrap(),
-                            v: self.board_dim.v / 2,
-                        },
-                        unpositioned_dir,
-                        10,
-                    ));
+                    seed.pos = Some(HexPoint {
+                        h: unpositioned_h_pos.next().unwrap(),
+                        v: self.board_dim.v / 2,
+                    });
+                    seed.dir = Some(unpositioned_dir);
+                    seed.len = Some(10);
+                    self.snakes.push(Snake::from_seed(&seed));
 
                     // alternate
                     unpositioned_dir = -unpositioned_dir;
@@ -579,7 +577,7 @@ impl EventHandler<ggez::GameError> for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    ControllerTemplate::AStar
+                                    Template::AStar
                                         .into_controller(player_snake.body.dir),
                                 ));
                                 "Autopilot on"
