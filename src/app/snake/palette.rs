@@ -399,7 +399,7 @@ impl Palette for RGBGradient {
                 };
 
                 match seg.segment_type {
-                    Normal | BlackHole{..} => normal_color,
+                    Normal | BlackHole { .. } => normal_color,
                     Eaten { .. } => self.eaten.paint_segment(&normal_color),
                     Crashed => *DEFAULT_CRASHED_COLOR,
                 }
@@ -434,7 +434,7 @@ impl Palette for HSLGradient {
                 let end_hue =
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
                 match seg.segment_type {
-                    Normal | BlackHole{..} => {
+                    Normal | BlackHole { .. } => {
                         styles.push(SegmentStyle::HSLGradient {
                             start_hue,
                             end_hue,
@@ -487,7 +487,7 @@ impl Palette for OkLabGradient {
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / len as f64;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / len as f64;
             match seg.segment_type {
-                Normal | BlackHole{..} => {
+                Normal | BlackHole { .. } => {
                     styles.push(SegmentStyle::OkLabGradient {
                         start_hue,
                         end_hue,
@@ -530,7 +530,7 @@ impl Palette for AlternatingFixed {
         let expected_mod = if self.iteration { 0 } else { 1 };
         for (i, seg) in body.iter().enumerate() {
             let color = match seg.segment_type {
-                Normal | BlackHole{..} => {
+                Normal | BlackHole { .. } => {
                     if i % 2 == expected_mod {
                         self.color1
                     } else {
@@ -585,7 +585,7 @@ impl Palette for Alternating {
             let r = (i + body.missing_front) as f32 + frame_fraction;
 
             let _color = match seg.segment_type {
-                Normal | BlackHole{..} => {
+                Normal | BlackHole { .. } => {
                     // Check whether there is a minimum or maximum within this segment
                     use std::f32::consts::PI;
                     if r % PI <= PI && r % PI + 1. >= PI {

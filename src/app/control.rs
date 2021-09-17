@@ -1,9 +1,9 @@
+use crate::basic::FrameStamp;
 use std::{
     cmp::max,
     collections::VecDeque,
     time::{Duration, Instant},
 };
-use crate::basic::FrameStamp;
 
 /// Stores an instant along with the number of frames it represents
 struct NFrameInstant(usize, Instant);
@@ -53,17 +53,12 @@ impl FpsCounter {
             if self.buffer.len() >= Self::LEN {
                 self.buffer.pop_front();
             }
-            self.buffer.push_back(NFrameInstant(self.step - self.n + num_frames - 1, Instant::now()));
+            self.buffer.push_back(NFrameInstant(
+                self.step - self.n + num_frames - 1,
+                Instant::now(),
+            ));
             self.n = self.step - 1;
-
-        // if self.n == 0 {
-        //     if self.buffer.len() >= Self::LEN {
-        //         self.buffer.pop_front();
-        //     }
-        //     self.buffer.push_back(NFrameInstant(1, Instant::now()));
-        //     self.n = self.step - 1;
         } else {
-            // self.n -= 1;
             self.n -= num_frames;
         }
     }

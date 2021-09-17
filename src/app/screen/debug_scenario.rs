@@ -1,21 +1,28 @@
-use ggez::{Context, GameResult, GameError};
-use ggez::event::{EventHandler, MouseButton, KeyMods, Button, GamepadId, Axis, ErrorOrigin, KeyCode};
-use ggez::graphics::{self, Color, DrawParam};
+use ggez::{
+    event::{EventHandler, KeyCode, KeyMods},
+    graphics::{self, Color, DrawParam},
+    Context, GameResult,
+};
 use rand::prelude::*;
 
-use crate::app;
-use crate::app::apple::spawn::{spawn_apples, SpawnPolicy};
-use crate::app::snake_management::{find_collisions, handle_collisions, advance_snakes};
-use crate::app::control::{self, Control};
-use crate::app::prefs::Prefs;
-use crate::app::rendering;
-use crate::app::apple::Apple;
-use crate::app::snake::{self, EatBehavior, EatMechanics, Snake};
-use crate::app::snake::controller::Template;
-use crate::app::snake::utils::split_snakes_mut;
-use crate::app::stats::Stats;
-use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
-use crate::basic::FrameStamp;
+use crate::{
+    app,
+    app::{
+        apple::{
+            spawn::{spawn_apples, SpawnPolicy},
+            Apple,
+        },
+        control::{self, Control},
+        prefs::Prefs,
+        rendering,
+        snake::{
+            self, controller::Template, utils::split_snakes_mut, EatBehavior, EatMechanics, Snake,
+        },
+        snake_management::{advance_snakes, find_collisions, handle_collisions},
+        stats::Stats,
+    },
+    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
+};
 
 pub struct DebugScenario {
     control: Control,
@@ -70,7 +77,10 @@ impl DebugScenario {
                 eat_other: hash_map! {},
                 default: EatBehavior::Die,
             },
-            palette: snake::PaletteTemplate::Solid { color: Color::RED, eaten: Color::WHITE },
+            palette: snake::PaletteTemplate::Solid {
+                color: Color::RED,
+                eaten: Color::WHITE,
+            },
             controller: Template::Programmed(vec![]),
         };
 
@@ -103,18 +113,32 @@ impl DebugScenario {
     }
 
     fn spawn_apples(&mut self) {
-        let new_apples = spawn_apples(&mut self.apple_spawn_policy, self.board_dim, &self.snakes, &self.apples, &self.prefs, &mut self.rng);
+        let new_apples = spawn_apples(
+            &mut self.apple_spawn_policy,
+            self.board_dim,
+            &self.snakes,
+            &self.apples,
+            &self.prefs,
+            &mut self.rng,
+        );
         self.apples.extend(new_apples.into_iter())
     }
 
-    fn advance_snakes(&mut self, frame_stamp: FrameStamp) {
-        advance_snakes(&mut self.snakes, &self.apples, self.board_dim, self.control.frame_stamp());
+    fn advance_snakes(&mut self, _frame_stamp: FrameStamp) {
+        advance_snakes(
+            &mut self.snakes,
+            &self.apples,
+            self.board_dim,
+            self.control.frame_stamp(),
+        );
 
         let collisions = find_collisions(&self.snakes, &self.apples);
         let (spawn_snakes, remove_apples, game_over) =
             handle_collisions(&collisions, &mut self.snakes, &self.apples);
 
-        if game_over { self.control.game_over(); }
+        if game_over {
+            self.control.game_over();
+        }
 
         for apple_index in remove_apples.into_iter().rev() {
             self.apples.remove(apple_index);
@@ -146,7 +170,8 @@ impl EventHandler<ggez::GameError> for DebugScenario {
         let grid_mesh = rendering::grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?;
         graphics::draw(ctx, &grid_mesh, draw_param)?;
 
-        let border_mesh = rendering::border_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?;
+        let border_mesh =
+            rendering::border_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?;
         graphics::draw(ctx, &border_mesh, draw_param)?;
 
         for snake_index in 0..self.snakes.len() {
@@ -181,11 +206,17 @@ impl EventHandler<ggez::GameError> for DebugScenario {
         graphics::present(ctx)
     }
 
-    fn key_down_event(&mut self, _ctx: &mut Context, keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {
+    fn key_down_event(
+        &mut self,
+        _ctx: &mut Context,
+        keycode: KeyCode,
+        _keymods: KeyMods,
+        _repeat: bool,
+    ) {
         if keycode == KeyCode::Space {
             match self.control.state() {
-                control::State::Playing => { self.control.pause() }
-                control::State::Paused => { self.control.play() }
+                control::State::Playing => self.control.pause(),
+                control::State::Paused => self.control.play(),
                 control::State::GameOver => {}
             }
         }

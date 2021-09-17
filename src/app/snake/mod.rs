@@ -2,19 +2,15 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::{
     app::{
-        apple::{self, Apple},
-        snake::{
-            controller::{Controller},
-            utils::OtherSnakes,
-        },
+        apple::Apple,
+        snake::{controller::Controller, utils::OtherSnakes},
     },
     basic::{Dir, HexDim, HexPoint},
 };
 use std::ops::Deref;
 
+use crate::{app::utils::Frames, basic::FrameStamp};
 pub use palette::{Palette, PaletteTemplate};
-use crate::basic::FrameStamp;
-use crate::app::utils::Frames;
 
 pub mod controller;
 mod palette;
@@ -32,12 +28,8 @@ pub enum State {
 pub enum Type {
     Player,
     Simulated,
-    Competitor {
-        life: Option<Frames>,
-    },
-    Killer {
-        life: Option<Frames>,
-    },
+    Competitor { life: Option<Frames> },
+    Killer { life: Option<Frames> },
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]

@@ -2,22 +2,19 @@ use std::ops::{Deref, DerefMut};
 
 use ggez::{
     conf::{WindowMode, WindowSetup},
-    Context,
     event::{EventHandler, KeyCode, KeyMods},
-    GameResult, graphics,
+    graphics,
     graphics::Rect,
+    Context, GameResult,
 };
 use itertools::Itertools;
 
+use crate::basic::CellDim;
 use apple::spawn::SpawnPolicy;
-pub use palette::Palette;
-use screen::{Screen, Game, StartScreen, DebugScenario};
-use snake::{EatMechanics, Seed};
 use keyboard_control::ControlSetup;
-use snake::{controller::Template, EatBehavior};
-use crate::{
-    basic::CellDim,
-};
+pub use palette::Palette;
+use screen::{Game, Screen};
+use snake::{controller::Template, EatBehavior, EatMechanics, Seed};
 
 pub mod keyboard_control;
 mod palette;
@@ -25,13 +22,13 @@ mod snake;
 mod snake_management;
 #[macro_use]
 mod apple;
-mod screen;
-mod utils;
-mod prefs;
-pub mod stats;
+mod control;
 mod message;
-pub mod control;
+mod prefs;
 mod rendering;
+mod screen;
+pub mod stats;
+mod utils;
 
 impl Deref for Screen {
     type Target = dyn EventHandler<ggez::GameError>;
@@ -97,7 +94,7 @@ impl App {
                 // controller: SnakeControllerTemplate::PlayerController12,
                 pos: None,
                 dir: None,
-                len: None
+                len: None,
             })
             .collect();
 

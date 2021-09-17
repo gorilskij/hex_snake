@@ -1,5 +1,4 @@
 use crate::basic::Point;
-use std::ops::Mul;
 
 #[derive(Copy, Clone, Mul)]
 pub struct CellDim {

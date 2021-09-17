@@ -1,10 +1,9 @@
 // This file contains structs describing various aspects of a segment
 
 use crate::{
-    app::snake::palette::SegmentStyle,
+    app::{rendering, snake::palette::SegmentStyle},
     basic::{CellDim, Dir, Point},
 };
-use crate::app::rendering;
 
 // A full (solid) segment starts at 0. and ends at 1.
 #[derive(Copy, Clone)]
@@ -91,8 +90,7 @@ pub struct SegmentDescription {
     pub destination: Point,
     pub turn: TurnDescription,
     pub fraction: SegmentFraction,
-    pub draw_style:
-    rendering::Style,
+    pub draw_style: rendering::Style,
     pub segment_style: SegmentStyle,
     pub cell_dim: CellDim,
 }

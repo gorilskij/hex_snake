@@ -1,6 +1,7 @@
-use crate::app::snake::Snake;
-use crate::app::apple::Apple;
-use crate::basic::{HexPoint, HexDim};
+use crate::{
+    app::{apple::Apple, snake::Snake},
+    basic::{HexDim, HexPoint},
+};
 use rand::Rng;
 
 pub type Frames = u64;
@@ -8,8 +9,7 @@ pub type Food = u32;
 
 pub fn get_occupied_cells(snakes: &[Snake], apples: &[Apple]) -> Vec<HexPoint> {
     // upper bound
-    let max_occupied_cells =
-        snakes.iter().map(|snake| snake.len()).sum::<usize>() + apples.len();
+    let max_occupied_cells = snakes.iter().map(|snake| snake.len()).sum::<usize>() + apples.len();
     let mut occupied_cells = Vec::with_capacity(max_occupied_cells);
     occupied_cells.extend(apples.iter().map(|apple| apple.pos));
     for snake in snakes {

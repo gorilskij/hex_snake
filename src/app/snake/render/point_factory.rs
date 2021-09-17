@@ -6,12 +6,15 @@ use hsl::HSL;
 use itertools::Itertools;
 
 use crate::{
-    app::snake::{
-        palette::SegmentStyle,
-        render::{
-            descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
-            hexagon_segments::HexagonSegments,
-            smooth_segments::SmoothSegments,
+    app::{
+        rendering,
+        snake::{
+            palette::SegmentStyle,
+            render::{
+                descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
+                hexagon_segments::HexagonSegments,
+                smooth_segments::SmoothSegments,
+            },
         },
     },
     basic::{
@@ -20,7 +23,6 @@ use crate::{
     },
     color::oklab::OkLab,
 };
-use crate::app::rendering;
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,

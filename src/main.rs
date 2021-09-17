@@ -10,24 +10,19 @@ extern crate lazy_static;
 use ggez::{event::run, ContextBuilder};
 
 use crate::{
-    app::{
-        keyboard_control::{ControlSetup},
-        App,
-    },
+    app::{keyboard_control::ControlSetup, App},
     basic::Side,
+    keyboard::Layout,
 };
-use ggez::{
-    conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
-};
-use crate::keyboard::Layout;
+use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 
 #[macro_use]
 mod basic;
 mod app;
 mod color;
+mod keyboard;
 mod partial_min_max;
 mod row;
-mod keyboard;
 
 // TODO
 //  - factor out lazy redrawing code (the whole mess with Some(grid_mesh)...)

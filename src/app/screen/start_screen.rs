@@ -1,38 +1,29 @@
 use std::slice;
 
 use ggez::{
-    Context,
-    event::EventHandler,
-    GameResult, graphics::{self, DrawParam},
+    event::{EventHandler, KeyCode, KeyMods},
+    graphics::{self, Color, DrawParam},
+    Context, GameResult,
 };
-use ggez::{
-    event::{KeyCode, KeyMods},
-    graphics::Color,
-};
-use rand::prelude::*;
-use rand::rngs::ThreadRng;
+use rand::{prelude::*, rngs::ThreadRng};
 
 use crate::{
     app,
     app::{
-        apple::{self, Apple
+        apple::{
+            spawn::{spawn_apples, SpawnPolicy},
+            Apple,
         },
+        control::Control,
+        prefs::Prefs,
+        rendering, snake,
+        snake::{controller::Template, utils::OtherSnakes, EatBehavior, EatMechanics, Seed, Snake},
         snake_management::{find_collisions, handle_collisions},
+        stats::Stats,
         Screen,
-        snake,
-        snake::{
-            controller::Template,
-            EatBehavior, EatMechanics, Seed, Snake, utils::OtherSnakes,
-        },
     },
-    basic::{CellDim, Dir, HexDim, HexPoint},
+    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint},
 };
-use crate::app::apple::spawn::{ScheduledSpawn, spawn_apples, SpawnPolicy};
-use crate::app::control::Control;
-use crate::app::prefs::Prefs;
-use crate::app::rendering;
-use crate::app::stats::Stats;
-use crate::basic::FrameStamp;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -108,13 +99,24 @@ impl SnakeDemo {
     }
 
     fn spawn_apples(&mut self, prefs: &Prefs, rng: &mut impl Rng) {
-        let new_apples = spawn_apples(&mut self.apple_spawn_policy, self.board_dim, slice::from_ref(&self.snake), &self.apples, prefs, rng);
+        let new_apples = spawn_apples(
+            &mut self.apple_spawn_policy,
+            self.board_dim,
+            slice::from_ref(&self.snake),
+            &self.apples,
+            prefs,
+            rng,
+        );
         self.apples.extend(new_apples.into_iter());
     }
 
     fn advance_snakes(&mut self, frame_stamp: FrameStamp, prefs: &Prefs, rng: &mut impl Rng) {
-        self.snake
-            .advance(OtherSnakes::empty(), &self.apples, self.board_dim, frame_stamp);
+        self.snake.advance(
+            OtherSnakes::empty(),
+            &self.apples,
+            self.board_dim,
+            frame_stamp,
+        );
 
         let collisions = find_collisions(slice::from_ref(&self.snake), &self.apples);
         let (spawn_snakes, remove_apples, game_over) =
@@ -217,8 +219,10 @@ impl EventHandler<ggez::GameError> for StartScreen {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         while self.control.can_update() {
             let frame_stamp = self.control.frame_stamp();
-            self.player1_demo.advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
-            self.player2_demo.advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
+            self.player1_demo
+                .advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
+            self.player2_demo
+                .advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
         }
         Ok(())
     }

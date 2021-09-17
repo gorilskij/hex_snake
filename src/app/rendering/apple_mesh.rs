@@ -1,22 +1,19 @@
 use ggez::{
-    Context,
-    GameResult, graphics::{Color, DrawMode, Mesh, MeshBuilder},
+    graphics::{Color, DrawMode, Mesh, MeshBuilder},
+    Context, GameResult,
 };
 use hsl::HSL;
 
 use crate::{
     app::{
+        apple::{self, Apple},
         palette::Palette,
-        apple::{
-            {self, Apple},
-        },
+        rendering,
         snake::render::render_hexagon,
+        stats::Stats,
     },
-    basic::{CellDim, transformations::translate},
+    basic::{transformations::translate, CellDim, FrameStamp},
 };
-use crate::basic::FrameStamp;
-use crate::app::stats::Stats;
-use crate::app::rendering;
 
 pub fn apple_mesh(
     apples: &[Apple],

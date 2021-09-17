@@ -1,27 +1,24 @@
 use ggez::{
-    Context,
-    GameResult, graphics::{Color, DrawMode, Mesh, MeshBuilder},
+    graphics::{Color, DrawMode, Mesh, MeshBuilder},
+    Context, GameResult,
 };
 
 use crate::{
-    app::snake::{
-        render::{
-            descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
-            render_hexagon,
+    app::{
+        rendering,
+        snake::{
+            render::{
+                descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
+                render_hexagon,
+            },
+            SegmentType, Snake,
         },
-        SegmentType,
+        stats::Stats,
     },
-    basic::transformations::translate,
+    basic::{transformations::translate, CellDim, FrameStamp, HexDim, Point},
 };
-use crate::{
-    app::snake::Snake,
-    basic::{CellDim, HexDim, Point},
-};
-use crate::basic::FrameStamp;
-use crate::app::stats::Stats;
-use crate::app::rendering;
-use std::cmp::min;
-use crate::partial_min_max::{partial_min, partial_max};
+
+use crate::partial_min_max::partial_min;
 
 const DRAW_WHITE_AURA: bool = false;
 
@@ -138,11 +135,14 @@ pub fn snake_mesh(
             let fraction = match segment_idx {
                 // head
                 0 => {
-                    if let SegmentType::BlackHole { just_created } = segment.segment_type {
+                    if let SegmentType::BlackHole { just_created: _ } = segment.segment_type {
                         // never exceed 0.5 into a black hole, stay there once you get there
                         if snake.len() == 1 {
                             // also tail
-                            SegmentFraction { start: partial_min(frame_fraction, 0.5).unwrap(), end: 0.5 }
+                            SegmentFraction {
+                                start: partial_min(frame_fraction, 0.5).unwrap(),
+                                end: 0.5,
+                            }
                         } else if snake.body.missing_front > 0 {
                             SegmentFraction::appearing(0.5)
                         } else {
@@ -151,7 +151,7 @@ pub fn snake_mesh(
                     } else {
                         SegmentFraction::appearing(frame_fraction)
                     }
-                },
+                }
                 // tail
                 i if i == snake.len() - 1 && snake.body.grow == 0 => {
                     if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
@@ -190,9 +190,12 @@ pub fn snake_mesh(
                     .unwrap_or(1.);
 
                 match segment.segment_type {
-                    SegmentType::BlackHole { .. } => {
-                        black_holes.push((segment_description, subsegments_per_segment, turn, frame_fraction))
-                    }
+                    SegmentType::BlackHole { .. } => black_holes.push((
+                        segment_description,
+                        subsegments_per_segment,
+                        turn,
+                        frame_fraction,
+                    )),
                     _ => other_heads.push((segment_description, subsegments_per_segment, turn)),
                 }
             } else {
@@ -205,7 +208,7 @@ pub fn snake_mesh(
 
     // Draw black holes and crashed heads
     let black_hole_color = Color::from_rgb(1, 36, 92);
-    for (mut segment_description, subsegments_per_segment, turn, frame_fraction) in black_holes {
+    for (segment_description, subsegments_per_segment, turn, frame_fraction) in black_holes {
         if segment_description.fraction.start == segment_description.fraction.end {
             // snake has died, animate black hole out
             assert!(frame_fraction >= 0.5, "{} < 0.5", frame_fraction);

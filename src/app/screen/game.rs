@@ -2,31 +2,37 @@ use std::collections::HashMap;
 
 use ggez::{
     conf::WindowMode,
-    Context,
     event::{EventHandler, KeyCode, KeyMods},
-    GameResult, graphics::{self, Color, DrawParam, Mesh},
+    graphics::{self, Color, DrawParam, Mesh},
+    Context, GameResult,
 };
 use rand::prelude::*;
 
 use crate::{
     app::{
-        snake_management::{find_collisions, handle_collisions},
+        apple::{
+            self,
+            spawn::{spawn_apples, SpawnPolicy},
+            Apple,
+        },
+        control::{self, Control},
+        message::{Message, MessageID},
         palette::Palette,
+        prefs::Prefs,
+        rendering,
         snake::{
             self,
-            controller::{Controller, Template}, Snake, utils::split_snakes_mut,
+            controller::{Controller, Template},
+            utils::split_snakes_mut,
+            Snake,
         },
+        snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes},
+        stats::Stats,
+        utils::Food,
     },
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
+    row::ROw,
 };
-use crate::app::{rendering, stats::Stats, utils::Food};
-use crate::app::apple::{self, Apple};
-use crate::app::apple::spawn::{ScheduledSpawn, spawn_apples, SpawnPolicy};
-use crate::app::snake_management::{spawn_snakes, advance_snakes};
-use crate::app::control::{self, Control};
-use crate::app::message::{Message, MessageID};
-use crate::app::prefs::Prefs;
-use crate::row::ROw;
 
 pub struct Game {
     control: Control,
@@ -130,11 +136,9 @@ impl Game {
             self.board_dim = new_board_dim;
 
             // restart if player snake head has left board limits
-            if self
-                .snakes
-                .iter()
-                .any(|s| s.snake_type == snake::Type::Player && !new_board_dim.contains(s.head().pos))
-            {
+            if self.snakes.iter().any(|s| {
+                s.snake_type == snake::Type::Player && !new_board_dim.contains(s.head().pos)
+            }) {
                 println!("warning: player snake outside of board, restarting");
                 self.restart();
             } else {
@@ -143,7 +147,8 @@ impl Game {
                     .retain(move |snake| new_board_dim.contains(snake.head().pos));
 
                 // remove apples outside of board limits
-                self.apples.retain(move |apple| new_board_dim.contains(apple.pos));
+                self.apples
+                    .retain(move |apple| new_board_dim.contains(apple.pos));
                 self.spawn_apples();
             }
 
@@ -218,14 +223,20 @@ impl Game {
     }
 
     fn advance_snakes(&mut self) {
-        advance_snakes(&mut self.snakes, &self.apples, self.board_dim, self.control.frame_stamp());
+        advance_snakes(
+            &mut self.snakes,
+            &self.apples,
+            self.board_dim,
+            self.control.frame_stamp(),
+        );
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
             matches!(snake.state, snake::State::Dying)
                 || matches!(
                     snake.snake_type,
-                    snake::Type::Competitor { life: Some(_) } | snake::Type::Killer { life: Some(_) }
+                    snake::Type::Competitor { life: Some(_) }
+                        | snake::Type::Killer { life: Some(_) }
                 )
         };
         if self.snakes.iter().all(dying_or_ephemeral) {
@@ -252,7 +263,13 @@ impl Game {
             self.apples.remove(apple_index);
         }
 
-        spawn_snakes(seeds, &mut self.snakes, &self.apples, self.board_dim, &mut self.rng);
+        spawn_snakes(
+            seeds,
+            &mut self.snakes,
+            &self.apples,
+            self.board_dim,
+            &mut self.rng,
+        );
     }
 }
 
@@ -262,7 +279,14 @@ impl Game {
     const CELL_SIDE_MAX: f32 = 50.;
 
     fn spawn_apples(&mut self) {
-        let new_apples = spawn_apples(&mut self.apple_spawn_policy, self.board_dim, &self.snakes, &self.apples, &self.prefs, &mut self.rng);
+        let new_apples = spawn_apples(
+            &mut self.apple_spawn_policy,
+            self.board_dim,
+            &self.snakes,
+            &self.apples,
+            &self.prefs,
+            &mut self.rng,
+        );
         self.apples.extend(new_apples.into_iter())
     }
 
@@ -402,8 +426,12 @@ impl EventHandler<ggez::GameError> for Game {
             )?));
             if self.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
-                    self.grid_mesh =
-                        Some(rendering::grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?);
+                    self.grid_mesh = Some(rendering::grid_mesh(
+                        self.board_dim,
+                        self.cell_dim,
+                        &self.palette,
+                        ctx,
+                    )?);
                 };
                 grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
             }
@@ -465,8 +493,12 @@ impl EventHandler<ggez::GameError> for Game {
             if update {
                 if self.prefs.draw_grid {
                     if self.grid_mesh.is_none() {
-                        self.grid_mesh =
-                            Some(rendering::grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?);
+                        self.grid_mesh = Some(rendering::grid_mesh(
+                            self.board_dim,
+                            self.cell_dim,
+                            &self.palette,
+                            ctx,
+                        )?);
                     };
                     grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
                 }

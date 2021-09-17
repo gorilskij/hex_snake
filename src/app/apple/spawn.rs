@@ -1,11 +1,14 @@
-use crate::basic::{HexPoint, HexDim};
+use crate::{
+    app::{
+        apple::{self, Apple},
+        screen::Prefs,
+        snake,
+        snake::{controller::Template, EatBehavior, EatMechanics, Seed, Snake},
+        utils::{get_occupied_cells, random_free_spot},
+    },
+    basic::{HexDim, HexPoint},
+};
 use rand::Rng;
-use crate::app::apple::{self, Apple};
-use crate::app::snake::{Snake, EatBehavior, EatMechanics, Seed};
-use crate::app::screen::Prefs;
-use crate::app::{snake};
-use crate::app::snake::controller::Template;
-use crate::app::utils::{get_occupied_cells, random_free_spot};
 
 #[allow(unused_macros)]
 macro_rules! spawn_schedule {
@@ -61,7 +64,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 controller: Template::AStar,
                 pos: None,
                 dir: None,
-                len: None
+                len: None,
             })
         } else if rand < prefs.prob_spawn_competitor + prefs.prob_spawn_killer {
             apple::Type::SpawnSnake(Seed {
@@ -71,7 +74,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 controller: Template::Killer,
                 pos: None,
                 dir: None,
-                len: None
+                len: None,
             })
         } else {
             apple::Type::Normal(prefs.apple_food)
@@ -81,7 +84,14 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
     }
 }
 
-pub fn spawn_apples(policy: &mut SpawnPolicy, board_dim: HexDim, snakes: &[Snake], apples: &[Apple], prefs: &Prefs, rng: &mut impl Rng) -> Vec<Apple> {
+pub fn spawn_apples(
+    policy: &mut SpawnPolicy,
+    board_dim: HexDim,
+    snakes: &[Snake],
+    apples: &[Apple],
+    prefs: &Prefs,
+    rng: &mut impl Rng,
+) -> Vec<Apple> {
     // lazy
     let mut occupied_cells = None;
 
@@ -91,27 +101,31 @@ pub fn spawn_apples(policy: &mut SpawnPolicy, board_dim: HexDim, snakes: &[Snake
         let can_spawn = match policy {
             SpawnPolicy::None => false,
             SpawnPolicy::Random { apple_count } => apples.len() + spawn.len() < *apple_count,
-            SpawnPolicy::ScheduledOnEat { apple_count, .. } => apples.len() + spawn.len() < *apple_count,
+            SpawnPolicy::ScheduledOnEat { apple_count, .. } => {
+                apples.len() + spawn.len() < *apple_count
+            }
         };
 
-        if !can_spawn { break; }
+        if !can_spawn {
+            break;
+        }
 
-        let occupied_cells = occupied_cells.get_or_insert_with(|| get_occupied_cells(snakes, apples));
+        let occupied_cells =
+            occupied_cells.get_or_insert_with(|| get_occupied_cells(snakes, apples));
 
         let new_apple_pos = match policy {
             SpawnPolicy::None => panic!("shouldn't be spawning with SpawnPolicy::None"),
             SpawnPolicy::Random { apple_count } => {
-                let apple_pos =
-                    match random_free_spot(occupied_cells, board_dim, rng) {
-                        Some(pos) => pos,
-                        None => {
-                            println!(
-                                "warning: no space left for new apples ({} apples will be missing)",
-                                *apple_count - apples.len(),
-                            );
-                            break;
-                        }
-                    };
+                let apple_pos = match random_free_spot(occupied_cells, board_dim, rng) {
+                    Some(pos) => pos,
+                    None => {
+                        println!(
+                            "warning: no space left for new apples ({} apples will be missing)",
+                            *apple_count - apples.len(),
+                        );
+                        break;
+                    }
+                };
 
                 // insert at sorted position
                 match occupied_cells.binary_search(&apple_pos) {
@@ -142,12 +156,10 @@ pub fn spawn_apples(policy: &mut SpawnPolicy, board_dim: HexDim, snakes: &[Snake
         };
 
         match new_apple_pos {
-            Some(pos) => {
-                spawn.push(Apple {
-                    pos,
-                    apple_type: generate_apple_type(prefs, rng),
-                })
-            },
+            Some(pos) => spawn.push(Apple {
+                pos,
+                apple_type: generate_apple_type(prefs, rng),
+            }),
             None => break,
         }
     }

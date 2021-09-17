@@ -1,6 +1,5 @@
+use crate::app::{rendering, utils::Food};
 use std::time::Duration;
-use crate::app::utils::Food;
-use crate::app::rendering;
 
 pub struct Prefs {
     pub draw_grid: bool,

@@ -7,7 +7,6 @@ use num_integer::Integer;
 
 use crate::{app::palette::Palette, basic::HexDim};
 
-
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh
 //  when border is drawn separately

@@ -13,7 +13,7 @@ pub mod transformations;
 
 macro_rules! hash_map {
     { $($key:expr => $value:expr),* $(,)? } => {{
-        let mut map = ::std::collections::HashMap::new();
+        let map = ::std::collections::HashMap::new();
         $( m.insert($key, $value); )*
         map
     }};

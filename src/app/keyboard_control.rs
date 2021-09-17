@@ -1,6 +1,8 @@
-use crate::basic::Side;
+use crate::{
+    basic::Side,
+    keyboard::{Layout, LayoutConverter},
+};
 use ggez::input::keyboard::KeyCode::{self, *};
-use crate::keyboard::{Layout, LayoutConverter};
 
 #[derive(Copy, Clone)]
 pub struct Controls {

@@ -1,5 +1,8 @@
 use crate::basic::Point;
-use ggez::{graphics::{Color, DrawParam, Font, PxScale, Text, self}, Context, GameResult};
+use ggez::{
+    graphics::{self, Color, DrawParam, Font, PxScale, Text},
+    Context, GameResult,
+};
 use std::time::{Duration, Instant};
 
 /// Finite number of possible messages

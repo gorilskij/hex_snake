@@ -1,15 +1,15 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
-use crate::app::{
-    apple::{self, Apple},
-    snake::{self, EatBehavior, SegmentType, Snake, State},
+use crate::{
+    app::{
+        apple::{self, Apple},
+        snake::{self, utils::split_snakes_mut, EatBehavior, Seed, SegmentType, Snake, State},
+        utils::{get_occupied_cells, random_free_spot},
+    },
+    basic::{Dir, FrameStamp, HexDim},
 };
-use crate::app::utils::{get_occupied_cells, random_free_spot};
-use crate::basic::{HexDim, Dir, FrameStamp};
-use crate::app::snake::Seed;
 use rand::Rng;
-use crate::app::snake::utils::split_snakes_mut;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -168,7 +168,13 @@ pub fn handle_collisions(
     (spawn_snakes, remove_apples, game_over)
 }
 
-pub fn spawn_snakes(seeds: Vec<Seed>, snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexDim, rng: &mut impl Rng) {
+pub fn spawn_snakes(
+    seeds: Vec<Seed>,
+    snakes: &mut Vec<Snake>,
+    apples: &[Apple],
+    board_dim: HexDim,
+    rng: &mut impl Rng,
+) {
     for mut seed in seeds {
         // avoid spawning too close to player snake heads
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
@@ -197,7 +203,12 @@ pub fn spawn_snakes(seeds: Vec<Seed>, snakes: &mut Vec<Snake>, apples: &[Apple],
 
 /// Returns the indices of snakes to be deleted (in reverse order so they
 /// can be deleted straight away)
-pub fn advance_snakes(snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexDim, frame_stamp: FrameStamp) {
+pub fn advance_snakes(
+    snakes: &mut Vec<Snake>,
+    apples: &[Apple],
+    board_dim: HexDim,
+    frame_stamp: FrameStamp,
+) {
     let mut remove_snakes = vec![];
     for snake_idx in 0..snakes.len() {
         // set snake to die if it ran out of life
@@ -216,12 +227,7 @@ pub fn advance_snakes(snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexD
         let (snake, other_snakes) = split_snakes_mut(snakes, snake_idx);
 
         // advance the snake
-        snake.advance(
-            other_snakes,
-            apples,
-            board_dim,
-            frame_stamp,
-        );
+        snake.advance(other_snakes, apples, board_dim, frame_stamp);
 
         // remove snake if it ran out of body
         if snake.len() == 0 {
@@ -230,5 +236,7 @@ pub fn advance_snakes(snakes: &mut Vec<Snake>, apples: &[Apple], board_dim: HexD
     }
 
     remove_snakes.sort_unstable();
-    remove_snakes.into_iter().rev().for_each(|i| { snakes.remove(i); });
+    remove_snakes.into_iter().rev().for_each(|i| {
+        snakes.remove(i);
+    });
 }
