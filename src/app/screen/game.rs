@@ -250,15 +250,11 @@ impl Game {
         }
 
         let collisions = find_collisions(self);
-        let (seeds, remove_apples, game_over) =
+        let (seeds, game_over) =
             handle_collisions(self, &collisions);
 
         if game_over {
             self.control.game_over()
-        }
-
-        for apple_index in remove_apples.into_iter().rev() {
-            self.apples.remove(apple_index);
         }
 
         spawn_snakes(self, seeds);
@@ -751,6 +747,10 @@ impl Environment for Game {
 
     fn remove_snake(&mut self, index: usize) -> Snake {
         self.snakes.remove(index)
+    }
+
+    fn remove_apple(&mut self, index: usize) -> Apple {
+        self.apples.remove(index)
     }
 
     fn board_dim(&self) -> HexDim {

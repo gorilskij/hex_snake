@@ -126,14 +126,11 @@ impl SnakeDemo {
         );
 
         let collisions = find_collisions(self);
-        let (spawn_snakes, remove_apples, game_over) =
+        let (spawn_snakes, game_over) =
             handle_collisions(self, &collisions);
 
         assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
         assert_eq!(game_over, false, "unexpected game over");
-        for apple_index in remove_apples.into_iter().rev() {
-            self.apples.remove(apple_index);
-        }
 
         self.spawn_apples(prefs, rng);
     }
@@ -207,6 +204,9 @@ impl Environment for SnakeDemo {
         panic!("tried to remove snake at index {} in SnakeDemo", index)
     }
 
+    fn remove_apple(&mut self, index: usize) -> Apple {
+        self.apples.remove(index)
+    }
 
     fn board_dim(&self) -> HexDim {
         self.board_dim

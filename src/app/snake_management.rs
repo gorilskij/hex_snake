@@ -62,22 +62,6 @@ pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
 
             for (segment_idx, segment) in iter {
                 if snake1.head().pos == segment.pos {
-                    // prevent duplicate head-head collision
-                    if segment_idx == 0
-                        && collisions.iter().any(|collision| {
-                            matches!(
-                                collision,
-                                Collision::Snake {
-                                    snake1_index: _snake2_index,
-                                    snake2_index: _snake1_index,
-                                    snake2_segment_index: 0
-                                }
-                            )
-                        })
-                    {
-                        continue 'outer;
-                    }
-
                     if snake1_index == snake2_index {
                         collisions.push(Collision::Itself {
                             snake_index: snake1_index,
@@ -100,14 +84,12 @@ pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
     collisions
 }
 
-/// Returns `(spawn_snakes, remove_apples, game_over)` where
+/// Returns `(spawn_snakes, game_over)` where
 ///  - `spawn_snakes` describes the new snakes to spawn
 /// (competitors, killers, etc.)
-///  - `remove_apples` are the indices of apples to be removed
-/// (e.g. because they've been eaten)
 ///  - `game_over` tells whether a snake crashed and ended the game
 #[must_use]
-pub fn handle_collisions<E: Environment>(env: &mut E, collisions: &[Collision]) -> (Vec<snake::Seed>, Vec<usize>, bool) {
+pub fn handle_collisions<E: Environment>(env: &mut E, collisions: &[Collision]) -> (Vec<snake::Seed>, bool) {
     let (snakes, apples) = env.snakes_apples_mut();
 
     let mut spawn_snakes = vec![];
@@ -132,17 +114,12 @@ pub fn handle_collisions<E: Environment>(env: &mut E, collisions: &[Collision]) 
                 snake2_index,
                 snake2_segment_index,
             } => {
-                let behavior = if snake2_segment_index == 0 {
-                    // special case for head-head collision (always crash)
-                    EatBehavior::Crash
-                } else {
-                    let mechanics = &snakes[snake1_index].eat_mechanics;
-                    mechanics
-                        .eat_other
-                        .get(&snakes[snake2_index].snake_type)
-                        .copied()
-                        .unwrap_or(mechanics.default)
-                };
+                let mechanics = &snakes[snake1_index].eat_mechanics;
+                let behavior = mechanics
+                    .eat_other
+                    .get(&snakes[snake2_index].snake_type)
+                    .copied()
+                    .unwrap_or(mechanics.default);
                 match behavior {
                     EatBehavior::Cut => snakes[snake2_index].cut_at(snake2_segment_index),
                     EatBehavior::Crash => {
@@ -167,7 +144,11 @@ pub fn handle_collisions<E: Environment>(env: &mut E, collisions: &[Collision]) 
     }
 
     remove_apples.sort_unstable();
-    (spawn_snakes, remove_apples, game_over)
+    for apple_idx in remove_apples.into_iter().rev() {
+        env.remove_apple(apple_idx);
+    }
+
+    (spawn_snakes, game_over)
 }
 
 pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {

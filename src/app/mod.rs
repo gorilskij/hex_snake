@@ -15,6 +15,7 @@ use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
 use snake::{controller::Template, EatBehavior, EatMechanics, Seed};
+use crate::app::screen::DebugScenario;
 
 pub mod keyboard_control;
 mod palette;
@@ -100,16 +101,16 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
-            // screen: Screen::DebugScenario(DebugScenario::collision1(cell_dim)),
+            screen: Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
             // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            screen: Screen::Game(Game::new(
-                cell_dim,
-                7.,
-                seeds,
-                Palette::dark(),
-                SpawnPolicy::Random { apple_count: 5 },
-                window_mode,
-            )),
+            // screen: Screen::Game(Game::new(
+            //     cell_dim,
+            //     7.,
+            //     seeds,
+            //     Palette::dark(),
+            //     SpawnPolicy::Random { apple_count: 5 },
+            //     window_mode,
+            // )),
             window_mode,
             window_setup,
         }

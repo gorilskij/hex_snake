@@ -50,7 +50,7 @@ pub struct DebugScenario {
 
 impl DebugScenario {
     /// A snake crashes into another snake's body
-    pub fn collision1(cell_dim: CellDim) -> Self {
+    pub fn head_body_collision(cell_dim: CellDim) -> Self {
         // snake2 crashes into snake1 coming from the bottom-right
 
         let seed1 = snake::Seed {
@@ -114,6 +114,69 @@ impl DebugScenario {
         this
     }
 
+    /// Head-head collision
+    pub fn head_head_collision(cell_dim: CellDim) -> Self {
+        let seed1 = snake::Seed {
+            pos: Some(HexPoint { h: 5, v: 7 }),
+            dir: Some(Dir::Ur),
+            len: Some(5),
+
+            snake_type: snake::Type::Simulated,
+            eat_mechanics: EatMechanics {
+                eat_self: EatBehavior::Crash,
+                eat_other: hash_map! {},
+                default: EatBehavior::Die,
+            },
+            palette: snake::PaletteTemplate::solid_white_red(),
+            controller: Template::Programmed(vec![]),
+        };
+
+        let seed2 = snake::Seed {
+            pos: Some(HexPoint { h: 11, v: 7 }),
+            dir: Some(Dir::Ul),
+            len: Some(5),
+
+            snake_type: snake::Type::Simulated,
+            eat_mechanics: EatMechanics {
+                eat_self: EatBehavior::Crash,
+                eat_other: hash_map! {},
+                default: EatBehavior::Die,
+            },
+            palette: snake::PaletteTemplate::Solid {
+                color: Color::RED,
+                eaten: Color::WHITE,
+            },
+            controller: Template::Programmed(vec![]),
+        };
+
+        let snake1 = Snake::from(&seed1);
+        let snake2 = Snake::from(&seed2);
+
+        let mut this = Self {
+            control: Control::new(3.),
+
+            cell_dim,
+
+            board_dim: HexDim { h: 20, v: 10 },
+            offset: Point { x: 0., y: 0. },
+            fit_to_window: false,
+
+            palette: app::Palette::dark(),
+            prefs: Default::default(),
+            stats: Default::default(),
+
+            apples: vec![],
+            apple_spawn_policy: SpawnPolicy::None,
+
+            seeds: vec![seed1, seed2],
+            snakes: vec![snake1, snake2],
+
+            rng: thread_rng(),
+        };
+        this.control.pause();
+        this
+    }
+
     fn spawn_apples(&mut self) {
         let new_apples = spawn_apples(
             &mut self.apple_spawn_policy,
@@ -130,15 +193,11 @@ impl DebugScenario {
         advance_snakes(self);
 
         let collisions = find_collisions(self);
-        let (spawn_snakes, remove_apples, game_over) =
+        let (spawn_snakes, game_over) =
             handle_collisions(self, &collisions);
 
         if game_over {
             self.control.game_over();
-        }
-
-        for apple_index in remove_apples.into_iter().rev() {
-            self.apples.remove(apple_index);
         }
 
         assert!(spawn_snakes.is_empty(), "unimplemented");
@@ -239,6 +298,10 @@ impl Environment for DebugScenario {
 
     fn remove_snake(&mut self, index: usize) -> Snake {
         self.snakes.remove(index)
+    }
+
+    fn remove_apple(&mut self, index: usize) -> Apple {
+        self.apples.remove(index)
     }
 
     fn board_dim(&self) -> HexDim {

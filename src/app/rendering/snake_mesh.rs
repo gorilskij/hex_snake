@@ -208,25 +208,32 @@ pub fn snake_mesh(
 
     // Draw black holes and crashed heads
     let black_hole_color = Color::from_rgb(1, 36, 92);
-    for (segment_description, subsegments_per_segment, turn, frame_fraction) in black_holes {
+
+    // draw the actual black holes first in case there are multiple
+    // snakes falling into the same black hole (black holes in the same
+    // place are still drawn multiple times)
+    for (segment_description, _, _, frame_fraction) in &black_holes {
+        let destination;
+        let real_cell_dim;
         if segment_description.fraction.start == segment_description.fraction.end {
             // snake has died, animate black hole out
-            assert!(frame_fraction >= 0.5, "{} < 0.5", frame_fraction);
+            assert!(*frame_fraction >= 0.5, "{} < 0.5", frame_fraction);
             let animation_fraction = frame_fraction - 0.5;
-            build_hexagon_at(
-                segment_description.destination + cell_dim.center() * animation_fraction,
-                cell_dim * (1. - animation_fraction),
-                black_hole_color,
-                &mut builder,
-            )?;
+            destination = segment_description.destination + cell_dim.center() * animation_fraction;
+            real_cell_dim = cell_dim * (1. - animation_fraction);
         } else {
-            build_hexagon_at(
-                segment_description.destination,
-                cell_dim,
-                black_hole_color,
-                &mut builder,
-            )?;
+            destination = segment_description.destination;
+            real_cell_dim = cell_dim;
         }
+        build_hexagon_at(
+            destination,
+            real_cell_dim,
+            black_hole_color,
+            &mut builder,
+        )?;
+    }
+
+    for (segment_description, subsegments_per_segment, turn, _) in black_holes {
         stats.polygons += 1;
         stats.polygons += segment_description.build(&mut builder, subsegments_per_segment, turn)?;
     }
