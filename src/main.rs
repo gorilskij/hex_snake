@@ -58,21 +58,20 @@ fn main() {
         srgb: true,
     };
 
+    let (mut ctx, event_loop) = ContextBuilder::new("hex_snake", "gorilskij")
+        .window_mode(window_mode)
+        .window_setup(window_setup)
+        .build()
+        .unwrap();
+
     let app = App::new(
         vec![ControlSetup {
             layout: Layout::Dvorak,
             keyboard_side: Side::Right,
             hand: Side::Right,
         }],
-        window_mode,
-        window_setup,
+        &mut ctx,
     );
-
-    let (ctx, event_loop) = ContextBuilder::new("hex_snake", "gorilskij")
-        .window_mode(app.wm())
-        .window_setup(app.ws())
-        .build()
-        .unwrap();
 
     eprintln!("start");
 

@@ -38,8 +38,6 @@ use crate::{
 pub struct Game {
     control: Control,
 
-    /// Dimension of the window
-    window_dim: Point,
     /// Hex-dimension of the grid
     board_dim: HexDim,
     /// Offset to center the grid in the window
@@ -85,14 +83,13 @@ impl Game {
         seeds: Vec<snake::Seed>,
         palette: Palette,
         apple_spawn_policy: SpawnPolicy,
-        wm: WindowMode,
+        ctx: &mut Context,
     ) -> Self {
         assert!(!seeds.is_empty(), "No players specified");
 
-        let mut game = Self {
+        let mut this = Self {
             control: Control::new(starting_fps),
 
-            window_dim: Point { x: wm.width, y: wm.height },
             // board_dim and offset get updated immediately after creation
             // by calling update_dim()
             board_dim: HexDim { h: 0, v: 0 },
@@ -119,18 +116,18 @@ impl Game {
 
             draw_cache_invalid: 0,
         };
+        this.update_dim(ctx);
         // warning: this spawns apples before there are any snakes
-        game.update_dim();
-        game.restart();
-        game
+        this.restart();
+        this
     }
 
-    fn update_dim(&mut self) {
-        let Point { x: width, y: height } = self.window_dim;
+    fn update_dim(&mut self, ctx: &Context) {
+        let window_dim: Point = ggez::graphics::window(ctx).inner_size().into();
         let CellDim { side, sin, cos } = self.cell_dim;
         let new_board_dim = HexDim {
-            h: ((width - cos) / (side + cos)) as isize,
-            v: ((height - sin) / (2. * sin)) as isize,
+            h: ((window_dim.x - cos) / (side + cos)) as isize,
+            v: ((window_dim.y - sin) / (2. * sin)) as isize,
         };
 
         if self.board_dim != new_board_dim {
@@ -164,7 +161,7 @@ impl Game {
             x: new_board_dim.h as f32 * (side + cos) + cos,
             y: new_board_dim.v as f32 * 2. * sin + sin,
         };
-        self.offset = (self.window_dim - board_cartesian_dim) / 2.;
+        self.offset = (window_dim - board_cartesian_dim) / 2.;
     }
 
     fn restart(&mut self) {
@@ -536,7 +533,7 @@ impl EventHandler<ggez::GameError> for Game {
         graphics::present(ctx)
     }
 
-    fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
+    fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
         use KeyCode::*;
 
         let numeric_keys = [Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9];
@@ -551,7 +548,7 @@ impl EventHandler<ggez::GameError> for Game {
                 control::State::Playing => {
                     self.control.pause();
                     self.draw_cache_invalid = 5;
-                },
+                }
                 control::State::Paused => self.control.play(),
             },
             G => {
@@ -594,8 +591,7 @@ impl EventHandler<ggez::GameError> for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    Template::AStar
-                                        .into_controller(player_snake.body.dir),
+                                    Template::AStar.into_controller(player_snake.body.dir),
                                 ));
                                 "Autopilot on"
                             }
@@ -683,16 +679,20 @@ impl EventHandler<ggez::GameError> for Game {
                 };
                 self.display_notification(text);
             }
-            k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
-            let new_food = idx as Food + 1;
-            self.prefs.apple_food = new_food;
-            // change existing apples
-            for apple in & mut self.apples {
-            if let apple::Type::Normal(food) = & mut apple.apple_type {
-            * food = new_food;
-            }
-            }
-            self.display_notification(format ! ("Apple food: {}", new_food));
+            #[rustfmt::skip] // rustfmt doesn't know about if let guards
+            k if let Some(idx) = numeric_keys
+                .iter()
+                .position(|nk| *nk == k) =>
+            {
+                let new_food = idx as Food + 1;
+                self.prefs.apple_food = new_food;
+                // change existing apples
+                for apple in & mut self.apples {
+                    if let apple::Type::Normal(food) = &mut apple.apple_type {
+                        *food = new_food;
+                    }
+                }
+                self.display_notification(format!("Apple food: {}", new_food));
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
@@ -703,7 +703,7 @@ impl EventHandler<ggez::GameError> for Game {
                     new_side_length = Self::CELL_SIDE_MAX
                 }
                 self.cell_dim = CellDim::from(new_side_length);
-                self.update_dim();
+                self.update_dim(ctx);
                 self.display_notification(format!("Cell side: {}", new_side_length));
             }
             k => {
@@ -717,9 +717,8 @@ impl EventHandler<ggez::GameError> for Game {
     }
 
     // TODO: forbid resizing in-game
-    fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
-        self.window_dim = Point { x: width, y: height };
-        self.update_dim();
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
+        self.update_dim(ctx);
         let HexDim { h, v } = self.board_dim;
         self.display_notification(format!("{}x{}", h, v));
     }

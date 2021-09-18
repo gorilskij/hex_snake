@@ -1,4 +1,4 @@
-use ggez::mint::Point2;
+use ggez::{mint::Point2, winit::dpi::PhysicalSize};
 use std::ops::{Div, Mul};
 
 /// A more convenient version of mint::Point2<f32>
@@ -17,6 +17,15 @@ impl From<Point> for Point2<f32> {
 impl From<Point2<f32>> for Point {
     fn from(Point2 { x, y }: Point2<f32>) -> Self {
         Point { x, y }
+    }
+}
+
+impl From<PhysicalSize<u32>> for Point {
+    fn from(size: PhysicalSize<u32>) -> Self {
+        Self {
+            x: size.width as f32,
+            y: size.height as f32,
+        }
     }
 }
 

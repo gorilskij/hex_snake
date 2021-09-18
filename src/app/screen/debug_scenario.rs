@@ -1,7 +1,7 @@
 use ggez::{
     event::{EventHandler, KeyCode, KeyMods},
     graphics::{self, Color, DrawParam},
-    Context, GameResult,
+    Context, GameError, GameResult,
 };
 use rand::prelude::*;
 
@@ -25,6 +25,7 @@ use crate::{
     },
     basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
 };
+use ggez::event::{Axis, Button, ErrorOrigin, GamepadId, MouseButton};
 
 pub struct DebugScenario {
     control: Control,
@@ -32,7 +33,7 @@ pub struct DebugScenario {
     cell_dim: CellDim,
 
     board_dim: HexDim,
-    offset: Point,
+    offset: Option<Point>,
     fit_to_window: bool,
 
     palette: app::Palette,
@@ -79,10 +80,8 @@ impl DebugScenario {
                 eat_other: hash_map! {},
                 default: EatBehavior::Die,
             },
-            palette: snake::PaletteTemplate::Solid {
-                color: Color::RED,
-                eaten: Color::WHITE,
-            },
+            // palette: snake::PaletteTemplate::dark_blue_to_red(false),
+            palette: snake::PaletteTemplate::rainbow(true),
             controller: Template::Programmed(vec![]),
         };
 
@@ -95,7 +94,7 @@ impl DebugScenario {
             cell_dim,
 
             board_dim: HexDim { h: 20, v: 10 },
-            offset: Point { x: 0., y: 0. },
+            offset: None,
             fit_to_window: false,
 
             palette: app::Palette::dark(),
@@ -158,7 +157,7 @@ impl DebugScenario {
             cell_dim,
 
             board_dim: HexDim { h: 20, v: 10 },
-            offset: Point { x: 0., y: 0. },
+            offset: None,
             fit_to_window: false,
 
             palette: app::Palette::dark(),
@@ -205,6 +204,16 @@ impl DebugScenario {
     }
 }
 
+fn get_offset(board_dim: HexDim, window_dim: Point, cell_dim: CellDim) -> Point {
+    let CellDim { side, sin, cos } = cell_dim;
+
+    let board_cartesian_dim = Point {
+        x: board_dim.h as f32 * (side + cos) + cos,
+        y: board_dim.v as f32 * 2. * sin + sin,
+    };
+    (window_dim - board_cartesian_dim) / 2.
+}
+
 impl EventHandler<ggez::GameError> for DebugScenario {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         while self.control.can_update() {
@@ -220,7 +229,15 @@ impl EventHandler<ggez::GameError> for DebugScenario {
 
         graphics::clear(ctx, Color::BLACK);
 
-        let draw_param = DrawParam::default().dest(self.offset);
+        let offset = *self.offset.get_or_insert_with(|| {
+            let window_dim = ggez::graphics::window(ctx).inner_size();
+            let window_dim = Point {
+                x: window_dim.width as f32,
+                y: window_dim.height as f32,
+            };
+            get_offset(self.board_dim, window_dim, self.cell_dim)
+        });
+        let draw_param = DrawParam::default().dest(offset);
 
         let grid_mesh = rendering::grid_mesh(self.board_dim, self.cell_dim, &self.palette, ctx)?;
         graphics::draw(ctx, &grid_mesh, draw_param)?;
@@ -275,6 +292,14 @@ impl EventHandler<ggez::GameError> for DebugScenario {
                 control::State::GameOver => {}
             }
         }
+    }
+
+    fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
+        self.offset = Some(get_offset(
+            self.board_dim,
+            Point { x: width, y: height },
+            self.cell_dim,
+        ));
     }
 }
 

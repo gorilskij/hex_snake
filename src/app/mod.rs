@@ -56,16 +56,10 @@ impl DerefMut for Screen {
 
 pub struct App {
     screen: Screen,
-    window_mode: WindowMode,
-    window_setup: WindowSetup,
 }
 
 impl App {
-    pub fn new(
-        players: Vec<ControlSetup>,
-        window_mode: WindowMode,
-        window_setup: WindowSetup,
-    ) -> Self {
+    pub fn new(players: Vec<ControlSetup>, ctx: &mut Context) -> Self {
         assert_eq!(
             players.iter().map(|cs| cs.layout).dedup().count(),
             1,
@@ -100,6 +94,7 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
+            // screen: Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
             // screen: Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
             // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
             screen: Screen::Game(Game::new(
@@ -108,10 +103,8 @@ impl App {
                 seeds,
                 Palette::dark(),
                 SpawnPolicy::Random { apple_count: 5 },
-                window_mode,
+                ctx,
             )),
-            window_mode,
-            window_setup,
         }
 
         // let seeds = vec![SnakeSeed {
@@ -179,14 +172,6 @@ impl App {
         //     window_mode,
         //     window_setup,
         // }
-    }
-
-    pub fn wm(&self) -> WindowMode {
-        self.window_mode
-    }
-
-    pub fn ws(&self) -> WindowSetup {
-        self.window_setup.clone()
     }
 }
 
