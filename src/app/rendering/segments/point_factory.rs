@@ -8,14 +8,12 @@ use itertools::Itertools;
 use crate::{
     app::{
         rendering,
-        snake::{
-            palette::SegmentStyle,
-            render::{
-                descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
-                hexagon_segments::HexagonSegments,
-                smooth_segments::SmoothSegments,
-            },
+        rendering::segments::{
+            descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
+            hexagon_segments::HexagonSegments,
+            smooth_segments::SmoothSegments,
         },
+        snake::palette::SegmentStyle,
     },
     basic::{
         transformations::{flip_horizontally, rotate_clockwise, translate},

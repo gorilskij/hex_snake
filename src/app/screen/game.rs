@@ -20,22 +20,20 @@ use crate::{
         palette::Palette,
         prefs::Prefs,
         rendering,
+        screen::Environment,
         snake::{
             self,
             controller::{Controller, Template},
             utils::split_snakes_mut,
-            Snake,
+            Seed, Snake,
         },
         snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes},
         stats::Stats,
         utils::Food,
     },
-    basic::{CellDim, Dir, HexDim, HexPoint, Point},
+    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
     row::ROw,
 };
-use crate::app::screen::Environment;
-use crate::basic::FrameStamp;
-use crate::app::snake::Seed;
 
 pub struct Game {
     control: Control,
@@ -250,8 +248,7 @@ impl Game {
         }
 
         let collisions = find_collisions(self);
-        let (seeds, game_over) =
-            handle_collisions(self, &collisions);
+        let (seeds, game_over) = handle_collisions(self, &collisions);
 
         if game_over {
             self.control.game_over()

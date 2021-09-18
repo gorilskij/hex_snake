@@ -3,12 +3,15 @@ pub use game::Game;
 pub use start_screen::StartScreen;
 
 pub use crate::app::prefs::Prefs;
+use crate::{
+    app::{
+        apple::Apple,
+        snake::{Seed, Snake},
+    },
+    basic::{FrameStamp, HexDim},
+};
 use ggez::event::EventHandler;
-use crate::app::snake::{Snake, Seed};
-use crate::app::apple::Apple;
-use crate::basic::{HexDim, FrameStamp};
-use rand::Rng;
-use rand::rngs::ThreadRng;
+use rand::{rngs::ThreadRng, Rng};
 
 mod debug_scenario;
 mod game;

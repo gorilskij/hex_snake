@@ -11,6 +11,7 @@ use itertools::Itertools;
 use std::{
     cmp::{max, min},
     collections::HashSet,
+    iter,
     rc::Rc,
 };
 
@@ -88,7 +89,6 @@ impl AStar {
         };
 
         // A* search
-
         let head = body[0].pos;
 
         let mut seen = HashSet::new();
@@ -100,11 +100,14 @@ impl AStar {
             parent: None,
         }];
 
-        let forbidden_positions = body
+        let mut forbidden_positions: HashSet<_> = body
             .iter()
             .chain(other_snakes.iter_segments())
             .map(|seg| seg.pos)
-            .collect::<HashSet<_>>();
+            .collect();
+        // no 180° turns
+        forbidden_positions.insert(body[0].pos.translate(-body.dir, 1));
+        let forbidden_positions = forbidden_positions;
 
         loop {
             if paths.is_empty() {
@@ -182,9 +185,23 @@ impl Controller for AStar {
             }
         }
 
+        let going_to_crash = || {
+            let potential_next_head = self.path.get(0).map(|dir| body[0].pos.translate(*dir, 1));
+            potential_next_head
+                .map(|pos| {
+                    body.cells
+                        .iter()
+                        .chain(other_snakes.iter_segments())
+                        .map(|seg| seg.pos)
+                        .contains(&pos)
+                })
+                .unwrap_or(false)
+        };
+
         if self.target.is_none()
             || self.path.is_empty()
             || self.steps_since_update >= Self::UPDATE_EVERY_N_STEPS
+            || going_to_crash()
         {
             self.recalculate_target(body[0].pos, apples, board_dim);
             self.recalculate_path(body, other_snakes, board_dim);

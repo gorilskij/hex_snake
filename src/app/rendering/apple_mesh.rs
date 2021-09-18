@@ -9,7 +9,7 @@ use crate::{
         apple::{self, Apple},
         palette::Palette,
         rendering,
-        snake::render::render_hexagon,
+        rendering::segments::render_hexagon,
         stats::Stats,
     },
     basic::{transformations::translate, CellDim, FrameStamp},

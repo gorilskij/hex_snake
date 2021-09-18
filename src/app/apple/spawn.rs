@@ -3,7 +3,7 @@ use crate::{
         apple::{self, Apple},
         screen::Prefs,
         snake,
-        snake::{controller::Template, EatBehavior, EatMechanics, Seed, Snake},
+        snake::{controller::Template, EatBehavior, EatMechanics, Snake},
         utils::{get_occupied_cells, random_free_spot},
     },
     basic::{HexDim, HexPoint},
@@ -67,7 +67,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 len: None,
             })
         } else if rand < prefs.prob_spawn_competitor + prefs.prob_spawn_killer {
-            apple::Type::SpawnSnake(Seed {
+            apple::Type::SpawnSnake(snake::Seed {
                 snake_type: snake::Type::Killer { life: Some(200) },
                 eat_mechanics: EatMechanics::always(EatBehavior::Die),
                 palette: snake::PaletteTemplate::dark_blue_to_red(false),

@@ -4,13 +4,13 @@
 use crate::{
     app::{
         apple::{self, Apple},
+        screen::Environment,
         snake::{self, utils::split_snakes_mut, EatBehavior, Seed, SegmentType, Snake, State},
         utils::{get_occupied_cells, random_free_spot},
     },
     basic::{Dir, FrameStamp, HexDim},
 };
 use rand::Rng;
-use crate::app::screen::Environment;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -89,7 +89,10 @@ pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
 /// (competitors, killers, etc.)
 ///  - `game_over` tells whether a snake crashed and ended the game
 #[must_use]
-pub fn handle_collisions<E: Environment>(env: &mut E, collisions: &[Collision]) -> (Vec<snake::Seed>, bool) {
+pub fn handle_collisions<E: Environment>(
+    env: &mut E,
+    collisions: &[Collision],
+) -> (Vec<snake::Seed>, bool) {
     let (snakes, apples) = env.snakes_apples_mut();
 
     let mut spawn_snakes = vec![];
@@ -159,7 +162,8 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
 
         let mut occupied_cells = get_occupied_cells(env.snakes(), env.apples());
-        for snake in env.snakes()
+        for snake in env
+            .snakes()
             .iter()
             .filter(|s| s.snake_type == snake::Type::Player)
         {

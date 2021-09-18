@@ -15,16 +15,16 @@ use crate::{
         control::{self, Control},
         prefs::Prefs,
         rendering,
+        screen::Environment,
         snake::{
-            self, controller::Template, utils::split_snakes_mut, EatBehavior, EatMechanics, Snake,
+            self, controller::Template, utils::split_snakes_mut, EatBehavior, EatMechanics, Seed,
+            Snake,
         },
         snake_management::{advance_snakes, find_collisions, handle_collisions},
         stats::Stats,
     },
     basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
 };
-use crate::app::screen::Environment;
-use crate::app::snake::Seed;
 
 pub struct DebugScenario {
     control: Control,
@@ -193,8 +193,7 @@ impl DebugScenario {
         advance_snakes(self);
 
         let collisions = find_collisions(self);
-        let (spawn_snakes, game_over) =
-            handle_collisions(self, &collisions);
+        let (spawn_snakes, game_over) = handle_collisions(self, &collisions);
 
         if game_over {
             self.control.game_over();

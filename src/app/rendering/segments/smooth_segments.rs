@@ -1,11 +1,12 @@
+use std::{cmp::max, f32::consts::TAU};
+
 use crate::{
-    app::snake::render::{
+    app::rendering::segments::{
         descriptions::{SegmentDescription, SegmentFraction, TurnType},
         point_factory::SegmentRenderer,
     },
     basic::{CellDim, Point},
 };
-use std::{cmp::max, f32::consts::TAU};
 
 pub struct SmoothSegments;
 

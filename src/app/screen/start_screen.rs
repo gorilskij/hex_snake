@@ -16,7 +16,9 @@ use crate::{
         },
         control::Control,
         prefs::Prefs,
-        rendering, snake,
+        rendering,
+        screen::Environment,
+        snake,
         snake::{controller::Template, utils::OtherSnakes, EatBehavior, EatMechanics, Seed, Snake},
         snake_management::{find_collisions, handle_collisions},
         stats::Stats,
@@ -24,9 +26,10 @@ use crate::{
     },
     basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint},
 };
-use crate::app::screen::Environment;
-use std::rc::{Weak, Rc};
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -126,8 +129,7 @@ impl SnakeDemo {
         );
 
         let collisions = find_collisions(self);
-        let (spawn_snakes, game_over) =
-            handle_collisions(self, &collisions);
+        let (spawn_snakes, game_over) = handle_collisions(self, &collisions);
 
         assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
         assert_eq!(game_over, false, "unexpected game over");
@@ -213,7 +215,11 @@ impl Environment for SnakeDemo {
     }
 
     fn frame_stamp(&self) -> FrameStamp {
-        self.control.upgrade().expect("Weak pointer dropped").borrow().frame_stamp()
+        self.control
+            .upgrade()
+            .expect("Weak pointer dropped")
+            .borrow()
+            .frame_stamp()
     }
 
     fn rng(&mut self) -> &mut ThreadRng {

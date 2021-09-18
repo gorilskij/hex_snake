@@ -6,19 +6,16 @@ use ggez::{
 use crate::{
     app::{
         rendering,
-        snake::{
-            render::{
-                descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
-                render_hexagon,
-            },
-            SegmentType, Snake,
+        rendering::segments::{
+            descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
+            render_hexagon,
         },
+        snake::{SegmentType, Snake},
         stats::Stats,
     },
     basic::{transformations::translate, CellDim, FrameStamp, HexDim, Point},
+    partial_min_max::partial_min,
 };
-
-use crate::partial_min_max::partial_min;
 
 const DRAW_WHITE_AURA: bool = false;
 
@@ -122,14 +119,6 @@ pub fn snake_mesh(
                 .map(|prev_idx| -snake.body.cells[prev_idx].coming_from)
                 .unwrap_or(snake.dir());
 
-            if coming_from == going_to {
-                // TODO: diagnose this bug
-                panic!(
-                    "180° turn ({:?} -> {:?}) at idx {}, segment_type: {:?}",
-                    coming_from, going_to, segment_idx, segment.segment_type
-                );
-            }
-
             let location = segment.pos.to_cartesian(cell_dim);
 
             let fraction = match segment_idx {
@@ -225,12 +214,7 @@ pub fn snake_mesh(
             destination = segment_description.destination;
             real_cell_dim = cell_dim;
         }
-        build_hexagon_at(
-            destination,
-            real_cell_dim,
-            black_hole_color,
-            &mut builder,
-        )?;
+        build_hexagon_at(destination, real_cell_dim, black_hole_color, &mut builder)?;
     }
 
     for (segment_description, subsegments_per_segment, turn, _) in black_holes {

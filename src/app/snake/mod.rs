@@ -1,20 +1,21 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    ops::Deref,
+};
+
+pub use palette::{Palette, PaletteTemplate};
 
 use crate::{
     app::{
         apple::Apple,
         snake::{controller::Controller, utils::OtherSnakes},
+        utils::Frames,
     },
-    basic::{Dir, HexDim, HexPoint},
+    basic::{Dir, FrameStamp, HexDim, HexPoint},
 };
-use std::ops::Deref;
-
-use crate::{app::utils::Frames, basic::FrameStamp};
-pub use palette::{Palette, PaletteTemplate};
 
 pub mod controller;
-mod palette;
-pub mod render;
+pub mod palette;
 pub mod utils;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -155,6 +156,11 @@ impl From<&Seed> for Snake {
         let dir = dir.expect("starting direction not provided");
         let len = len.expect("starting length not provided");
 
+        eprintln!(
+            "spawn snake at {:?} coming from {:?} going to {:?}",
+            pos, -dir, dir
+        );
+
         let head = Segment {
             segment_type: SegmentType::Normal,
             pos,
@@ -250,15 +256,24 @@ impl Snake {
         board_dim: HexDim,
         frame_stamp: FrameStamp,
     ) {
-        if !self.body.dir_grace && self.state == State::Living {
-            if let Some(new_dir) =
-                self.controller
-                    .next_dir(&mut self.body, other_snakes, apples, board_dim)
-            {
-                self.body.dir = new_dir;
+        if self.body.dir_grace || self.state != State::Living {
+            return;
+        }
+
+        let new_dir = self
+            .controller
+            .next_dir(&mut self.body, other_snakes, apples, board_dim);
+        match new_dir {
+            Some(dir) if dir == -self.body.dir => panic!(
+                "controller tried to perform a 180° turn {:?} -> {:?}",
+                self.body.dir, dir
+            ),
+            Some(dir) if dir != self.body.dir => {
+                self.body.dir = dir;
                 self.body.dir_grace = true;
                 self.body.turn_start = Some(frame_stamp);
             }
+            _ => {}
         }
     }
 
