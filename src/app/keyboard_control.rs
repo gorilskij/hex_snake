@@ -17,8 +17,9 @@ pub struct Controls {
 impl Controls {
     /// All keybinding specifications are in Qwerty, this
     /// function is used to translate them to other keyboard
-    /// layouts
-    fn from_qwerty_to(self, layout: Layout) -> Self {
+    /// layouts (find the key in the new layout which
+    /// corresponds to the given key in qwerty)
+    fn to_layout(self, layout: Layout) -> Self {
         let c = LayoutConverter::new(Layout::Qwerty, layout);
         Self {
             u: c.cvt(self.u),
@@ -52,6 +53,6 @@ impl From<ControlSetup> for Controls {
                 Self { ul: S, u: D, ur: F, dl: Z, d: X, dr: C },
         };
 
-        qwerty_controls.from_qwerty_to(setup.layout)
+        qwerty_controls.to_layout(setup.layout)
     }
 }

@@ -52,12 +52,22 @@ pub enum SpawnPolicy {
     // ScheduledOtTime { .. }
 }
 
+impl SpawnPolicy {
+    pub fn reset(&mut self) {
+        match self {
+            SpawnPolicy::None => {}
+            SpawnPolicy::Random { .. } => {}
+            SpawnPolicy::ScheduledOnEat { next_index, .. } => *next_index = 0,
+        }
+    }
+}
+
 // TODO: add a snake spawn policy
 fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
     if prefs.special_apples {
         let rand = rng.gen::<f32>();
         if rand < prefs.prob_spawn_competitor {
-            apple::Type::SpawnSnake(snake::Seed {
+            apple::Type::SpawnSnake(Box::new(snake::Seed {
                 snake_type: snake::Type::Competitor { life: Some(200) },
                 eat_mechanics: EatMechanics::always(EatBehavior::Die),
                 palette: snake::PaletteTemplate::pastel_rainbow(true),
@@ -65,9 +75,9 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 pos: None,
                 dir: None,
                 len: None,
-            })
+            }))
         } else if rand < prefs.prob_spawn_competitor + prefs.prob_spawn_killer {
-            apple::Type::SpawnSnake(snake::Seed {
+            apple::Type::SpawnSnake(Box::new(snake::Seed {
                 snake_type: snake::Type::Killer { life: Some(200) },
                 eat_mechanics: EatMechanics::always(EatBehavior::Die),
                 palette: snake::PaletteTemplate::dark_blue_to_red(false),
@@ -75,7 +85,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 pos: None,
                 dir: None,
                 len: None,
-            })
+            }))
         } else {
             apple::Type::Normal(prefs.apple_food)
         }

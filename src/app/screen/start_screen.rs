@@ -132,7 +132,7 @@ impl SnakeDemo {
         let (spawn_snakes, game_over) = handle_collisions(self, &collisions);
 
         assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
-        assert_eq!(game_over, false, "unexpected game over");
+        assert!(!game_over, "unexpected game over");
 
         self.spawn_apples(prefs, rng);
     }
@@ -244,6 +244,7 @@ pub struct StartScreen {
 }
 
 impl StartScreen {
+    #[allow(dead_code)]
     pub fn new(cell_dim: CellDim) -> Self {
         let control = Rc::new(RefCell::new(Control::new(7.)));
         let weak1 = Rc::downgrade(&control);

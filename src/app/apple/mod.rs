@@ -9,7 +9,7 @@ pub mod spawn;
 #[derive(Debug)]
 pub enum Type {
     Normal(Food),
-    SpawnSnake(snake::Seed),
+    SpawnSnake(Box<snake::Seed>),
 }
 
 pub struct Apple {

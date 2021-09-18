@@ -1,7 +1,7 @@
 use ggez::{
     event::{EventHandler, KeyCode, KeyMods},
     graphics::{self, Color, DrawParam},
-    Context, GameError, GameResult,
+    Context, GameResult,
 };
 use rand::prelude::*;
 
@@ -25,7 +25,7 @@ use crate::{
     },
     basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
 };
-use ggez::event::{Axis, Button, ErrorOrigin, GamepadId, MouseButton};
+
 
 pub struct DebugScenario {
     control: Control,
@@ -49,6 +49,8 @@ pub struct DebugScenario {
     rng: ThreadRng,
 }
 
+// Constructors
+#[allow(dead_code)]
 impl DebugScenario {
     /// A snake crashes into another snake's body
     pub fn head_body_collision(cell_dim: CellDim) -> Self {
@@ -175,6 +177,15 @@ impl DebugScenario {
         this.control.pause();
         this
     }
+}
+
+impl DebugScenario {
+    fn restart(&mut self) {
+        self.snakes = self.seeds.iter().map(Snake::from).collect();
+        self.apples = vec![];
+        self.apple_spawn_policy.reset();
+        self.control.play();
+    }
 
     fn spawn_apples(&mut self) {
         let new_apples = spawn_apples(
@@ -285,16 +296,23 @@ impl EventHandler<ggez::GameError> for DebugScenario {
         _keymods: KeyMods,
         _repeat: bool,
     ) {
+        use control::State::*;
+
         if keycode == KeyCode::Space {
             match self.control.state() {
-                control::State::Playing => self.control.pause(),
-                control::State::Paused => self.control.play(),
-                control::State::GameOver => {}
+                Playing => self.control.pause(),
+                Paused => self.control.play(),
+                GameOver => self.restart(),
             }
+        } else if keycode == KeyCode::R {
+            self.restart()
         }
     }
 
     fn resize_event(&mut self, _ctx: &mut Context, width: f32, height: f32) {
+        if self.fit_to_window {
+            todo!()
+        }
         self.offset = Some(get_offset(
             self.board_dim,
             Point { x: width, y: height },

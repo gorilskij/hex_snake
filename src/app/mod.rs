@@ -1,7 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
 use ggez::{
-    conf::{WindowMode, WindowSetup},
     event::{EventHandler, KeyCode, KeyMods},
     graphics,
     graphics::Rect,
@@ -9,12 +8,13 @@ use ggez::{
 };
 use itertools::Itertools;
 
-use crate::{app::screen::DebugScenario, basic::CellDim};
+use crate::{basic::CellDim};
 use apple::spawn::SpawnPolicy;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
 use snake::{controller::Template, EatBehavior, EatMechanics, Seed};
+use crate::app::screen::{DebugScenario, StartScreen};
 
 pub mod keyboard_control;
 mod palette;
@@ -94,17 +94,20 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
-            // screen: Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
-            // screen: Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
-            // screen: Screen::StartScreen(StartScreen::new(cell_dim)),
-            screen: Screen::Game(Game::new(
-                cell_dim,
-                7.,
-                seeds,
-                Palette::dark(),
-                SpawnPolicy::Random { apple_count: 5 },
-                ctx,
-            )),
+            screen: match 0 {
+                0 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
+                1 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
+                2 => Screen::StartScreen(StartScreen::new(cell_dim)),
+                3 => Screen::Game(Game::new(
+                    cell_dim,
+                    7.,
+                    seeds,
+                    Palette::dark(),
+                    SpawnPolicy::Random { apple_count: 5 },
+                    ctx,
+                )),
+                _ => unreachable!(),
+            }
         }
 
         // let seeds = vec![SnakeSeed {

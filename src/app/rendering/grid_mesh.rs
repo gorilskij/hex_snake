@@ -115,13 +115,12 @@ pub fn border_mesh(
     builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
 
     // right border
+    let single_offset = 2. * (side + cos);
     if board_dim.h.is_even() {
-        let single_offset = 2. * (side + cos);
         let offset = (board_dim.h / 2) as f32 * single_offset;
         vline_a.iter_mut().for_each(|a| a.x += offset);
         builder.polyline(draw_mode, &vline_a[1..], color)?;
     } else {
-        let single_offset = 2. * (side + cos);
         let offset = ((board_dim.h - 1) / 2) as f32 * single_offset;
         vline_b.iter_mut().for_each(|b| b.x += offset);
         builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;

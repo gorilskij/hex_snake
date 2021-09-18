@@ -10,13 +10,14 @@ use crate::{
     },
     basic::{FrameStamp, HexDim},
 };
-use ggez::event::EventHandler;
+
 use rand::{rngs::ThreadRng, Rng};
 
 mod debug_scenario;
 mod game;
 mod start_screen;
 
+#[allow(dead_code)]
 pub enum Screen {
     DebugScenario(DebugScenario),
     StartScreen(StartScreen),

@@ -18,7 +18,10 @@ pub enum Dir {
 
 impl From<u8> for Dir {
     fn from(num: u8) -> Self {
-        unsafe { std::mem::transmute(num % 6) }
+        // SAFETY: (num % 6) is between 0 and 5
+        unsafe {
+            std::mem::transmute(num % 6)
+        }
     }
 }
 

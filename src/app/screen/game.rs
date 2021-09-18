@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use ggez::{
-    conf::WindowMode,
     event::{EventHandler, KeyCode, KeyMods},
     graphics::{self, Color, DrawParam, Mesh},
     Context, GameResult,
@@ -77,6 +76,7 @@ pub struct Game {
 }
 
 impl Game {
+    #[allow(dead_code)]
     pub fn new(
         cell_dim: CellDim,
         starting_fps: f64,
@@ -717,7 +717,7 @@ impl EventHandler<ggez::GameError> for Game {
     }
 
     // TODO: forbid resizing in-game
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
+    fn resize_event(&mut self, ctx: &mut Context, _width: f32, _height: f32) {
         self.update_dim(ctx);
         let HexDim { h, v } = self.board_dim;
         self.display_notification(format!("{}x{}", h, v));

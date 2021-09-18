@@ -20,6 +20,7 @@ macro_rules! hash_map {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[allow(dead_code)]
 pub enum Side {
     Left,
     Right,

@@ -1,6 +1,7 @@
-#![deny(unused_must_use)]
 #![feature(stmt_expr_attributes)]
 #![feature(if_let_guard)]
+#![deny(unused_must_use)]
+// #![deny(unsafe_code)]
 
 #[macro_use]
 extern crate derive_more;

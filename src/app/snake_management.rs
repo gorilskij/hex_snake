@@ -3,12 +3,12 @@
 
 use crate::{
     app::{
-        apple::{self, Apple},
+        apple::{self},
         screen::Environment,
-        snake::{self, utils::split_snakes_mut, EatBehavior, Seed, SegmentType, Snake, State},
+        snake::{self, utils::split_snakes_mut, EatBehavior, Seed, SegmentType, State},
         utils::{get_occupied_cells, random_free_spot},
     },
-    basic::{Dir, FrameStamp, HexDim},
+    basic::{Dir},
 };
 use rand::Rng;
 
@@ -109,7 +109,7 @@ pub fn handle_collisions<E: Environment>(
                             food_left: *food,
                         }
                     }
-                    apple::Type::SpawnSnake(seed) => spawn_snakes.push(seed.clone()),
+                    apple::Type::SpawnSnake(seed) => spawn_snakes.push(*seed.clone()),
                 }
             }
             Collision::Snake {

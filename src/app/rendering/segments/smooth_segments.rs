@@ -27,11 +27,11 @@ fn upper_intersection_point(p0: Point, r0: f32, p1: Point, r1: f32) -> Point {
     let a = (r0.powi(2) - r1.powi(2) + d.powi(2)) / (2. * d);
     let p2: Point = p0 + (a / d) * (p1 - p0);
     let h = (r0.powi(2) - a.powi(2)).sqrt();
-    let p3 = Point {
+    // p3
+    Point {
         x: p2.x - (h / d) * (p1.y - p0.y),
         y: p2.y + (h / d) * (p1.x - p0.x),
-    };
-    p3
+    }
 }
 
 impl SegmentRenderer for SmoothSegments {

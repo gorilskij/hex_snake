@@ -11,7 +11,6 @@ use itertools::Itertools;
 use std::{
     cmp::{max, min},
     collections::HashSet,
-    iter,
     rc::Rc,
 };
 
@@ -52,7 +51,7 @@ impl PathNode {
 impl AStar {
     const UPDATE_EVERY_N_STEPS: usize = 10;
     const HEURISTIC: fn(HexPoint, HexPoint, HexDim) -> usize = Self::heuristic;
-    const SEARCH_LIMIT: Option<usize> = None;
+    // const SEARCH_LIMIT: Option<usize> = None;
 
     fn heuristic(a: HexPoint, b: HexPoint, board_dim: HexDim) -> usize {
         let h1 = (a.h - b.h).abs();

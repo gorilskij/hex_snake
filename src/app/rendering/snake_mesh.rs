@@ -204,7 +204,8 @@ pub fn snake_mesh(
     for (segment_description, _, _, frame_fraction) in &black_holes {
         let destination;
         let real_cell_dim;
-        if segment_description.fraction.start == segment_description.fraction.end {
+        let SegmentFraction { start, end } = segment_description.fraction;
+        if (start - end).abs() < f32::EPSILON {
             // snake has died, animate black hole out
             assert!(*frame_fraction >= 0.5, "{} < 0.5", frame_fraction);
             let animation_fraction = frame_fraction - 0.5;
