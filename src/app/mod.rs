@@ -94,7 +94,7 @@ impl App {
 
         let cell_dim = CellDim::from(30.);
         Self {
-            screen: match 0 {
+            screen: match 3 {
                 0 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
                 1 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
                 2 => Screen::StartScreen(StartScreen::new(cell_dim)),
@@ -193,7 +193,6 @@ impl EventHandler<ggez::GameError> for App {
     }
 
     fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, mods: KeyMods, repeat: bool) {
-        println!("pressed {:?}", key);
         self.screen.key_down_event(ctx, key, mods, repeat)
     }
 

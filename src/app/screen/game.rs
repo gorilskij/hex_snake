@@ -553,6 +553,7 @@ impl EventHandler<ggez::GameError> for Game {
             },
             G => {
                 self.prefs.draw_grid = !self.prefs.draw_grid;
+                self.prefs.draw_border = self.prefs.draw_grid;
                 let text = if self.prefs.draw_grid {
                     "Grid on"
                 } else {
