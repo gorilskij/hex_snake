@@ -1,4 +1,4 @@
-use std::{cmp::max, f32::consts::TAU};
+use std::{f32::consts::TAU, iter};
 
 use crate::{
     app::rendering::segments::{
@@ -7,12 +7,13 @@ use crate::{
     },
     basic::{CellDim, Point},
 };
+use lyon_geom::{Arc, Angle};
+use itertools::Itertools;
 
 pub struct SmoothSegments;
 
-/// Number of segments for a full turn, a lower number results
-/// in a lower resolution, i.e. jagged edges
-const NUM_ANGLE_SEGMENTS: usize = 10;
+// TODO: make this a variable parameter based on zoom level
+const TOLERANCE: f32 = 0.5;
 
 /// Return the upper intersection point between two circles
 ///  - p0, p1 are the centers of the circles
@@ -63,13 +64,18 @@ impl SegmentRenderer for SmoothSegments {
 
         let CellDim { side, sin, cos } = *cell_dim;
 
-        // distance of the pivot from where it is for a sharp turn
-        let pivot_dist = 2. * cos * (1. / turn - 1.);
-        // too straight to be drawn as curved, default to straight drawing
-        if pivot_dist.is_infinite() {
-            return Self::render_default_straight_segment(description);
-        }
-        let pivot = Point { x: side + cos + pivot_dist, y: 0. };
+        let pivot = {
+            // distance of the pivot from where it is for a sharp turn
+            let pivot_dist = 2. * cos * (1. / turn - 1.);
+            // too straight to be drawn as curved, default to straight drawing
+            if pivot_dist.is_infinite() {
+                return Self::render_default_straight_segment(description);
+            }
+            Point { x: side + cos + pivot_dist, y: 0. }
+        };
+
+        let inner_radius = pivot.x - side - cos;
+        let outer_radius = pivot.x - cos;
 
         // We imagine a circle in which the cell's hexagon is inscribed,
         // we also imagine a circle around the pivot tracing the outer path,
@@ -84,8 +90,7 @@ impl SegmentRenderer for SmoothSegments {
             // find the (upper) intersection point between the two circles
             let p0 = Point { x: cos + side / 2., y: sin };
             let r0 = ((side / 2.).powi(2) + sin.powi(2)).sqrt();
-            let r1 = side + pivot_dist;
-            let intersection_point = upper_intersection_point(p0, r0, pivot, r1);
+            let intersection_point = upper_intersection_point(p0, r0, pivot, outer_radius);
 
             // find the angle around the pivot for when the pivot is right or left
             // of the intersection point
@@ -96,33 +101,38 @@ impl SegmentRenderer for SmoothSegments {
             }
         };
 
-        let inner_line_start = Point { x: cos + side, y: 0. };
-        let outer_line_start = Point { x: cos, y: 0. };
+        let start_radians = fraction.start * total_angle;
+        let end_radians = fraction.end * total_angle;
 
-        let fraction_size = fraction.end - fraction.start;
-        let num_angle_segments = NUM_ANGLE_SEGMENTS as f32 * fraction_size;
-        let num_angle_segments = max(1, num_angle_segments as usize);
+        let center = pivot.into();
+        let start_angle = Angle { radians: TAU / 2. - start_radians };
+        let sweep_angle = Angle { radians: start_radians - end_radians };
+        let x_rotation = Angle { radians: 0. };
 
-        let mut points = Vec::with_capacity(num_angle_segments * 2 + 2);
-        let start_angle = fraction.start * total_angle;
-        let end_angle = fraction.end * total_angle;
-        let angle_diff = end_angle - start_angle;
+        let inner_arc = Arc {
+            center,
+            radii: Point::square(inner_radius).into(),
+            start_angle,
+            sweep_angle,
+            x_rotation,
+        };
 
-        let inner_line = (0..=num_angle_segments).map(move |i| {
-            let i = i as f32 / num_angle_segments as f32;
-            let angle = start_angle + i * angle_diff;
-            inner_line_start.rotate_counterclockwise(pivot, angle)
-        });
+        let outer_arc = Arc {
+            center,
+            radii: Point::square(outer_radius).into(),
+            start_angle: inner_arc.end_angle(),
+            sweep_angle: -sweep_angle,
+            x_rotation,
+        };
 
-        // outer line in opposite direction (notice call to rev)
-        let outer_line = (0..=num_angle_segments).rev().map(move |i| {
-            let i = i as f32 / num_angle_segments as f32;
-            let angle = start_angle + i * angle_diff;
-            outer_line_start.rotate_counterclockwise(pivot, angle)
-        });
+        let points = iter::once(inner_arc.sample(0.))
+            .chain(inner_arc.flattened(TOLERANCE))
+            .chain(iter::once(outer_arc.sample(0.)))
+            .chain(outer_arc.flattened(TOLERANCE))
+            .map(Point::from)
+            .collect_vec();
 
-        points.extend(inner_line);
-        points.extend(outer_line);
+        println!("total: {}", points.len());
 
         // TODO: if this appears again, just forgo drawing the segment
         if points.len() < 3 {

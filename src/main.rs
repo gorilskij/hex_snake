@@ -26,6 +26,7 @@ mod partial_min_max;
 mod row;
 
 // TODO
+//  - untie frame_fraction from graphics
 //  - factor out lazy redrawing code (the whole mess with Some(grid_mesh)...)
 //  - if a frame is nearing its end, delay turning until the next frame to avoid choppy animation
 //  - make border toggleable
