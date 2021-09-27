@@ -33,23 +33,24 @@ use crate::{
     basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
     row::ROw,
 };
+use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
+use ggez::input::mouse;
+use ggez::graphics::{MeshBuilder, DrawMode, StrokeOptions};
+use crate::app::rendering::segments::render_hexagon;
+use crate::basic::transformations::translate;
+use crate::app::game_context::GameContext;
 
 pub struct Game {
     control: Control,
 
-    /// Hex-dimension of the grid
-    board_dim: HexDim,
+    gtx: GameContext,
+
     /// Offset to center the grid in the window
     offset: Point,
 
     seeds: Vec<snake::Seed>,
     snakes: Vec<Snake>,
     apples: Vec<Apple>,
-
-    apple_spawn_policy: SpawnPolicy,
-
-    cell_dim: CellDim,
-    palette: Palette,
 
     rng: ThreadRng,
 
@@ -58,7 +59,6 @@ pub struct Game {
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
 
-    prefs: Prefs,
     messages: HashMap<MessageID, Message>,
 
     /// Cached meshes used when the game is paused
@@ -90,25 +90,26 @@ impl Game {
         let mut this = Self {
             control: Control::new(starting_fps),
 
-            // board_dim and offset get updated immediately after creation
-            // by calling update_dim()
-            board_dim: HexDim { h: 0, v: 0 },
+            gtx: GameContext {
+                // updated immediately after creation
+                board_dim: HexPoint { h: 0, v: 0 },
+                cell_dim,
+                palette,
+                prefs: Default::default(),
+                apple_spawn_policy,
+                frame_stamp: Default::default(),
+            },
+            // updated immediately after creation
             offset: Point { x: 0., y: 0. },
 
             seeds: seeds.into_iter().map(Into::into).collect(),
             snakes: vec![],
             apples: vec![],
 
-            apple_spawn_policy,
-
-            cell_dim,
-            palette,
-
             rng: thread_rng(),
             grid_mesh: None,
             border_mesh: None,
 
-            prefs: Prefs::default(),
             messages: HashMap::new(),
 
             cached_snake_mesh: None,
@@ -123,30 +124,27 @@ impl Game {
     }
 
     fn update_dim(&mut self, ctx: &Context) {
-        let window_dim: Point = ggez::graphics::window(ctx).inner_size().into();
-        let CellDim { side, sin, cos } = self.cell_dim;
-        let new_board_dim = HexDim {
-            h: ((window_dim.x - cos) / (side + cos)) as isize,
-            v: ((window_dim.y - sin) / (2. * sin)) as isize,
-        };
+        let board_dim = calculate_board_dim(ctx, self.gtx.cell_dim);
 
-        if self.board_dim != new_board_dim {
-            self.board_dim = new_board_dim;
+        self.offset = calculate_offset(ctx, board_dim, self.gtx.cell_dim);
+
+        if self.gtx.board_dim != board_dim {
+            self.gtx.board_dim = board_dim;
 
             // restart if player snake head has left board limits
             if self.snakes.iter().any(|s| {
-                s.snake_type == snake::Type::Player && !new_board_dim.contains(s.head().pos)
+                s.snake_type == snake::Type::Player && !board_dim.contains(s.head().pos)
             }) {
                 println!("warning: player snake outside of board, restarting");
                 self.restart();
             } else {
                 // remove snakes outside of board limits
                 self.snakes
-                    .retain(move |snake| new_board_dim.contains(snake.head().pos));
+                    .retain(move |snake| board_dim.contains(snake.head().pos));
 
                 // remove apples outside of board limits
                 self.apples
-                    .retain(move |apple| new_board_dim.contains(apple.pos));
+                    .retain(move |apple| board_dim.contains(apple.pos));
                 self.spawn_apples();
             }
 
@@ -156,12 +154,6 @@ impl Game {
             self.cached_apple_mesh = None;
             self.cached_snake_mesh = None;
         }
-
-        let board_cartesian_dim = Point {
-            x: new_board_dim.h as f32 * (side + cos) + cos,
-            y: new_board_dim.v as f32 * 2. * sin + sin,
-        };
-        self.offset = (window_dim - board_cartesian_dim) / 2.;
     }
 
     fn restart(&mut self) {
@@ -181,10 +173,10 @@ impl Game {
             const DISTANCE_BETWEEN_SNAKES: isize = 1;
 
             let total_width = (unpositioned - 1) as isize * DISTANCE_BETWEEN_SNAKES + 1;
-            assert!(total_width < self.board_dim.h, "snakes spread too wide");
+            assert!(total_width < self.gtx.board_dim.h, "snakes spread too wide");
 
             let half = total_width / 2;
-            let middle = self.board_dim.h / 2;
+            let middle = self.gtx.board_dim.h / 2;
             let start = middle - half;
             let end = start + total_width - 1;
 
@@ -202,7 +194,7 @@ impl Game {
                 _ => {
                     seed.pos = Some(HexPoint {
                         h: unpositioned_h_pos.next().unwrap(),
-                        v: self.board_dim.v / 2,
+                        v: self.gtx.board_dim.v / 2,
                     });
                     seed.dir = Some(unpositioned_dir);
                     seed.len = Some(10);
@@ -220,8 +212,8 @@ impl Game {
         self.spawn_apples();
     }
 
-    fn advance_snakes(&mut self) {
-        advance_snakes(self);
+    fn advance_snakes(&mut self, ctx: &Context) {
+        advance_snakes(self, ctx);
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
@@ -262,11 +254,9 @@ impl Game {
 
     fn spawn_apples(&mut self) {
         let new_apples = spawn_apples(
-            &mut self.apple_spawn_policy,
-            self.board_dim,
             &self.snakes,
             &self.apples,
-            &self.prefs,
+            &mut self.gtx,
             &mut self.rng,
         );
         self.apples.extend(new_apples.into_iter())
@@ -300,7 +290,7 @@ impl Game {
             Message::default_top_right(
                 text.to_string(),
                 Color::WHITE,
-                Some(self.prefs.message_duration),
+                Some(self.gtx.prefs.message_duration),
             ),
         );
     }
@@ -336,9 +326,9 @@ impl Game {
 }
 
 impl EventHandler<ggez::GameError> for Game {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
         while self.control.can_update() {
-            self.advance_snakes();
+            self.advance_snakes(ctx);
             self.spawn_apples();
         }
 
@@ -346,9 +336,9 @@ impl EventHandler<ggez::GameError> for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        self.control.graphics_frame();
+        self.control.graphics_frame(&mut self.gtx);
 
-        if self.prefs.display_fps {
+        if self.gtx.prefs.display_fps {
             self.update_fps_message();
         }
 
@@ -382,7 +372,7 @@ impl EventHandler<ggez::GameError> for Game {
             // same game frame are blocked
             for idx in 0..self.snakes.len() {
                 let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, idx);
-                snake.update_dir(other_snakes, &self.apples, self.board_dim, frame_stamp);
+                snake.update_dir(other_snakes, &self.apples, &self.gtx, ctx);
             }
 
             self.cached_snake_mesh = None;
@@ -390,39 +380,29 @@ impl EventHandler<ggez::GameError> for Game {
 
             snake_mesh = Some(ROw::Owned(rendering::snake_mesh(
                 &mut self.snakes,
-                frame_stamp,
-                self.board_dim,
-                self.cell_dim,
-                self.prefs.draw_style,
+                &self.gtx,
                 ctx,
                 &mut stats,
             )?));
             apple_mesh = Some(ROw::Owned(rendering::apple_mesh(
                 &self.apples,
-                frame_stamp,
-                self.cell_dim,
-                self.prefs.draw_style,
-                &self.palette,
+                &self.gtx,
                 ctx,
                 &mut stats,
             )?));
-            if self.prefs.draw_grid {
+            if self.gtx.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
                     self.grid_mesh = Some(rendering::grid_mesh(
-                        self.board_dim,
-                        self.cell_dim,
-                        &self.palette,
+                        &self.gtx,
                         ctx,
                     )?);
                 };
                 grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
             }
-            if self.prefs.draw_border {
+            if self.gtx.prefs.draw_border {
                 if self.border_mesh.is_none() {
                     self.border_mesh = Some(rendering::border_mesh(
-                        self.board_dim,
-                        self.cell_dim,
-                        &self.palette,
+                        &self.gtx,
                         ctx,
                     )?);
                 }
@@ -440,10 +420,7 @@ impl EventHandler<ggez::GameError> for Game {
             {
                 self.cached_apple_mesh = Some(rendering::apple_mesh(
                     &self.apples,
-                    frame_stamp,
-                    self.cell_dim,
-                    self.prefs.draw_style,
-                    &self.palette,
+                    &self.gtx,
                     ctx,
                     &mut stats,
                 )?);
@@ -453,10 +430,7 @@ impl EventHandler<ggez::GameError> for Game {
             if self.cached_snake_mesh.is_none() {
                 self.cached_snake_mesh = Some(rendering::snake_mesh(
                     &mut self.snakes,
-                    frame_stamp,
-                    self.board_dim,
-                    self.cell_dim,
-                    self.prefs.draw_style,
+                    &self.gtx,
                     ctx,
                     &mut stats,
                 )?);
@@ -473,23 +447,19 @@ impl EventHandler<ggez::GameError> for Game {
             }
 
             if update {
-                if self.prefs.draw_grid {
+                if self.gtx.prefs.draw_grid {
                     if self.grid_mesh.is_none() {
                         self.grid_mesh = Some(rendering::grid_mesh(
-                            self.board_dim,
-                            self.cell_dim,
-                            &self.palette,
+                            &self.gtx,
                             ctx,
                         )?);
                     };
                     grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
                 }
-                if self.prefs.draw_border {
+                if self.gtx.prefs.draw_border {
                     if self.border_mesh.is_none() {
                         self.border_mesh = Some(rendering::border_mesh(
-                            self.board_dim,
-                            self.cell_dim,
-                            &self.palette,
+                            &self.gtx,
                             ctx,
                         )?);
                     }
@@ -507,7 +477,7 @@ impl EventHandler<ggez::GameError> for Game {
             || apple_mesh.is_some()
             || snake_mesh.is_some()
         {
-            graphics::clear(ctx, self.palette.background_color);
+            graphics::clear(ctx, self.gtx.palette.background_color);
 
             if let Some(mesh) = grid_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
@@ -521,8 +491,16 @@ impl EventHandler<ggez::GameError> for Game {
             if let Some(mesh) = border_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
             }
+            // only draw controller artifacts for player snake(s)
+            for snake in &self.snakes {
+                if snake.snake_type == snake::Type::Player {
+                    if let Some(mesh) = snake.controller.get_mesh(&self.gtx, ctx) {
+                        graphics::draw(ctx, &mesh?, draw_param)?;
+                    }
+                }
+            }
 
-            if self.prefs.display_stats {
+            if self.gtx.prefs.display_stats {
                 let message = stats.get_stats_message();
                 self.messages.insert(MessageID::Stats, message);
             }
@@ -552,9 +530,9 @@ impl EventHandler<ggez::GameError> for Game {
                 control::State::Paused => self.control.play(),
             },
             G => {
-                self.prefs.draw_grid = !self.prefs.draw_grid;
-                self.prefs.draw_border = self.prefs.draw_grid;
-                let text = if self.prefs.draw_grid {
+                self.gtx.prefs.draw_grid = !self.gtx.prefs.draw_grid;
+                self.gtx.prefs.draw_border = self.gtx.prefs.draw_grid;
+                let text = if self.gtx.prefs.draw_grid {
                     "Grid on"
                 } else {
                     "Grid off"
@@ -562,15 +540,15 @@ impl EventHandler<ggez::GameError> for Game {
                 self.display_notification(text);
             }
             F => {
-                self.prefs.display_fps = !self.prefs.display_fps;
-                if !self.prefs.display_fps {
+                self.gtx.prefs.display_fps = !self.gtx.prefs.display_fps;
+                if !self.gtx.prefs.display_fps {
                     self.messages.remove(&MessageID::Fps);
                     self.draw_cache_invalid = 5;
                 }
             }
             S => {
-                self.prefs.display_stats = !self.prefs.display_stats;
-                if !self.prefs.display_stats {
+                self.gtx.prefs.display_stats = !self.gtx.prefs.display_stats;
+                if !self.gtx.prefs.display_stats {
                     self.messages.remove(&MessageID::Stats);
                     self.draw_cache_invalid = 5;
                 }
@@ -643,13 +621,13 @@ impl EventHandler<ggez::GameError> for Game {
             }
             Escape => {
                 let text;
-                match self.prefs.draw_style {
+                match self.gtx.prefs.draw_style {
                     rendering::Style::Hexagon => {
-                        self.prefs.draw_style = rendering::Style::Smooth;
+                        self.gtx.prefs.draw_style = rendering::Style::Smooth;
                         text = "draw style: smooth";
                     }
                     rendering::Style::Smooth => {
-                        self.prefs.draw_style = rendering::Style::Hexagon;
+                        self.gtx.prefs.draw_style = rendering::Style::Hexagon;
                         text = "draw style: hexagon";
                     }
                 }
@@ -661,12 +639,12 @@ impl EventHandler<ggez::GameError> for Game {
                 }
             }
             X => {
-                self.prefs.special_apples = !self.prefs.special_apples;
-                let text = if self.prefs.special_apples {
+                self.gtx.prefs.special_apples = !self.gtx.prefs.special_apples;
+                let text = if self.gtx.prefs.special_apples {
                     "Special apples enabled"
                 } else {
                     // replace special apples with normal apples
-                    let apple_food = self.prefs.apple_food;
+                    let apple_food = self.gtx.prefs.apple_food;
                     self.apples.iter_mut().for_each(|apple| {
                         if !matches!(apple.apple_type, apple::Type::Normal(_)) {
                             *apple = Apple {
@@ -686,7 +664,7 @@ impl EventHandler<ggez::GameError> for Game {
                 .position(|nk| *nk == k) =>
             {
                 let new_food = idx as Food + 1;
-                self.prefs.apple_food = new_food;
+                self.gtx.prefs.apple_food = new_food;
                 // change existing apples
                 for apple in & mut self.apples {
                     if let apple::Type::Normal(food) = &mut apple.apple_type {
@@ -697,13 +675,13 @@ impl EventHandler<ggez::GameError> for Game {
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
-                let mut new_side_length = self.cell_dim.side * factor;
+                let mut new_side_length = self.gtx.cell_dim.side * factor;
                 if new_side_length < Self::CELL_SIDE_MIN {
                     new_side_length = Self::CELL_SIDE_MIN
                 } else if new_side_length > Self::CELL_SIDE_MAX {
                     new_side_length = Self::CELL_SIDE_MAX
                 }
-                self.cell_dim = CellDim::from(new_side_length);
+                self.gtx.cell_dim = CellDim::from(new_side_length);
                 self.update_dim(ctx);
                 self.display_notification(format!("Cell side: {}", new_side_length));
             }
@@ -720,7 +698,7 @@ impl EventHandler<ggez::GameError> for Game {
     // TODO: forbid resizing in-game
     fn resize_event(&mut self, ctx: &mut Context, _width: f32, _height: f32) {
         self.update_dim(ctx);
-        let HexDim { h, v } = self.board_dim;
+        let HexDim { h, v } = self.gtx.board_dim;
         self.display_notification(format!("{}x{}", h, v));
     }
 }
@@ -734,8 +712,8 @@ impl Environment for Game {
         &self.apples
     }
 
-    fn snakes_apples_mut(&mut self) -> (&mut [Snake], &mut [Apple]) {
-        (&mut self.snakes, &mut self.apples)
+    fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {
+        (&mut self.snakes, &mut self.apples, &mut self.gtx)
     }
 
     fn add_snake(&mut self, seed: &Seed) {
@@ -750,12 +728,8 @@ impl Environment for Game {
         self.apples.remove(index)
     }
 
-    fn board_dim(&self) -> HexDim {
-        self.board_dim
-    }
-
-    fn frame_stamp(&self) -> FrameStamp {
-        self.control.frame_stamp()
+    fn gtx(&self) -> &GameContext {
+        &self.gtx
     }
 
     fn rng(&mut self) -> &mut ThreadRng {

@@ -8,6 +8,9 @@ use crate::{
     },
     basic::{Dir, HexPoint},
 };
+use crate::basic::CellDim;
+use ggez::Context;
+use crate::app::game_context::GameContext;
 #[allow(unused_macros)]
 macro_rules! move_sequence {
     (@ turn($dir:expr) ) => {
@@ -37,7 +40,7 @@ pub struct Programmed {
 }
 
 impl Controller for Programmed {
-    fn next_dir(&mut self, _: &mut Body, _: OtherSnakes, _: &[Apple], _: HexPoint) -> Option<Dir> {
+    fn next_dir(&mut self, _: &mut Body, _: OtherSnakes, _: &[Apple], _: &GameContext, _: &Context) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
         } else {

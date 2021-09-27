@@ -1,8 +1,12 @@
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
+use itertools::Itertools;
+
 use rand::Rng;
 use std::{cmp::Ordering, f32::consts::TAU};
 use Dir::*;
+use crate::basic::angle_distance;
+use crate::partial_min_max::PartialMinMax;
 
 // defined in clockwise order starting at U
 #[repr(u8)]
@@ -114,6 +118,16 @@ impl Dir {
         (Dl, 7. / 12. * TAU),
         (Ul, 5. / 12. * TAU),
     ];
+
+    /// Return all `Dir`s sorted by how close they are to the given angle
+    pub fn closest_to_angle(angle: f32) -> Vec<Self> {
+        Self::ANGLES
+            .into_iter()
+            .map(|(dir, ang)| (dir, ang, angle_distance(angle, ang)))
+            .sorted_by(|(_, _, dist1), (_, _, dist2)| dist1.partial_cmp(dist2).unwrap())
+            .map(|(dir, _, _)| dir)
+            .collect()
+    }
 
     // clockwise order starting from U
     pub fn iter() -> impl Iterator<Item = Self> {

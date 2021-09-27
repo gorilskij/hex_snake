@@ -13,7 +13,7 @@ use apple::spawn::SpawnPolicy;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
-use snake::{controller::Template, EatBehavior, EatMechanics, Seed};
+use snake::{controller, EatBehavior, EatMechanics, Seed};
 use crate::app::screen::{DebugScenario, StartScreen};
 
 pub mod keyboard_control;
@@ -29,6 +29,7 @@ mod rendering;
 mod screen;
 pub mod stats;
 mod utils;
+mod game_context;
 
 impl Deref for Screen {
     type Target = dyn EventHandler<ggez::GameError>;
@@ -84,7 +85,8 @@ impl App {
                 palette: snake::PaletteTemplate::rainbow(true),
                 // palette: PaletteTemplate::dark_blue_to_red(false),
                 // palette: PaletteTemplate::zebra(),
-                controller: Template::Keyboard(cs),
+                // controller: controller::Template::Keyboard(cs),
+                controller: controller::Template::Mouse,
                 // controller: SnakeControllerTemplate::PlayerController12,
                 pos: None,
                 dir: None,
@@ -106,6 +108,7 @@ impl App {
                     SpawnPolicy::Random { apple_count: 5 },
                     ctx,
                 )),
+                4 => Screen::DebugScenario(DebugScenario::many_snakes()),
                 _ => unreachable!(),
             }
         }

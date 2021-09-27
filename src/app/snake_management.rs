@@ -11,6 +11,7 @@ use crate::{
     basic::{Dir},
 };
 use rand::Rng;
+use ggez::Context;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -93,7 +94,7 @@ pub fn handle_collisions<E: Environment>(
     env: &mut E,
     collisions: &[Collision],
 ) -> (Vec<snake::Seed>, bool) {
-    let (snakes, apples) = env.snakes_apples_mut();
+    let (snakes, apples, _) = env.snakes_apples_gtx_mut();
 
     let mut spawn_snakes = vec![];
     let mut remove_apples = vec![];
@@ -124,7 +125,16 @@ pub fn handle_collisions<E: Environment>(
                     .copied()
                     .unwrap_or(mechanics.default);
                 match behavior {
-                    EatBehavior::Cut => snakes[snake2_index].cut_at(snake2_segment_index),
+                    EatBehavior::Ignore => {}
+                    EatBehavior::Cut => {
+                        // if it's a head-head collision, both snakes die
+                        if snake2_segment_index == 0 {
+                            snakes[snake1_index].die();
+                            snakes[snake2_index].die();
+                        } else {
+                            snakes[snake2_index].cut_at(snake2_segment_index)
+                        }
+                    },
                     EatBehavior::Crash => {
                         snakes[snake1_index].crash();
                         game_over = true;
@@ -135,6 +145,7 @@ pub fn handle_collisions<E: Environment>(
             Collision::Itself { snake_index, snake_segment_index } => {
                 let behavior = snakes[snake_index].eat_mechanics.eat_self;
                 match behavior {
+                    EatBehavior::Ignore => {},
                     EatBehavior::Cut => snakes[snake_index].cut_at(snake_segment_index),
                     EatBehavior::Crash => {
                         snakes[snake_index].crash();
@@ -187,10 +198,11 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {
 
 /// Returns the indices of snakes to be deleted (in reverse order so they
 /// can be deleted straight away)
-pub fn advance_snakes<E: Environment>(env: &mut E) {
+pub fn advance_snakes<E: Environment>(env: &mut E, ctx: &Context) {
     let board_dim = env.board_dim();
+    let cell_dim = env.cell_dim();
     let frame_stamp = env.frame_stamp();
-    let (snakes, apples) = env.snakes_apples_mut();
+    let (snakes, apples, gtx) = env.snakes_apples_gtx_mut();
 
     let mut remove_snakes = vec![];
     for snake_idx in 0..snakes.len() {
@@ -210,7 +222,7 @@ pub fn advance_snakes<E: Environment>(env: &mut E) {
         let (snake, other_snakes) = split_snakes_mut(snakes, snake_idx);
 
         // advance the snake
-        snake.advance(other_snakes, apples, board_dim, frame_stamp);
+        snake.advance(other_snakes, apples, gtx, ctx);
 
         // remove snake if it ran out of body
         if snake.len() == 0 {

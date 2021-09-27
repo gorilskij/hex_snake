@@ -13,6 +13,9 @@ use std::{
     collections::HashSet,
     rc::Rc,
 };
+use ggez::Context;
+use crate::basic::CellDim;
+use crate::app::game_context::GameContext;
 
 pub struct AStar {
     pub target: Option<HexPoint>,
@@ -175,7 +178,8 @@ impl Controller for AStar {
         body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
-        board_dim: HexDim,
+        gtx: &GameContext,
+        _ctx: &Context,
     ) -> Option<Dir> {
         if let Some(p) = self.target {
             if p == body[0].pos {
@@ -202,8 +206,8 @@ impl Controller for AStar {
             || self.steps_since_update >= Self::UPDATE_EVERY_N_STEPS
             || going_to_crash()
         {
-            self.recalculate_target(body[0].pos, apples, board_dim);
-            self.recalculate_path(body, other_snakes, board_dim);
+            self.recalculate_target(body[0].pos, apples, gtx.board_dim);
+            self.recalculate_path(body, other_snakes, gtx.board_dim);
             self.steps_since_update = 0;
         }
         self.steps_since_update += 1;
@@ -220,7 +224,7 @@ impl Controller for AStar {
             let dir = self.path.remove(0);
             Some(dir)
         } else {
-            Self::least_damage(body[0].pos, body, other_snakes, board_dim)
+            Self::least_damage(body[0].pos, body, other_snakes, gtx.board_dim)
         }
     }
 }

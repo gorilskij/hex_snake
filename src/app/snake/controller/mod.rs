@@ -22,6 +22,11 @@ use crate::{
 use ggez::event::KeyCode;
 use itertools::{repeat_n, Itertools};
 use std::{collections::VecDeque, f32::consts::TAU};
+use ggez::{Context, GameResult};
+use crate::basic::CellDim;
+use crate::app::snake::controller::mouse::Mouse;
+use ggez::graphics::Mesh;
+use crate::app::game_context::GameContext;
 
 mod a_star;
 mod competitor1;
@@ -30,12 +35,14 @@ mod keyboard;
 mod keyboard_clock;
 mod killer;
 pub mod programmed;
+mod mouse;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Template {
     Keyboard(ControlSetup),
     KeyboardClock,
+    Mouse,
     Programmed(Vec<Move>),
     Competitor1,
     Competitor2,
@@ -52,12 +59,15 @@ pub trait Controller {
         body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
-        board_dim: HexDim,
+        gtx: &GameContext,
+        ctx: &Context,
     ) -> Option<Dir>;
 
     fn reset(&mut self, _dir: Dir) {}
 
     fn key_pressed(&mut self, _key: KeyCode) {}
+
+    fn get_mesh(&self, gtx: &GameContext, ctx: &mut Context) -> Option<GameResult<Mesh>> { None }
 }
 
 // Group contiguous instances of Move::Wait together
@@ -160,6 +170,7 @@ impl Template {
                 alternation: false,
                 next_dir: None,
             }),
+            Template::Mouse => Box::new(Mouse),
             Template::Programmed(move_sequence) => Box::new(Programmed {
                 move_sequence,
                 dir: start_dir,
@@ -180,14 +191,4 @@ impl Template {
             }),
         }
     }
-}
-
-// useful to multiple ai controllers
-fn angle_distance(a1: f32, a2: f32) -> f32 {
-    let d1 = (a1 - a2).abs();
-    // add tau to the smaller of the two angles and consider that distance as well
-    let b1 = partial_min(a1, a2).unwrap() + TAU;
-    let b2 = partial_max(a1, a2).unwrap();
-    let d2 = (b1 - b2).abs();
-    partial_min(d1, d2).unwrap()
 }

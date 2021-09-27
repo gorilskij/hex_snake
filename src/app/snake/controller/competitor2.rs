@@ -2,7 +2,7 @@ use crate::{
     app::{
         apple::Apple,
         snake::{
-            controller::{angle_distance, Controller, OtherSnakes},
+            controller::{Controller, OtherSnakes},
             Body,
         },
     },
@@ -11,6 +11,9 @@ use crate::{
 };
 use itertools::Itertools;
 use std::f32::consts::PI;
+use crate::basic::angle_distance;
+use ggez::Context;
+use crate::app::game_context::GameContext;
 
 pub struct Competitor2 {
     pub dir_state: bool, // Dir12 flip-flop state
@@ -28,7 +31,8 @@ impl Controller for Competitor2 {
         body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
-        _board_dim: HexDim,
+        gtx: &GameContext,
+        _ctx: &Context,
     ) -> Option<Dir> {
         // this also sets the target apple on the first frame
         if self.frames_since_update % Self::UPDATE_EVERY_N_FRAMES == 0 {

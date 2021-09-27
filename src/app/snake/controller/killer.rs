@@ -2,14 +2,17 @@ use crate::{
     app::{
         apple::Apple,
         snake::{
-            controller::{angle_distance, Controller, OtherSnakes},
+            controller::{Controller, OtherSnakes},
             Body, Segment, Type,
         },
     },
     basic::{CellDim, Dir, HexDim, HexPoint},
     partial_min_max::PartialMinMax,
 };
-use std::f32::consts::PI;
+use std::f32::consts::TAU;
+use ggez::Context;
+use crate::basic::angle_distance;
+use crate::app::game_context::GameContext;
 
 // tries to kill player
 pub struct Killer;
@@ -28,13 +31,11 @@ fn rough_direction(
     other_snakes: OtherSnakes,
     board_dim: HexDim,
 ) -> Option<Dir> {
-    const TWO_PI: f32 = 2. * PI;
-
     // dy is scaled to convert from 'hex' coordinates to approximate cartesian coordinates
     let CellDim { sin, .. } = CellDim::from(1.);
     let dx = (to.h - from.h) as f32;
     let dy = -(to.v - from.v) as f32 / (2. * sin);
-    let angle = (dy.atan2(dx) + TWO_PI) % TWO_PI;
+    let angle = (dy.atan2(dx) + TAU) % TAU;
 
     let head_pos = body.cells[0].pos;
 
@@ -47,7 +48,7 @@ fn rough_direction(
             distance_to_snake(head_pos, *d, body, other_snakes, board_dim, Some(2)) > 1
         })
         .partial_min_by_key(|(_, a)| angle_distance(angle, *a))
-        .take()
+        // .take()
         .map(|(d, _)| d)
 }
 
@@ -79,7 +80,8 @@ impl Controller for Killer {
         body: &mut Body,
         other_snakes: OtherSnakes,
         _apples: &[Apple],
-        board_dim: HexDim,
+        gtx: &GameContext,
+        _ctx: &Context,
     ) -> Option<Dir> {
         let player_snake = other_snakes
             .iter_snakes()
@@ -90,8 +92,8 @@ impl Controller for Killer {
         let mut target = player_snake.head().pos;
         // how many cells ahead of the player to target
         for _ in 0..1 {
-            target = target.wrapping_translate(player_snake.dir(), 1, board_dim);
+            target = target.wrapping_translate(player_snake.dir(), 1, gtx.board_dim);
         }
-        rough_direction(body.cells[0].pos, target, body, other_snakes, board_dim)
+        rough_direction(body.cells[0].pos, target, body, other_snakes, gtx.board_dim)
     }
 }

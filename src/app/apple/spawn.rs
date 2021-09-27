@@ -9,6 +9,7 @@ use crate::{
     basic::{HexDim, HexPoint},
 };
 use rand::Rng;
+use crate::app::game_context::GameContext;
 
 #[allow(unused_macros)]
 macro_rules! spawn_schedule {
@@ -95,11 +96,9 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
 }
 
 pub fn spawn_apples(
-    policy: &mut SpawnPolicy,
-    board_dim: HexDim,
     snakes: &[Snake],
     apples: &[Apple],
-    prefs: &Prefs,
+    gtx: &mut GameContext,
     rng: &mut impl Rng,
 ) -> Vec<Apple> {
     // lazy
@@ -108,7 +107,7 @@ pub fn spawn_apples(
     let mut spawn = vec![];
 
     loop {
-        let can_spawn = match policy {
+        let can_spawn = match &gtx.apple_spawn_policy {
             SpawnPolicy::None => false,
             SpawnPolicy::Random { apple_count } => apples.len() + spawn.len() < *apple_count,
             SpawnPolicy::ScheduledOnEat { apple_count, .. } => {
@@ -123,10 +122,10 @@ pub fn spawn_apples(
         let occupied_cells =
             occupied_cells.get_or_insert_with(|| get_occupied_cells(snakes, apples));
 
-        let new_apple_pos = match policy {
+        let new_apple_pos = match &mut gtx.apple_spawn_policy {
             SpawnPolicy::None => panic!("shouldn't be spawning with SpawnPolicy::None"),
             SpawnPolicy::Random { apple_count } => {
-                let apple_pos = match random_free_spot(occupied_cells, board_dim, rng) {
+                let apple_pos = match random_free_spot(occupied_cells, gtx.board_dim, rng) {
                     Some(pos) => pos,
                     None => {
                         println!(
@@ -168,7 +167,7 @@ pub fn spawn_apples(
         match new_apple_pos {
             Some(pos) => spawn.push(Apple {
                 pos,
-                apple_type: generate_apple_type(prefs, rng),
+                apple_type: generate_apple_type(&gtx.prefs, rng),
             }),
             None => break,
         }

@@ -4,6 +4,7 @@ use std::{
     collections::VecDeque,
     time::{Duration, Instant},
 };
+use crate::app::game_context::GameContext;
 
 /// Stores an instant along with the number of frames it represents
 struct NFrameInstant(usize, Instant);
@@ -219,9 +220,10 @@ impl Control {
     }
 
     // call in draw()
-    pub fn graphics_frame(&mut self) {
+    pub fn graphics_frame(&mut self, gtx: &mut GameContext) {
         self.measured_graphics_fps.register_frames(1);
         self.graphics_frame_num += 1;
+        gtx.frame_stamp = self.frame_stamp();
     }
 
     pub fn state(&self) -> State {

@@ -43,4 +43,9 @@ impl Prefs {
         self.apple_food = food;
         self
     }
+
+    pub fn special_apples(mut self, special_apples: bool) -> Self {
+        self.special_apples = special_apples;
+        self
+    }
 }

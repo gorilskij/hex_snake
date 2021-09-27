@@ -9,6 +9,9 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 use std::iter::once;
+use crate::basic::CellDim;
+use ggez::Context;
+use crate::app::game_context::GameContext;
 
 pub struct Competitor1;
 
@@ -44,7 +47,8 @@ impl Controller for Competitor1 {
         body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
-        board_dim: HexDim,
+        gtx: &GameContext,
+        _ctx: &Context,
     ) -> Option<Dir> {
         // all turns
         let available_directions: Vec<_> = once(body.dir)
@@ -74,7 +78,7 @@ impl Controller for Competitor1 {
                 dir_score(
                     body.cells[0].pos,
                     dir,
-                    board_dim,
+                    gtx.board_dim,
                     &snake_positions,
                     &apple_positions,
                 )

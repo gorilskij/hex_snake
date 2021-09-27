@@ -10,6 +10,12 @@ pub struct CellDim {
     pub cos: f32,
 }
 
+impl Default for CellDim {
+    fn default() -> Self {
+        Self::from(30.)
+    }
+}
+
 impl From<f32> for CellDim {
     fn from(side: f32) -> Self {
         use std::f32::consts::FRAC_PI_3;
@@ -29,3 +35,11 @@ impl CellDim {
         }
     }
 }
+
+impl PartialEq for CellDim {
+    fn eq(&self, other: &Self) -> bool {
+        (self.side - other.side).abs() < f32::EPSILON
+    }
+}
+
+impl Eq for CellDim {}

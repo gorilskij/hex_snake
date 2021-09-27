@@ -16,6 +16,7 @@ use crate::{
     basic::{transformations::translate, CellDim, FrameStamp, HexDim, Point},
     partial_min_max::partial_min,
 };
+use crate::app::game_context::GameContext;
 
 const DRAW_WHITE_AURA: bool = false;
 
@@ -33,16 +34,13 @@ fn build_hexagon_at(
 
 pub fn snake_mesh(
     snakes: &mut [Snake],
-    frame_stamp: FrameStamp,
-    board_dim: HexDim,
-    cell_dim: CellDim,
-    draw_style: rendering::Style,
+    gtx: &GameContext,
     ctx: &mut Context,
     stats: &mut Stats,
 ) -> GameResult<Mesh> {
     stats.redrawing_snakes = true;
 
-    let frame_fraction = frame_stamp.1;
+    let frame_fraction = gtx.frame_stamp.1;
 
     let mut builder = MeshBuilder::new();
 
@@ -81,16 +79,16 @@ pub fn snake_mesh(
             let current_path_color = Color::from_rgb(97, 128, 11);
             for &point in &search_trace.cells_searched {
                 build_hexagon_at(
-                    point.to_cartesian(cell_dim),
-                    cell_dim,
+                    point.to_cartesian(gtx.cell_dim),
+                    gtx.cell_dim,
                     searched_cell_color,
                     &mut builder,
                 )?;
             }
             for &point in &search_trace.current_path {
                 build_hexagon_at(
-                    point.to_cartesian(cell_dim),
-                    cell_dim,
+                    point.to_cartesian(gtx.cell_dim),
+                    gtx.cell_dim,
                     current_path_color,
                     &mut builder,
                 )?;
@@ -100,10 +98,10 @@ pub fn snake_mesh(
 
         // Draw white aura around snake heads (debug)
         if DRAW_WHITE_AURA {
-            for point in snake.reachable(7, board_dim) {
+            for point in snake.reachable(7, gtx.board_dim) {
                 build_hexagon_at(
-                    point.to_cartesian(cell_dim),
-                    cell_dim,
+                    point.to_cartesian(gtx.cell_dim),
+                    gtx.cell_dim,
                     Color::WHITE,
                     &mut builder,
                 )?;
@@ -119,7 +117,7 @@ pub fn snake_mesh(
                 .map(|prev_idx| -snake.body.cells[prev_idx].coming_from)
                 .unwrap_or(snake.dir());
 
-            let location = segment.pos.to_cartesian(cell_dim);
+            let location = segment.pos.to_cartesian(gtx.cell_dim);
 
             let fraction = match segment_idx {
                 // head
@@ -159,9 +157,9 @@ pub fn snake_mesh(
                 destination: location,
                 turn: TurnDescription { coming_from, going_to },
                 fraction,
-                draw_style,
+                draw_style: gtx.prefs.draw_style,
                 segment_style: segment_styles[segment_idx],
-                cell_dim,
+                cell_dim: gtx.cell_dim,
             };
 
             if segment_idx == 0 {
@@ -209,11 +207,11 @@ pub fn snake_mesh(
             // snake has died, animate black hole out
             assert!(*frame_fraction >= 0.5, "{} < 0.5", frame_fraction);
             let animation_fraction = frame_fraction - 0.5;
-            destination = segment_description.destination + cell_dim.center() * animation_fraction;
-            real_cell_dim = cell_dim * (1. - animation_fraction);
+            destination = segment_description.destination + gtx.cell_dim.center() * animation_fraction;
+            real_cell_dim = gtx.cell_dim * (1. - animation_fraction);
         } else {
             destination = segment_description.destination;
-            real_cell_dim = cell_dim;
+            real_cell_dim = gtx.cell_dim;
         }
         build_hexagon_at(destination, real_cell_dim, black_hole_color, &mut builder)?;
     }

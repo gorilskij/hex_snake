@@ -30,6 +30,7 @@ use std::{
     cell::RefCell,
     rc::{Rc, Weak},
 };
+use crate::app::game_context::GameContext;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -109,32 +110,34 @@ impl SnakeDemo {
     }
 
     fn spawn_apples(&mut self, prefs: &Prefs, rng: &mut impl Rng) {
-        let new_apples = spawn_apples(
-            &mut self.apple_spawn_policy,
-            self.board_dim,
-            slice::from_ref(&self.snake),
-            &self.apples,
-            prefs,
-            rng,
-        );
-        self.apples.extend(new_apples.into_iter());
+        unimplemented!("how do you use GameContext here??")
+        // let new_apples = spawn_apples(
+        //     slice::from_ref(&self.snake),
+        //     &self.apples,
+        //     &self.gtx,
+        //     rng,
+        // );
+        // self.apples.extend(new_apples.into_iter());
     }
 
-    fn advance_snakes(&mut self, frame_stamp: FrameStamp, prefs: &Prefs, rng: &mut impl Rng) {
-        self.snake.advance(
-            OtherSnakes::empty(),
-            &self.apples,
-            self.board_dim,
-            frame_stamp,
-        );
+    fn advance_snakes(&mut self, cell_dim: CellDim, frame_stamp: FrameStamp, prefs: &Prefs, ctx: &Context, rng: &mut impl Rng) {
+        unimplemented!("how do you use GameContext here??")
+        // self.snake.advance(
+        //     OtherSnakes::empty(),
+        //     &self.apples,
+        //     self.board_dim,
+        //     cell_dim,
+        //     ctx,
+        //     frame_stamp,
+        // );
 
-        let collisions = find_collisions(self);
-        let (spawn_snakes, game_over) = handle_collisions(self, &collisions);
-
-        assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
-        assert!(!game_over, "unexpected game over");
-
-        self.spawn_apples(prefs, rng);
+        // let collisions = find_collisions(self);
+        // let (spawn_snakes, game_over) = handle_collisions(self, &collisions);
+        //
+        // assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
+        // assert!(!game_over, "unexpected game over");
+        //
+        // self.spawn_apples(prefs, rng);
     }
 
     fn draw(
@@ -146,42 +149,43 @@ impl SnakeDemo {
         palette: &app::Palette,
         stats: &mut Stats,
     ) -> GameResult {
-        self.snake
-            .update_dir(OtherSnakes::empty(), &[], self.board_dim, frame_stamp);
-
-        let draw_param = DrawParam::default().dest(self.location.to_cartesian(cell_dim));
-
-        let grid_mesh = rendering::grid_mesh(self.board_dim, cell_dim, palette, ctx)?;
-        graphics::draw(ctx, &grid_mesh, draw_param)?;
-
-        let border_mesh = rendering::border_mesh(self.board_dim, cell_dim, palette, ctx)?;
-        graphics::draw(ctx, &border_mesh, draw_param)?;
-
-        let snake_mesh = rendering::snake_mesh(
-            slice::from_mut(&mut self.snake),
-            frame_stamp,
-            self.board_dim,
-            cell_dim,
-            draw_style,
-            ctx,
-            stats,
-        )?;
-        graphics::draw(ctx, &snake_mesh, draw_param)?;
-
-        if !self.apples.is_empty() {
-            let apple_mesh = rendering::apple_mesh(
-                &self.apples,
-                frame_stamp,
-                cell_dim,
-                draw_style,
-                palette,
-                ctx,
-                stats,
-            )?;
-            graphics::draw(ctx, &apple_mesh, draw_param)?;
-        }
-
-        Ok(())
+        unimplemented!("how do you use GameContext here??")
+        // self.snake
+        //     .update_dir(OtherSnakes::empty(), &[], self.board_dim, cell_dim, ctx, frame_stamp);
+        //
+        // let draw_param = DrawParam::default().dest(self.location.to_cartesian(cell_dim));
+        //
+        // let grid_mesh = rendering::grid_mesh(self.board_dim, cell_dim, palette, ctx)?;
+        // graphics::draw(ctx, &grid_mesh, draw_param)?;
+        //
+        // let border_mesh = rendering::border_mesh(self.board_dim, cell_dim, palette, ctx)?;
+        // graphics::draw(ctx, &border_mesh, draw_param)?;
+        //
+        // let snake_mesh = rendering::snake_mesh(
+        //     slice::from_mut(&mut self.snake),
+        //     frame_stamp,
+        //     self.board_dim,
+        //     cell_dim,
+        //     draw_style,
+        //     ctx,
+        //     stats,
+        // )?;
+        // graphics::draw(ctx, &snake_mesh, draw_param)?;
+        //
+        // if !self.apples.is_empty() {
+        //     let apple_mesh = rendering::apple_mesh(
+        //         &self.apples,
+        //         frame_stamp,
+        //         cell_dim,
+        //         draw_style,
+        //         palette,
+        //         ctx,
+        //         stats,
+        //     )?;
+        //     graphics::draw(ctx, &apple_mesh, draw_param)?;
+        // }
+        //
+        // Ok(())
     }
 }
 
@@ -194,8 +198,9 @@ impl Environment for SnakeDemo {
         &self.apples
     }
 
-    fn snakes_apples_mut(&mut self) -> (&mut [Snake], &mut [Apple]) {
-        (slice::from_mut(&mut self.snake), &mut self.apples)
+    fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {
+        unimplemented!()
+        // (slice::from_mut(&mut self.snake), &mut self.apples)
     }
 
     fn add_snake(&mut self, seed: &Seed) {
@@ -210,8 +215,16 @@ impl Environment for SnakeDemo {
         self.apples.remove(index)
     }
 
+    fn gtx(&self) -> &GameContext {
+        panic!("SnakeDemo has no GameContext")
+    }
+
     fn board_dim(&self) -> HexDim {
         self.board_dim
+    }
+
+    fn cell_dim(&self) -> CellDim {
+        self.cell_dim()
     }
 
     fn frame_stamp(&self) -> FrameStamp {
@@ -269,42 +282,43 @@ impl StartScreen {
 }
 
 impl EventHandler<ggez::GameError> for StartScreen {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
         while self.control.borrow_mut().can_update() {
             let frame_stamp = self.control.borrow().frame_stamp();
             self.player1_demo
-                .advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
+                .advance_snakes(self.cell_dim, frame_stamp, &self.prefs, ctx, &mut self.rng);
             self.player2_demo
-                .advance_snakes(frame_stamp, &self.prefs, &mut self.rng);
+                .advance_snakes(self.cell_dim, frame_stamp, &self.prefs, ctx, &mut self.rng);
         }
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        self.control.borrow_mut().graphics_frame();
-        let frame_stamp = self.control.borrow().frame_stamp();
-
-        graphics::clear(ctx, Color::BLACK);
-
-        let palette = &self.palettes[self.current_palette];
-        self.player1_demo.draw(
-            ctx,
-            self.cell_dim,
-            frame_stamp,
-            self.prefs.draw_style,
-            palette,
-            &mut self.stats,
-        )?;
-        self.player2_demo.draw(
-            ctx,
-            self.cell_dim,
-            frame_stamp,
-            self.prefs.draw_style,
-            palette,
-            &mut self.stats,
-        )?;
-
-        graphics::present(ctx)
+        unimplemented!("how do you use GameContext here??")
+        // self.control.borrow_mut().graphics_frame(&mut self.gtx);
+        // let frame_stamp = self.control.borrow().frame_stamp();
+        //
+        // graphics::clear(ctx, Color::BLACK);
+        //
+        // let palette = &self.palettes[self.current_palette];
+        // self.player1_demo.draw(
+        //     ctx,
+        //     self.cell_dim,
+        //     frame_stamp,
+        //     self.prefs.draw_style,
+        //     palette,
+        //     &mut self.stats,
+        // )?;
+        // self.player2_demo.draw(
+        //     ctx,
+        //     self.cell_dim,
+        //     frame_stamp,
+        //     self.prefs.draw_style,
+        //     palette,
+        //     &mut self.stats,
+        // )?;
+        //
+        // graphics::present(ctx)
     }
 
     fn key_down_event(

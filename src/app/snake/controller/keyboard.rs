@@ -11,6 +11,9 @@ use crate::{
 };
 use ggez::event::KeyCode;
 use std::collections::VecDeque;
+use crate::basic::CellDim;
+use ggez::Context;
+use crate::app::game_context::GameContext;
 
 pub struct Keyboard {
     pub controls: Controls,
@@ -23,7 +26,7 @@ impl Keyboard {
 }
 
 impl Controller for Keyboard {
-    fn next_dir(&mut self, _: &mut Body, _: OtherSnakes, _: &[Apple], _: HexDim) -> Option<Dir> {
+    fn next_dir(&mut self, _: &mut Body, _: OtherSnakes, _: &[Apple], _: &GameContext, _: &Context) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = queue_dir;
             Some(self.dir)

@@ -132,8 +132,6 @@ impl SegmentRenderer for SmoothSegments {
             .map(Point::from)
             .collect_vec();
 
-        println!("total: {}", points.len());
-
         // TODO: if this appears again, just forgo drawing the segment
         if points.len() < 3 {
             assert_eq!(points.len(), 2);

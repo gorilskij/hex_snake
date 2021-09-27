@@ -13,6 +13,9 @@ use crate::{
     },
     basic::{Dir, FrameStamp, HexDim, HexPoint},
 };
+use crate::basic::CellDim;
+use ggez::Context;
+use crate::app::game_context::GameContext;
 
 pub mod controller;
 pub mod palette;
@@ -53,6 +56,7 @@ pub struct Segment {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum EatBehavior {
+    Ignore, // pass through
     Cut,   // cut the other snake's tail off
     Crash, // stop the game
     Die,   // disappear
@@ -253,8 +257,8 @@ impl Snake {
         &mut self,
         other_snakes: OtherSnakes,
         apples: &[Apple],
-        board_dim: HexDim,
-        frame_stamp: FrameStamp,
+        gtx: &GameContext,
+        ctx: &Context,
     ) {
         if self.body.dir_grace || self.state != State::Living {
             return;
@@ -262,16 +266,19 @@ impl Snake {
 
         let new_dir = self
             .controller
-            .next_dir(&mut self.body, other_snakes, apples, board_dim);
+            .next_dir(&mut self.body, other_snakes, apples, gtx, ctx);
         match new_dir {
-            Some(dir) if dir == -self.body.dir => panic!(
-                "controller tried to perform a 180° turn {:?} -> {:?}",
-                self.body.dir, dir
-            ),
+            Some(dir) if dir == -self.body.dir => {
+                eprintln!(
+                    "warning: controller tried to perform a 180° turn {:?} -> {:?}",
+                    self.body.dir, dir
+                );
+                return;
+            },
             Some(dir) if dir != self.body.dir => {
                 self.body.dir = dir;
                 self.body.dir_grace = true;
-                self.body.turn_start = Some(frame_stamp);
+                self.body.turn_start = Some(gtx.frame_stamp);
             }
             _ => {}
         }
@@ -281,8 +288,8 @@ impl Snake {
         &mut self,
         other_snakes: OtherSnakes,
         apples: &[Apple],
-        board_dim: HexDim,
-        frame_stamp: FrameStamp,
+        gtx: &GameContext,
+        ctx: &Context,
     ) {
         let last_idx = self.len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].segment_type {
@@ -297,7 +304,7 @@ impl Snake {
         match &mut self.state {
             State::Dying => self.body.missing_front += 1,
             State::Living => {
-                self.update_dir(other_snakes, apples, board_dim, frame_stamp);
+                self.update_dir(other_snakes, apples, gtx, ctx);
 
                 // create new head for snake
                 let dir = self.dir();
@@ -305,7 +312,7 @@ impl Snake {
                     segment_type: SegmentType::Normal,
                     // this gets very interesting if you move 2 cells each time
                     // (porous snake)
-                    pos: self.head().pos.wrapping_translate(dir, 1, board_dim),
+                    pos: self.head().pos.wrapping_translate(dir, 1, gtx.board_dim),
                     coming_from: -dir,
                     teleported: None,
                 };
