@@ -7,11 +7,10 @@ use crate::{
             Body,
         },
     },
-    basic::{Dir, HexDim},
+    basic::Dir,
 };
 use ggez::event::KeyCode;
 use std::collections::VecDeque;
-use crate::basic::CellDim;
 use ggez::Context;
 use crate::app::game_context::GameContext;
 

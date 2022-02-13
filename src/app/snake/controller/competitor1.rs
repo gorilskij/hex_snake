@@ -9,7 +9,6 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 use std::iter::once;
-use crate::basic::CellDim;
 use ggez::Context;
 use crate::app::game_context::GameContext;
 

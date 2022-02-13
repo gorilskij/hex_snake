@@ -96,6 +96,7 @@ pub enum State {
 pub struct Control {
     game_fps: f64,
     game_frame_duration: Duration,
+    start: Instant,
     last_update: Instant,
 
     // amount of time which game frames have not yet
@@ -124,10 +125,12 @@ pub struct Control {
 
 impl Control {
     pub fn new(fps: f64) -> Self {
+        let now = Instant::now();
         Self {
             game_fps: fps,
             game_frame_duration: Duration::from_nanos((1_000_000_000.0 / fps) as u64),
-            last_update: Instant::now(),
+            start: now,
+            last_update: now,
             remainder: 0.,
 
             missed_updates: None,
@@ -224,6 +227,7 @@ impl Control {
         self.measured_graphics_fps.register_frames(1);
         self.graphics_frame_num += 1;
         gtx.frame_stamp = self.frame_stamp();
+        gtx.elapsed_millis = self.start.elapsed().as_millis();
     }
 
     pub fn state(&self) -> State {

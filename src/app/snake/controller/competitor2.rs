@@ -6,7 +6,7 @@ use crate::{
             Body,
         },
     },
-    basic::{CellDim, Dir, Dir12, HexDim, HexPoint},
+    basic::{CellDim, Dir, Dir12, HexPoint},
     partial_min_max::PartialMinMax,
 };
 use itertools::Itertools;

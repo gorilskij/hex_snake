@@ -14,7 +14,6 @@ use std::{
     rc::Rc,
 };
 use ggez::Context;
-use crate::basic::CellDim;
 use crate::app::game_context::GameContext;
 
 pub struct AStar {

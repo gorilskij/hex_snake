@@ -1,10 +1,8 @@
-use std::ops::{Deref, DerefMut};
-
 use ggez::{
     event::{EventHandler, KeyCode, KeyMods},
     graphics,
     graphics::Rect,
-    Context, GameResult,
+    Context,
 };
 use itertools::Itertools;
 
@@ -15,6 +13,7 @@ pub use palette::Palette;
 use screen::{Game, Screen};
 use snake::{controller, EatBehavior, EatMechanics, Seed};
 use crate::app::screen::{DebugScenario, StartScreen};
+use crate::app::app_error::{AppError, AppResult, AppErrorConversion};
 
 pub mod keyboard_control;
 mod palette;
@@ -30,30 +29,7 @@ mod screen;
 pub mod stats;
 mod utils;
 mod game_context;
-
-impl Deref for Screen {
-    type Target = dyn EventHandler<ggez::GameError>;
-
-    fn deref(&self) -> &Self::Target {
-        use Screen::*;
-        match self {
-            DebugScenario(x) => x,
-            StartScreen(x) => x,
-            Game(x) => x,
-        }
-    }
-}
-
-impl DerefMut for Screen {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        use Screen::*;
-        match self {
-            DebugScenario(x) => x,
-            StartScreen(x) => x,
-            Game(x) => x,
-        }
-    }
-}
+mod app_error;
 
 pub struct App {
     screen: Screen,
@@ -85,8 +61,8 @@ impl App {
                 palette: snake::PaletteTemplate::rainbow(true),
                 // palette: PaletteTemplate::dark_blue_to_red(false),
                 // palette: PaletteTemplate::zebra(),
-                // controller: controller::Template::Keyboard(cs),
-                controller: controller::Template::Mouse,
+                controller: controller::Template::Keyboard(cs),
+                // controller: controller::Template::Mouse,
                 // controller: SnakeControllerTemplate::PlayerController12,
                 pos: None,
                 dir: None,
@@ -181,18 +157,18 @@ impl App {
     }
 }
 
-impl EventHandler<ggez::GameError> for App {
-    fn update(&mut self, ctx: &mut Context) -> GameResult {
+impl EventHandler<AppError> for App {
+    fn update(&mut self, ctx: &mut Context) -> AppResult {
         if let Screen::StartScreen(start_screen) = &self.screen {
             if let Some(next_screen) = start_screen.next_screen() {
                 self.screen = next_screen
             }
         }
-        self.screen.update(ctx)
+        self.screen.update(ctx).with_trace_step("App::update")
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        self.screen.draw(ctx)
+    fn draw(&mut self, ctx: &mut Context) -> AppResult {
+        self.screen.draw(ctx).with_trace_step("App::draw")
     }
 
     fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, mods: KeyMods, repeat: bool) {

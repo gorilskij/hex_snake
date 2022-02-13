@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    graphics::{self, Color, DrawParam, Mesh},
-    Context, GameResult,
-};
+use ggez::{event::{EventHandler, KeyCode, KeyMods}, graphics::{self, Color, DrawParam, Mesh}, Context};
 use rand::prelude::*;
 
 use crate::{
@@ -17,7 +13,6 @@ use crate::{
         control::{self, Control},
         message::{Message, MessageID},
         palette::Palette,
-        prefs::Prefs,
         rendering,
         screen::Environment,
         snake::{
@@ -30,15 +25,12 @@ use crate::{
         stats::Stats,
         utils::Food,
     },
-    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
+    basic::{CellDim, Dir, HexDim, HexPoint, Point},
     row::ROw,
 };
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
-use ggez::input::mouse;
-use ggez::graphics::{MeshBuilder, DrawMode, StrokeOptions};
-use crate::app::rendering::segments::render_hexagon;
-use crate::basic::transformations::translate;
 use crate::app::game_context::GameContext;
+use crate::app::app_error::{AppError, AppResult, GameResultExtension, AppErrorConversion};
 
 pub struct Game {
     control: Control,
@@ -98,6 +90,7 @@ impl Game {
                 prefs: Default::default(),
                 apple_spawn_policy,
                 frame_stamp: Default::default(),
+                elapsed_millis: 0,
             },
             // updated immediately after creation
             offset: Point { x: 0., y: 0. },
@@ -262,7 +255,7 @@ impl Game {
         self.apples.extend(new_apples.into_iter())
     }
 
-    fn draw_messages(&mut self, ctx: &mut Context) -> GameResult {
+    fn draw_messages(&mut self, ctx: &mut Context) -> AppResult {
         // draw messages and remove the ones that have
         // outlived their durations
         let remove = self
@@ -273,7 +266,8 @@ impl Game {
                     .draw(ctx)
                     .map(|keep| if !keep { Some(*id) } else { None })
             })
-            .collect::<GameResult<Vec<_>>>()?;
+            .collect::<AppResult<Vec<_>>>()
+            .with_trace_step("draw_messages")?;
         remove
             .iter()
             .filter_map(|o| *o)
@@ -325,8 +319,8 @@ impl Game {
     }
 }
 
-impl EventHandler<ggez::GameError> for Game {
-    fn update(&mut self, ctx: &mut Context) -> GameResult {
+impl EventHandler<AppError> for Game {
+    fn update(&mut self, ctx: &mut Context) -> AppResult {
         while self.control.can_update() {
             self.advance_snakes(ctx);
             self.spawn_apples();
@@ -335,7 +329,7 @@ impl EventHandler<ggez::GameError> for Game {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult {
+    fn draw(&mut self, ctx: &mut Context) -> AppResult {
         self.control.graphics_frame(&mut self.gtx);
 
         if self.gtx.prefs.display_fps {
@@ -361,7 +355,6 @@ impl EventHandler<ggez::GameError> for Game {
         let mut snake_mesh = None;
         let mut apple_mesh = None;
 
-        let frame_stamp = self.control.frame_stamp();
         let mut stats = Stats::default();
 
         if self.control.state() == control::State::Playing {
@@ -508,7 +501,7 @@ impl EventHandler<ggez::GameError> for Game {
             self.draw_messages(ctx)?;
         }
 
-        graphics::present(ctx)
+        graphics::present(ctx).into_with_trace("Game::draw")
     }
 
     fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {

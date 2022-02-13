@@ -1,7 +1,7 @@
 use ggez::{
     event::{EventHandler, KeyCode, KeyMods},
     graphics::{self, Color, DrawParam},
-    Context, GameResult,
+    Context,
 };
 use rand::prelude::*;
 
@@ -23,10 +23,11 @@ use crate::{
         snake_management::{advance_snakes, find_collisions, handle_collisions},
         stats::Stats,
     },
-    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint, Point},
+    basic::{CellDim, Dir, HexDim, HexPoint, Point},
 };
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::game_context::GameContext;
+use crate::app::app_error::{AppError, AppResult, GameResultExtension};
 
 
 pub struct DebugScenario {
@@ -95,6 +96,7 @@ impl DebugScenario {
                 prefs: Default::default(),
                 apple_spawn_policy: SpawnPolicy::None,
                 frame_stamp: Default::default(),
+                elapsed_millis: 0,
             },
 
             offset: None,
@@ -159,6 +161,7 @@ impl DebugScenario {
                 prefs: Default::default(),
                 apple_spawn_policy: SpawnPolicy::None,
                 frame_stamp: Default::default(),
+                elapsed_millis: 0,
             },
 
             offset: None,
@@ -215,6 +218,7 @@ impl DebugScenario {
                 prefs: Prefs::default().special_apples(false),
                 apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
                 frame_stamp: Default::default(),
+                elapsed_millis: 0,
             },
 
             offset: None,
@@ -276,16 +280,15 @@ impl DebugScenario {
     }
 }
 
-impl EventHandler<ggez::GameError> for DebugScenario {
-    fn update(&mut self, ctx: &mut Context) -> GameResult {
+impl EventHandler<AppError> for DebugScenario {
+    fn update(&mut self, ctx: &mut Context) -> AppResult {
         while self.control.can_update() {
-            let frame_stamp = self.control.frame_stamp();
             self.advance_snakes(ctx);
         }
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult {
+    fn draw(&mut self, ctx: &mut Context) -> AppResult {
         self.control.graphics_frame(&mut self.gtx);
 
         graphics::clear(ctx, Color::BLACK);
@@ -327,7 +330,7 @@ impl EventHandler<ggez::GameError> for DebugScenario {
             graphics::draw(ctx, &apple_mesh, draw_param)?;
         }
 
-        graphics::present(ctx)
+        graphics::present(ctx).into_with_trace("DebugScenario::draw")
     }
 
     fn key_down_event(

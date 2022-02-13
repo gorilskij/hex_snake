@@ -1,12 +1,13 @@
 use crate::basic::{CellDim, Point};
 use ggez::{
     graphics::{DrawMode, Mesh, MeshBuilder},
-    Context, GameResult,
+    Context,
 };
 use num_integer::Integer;
 
-use crate::{app::palette::Palette, basic::HexDim};
+use crate::basic::HexDim;
 use crate::app::game_context::GameContext;
+use crate::app::app_error::{AppResult, GameResultExtension, AppErrorConversion};
 
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh
@@ -14,7 +15,7 @@ use crate::app::game_context::GameContext;
 pub fn grid_mesh(
     gtx: &GameContext,
     ctx: &mut Context,
-) -> GameResult<Mesh> {
+) -> AppResult<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
@@ -23,73 +24,80 @@ pub fn grid_mesh(
     let mut vline_b = vec![]; // lines that start from the top with \
 
     #[rustfmt::skip]
-        for dv in (0..=board_v).map(|v| v as f32 * 2. * sin) {
-            vline_a.push(Point { x: cos, y: dv });
-            vline_a.push(Point { x: 0., y: dv + sin });
-            vline_b.push(Point { x: cos + side, y: dv });
-            vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
-        }
+    for dv in (0..=board_v).map(|v| v as f32 * 2. * sin) {
+        vline_a.push(Point { x: cos, y: dv });
+        vline_a.push(Point { x: 0., y: dv + sin });
+        vline_b.push(Point { x: cos + side, y: dv });
+        vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
+    }
 
     let mut builder = MeshBuilder::new();
 
     let draw_mode = DrawMode::stroke(gtx.palette.grid_thickness);
     let color = gtx.palette.grid_color;
-    for h in 0..(board_h + 1) / 2 {
-        if h == 0 {
-            builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
-        } else {
-            builder.polyline(draw_mode, &vline_a, color)?;
-        }
-        if board_h.is_odd() && h == (board_h + 1) / 2 - 1 {
-            builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
-        } else {
-            builder.polyline(draw_mode, &vline_b, color)?;
-        }
 
-        let dh = h as f32 * 2. * (side + cos);
+    let res: AppResult<_> = try {
+        for h in 0..(board_h + 1) / 2 {
+            if h == 0 {
+                builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
+            } else {
+                builder.polyline(draw_mode, &vline_a, color)?;
+            }
+            if board_h.is_odd() && h == (board_h + 1) / 2 - 1 {
+                builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
+            } else {
+                builder.polyline(draw_mode, &vline_b, color)?;
+            }
 
-        for v in 0..=board_v {
-            let dv = v as f32 * 2. * sin;
+            let dh = h as f32 * 2. * (side + cos);
 
-            // line between a and b
-            builder.line(
-                #[rustfmt::skip] &[
+            for v in 0..=board_v {
+                let dv = v as f32 * 2. * sin;
+
+                // line between a and b
+                builder.line(
+                    #[rustfmt::skip] &[
                         Point { x: cos + dh, y: dv },
                         Point { x: cos + side + dh, y: dv },
                     ],
-                gtx.palette.grid_thickness,
-                color,
-            )?;
-
-            // line between b and a
-            if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
-                builder.line(
-                    #[rustfmt::skip] &[
-                            Point { x: 2. * cos + side + dh, y: sin + dv },
-                            Point { x: 2. * cos + 2. * side + dh, y: sin + dv },
-                        ],
                     gtx.palette.grid_thickness,
                     color,
                 )?;
+
+                // line between b and a
+                if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
+                    builder.line(
+                        #[rustfmt::skip] &[
+                            Point { x: 2. * cos + side + dh, y: sin + dv },
+                            Point { x: 2. * cos + 2. * side + dh, y: sin + dv },
+                        ],
+                        gtx.palette.grid_thickness,
+                        color,
+                    )?;
+                }
             }
+
+            // shift the lines right by 2 cells
+            let offset = 2. * (side + cos);
+            vline_a.iter_mut().for_each(|a| a.x += offset);
+            vline_b.iter_mut().for_each(|b| b.x += offset);
+        }
+        if board_h.is_even() {
+            builder.polyline(draw_mode, &vline_a[1..], color)?;
         }
 
-        // shift the lines right by 2 cells
-        let offset = 2. * (side + cos);
-        vline_a.iter_mut().for_each(|a| a.x += offset);
-        vline_b.iter_mut().for_each(|b| b.x += offset);
-    }
-    if board_h.is_even() {
-        builder.polyline(draw_mode, &vline_a[1..], color)?;
-    }
-
-    builder.build(ctx)
+        builder.build(ctx)?
+    };
+    // TODO: write a proc macro that does this with an #[annotation]
+    //  i.e. it automatically wraps the method in a try block and
+    //  attaches a trace step to it
+    res.with_trace_step("grid_mesh")
 }
 
 pub fn border_mesh(
     gtx: &GameContext,
     ctx: &mut Context,
-) -> GameResult<Mesh> {
+) -> AppResult<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
@@ -151,5 +159,5 @@ pub fn border_mesh(
     hline.iter_mut().for_each(|p| p.y += offset);
     builder.polyline(draw_mode, &hline, color)?;
 
-    builder.build(ctx)
+    builder.build(ctx).into_with_trace("border_mesh")
 }

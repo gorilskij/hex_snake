@@ -14,6 +14,9 @@ use crate::{
 use rand::{rngs::ThreadRng, Rng};
 use crate::basic::CellDim;
 use crate::app::game_context::GameContext;
+use std::ops::{Deref, DerefMut};
+use ggez::event::EventHandler;
+use crate::app::app_error::AppError;
 
 mod debug_scenario;
 mod game;
@@ -25,6 +28,30 @@ pub enum Screen {
     DebugScenario(DebugScenario),
     StartScreen(StartScreen),
     Game(Game),
+}
+
+impl Deref for Screen {
+    type Target = dyn EventHandler<AppError>;
+
+    fn deref(&self) -> &Self::Target {
+        use Screen::*;
+        match self {
+            DebugScenario(x) => x,
+            StartScreen(x) => x,
+            Game(x) => x,
+        }
+    }
+}
+
+impl DerefMut for Screen {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        use Screen::*;
+        match self {
+            DebugScenario(x) => x,
+            StartScreen(x) => x,
+            Game(x) => x,
+        }
+    }
 }
 
 pub trait Environment<R: Rng = ThreadRng> {

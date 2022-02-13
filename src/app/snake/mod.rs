@@ -13,7 +13,6 @@ use crate::{
     },
     basic::{Dir, FrameStamp, HexDim, HexPoint},
 };
-use crate::basic::CellDim;
 use ggez::Context;
 use crate::app::game_context::GameContext;
 

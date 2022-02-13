@@ -1,5 +1,6 @@
 #![feature(stmt_expr_attributes)]
 #![feature(if_let_guard)]
+#![feature(try_blocks)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
 

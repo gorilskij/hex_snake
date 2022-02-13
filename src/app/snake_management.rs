@@ -199,9 +199,6 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {
 /// Returns the indices of snakes to be deleted (in reverse order so they
 /// can be deleted straight away)
 pub fn advance_snakes<E: Environment>(env: &mut E, ctx: &Context) {
-    let board_dim = env.board_dim();
-    let cell_dim = env.cell_dim();
-    let frame_stamp = env.frame_stamp();
     let (snakes, apples, gtx) = env.snakes_apples_gtx_mut();
 
     let mut remove_snakes = vec![];

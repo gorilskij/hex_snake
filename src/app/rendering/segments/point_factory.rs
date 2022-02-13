@@ -1,6 +1,5 @@
 use ggez::{
     graphics::{Color, DrawMode, MeshBuilder},
-    GameResult,
 };
 use hsl::HSL;
 use itertools::Itertools;
@@ -21,6 +20,7 @@ use crate::{
     },
     color::oklab::OkLab,
 };
+use crate::app::app_error::{AppResult, GameResultExtension};
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
@@ -173,10 +173,10 @@ impl SegmentDescription {
         builder: &mut MeshBuilder,
         subsegments_per_segment: usize,
         turn: f32,
-    ) -> GameResult<usize> {
+    ) -> AppResult<usize> {
         let mut polygons = 0;
         for (color, points) in self.render(subsegments_per_segment, turn) {
-            builder.polygon(DrawMode::fill(), &points, color)?;
+            builder.polygon(DrawMode::fill(), &points, color).into_with_trace("SegmentDescription::build")?;
             polygons += 1;
         }
         Ok(polygons)

@@ -6,10 +6,9 @@ use crate::{
             Body,
         },
     },
-    basic::{Dir, Dir12, HexDim},
+    basic::{Dir, Dir12},
 };
 use ggez::event::KeyCode;
-use crate::basic::CellDim;
 use ggez::Context;
 use crate::app::game_context::GameContext;
 

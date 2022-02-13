@@ -1,9 +1,10 @@
 use crate::basic::Point;
 use ggez::{
     graphics::{self, Color, DrawParam, Font, PxScale, Text},
-    Context, GameResult,
+    Context,
 };
 use std::time::{Duration, Instant};
+use crate::app::app_error::{AppResult, GameResultExtension};
 
 /// Finite number of possible messages
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
@@ -62,7 +63,7 @@ impl Message {
 
     /// Returns Ok(true) if the message should continue existing
     /// and Ok(false) if it should be removed
-    pub fn draw(&self, ctx: &mut Context) -> GameResult<bool> {
+    pub fn draw(&self, ctx: &mut Context) -> AppResult<bool> {
         let mut text = Text::new(self.text.as_str());
         text.set_font(Font::default(), PxScale::from(self.font_size));
 
@@ -97,7 +98,7 @@ impl Message {
             }
         }
 
-        ggez::graphics::draw(ctx, &text, DrawParam::from((location, color)))?;
+        ggez::graphics::draw(ctx, &text, DrawParam::from((location, color))).into_with_trace("Message::draw")?;
         Ok(true)
     }
 }

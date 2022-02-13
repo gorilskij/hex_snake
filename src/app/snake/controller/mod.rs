@@ -16,17 +16,16 @@ use crate::{
             Body,
         },
     },
-    basic::{Dir, Dir12, HexDim, Side},
-    partial_min_max::{partial_max, partial_min},
+    basic::{Dir, Dir12, Side},
 };
 use ggez::event::KeyCode;
 use itertools::{repeat_n, Itertools};
-use std::{collections::VecDeque, f32::consts::TAU};
-use ggez::{Context, GameResult};
-use crate::basic::CellDim;
+use std::collections::VecDeque;
+use ggez::Context;
 use crate::app::snake::controller::mouse::Mouse;
 use ggez::graphics::Mesh;
 use crate::app::game_context::GameContext;
+use crate::app::app_error::AppResult;
 
 mod a_star;
 mod competitor1;
@@ -67,7 +66,7 @@ pub trait Controller {
 
     fn key_pressed(&mut self, _key: KeyCode) {}
 
-    fn get_mesh(&self, gtx: &GameContext, ctx: &mut Context) -> Option<GameResult<Mesh>> { None }
+    fn get_mesh(&self, _gtx: &GameContext, _ctx: &mut Context) -> Option<AppResult<Mesh>> { None }
 }
 
 // Group contiguous instances of Move::Wait together

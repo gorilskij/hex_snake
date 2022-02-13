@@ -6,7 +6,6 @@ use rand::Rng;
 use std::{cmp::Ordering, f32::consts::TAU};
 use Dir::*;
 use crate::basic::angle_distance;
-use crate::partial_min_max::PartialMinMax;
 
 // defined in clockwise order starting at U
 #[repr(u8)]

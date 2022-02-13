@@ -6,9 +6,8 @@ use crate::{
             Body,
         },
     },
-    basic::{Dir, HexPoint},
+    basic::Dir,
 };
-use crate::basic::CellDim;
 use ggez::Context;
 use crate::app::game_context::GameContext;
 #[allow(unused_macros)]

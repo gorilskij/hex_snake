@@ -6,7 +6,7 @@ use crate::{
         snake::{controller::Template, EatBehavior, EatMechanics, Snake},
         utils::{get_occupied_cells, random_free_spot},
     },
-    basic::{HexDim, HexPoint},
+    basic::HexPoint,
 };
 use rand::Rng;
 use crate::app::game_context::GameContext;
