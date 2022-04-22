@@ -22,7 +22,7 @@ impl From<f32> for CellDim {
         Self {
             side,
             sin: FRAC_PI_3.sin() * side,
-            cos: FRAC_PI_3.cos() * side,
+            cos: 0.5 * side,
         }
     }
 }

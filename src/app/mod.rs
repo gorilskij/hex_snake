@@ -74,7 +74,7 @@ impl App {
 
         // Manual selection of what to launch
         Self {
-            screen: match 0 {
+            screen: match 3 {
                 5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
                 4 => Screen::DebugScenario(DebugScenario::many_snakes()),
                 3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
