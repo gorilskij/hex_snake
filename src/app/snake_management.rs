@@ -222,7 +222,7 @@ pub fn advance_snakes<E: Environment>(env: &mut E, ctx: &Context) {
         snake.advance(other_snakes, apples, gtx, ctx);
 
         // remove snake if it ran out of body
-        if snake.len() == 0 {
+        if snake.visible_len() == 0 {
             remove_snakes.push(snake_idx);
         }
     }

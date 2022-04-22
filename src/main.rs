@@ -25,6 +25,7 @@ mod color;
 mod keyboard;
 mod partial_min_max;
 mod row;
+mod support;
 
 // TODO
 //  - untie frame_fraction from graphics
@@ -33,6 +34,9 @@ mod row;
 //  - make border toggleable
 //  - smooth animation when cutting
 //  - diagnose high cpu use when paused
+
+// TODO
+//  implement snake rain, snakes fall from the sky and flow along other snakes, it would look awesome
 
 fn main() {
     let width = 2000.;
@@ -76,7 +80,7 @@ fn main() {
         &mut ctx,
     );
 
-    eprintln!("start");
+    println!("start");
 
     // ggez::graphics::set_screen_coordinates(&mut ctx, Rect { x: 0., y: 0., w: width, h: height })
     //     .unwrap();

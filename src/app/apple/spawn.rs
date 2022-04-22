@@ -64,6 +64,7 @@ impl SpawnPolicy {
 }
 
 // TODO: add a snake spawn policy
+// TODO: factor ai snake palettes out into game palette
 fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
     if prefs.special_apples {
         let rand = rng.gen::<f32>();
@@ -82,6 +83,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 snake_type: snake::Type::Killer { life: Some(200) },
                 eat_mechanics: EatMechanics::always(EatBehavior::Die),
                 palette: snake::PaletteTemplate::dark_blue_to_red(false),
+                // palette: snake::PaletteTemplate::dark_rainbow(true),
                 controller: Template::Killer,
                 pos: None,
                 dir: None,

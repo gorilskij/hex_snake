@@ -90,7 +90,7 @@ impl AStar {
         };
 
         // A* search
-        let head = body[0].pos;
+        let head = body.cells[0].pos;
 
         let mut seen = HashSet::new();
         seen.insert(head);
@@ -102,12 +102,13 @@ impl AStar {
         }];
 
         let mut forbidden_positions: HashSet<_> = body
+            .cells
             .iter()
             .chain(other_snakes.iter_segments())
             .map(|seg| seg.pos)
             .collect();
         // no 180° turns
-        forbidden_positions.insert(body[0].pos.translate(-body.dir, 1));
+        forbidden_positions.insert(body.cells[0].pos.translate(-body.dir, 1));
         let forbidden_positions = forbidden_positions;
 
         loop {
@@ -157,6 +158,7 @@ impl AStar {
         board_dim: HexDim,
     ) -> Option<Dir> {
         let forbidden = body
+            .cells
             .iter()
             .chain(other_snakes.iter_segments())
             .map(|seg| seg.pos)
@@ -181,14 +183,14 @@ impl Controller for AStar {
         _ctx: &Context,
     ) -> Option<Dir> {
         if let Some(p) = self.target {
-            if p == body[0].pos {
+            if p == body.cells[0].pos {
                 // apple eaten
                 self.target = None;
             }
         }
 
         let going_to_crash = || {
-            let potential_next_head = self.path.get(0).map(|dir| body[0].pos.translate(*dir, 1));
+            let potential_next_head = self.path.get(0).map(|dir| body.cells[0].pos.translate(*dir, 1));
             potential_next_head
                 .map(|pos| {
                     body.cells
@@ -205,13 +207,13 @@ impl Controller for AStar {
             || self.steps_since_update >= Self::UPDATE_EVERY_N_STEPS
             || going_to_crash()
         {
-            self.recalculate_target(body[0].pos, apples, gtx.board_dim);
+            self.recalculate_target(body.cells[0].pos, apples, gtx.board_dim);
             self.recalculate_path(body, other_snakes, gtx.board_dim);
             self.steps_since_update = 0;
         }
         self.steps_since_update += 1;
 
-        let head_pos = body[0].pos;
+        let head_pos = body.cells[0].pos;
         if let Some(search_trace) = &mut body.search_trace {
             search_trace.cells_searched.remove(&head_pos);
             if !search_trace.current_path.is_empty() {
@@ -223,7 +225,7 @@ impl Controller for AStar {
             let dir = self.path.remove(0);
             Some(dir)
         } else {
-            Self::least_damage(body[0].pos, body, other_snakes, gtx.board_dim)
+            Self::least_damage(body.cells[0].pos, body, other_snakes, gtx.board_dim)
         }
     }
 }

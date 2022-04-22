@@ -19,7 +19,7 @@ impl Controller for Mouse {
         let mouse_position: Point = mouse::position(ctx).into();
         let target = HexPoint::from_cartesian(mouse_position, gtx.cell_dim);
 
-        let current = body[0].pos;
+        let current = body.cells[0].pos;
 
         // actual cell_dim doesn't matter, scaling preserves angles
         let CellDim { sin, .. } = CellDim::from(1.);

@@ -9,7 +9,7 @@ pub type Food = u32;
 
 pub fn get_occupied_cells(snakes: &[Snake], apples: &[Apple]) -> Vec<HexPoint> {
     // upper bound
-    let max_occupied_cells = snakes.iter().map(|snake| snake.len()).sum::<usize>() + apples.len();
+    let max_occupied_cells = snakes.iter().map(|snake| snake.visible_len()).sum::<usize>() + apples.len();
     let mut occupied_cells = Vec::with_capacity(max_occupied_cells);
     occupied_cells.extend(apples.iter().map(|apple| apple.pos));
     for snake in snakes {

@@ -62,7 +62,7 @@ pub fn snake_mesh(
         const MIN_SUBSEGMENTS: usize = 1;
         const MAX_SUBSEGMENTS: usize = 20;
 
-        let subsegments_per_segment = match TOTAL_SUBSEGMENTS / snake.len() {
+        let subsegments_per_segment = match TOTAL_SUBSEGMENTS / snake.visible_len() {
             x if x < MIN_SUBSEGMENTS => MIN_SUBSEGMENTS,
             x if x > MAX_SUBSEGMENTS => MAX_SUBSEGMENTS,
             x => x,
@@ -124,7 +124,7 @@ pub fn snake_mesh(
                 0 => {
                     if let SegmentType::BlackHole { just_created: _ } = segment.segment_type {
                         // never exceed 0.5 into a black hole, stay there once you get there
-                        if snake.len() == 1 {
+                        if snake.visible_len() == 1 {
                             // also tail
                             SegmentFraction {
                                 start: partial_min(frame_fraction, 0.5).unwrap(),
@@ -140,7 +140,7 @@ pub fn snake_mesh(
                     }
                 }
                 // tail
-                i if i == snake.len() - 1 && snake.body.grow == 0 => {
+                i if i == snake.visible_len() - 1 && snake.body.grow == 0 => {
                     if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
                         let frac = ((original_food - food_left) as f32 + frame_fraction)
                             / (original_food + 1) as f32;

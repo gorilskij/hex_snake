@@ -71,12 +71,16 @@ impl App {
             .collect();
 
         let cell_dim = CellDim::from(30.);
+
+        // Manual selection of what to launch
         Self {
-            screen: match 3 {
-                0 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
-                1 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
-                2 => Screen::StartScreen(StartScreen::new(cell_dim)),
-                3 => Screen::Game(Game::new(
+            screen: match 0 {
+                5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
+                4 => Screen::DebugScenario(DebugScenario::many_snakes()),
+                3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
+                2 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
+                1 => Screen::StartScreen(StartScreen::new(cell_dim)),
+                0 => Screen::Game(Game::new(
                     cell_dim,
                     7.,
                     seeds,
@@ -84,7 +88,6 @@ impl App {
                     SpawnPolicy::Random { apple_count: 5 },
                     ctx,
                 )),
-                4 => Screen::DebugScenario(DebugScenario::many_snakes()),
                 _ => unreachable!(),
             }
         }

@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    ops::Deref,
 };
 
 pub use palette::{Palette, PaletteTemplate};
@@ -113,13 +112,26 @@ pub struct Body {
     pub search_trace: Option<SearchTrace>,
 }
 
-impl Deref for Body {
-    type Target = VecDeque<Segment>;
+impl Body {
+    /// The current length of the body (how many cells are visible)
+    pub fn visible_len(&self) -> usize {
+        self.cells.len()
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.cells
+    /// The full logical length of the snake, including the part that
+    /// is inside a black hole when the snake is dying
+    pub fn logical_len(&self) -> usize {
+        self.cells.len() + self.missing_front
     }
 }
+
+// impl Deref for Body {
+//     type Target = VecDeque<Segment>;
+//
+//     fn deref(&self) -> &Self::Target {
+//         &self.cells
+//     }
+// }
 
 pub struct Snake {
     pub snake_type: Type,
@@ -196,8 +208,14 @@ impl From<&Seed> for Snake {
 }
 
 impl Snake {
-    pub fn len(&self) -> usize {
-        self.body.cells.len()
+    pub fn visible_len(&self) -> usize {
+        self.body.visible_len()
+    }
+
+    /// The full logical length of the snake, including the part that
+    /// is inside a black hole when the snake is dying
+    pub fn logical_len(&self) -> usize {
+        self.body.logical_len()
     }
 
     pub fn dir(&self) -> Dir {
@@ -290,7 +308,7 @@ impl Snake {
         gtx: &GameContext,
         ctx: &Context,
     ) {
-        let last_idx = self.len() - 1;
+        let last_idx = self.visible_len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].segment_type {
             if *food_left == 0 {
                 self.body.cells[last_idx].segment_type = SegmentType::Normal;
@@ -336,11 +354,9 @@ impl Snake {
 
         // ensure a length of at least 2 to avoid weird animation,
         // otherwise, stop any previous growth
-        if self.len() < 2 {
-            self.body.grow = 2 - self.len();
-        } else {
-            self.body.grow = 0;
-        }
+        self.body.grow = 2_usize
+            .checked_sub(self.visible_len())
+            .unwrap_or(0);
     }
 
     pub fn crash(&mut self) {

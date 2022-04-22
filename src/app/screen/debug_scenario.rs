@@ -237,6 +237,116 @@ impl DebugScenario {
         this.control.pause();
         this
     }
+
+    /// Comparison of persistent and non-persistent skins entering a black hole
+    pub fn double_head_body_collision(cell_dim: CellDim) -> Self {
+        let wall_seed = snake::Seed {
+            pos: Some(HexPoint { h: 5, v: 7 }),
+            dir: Some(Dir::U),
+            len: Some(15),
+
+            snake_type: snake::Type::Simulated,
+            eat_mechanics: EatMechanics {
+                eat_self: EatBehavior::Crash,
+                eat_other: hash_map! {},
+                default: EatBehavior::Crash,
+            },
+            palette: snake::PaletteTemplate::solid_white_red(),
+            controller: controller::Template::Programmed(vec![]),
+        };
+
+        let crash_seeds = vec![
+            snake::Seed {
+                pos: Some(HexPoint { h: 14, v: 5 }),
+                dir: Some(Dir::Ul),
+                len: Some(5),
+
+                snake_type: snake::Type::Simulated,
+                eat_mechanics: EatMechanics {
+                    eat_self: EatBehavior::Crash,
+                    eat_other: hash_map! {},
+                    default: EatBehavior::Die,
+                },
+                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
+                palette: snake::PaletteTemplate::dark_blue_to_red(true),
+                controller: controller::Template::Programmed(vec![]),
+            },
+            snake::Seed {
+                pos: Some(HexPoint { h: 14, v: 7 }),
+                dir: Some(Dir::Ul),
+                len: Some(5),
+
+                snake_type: snake::Type::Simulated,
+                eat_mechanics: EatMechanics {
+                    eat_self: EatBehavior::Crash,
+                    eat_other: hash_map! {},
+                    default: EatBehavior::Die,
+                },
+                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
+                palette: snake::PaletteTemplate::dark_blue_to_red(false),
+                controller: controller::Template::Programmed(vec![]),
+            },
+            snake::Seed {
+                pos: Some(HexPoint { h: 14, v: 9 }),
+                dir: Some(Dir::Ul),
+                len: Some(5),
+
+                snake_type: snake::Type::Simulated,
+                eat_mechanics: EatMechanics {
+                    eat_self: EatBehavior::Crash,
+                    eat_other: hash_map! {},
+                    default: EatBehavior::Die,
+                },
+                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
+                palette: snake::PaletteTemplate::rainbow(true),
+                controller: controller::Template::Programmed(vec![]),
+            },
+            snake::Seed {
+                pos: Some(HexPoint { h: 14, v: 11 }),
+                dir: Some(Dir::Ul),
+                len: Some(5),
+
+                snake_type: snake::Type::Simulated,
+                eat_mechanics: EatMechanics {
+                    eat_self: EatBehavior::Crash,
+                    eat_other: hash_map! {},
+                    default: EatBehavior::Die,
+                },
+                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
+                palette: snake::PaletteTemplate::rainbow(false),
+                controller: controller::Template::Programmed(vec![]),
+            }
+        ];
+
+        let mut this = Self {
+            control: Control::new(3.),
+
+            gtx: GameContext {
+                board_dim: HexDim { h: 20, v: 15 },
+                cell_dim,
+                palette: app::Palette::dark(),
+                prefs: Default::default(),
+                apple_spawn_policy: SpawnPolicy::None,
+                frame_stamp: Default::default(),
+                elapsed_millis: 0,
+            },
+
+            offset: None,
+            fit_to_window: false,
+
+            stats: Default::default(),
+
+            apples: vec![],
+
+            seeds: vec![wall_seed].into_iter().chain(crash_seeds).collect(),
+            snakes: vec![],
+
+            rng: thread_rng(),
+        };
+        this.restart();
+        this.control.pause();
+        this
+    }
 }
 
 impl DebugScenario {
@@ -251,7 +361,7 @@ impl DebugScenario {
         self.snakes = self.seeds.iter().map(Snake::from).collect();
         self.apples = vec![];
         self.gtx.apple_spawn_policy.reset();
-        self.control.play();
+        self.control.pause();
     }
 
     fn spawn_apples(&mut self) {
