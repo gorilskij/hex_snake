@@ -8,10 +8,10 @@ use crate::{
         snake::{self, utils::split_snakes_mut, EatBehavior, Seed, SegmentType, State},
         utils::{get_occupied_cells, random_free_spot},
     },
-    basic::{Dir},
+    basic::Dir,
 };
-use rand::Rng;
 use ggez::Context;
+use rand::Rng;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -134,7 +134,7 @@ pub fn handle_collisions<E: Environment>(
                         } else {
                             snakes[snake2_index].cut_at(snake2_segment_index)
                         }
-                    },
+                    }
                     EatBehavior::Crash => {
                         snakes[snake1_index].crash();
                         game_over = true;
@@ -145,7 +145,7 @@ pub fn handle_collisions<E: Environment>(
             Collision::Itself { snake_index, snake_segment_index } => {
                 let behavior = snakes[snake_index].eat_mechanics.eat_self;
                 match behavior {
-                    EatBehavior::Ignore => {},
+                    EatBehavior::Ignore => {}
                     EatBehavior::Cut => snakes[snake_index].cut_at(snake_segment_index),
                     EatBehavior::Crash => {
                         snakes[snake_index].crash();
@@ -222,7 +222,7 @@ pub fn advance_snakes<E: Environment>(env: &mut E, ctx: &Context) {
         snake.advance(other_snakes, apples, gtx, ctx);
 
         // remove snake if it ran out of body
-        if snake.visible_len() == 0 {
+        if snake.body.visible_len() == 0 {
             remove_snakes.push(snake_idx);
         }
     }

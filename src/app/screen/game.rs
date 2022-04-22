@@ -1,20 +1,29 @@
 use std::collections::HashMap;
 
-use ggez::{event::{EventHandler, KeyCode, KeyMods}, graphics::{self, Color, DrawParam, Mesh}, Context};
+use ggez::{
+    event::{EventHandler, KeyCode, KeyMods},
+    graphics::{self, Color, DrawParam, Mesh},
+    Context,
+};
 use rand::prelude::*;
 
 use crate::{
     app::{
+        app_error::{AppError, AppErrorConversion, AppResult, GameResultExtension},
         apple::{
             self,
             spawn::{spawn_apples, SpawnPolicy},
             Apple,
         },
         control::{self, Control},
+        game_context::GameContext,
         message::{Message, MessageID},
         palette::Palette,
         rendering,
-        screen::Environment,
+        screen::{
+            board_dim::{calculate_board_dim, calculate_offset},
+            Environment,
+        },
         snake::{
             self,
             controller::{Controller, Template},
@@ -28,9 +37,6 @@ use crate::{
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
     row::ROw,
 };
-use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
-use crate::app::game_context::GameContext;
-use crate::app::app_error::{AppError, AppResult, GameResultExtension, AppErrorConversion};
 
 pub struct Game {
     control: Control,
@@ -125,9 +131,11 @@ impl Game {
             self.gtx.board_dim = board_dim;
 
             // restart if player snake head has left board limits
-            if self.snakes.iter().any(|s| {
-                s.snake_type == snake::Type::Player && !board_dim.contains(s.head().pos)
-            }) {
+            if self
+                .snakes
+                .iter()
+                .any(|s| s.snake_type == snake::Type::Player && !board_dim.contains(s.head().pos))
+            {
                 println!("warning: player snake outside of board, restarting");
                 self.restart();
             } else {
@@ -246,12 +254,7 @@ impl Game {
     const CELL_SIDE_MAX: f32 = 50.;
 
     fn spawn_apples(&mut self) {
-        let new_apples = spawn_apples(
-            &self.snakes,
-            &self.apples,
-            &mut self.gtx,
-            &mut self.rng,
-        );
+        let new_apples = spawn_apples(&self.snakes, &self.apples, &mut self.gtx, &mut self.rng);
         self.apples.extend(new_apples.into_iter())
     }
 
@@ -385,19 +388,13 @@ impl EventHandler<AppError> for Game {
             )?));
             if self.gtx.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
-                    self.grid_mesh = Some(rendering::grid_mesh(
-                        &self.gtx,
-                        ctx,
-                    )?);
+                    self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
                 };
                 grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
             }
             if self.gtx.prefs.draw_border {
                 if self.border_mesh.is_none() {
-                    self.border_mesh = Some(rendering::border_mesh(
-                        &self.gtx,
-                        ctx,
-                    )?);
+                    self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
                 }
                 border_mesh = Some(self.border_mesh.as_ref().unwrap());
             }
@@ -442,19 +439,13 @@ impl EventHandler<AppError> for Game {
             if update {
                 if self.gtx.prefs.draw_grid {
                     if self.grid_mesh.is_none() {
-                        self.grid_mesh = Some(rendering::grid_mesh(
-                            &self.gtx,
-                            ctx,
-                        )?);
+                        self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
                     };
                     grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
                 }
                 if self.gtx.prefs.draw_border {
                     if self.border_mesh.is_none() {
-                        self.border_mesh = Some(rendering::border_mesh(
-                            &self.gtx,
-                            ctx,
-                        )?);
+                        self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
                     }
                     border_mesh = Some(self.border_mesh.as_ref().unwrap());
                 }

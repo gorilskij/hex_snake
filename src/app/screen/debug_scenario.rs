@@ -8,27 +8,27 @@ use rand::prelude::*;
 use crate::{
     app,
     app::{
+        app_error::{AppError, AppResult, GameResultExtension},
         apple::{
             spawn::{spawn_apples, SpawnPolicy},
             Apple,
         },
         control::{self, Control},
+        game_context::GameContext,
         prefs::Prefs,
         rendering,
-        screen::Environment,
+        screen::{
+            board_dim::{calculate_board_dim, calculate_offset},
+            Environment,
+        },
         snake::{
-            self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics, Seed,
-            Snake,
+            self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics, Seed, Snake,
         },
         snake_management::{advance_snakes, find_collisions, handle_collisions},
         stats::Stats,
     },
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
 };
-use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
-use crate::app::game_context::GameContext;
-use crate::app::app_error::{AppError, AppResult, GameResultExtension};
-
 
 pub struct DebugScenario {
     control: Control,
@@ -187,24 +187,22 @@ impl DebugScenario {
 
         let rng = &mut thread_rng();
         let seeds: Vec<_> = (0..NUM_SNAKES)
-            .map(|i| {
-                snake::Seed {
-                    pos: Some(HexPoint {
-                        h: i as isize / 7 * 2 + 3,
-                        v: i as isize % 10 * 2 + 3,
-                    }),
-                    dir: Some(Dir::random(rng)),
-                    len: Some(5),
+            .map(|i| snake::Seed {
+                pos: Some(HexPoint {
+                    h: i as isize / 7 * 2 + 3,
+                    v: i as isize % 10 * 2 + 3,
+                }),
+                dir: Some(Dir::random(rng)),
+                len: Some(5),
 
-                    snake_type: snake::Type::Competitor { life: None },
-                    eat_mechanics: EatMechanics {
-                        eat_self: EatBehavior::Ignore,
-                        eat_other: hash_map! {},
-                        default: EatBehavior::Ignore,
-                    },
-                    palette: snake::PaletteTemplate::pastel_rainbow(true),
-                    controller: controller::Template::AStar,
-                }
+                snake_type: snake::Type::Competitor { life: None },
+                eat_mechanics: EatMechanics {
+                    eat_self: EatBehavior::Ignore,
+                    eat_other: hash_map! {},
+                    default: EatBehavior::Ignore,
+                },
+                palette: snake::PaletteTemplate::pastel_rainbow(true),
+                controller: controller::Template::AStar,
             })
             .collect();
 
@@ -315,7 +313,7 @@ impl DebugScenario {
                 // palette: snake::PaletteTemplate::dark_blue_to_red(false),
                 palette: snake::PaletteTemplate::rainbow(false),
                 controller: controller::Template::Programmed(vec![]),
-            }
+            },
         ];
 
         let mut this = Self {
@@ -365,12 +363,7 @@ impl DebugScenario {
     }
 
     fn spawn_apples(&mut self) {
-        let new_apples = spawn_apples(
-            &self.snakes,
-            &self.apples,
-            &mut self.gtx,
-            &mut self.rng,
-        );
+        let new_apples = spawn_apples(&self.snakes, &self.apples, &mut self.gtx, &mut self.rng);
         self.apples.extend(new_apples.into_iter())
     }
 
@@ -413,8 +406,7 @@ impl EventHandler<AppError> for DebugScenario {
         let grid_mesh = rendering::grid_mesh(&self.gtx, ctx)?;
         graphics::draw(ctx, &grid_mesh, draw_param)?;
 
-        let border_mesh =
-            rendering::border_mesh(&self.gtx, ctx)?;
+        let border_mesh = rendering::border_mesh(&self.gtx, ctx)?;
         graphics::draw(ctx, &border_mesh, draw_param)?;
 
         for snake_index in 0..self.snakes.len() {
@@ -422,21 +414,11 @@ impl EventHandler<AppError> for DebugScenario {
             snake.update_dir(other_snakes, &self.apples, &self.gtx, ctx);
         }
 
-        let snake_mesh = rendering::snake_mesh(
-            &mut self.snakes,
-            &self.gtx,
-            ctx,
-            &mut self.stats,
-        )?;
+        let snake_mesh = rendering::snake_mesh(&mut self.snakes, &self.gtx, ctx, &mut self.stats)?;
         graphics::draw(ctx, &snake_mesh, draw_param)?;
 
         if !self.apples.is_empty() {
-            let apple_mesh = rendering::apple_mesh(
-                &self.apples,
-                &self.gtx,
-                ctx,
-                &mut self.stats,
-            )?;
+            let apple_mesh = rendering::apple_mesh(&self.apples, &self.gtx, ctx, &mut self.stats)?;
             graphics::draw(ctx, &apple_mesh, draw_param)?;
         }
 

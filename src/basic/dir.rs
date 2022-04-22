@@ -2,10 +2,10 @@ use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
 use itertools::Itertools;
 
+use crate::basic::angle_distance;
 use rand::Rng;
 use std::{cmp::Ordering, f32::consts::TAU};
 use Dir::*;
-use crate::basic::angle_distance;
 
 // defined in clockwise order starting at U
 #[repr(u8)]
@@ -22,9 +22,7 @@ pub enum Dir {
 impl From<u8> for Dir {
     fn from(num: u8) -> Self {
         // SAFETY: (num % 6) is between 0 and 5
-        unsafe {
-            std::mem::transmute(num % 6)
-        }
+        unsafe { std::mem::transmute(num % 6) }
     }
 }
 

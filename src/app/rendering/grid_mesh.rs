@@ -5,17 +5,18 @@ use ggez::{
 };
 use num_integer::Integer;
 
-use crate::basic::HexDim;
-use crate::app::game_context::GameContext;
-use crate::app::app_error::{AppResult, GameResultExtension, AppErrorConversion};
+use crate::{
+    app::{
+        app_error::{AppErrorConversion, AppResult, GameResultExtension},
+        game_context::GameContext,
+    },
+    basic::HexDim,
+};
 
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh
 //  when border is drawn separately
-pub fn grid_mesh(
-    gtx: &GameContext,
-    ctx: &mut Context,
-) -> AppResult<Mesh> {
+pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> AppResult<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
@@ -94,10 +95,7 @@ pub fn grid_mesh(
     res.with_trace_step("grid_mesh")
 }
 
-pub fn border_mesh(
-    gtx: &GameContext,
-    ctx: &mut Context,
-) -> AppResult<Mesh> {
+pub fn border_mesh(gtx: &GameContext, ctx: &mut Context) -> AppResult<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 

@@ -1,7 +1,9 @@
 use ggez::{mint::Point2, winit::dpi::PhysicalSize};
-use std::ops::{Div, Mul};
 use lyon_geom::euclid::default::{Point2D, Vector2D};
-use std::marker::PhantomData;
+use std::{
+    marker::PhantomData,
+    ops::{Div, Mul},
+};
 
 /// A more convenient version of mint::Point2<f32>
 #[derive(Copy, Clone, Debug, Add, AddAssign, Sub, SubAssign)]

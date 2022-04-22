@@ -1,6 +1,7 @@
 use crate::{
     app::{
         apple::Apple,
+        game_context::GameContext,
         keyboard_control::Controls,
         snake::{
             controller::{Controller, OtherSnakes},
@@ -9,10 +10,8 @@ use crate::{
     },
     basic::Dir,
 };
-use ggez::event::KeyCode;
+use ggez::{event::KeyCode, Context};
 use std::collections::VecDeque;
-use ggez::Context;
-use crate::app::game_context::GameContext;
 
 pub struct Keyboard {
     pub controls: Controls,
@@ -25,7 +24,14 @@ impl Keyboard {
 }
 
 impl Controller for Keyboard {
-    fn next_dir(&mut self, _: &mut Body, _: OtherSnakes, _: &[Apple], _: &GameContext, _: &Context) -> Option<Dir> {
+    fn next_dir(
+        &mut self,
+        _: &mut Body,
+        _: OtherSnakes,
+        _: &[Apple],
+        _: &GameContext,
+        _: &Context,
+    ) -> Option<Dir> {
         if let Some(queue_dir) = self.control_queue.pop_front() {
             self.dir = queue_dir;
             Some(self.dir)

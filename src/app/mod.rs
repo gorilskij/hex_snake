@@ -6,14 +6,18 @@ use ggez::{
 };
 use itertools::Itertools;
 
-use crate::{basic::CellDim};
+use crate::{
+    app::{
+        app_error::{AppError, AppErrorConversion, AppResult},
+        screen::{DebugScenario, StartScreen},
+    },
+    basic::CellDim,
+};
 use apple::spawn::SpawnPolicy;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
 use snake::{controller, EatBehavior, EatMechanics, Seed};
-use crate::app::screen::{DebugScenario, StartScreen};
-use crate::app::app_error::{AppError, AppResult, AppErrorConversion};
 
 pub mod keyboard_control;
 mod palette;
@@ -21,15 +25,15 @@ mod snake;
 mod snake_management;
 #[macro_use]
 mod apple;
+mod app_error;
 mod control;
+mod game_context;
 mod message;
 mod prefs;
 mod rendering;
 mod screen;
 pub mod stats;
 mod utils;
-mod game_context;
-mod app_error;
 
 pub struct App {
     screen: Screen,
@@ -74,7 +78,7 @@ impl App {
 
         // Manual selection of what to launch
         Self {
-            screen: match 3 {
+            screen: match 0 {
                 5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
                 4 => Screen::DebugScenario(DebugScenario::many_snakes()),
                 3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
@@ -89,7 +93,7 @@ impl App {
                     ctx,
                 )),
                 _ => unreachable!(),
-            }
+            },
         }
 
         // let seeds = vec![SnakeSeed {

@@ -1,6 +1,8 @@
 use crate::{
     app::{
+        app_error::AppResult,
         apple::Apple,
+        game_context::GameContext,
         keyboard_control::ControlSetup,
         snake::{
             controller::{
@@ -10,6 +12,7 @@ use crate::{
                 keyboard::Keyboard,
                 keyboard_clock::KeyboardClock,
                 killer::Killer,
+                mouse::Mouse,
                 programmed::{Move, Programmed},
             },
             utils::OtherSnakes,
@@ -18,14 +21,9 @@ use crate::{
     },
     basic::{Dir, Dir12, Side},
 };
-use ggez::event::KeyCode;
+use ggez::{event::KeyCode, graphics::Mesh, Context};
 use itertools::{repeat_n, Itertools};
 use std::collections::VecDeque;
-use ggez::Context;
-use crate::app::snake::controller::mouse::Mouse;
-use ggez::graphics::Mesh;
-use crate::app::game_context::GameContext;
-use crate::app::app_error::AppResult;
 
 mod a_star;
 mod competitor1;
@@ -33,8 +31,8 @@ mod competitor2;
 mod keyboard;
 mod keyboard_clock;
 mod killer;
-pub mod programmed;
 mod mouse;
+pub mod programmed;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -66,7 +64,9 @@ pub trait Controller {
 
     fn key_pressed(&mut self, _key: KeyCode) {}
 
-    fn get_mesh(&self, _gtx: &GameContext, _ctx: &mut Context) -> Option<AppResult<Mesh>> { None }
+    fn get_mesh(&self, _gtx: &GameContext, _ctx: &mut Context) -> Option<AppResult<Mesh>> {
+        None
+    }
 }
 
 // Group contiguous instances of Move::Wait together

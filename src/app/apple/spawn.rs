@@ -1,6 +1,7 @@
 use crate::{
     app::{
         apple::{self, Apple},
+        game_context::GameContext,
         screen::Prefs,
         snake,
         snake::{controller::Template, EatBehavior, EatMechanics, Snake},
@@ -9,7 +10,6 @@ use crate::{
     basic::HexPoint,
 };
 use rand::Rng;
-use crate::app::game_context::GameContext;
 
 #[allow(unused_macros)]
 macro_rules! spawn_schedule {

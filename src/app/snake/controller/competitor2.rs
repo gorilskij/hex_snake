@@ -1,19 +1,18 @@
 use crate::{
     app::{
         apple::Apple,
+        game_context::GameContext,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,
         },
     },
-    basic::{CellDim, Dir, Dir12, HexPoint},
+    basic::{angle_distance, CellDim, Dir, Dir12, HexPoint},
     partial_min_max::PartialMinMax,
 };
+use ggez::Context;
 use itertools::Itertools;
 use std::f32::consts::PI;
-use crate::basic::angle_distance;
-use ggez::Context;
-use crate::app::game_context::GameContext;
 
 pub struct Competitor2 {
     pub dir_state: bool, // Dir12 flip-flop state

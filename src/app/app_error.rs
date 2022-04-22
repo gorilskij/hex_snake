@@ -1,7 +1,9 @@
 use ggez::{GameError, GameResult};
-use std::error::Error;
-use std::fmt::{Debug, Formatter, Display};
-use std::fmt;
+use std::{
+    error::Error,
+    fmt,
+    fmt::{Debug, Display, Formatter},
+};
 
 /// The second member contains a trace in reverse order
 pub struct AppError(GameError, Vec<String>);

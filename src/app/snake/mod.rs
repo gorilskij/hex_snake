@@ -1,19 +1,17 @@
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub use palette::{Palette, PaletteTemplate};
 
 use crate::{
     app::{
         apple::Apple,
+        game_context::GameContext,
         snake::{controller::Controller, utils::OtherSnakes},
         utils::Frames,
     },
     basic::{Dir, FrameStamp, HexDim, HexPoint},
 };
 use ggez::Context;
-use crate::app::game_context::GameContext;
 
 pub mod controller;
 pub mod palette;
@@ -55,9 +53,9 @@ pub struct Segment {
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum EatBehavior {
     Ignore, // pass through
-    Cut,   // cut the other snake's tail off
-    Crash, // stop the game
-    Die,   // disappear
+    Cut,    // cut the other snake's tail off
+    Crash,  // stop the game
+    Die,    // disappear
 }
 
 #[derive(Clone, Debug)]
@@ -208,16 +206,6 @@ impl From<&Seed> for Snake {
 }
 
 impl Snake {
-    pub fn visible_len(&self) -> usize {
-        self.body.visible_len()
-    }
-
-    /// The full logical length of the snake, including the part that
-    /// is inside a black hole when the snake is dying
-    pub fn logical_len(&self) -> usize {
-        self.body.logical_len()
-    }
-
     pub fn dir(&self) -> Dir {
         self.body.dir
     }
@@ -290,8 +278,7 @@ impl Snake {
                     "warning: controller tried to perform a 180° turn {:?} -> {:?}",
                     self.body.dir, dir
                 );
-                return;
-            },
+            }
             Some(dir) if dir != self.body.dir => {
                 self.body.dir = dir;
                 self.body.dir_grace = true;
@@ -308,7 +295,7 @@ impl Snake {
         gtx: &GameContext,
         ctx: &Context,
     ) {
-        let last_idx = self.visible_len() - 1;
+        let last_idx = self.body.visible_len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.cells[last_idx].segment_type {
             if *food_left == 0 {
                 self.body.cells[last_idx].segment_type = SegmentType::Normal;
@@ -354,9 +341,7 @@ impl Snake {
 
         // ensure a length of at least 2 to avoid weird animation,
         // otherwise, stop any previous growth
-        self.body.grow = 2_usize
-            .checked_sub(self.visible_len())
-            .unwrap_or(0);
+        self.body.grow = 2_usize.saturating_sub(self.body.visible_len());
     }
 
     pub fn crash(&mut self) {

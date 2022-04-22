@@ -7,8 +7,8 @@ use crate::{
     },
     basic::{CellDim, Point},
 };
-use lyon_geom::{Arc, Angle};
 use itertools::Itertools;
+use lyon_geom::{Angle, Arc};
 
 pub struct SmoothSegments;
 
@@ -106,7 +106,9 @@ impl SegmentRenderer for SmoothSegments {
 
         let center = pivot.into();
         let start_angle = Angle { radians: TAU / 2. - start_radians };
-        let sweep_angle = Angle { radians: start_radians - end_radians };
+        let sweep_angle = Angle {
+            radians: start_radians - end_radians,
+        };
         let x_rotation = Angle { radians: 0. };
 
         let inner_arc = Arc {

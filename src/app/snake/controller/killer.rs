@@ -1,18 +1,17 @@
 use crate::{
     app::{
         apple::Apple,
+        game_context::GameContext,
         snake::{
             controller::{Controller, OtherSnakes},
             Body, Segment, Type,
         },
     },
-    basic::{CellDim, Dir, HexDim, HexPoint},
+    basic::{angle_distance, CellDim, Dir, HexDim, HexPoint},
     partial_min_max::PartialMinMax,
 };
-use std::f32::consts::TAU;
 use ggez::Context;
-use crate::basic::angle_distance;
-use crate::app::game_context::GameContext;
+use std::f32::consts::TAU;
 
 // tries to kill player
 pub struct Killer;

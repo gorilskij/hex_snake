@@ -6,15 +6,14 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 
-use crate::app::apple::Apple;
+use crate::app::{apple::Apple, game_context::GameContext};
+use ggez::Context;
 use itertools::Itertools;
 use std::{
     cmp::{max, min},
     collections::HashSet,
     rc::Rc,
 };
-use ggez::Context;
-use crate::app::game_context::GameContext;
 
 pub struct AStar {
     pub target: Option<HexPoint>,
@@ -190,7 +189,10 @@ impl Controller for AStar {
         }
 
         let going_to_crash = || {
-            let potential_next_head = self.path.get(0).map(|dir| body.cells[0].pos.translate(*dir, 1));
+            let potential_next_head = self
+                .path
+                .get(0)
+                .map(|dir| body.cells[0].pos.translate(*dir, 1));
             potential_next_head
                 .map(|pos| {
                     body.cells

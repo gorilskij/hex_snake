@@ -16,10 +16,8 @@ pub fn calculate_board_dim(ctx: &Context, cell_dim: CellDim) -> HexDim {
     let window_dim: Point = ggez::graphics::window(ctx).inner_size().into();
     let CellDim { side, sin, cos } = cell_dim;
 
-    let board_dim = HexDim {
+    HexDim {
         h: ((window_dim.x - cos) / (side + cos)) as isize,
         v: ((window_dim.y - sin) / (2. * sin)) as isize,
-    };
-
-    board_dim
+    }
 }

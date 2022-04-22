@@ -7,8 +7,8 @@ use crate::{
     app::snake::{Body, SegmentType},
     basic::HexPoint,
     color::oklab::OkLab,
+    support::Limits,
 };
-use crate::support::Limits;
 
 macro_rules! gray {
     ($lightness:expr) => {
@@ -324,7 +324,8 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
 /// and growing
 fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
     let len = len as f64;
-    if let SegmentType::Eaten { original_food, food_left } = body.cells.last().unwrap().segment_type {
+    if let SegmentType::Eaten { original_food, food_left } = body.cells.last().unwrap().segment_type
+    {
         // Correct for eaten segment at the tail and
         //  fractional segment at the head (the eaten
         //  segment reduces in size more slowly than
@@ -431,7 +432,8 @@ impl Palette for HSLGradient {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
             } else {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
-                let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len as f64;
+                let start_hue =
+                    self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len as f64;
                 let end_hue =
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len as f64;
                 match seg.segment_type {
@@ -485,8 +487,10 @@ impl Palette for OkLabGradient {
         let logical_len = correct_len(logical_len, body, frame_fraction);
         for (i, seg) in body.cells.iter().enumerate() {
             let r = (i + body.missing_front) as f64 + frame_fraction;
-            let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len as f64;
-            let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len as f64;
+            let start_hue =
+                self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len as f64;
+            let end_hue =
+                self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len as f64;
             match seg.segment_type {
                 Normal | BlackHole { .. } => {
                     styles.push(SegmentStyle::OkLabGradient {

@@ -1,10 +1,9 @@
-use crate::basic::FrameStamp;
+use crate::{app::game_context::GameContext, basic::FrameStamp};
 use std::{
     cmp::max,
     collections::VecDeque,
     time::{Duration, Instant},
 };
-use crate::app::game_context::GameContext;
 
 /// Stores an instant along with the number of frames it represents
 struct NFrameInstant(usize, Instant);

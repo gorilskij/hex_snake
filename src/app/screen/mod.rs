@@ -11,17 +11,18 @@ use crate::{
     basic::{FrameStamp, HexDim},
 };
 
-use rand::{rngs::ThreadRng, Rng};
-use crate::basic::CellDim;
-use crate::app::game_context::GameContext;
-use std::ops::{Deref, DerefMut};
+use crate::{
+    app::{app_error::AppError, game_context::GameContext},
+    basic::CellDim,
+};
 use ggez::event::EventHandler;
-use crate::app::app_error::AppError;
+use rand::{rngs::ThreadRng, Rng};
+use std::ops::{Deref, DerefMut};
 
+mod board_dim;
 mod debug_scenario;
 mod game;
 mod start_screen;
-mod board_dim;
 
 #[allow(dead_code)]
 pub enum Screen {
@@ -63,8 +64,14 @@ pub trait Environment<R: Rng = ThreadRng> {
     fn remove_apple(&mut self, index: usize) -> Apple;
     fn gtx(&self) -> &GameContext;
     // TODO: remove redundant methods
-    fn board_dim(&self) -> HexDim { self.gtx().board_dim }
-    fn cell_dim(&self) -> CellDim { self.gtx().cell_dim }
-    fn frame_stamp(&self) -> FrameStamp { self.gtx().frame_stamp }
+    fn board_dim(&self) -> HexDim {
+        self.gtx().board_dim
+    }
+    fn cell_dim(&self) -> CellDim {
+        self.gtx().cell_dim
+    }
+    fn frame_stamp(&self) -> FrameStamp {
+        self.gtx().frame_stamp
+    }
     fn rng(&mut self) -> &mut R;
 }

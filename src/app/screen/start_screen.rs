@@ -10,11 +10,10 @@ use rand::{prelude::*, rngs::ThreadRng};
 use crate::{
     app,
     app::{
-        apple::{
-            spawn::SpawnPolicy,
-            Apple,
-        },
+        app_error::{AppError, AppResult},
+        apple::{spawn::SpawnPolicy, Apple},
         control::Control,
+        game_context::GameContext,
         prefs::Prefs,
         rendering,
         screen::Environment,
@@ -29,8 +28,6 @@ use std::{
     cell::RefCell,
     rc::{Rc, Weak},
 };
-use crate::app::game_context::GameContext;
-use crate::app::app_error::{AppError, AppResult};
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -120,7 +117,14 @@ impl SnakeDemo {
         // self.apples.extend(new_apples.into_iter());
     }
 
-    fn advance_snakes(&mut self, cell_dim: CellDim, frame_stamp: FrameStamp, prefs: &Prefs, ctx: &Context, rng: &mut impl Rng) {
+    fn advance_snakes(
+        &mut self,
+        cell_dim: CellDim,
+        frame_stamp: FrameStamp,
+        prefs: &Prefs,
+        ctx: &Context,
+        rng: &mut impl Rng,
+    ) {
         unimplemented!("how do you use GameContext here??")
         // self.snake.advance(
         //     OtherSnakes::empty(),
@@ -285,10 +289,20 @@ impl EventHandler<AppError> for StartScreen {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
         while self.control.borrow_mut().can_update() {
             let frame_stamp = self.control.borrow().frame_stamp();
-            self.player1_demo
-                .advance_snakes(self.cell_dim, frame_stamp, &self.prefs, ctx, &mut self.rng);
-            self.player2_demo
-                .advance_snakes(self.cell_dim, frame_stamp, &self.prefs, ctx, &mut self.rng);
+            self.player1_demo.advance_snakes(
+                self.cell_dim,
+                frame_stamp,
+                &self.prefs,
+                ctx,
+                &mut self.rng,
+            );
+            self.player2_demo.advance_snakes(
+                self.cell_dim,
+                frame_stamp,
+                &self.prefs,
+                ctx,
+                &mut self.rng,
+            );
         }
         Ok(())
     }

@@ -1,6 +1,7 @@
 use crate::{
     app::{
         apple::Apple,
+        game_context::GameContext,
         snake::{
             controller::{Controller, OtherSnakes},
             Body,
@@ -8,9 +9,8 @@ use crate::{
     },
     basic::{Dir, HexDim, HexPoint},
 };
-use std::iter::once;
 use ggez::Context;
-use crate::app::game_context::GameContext;
+use std::iter::once;
 
 pub struct Competitor1;
 

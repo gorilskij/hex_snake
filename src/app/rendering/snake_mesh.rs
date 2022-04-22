@@ -6,20 +6,18 @@ use itertools::izip;
 
 use crate::{
     app::{
+        app_error::{AppResult, GameResultExtension},
+        game_context::GameContext,
         rendering::segments::{
             descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
             render_hexagon,
         },
-        snake::{SegmentType, Snake},
+        snake::{palette::SegmentStyle, Segment, SegmentType, Snake, State},
         stats::Stats,
     },
     basic::{transformations::translate, CellDim, Point},
     partial_min_max::partial_min,
 };
-use crate::app::game_context::GameContext;
-use crate::app::app_error::{AppResult, GameResultExtension};
-use crate::app::snake::{Segment, State};
-use crate::app::snake::palette::SegmentStyle;
 
 const DRAW_WHITE_AURA: bool = false;
 
@@ -31,11 +29,20 @@ fn build_hexagon_at(
 ) -> AppResult {
     let mut hexagon_points = render_hexagon(cell_dim);
     translate(&mut hexagon_points, location);
-    builder.polygon(DrawMode::fill(), &hexagon_points, color).into_with_trace("build_hexagon_at")?;
+    builder
+        .polygon(DrawMode::fill(), &hexagon_points, color)
+        .into_with_trace("build_hexagon_at")?;
     Ok(())
 }
 
-fn segment_description(segment: &Segment, segment_idx: usize, snake: &Snake, frame_fraction: f32, segment_styles: &[SegmentStyle], gtx: &GameContext) -> SegmentDescription {
+fn segment_description(
+    segment: &Segment,
+    segment_idx: usize,
+    snake: &Snake,
+    frame_fraction: f32,
+    segment_styles: &[SegmentStyle],
+    gtx: &GameContext,
+) -> SegmentDescription {
     let coming_from = segment.coming_from;
     let going_to = segment_idx
         .checked_sub(1)
@@ -49,7 +56,7 @@ fn segment_description(segment: &Segment, segment_idx: usize, snake: &Snake, fra
         0 => {
             if let SegmentType::BlackHole { just_created: _ } = segment.segment_type {
                 // never exceed 0.5 into a black hole, stay there once you get there
-                if snake.visible_len() == 1 {
+                if snake.body.visible_len() == 1 {
                     // also tail
                     SegmentFraction {
                         start: partial_min(frame_fraction, 0.5).unwrap(),
@@ -65,7 +72,7 @@ fn segment_description(segment: &Segment, segment_idx: usize, snake: &Snake, fra
             }
         }
         // tail
-        i if i == snake.visible_len() - 1 && snake.body.grow == 0 => {
+        i if i == snake.body.visible_len() - 1 && snake.body.grow == 0 => {
             if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
                 let frac = ((original_food - food_left) as f32 + frame_fraction)
                     / (original_food + 1) as f32;
@@ -135,11 +142,17 @@ fn build_snake_body(
     }
 
     for (segment_idx, segment) in snake.body.cells.iter().enumerate() {
-        let segment_description = segment_description(segment, segment_idx, snake, frame_fraction, &segment_styles, gtx);
+        let segment_description = segment_description(
+            segment,
+            segment_idx,
+            snake,
+            frame_fraction,
+            segment_styles,
+            gtx,
+        );
 
         // Draw body segments, turn transition for all non-head segments is 1
-        stats.polygons +=
-            segment_description.build(builder, subsegments_per_segment, 1.)?;
+        stats.polygons += segment_description.build(builder, subsegments_per_segment, 1.)?;
     }
 
     Ok(())
@@ -151,6 +164,7 @@ fn build_snake_body(
 //  those that are going away from the black hole need
 //  to be drawn below it (see debug scenario 3)
 // TODO: refactor this whole mess
+// TODO: bring back hexagonal black hole for hexagon style
 pub fn snake_mesh(
     snakes: &mut [Snake],
     gtx: &GameContext,
@@ -185,7 +199,7 @@ pub fn snake_mesh(
         const MIN_SUBSEGMENTS: usize = 1;
         const MAX_SUBSEGMENTS: usize = 20;
 
-        let subsegments_per_segment = match TOTAL_SUBSEGMENTS / snake.visible_len() {
+        let subsegments_per_segment = match TOTAL_SUBSEGMENTS / snake.body.visible_len() {
             x if x < MIN_SUBSEGMENTS => MIN_SUBSEGMENTS,
             x if x > MAX_SUBSEGMENTS => MAX_SUBSEGMENTS,
             x => x,
@@ -196,7 +210,6 @@ pub fn snake_mesh(
         }
 
         let segment_styles = snake.palette.segment_styles(&snake.body, frame_fraction);
-
 
         let turn = snake
             .body
@@ -211,7 +224,8 @@ pub fn snake_mesh(
             .unwrap_or(1.);
 
         let segment = &snake.body.cells[0];
-        let segment_description = segment_description(segment, 0, snake, frame_fraction, &segment_styles, gtx);
+        let segment_description =
+            segment_description(segment, 0, snake, frame_fraction, &segment_styles, gtx);
 
         match segment.segment_type {
             SegmentType::BlackHole { .. } => black_holes.push((
@@ -220,11 +234,7 @@ pub fn snake_mesh(
                 turn,
                 frame_fraction,
             )),
-            _ => other_heads.push((
-                segment_description,
-                subsegments_per_segment,
-                turn,
-            )),
+            _ => other_heads.push((segment_description, subsegments_per_segment, turn)),
         }
 
         subsegments_per_segment_all.push(subsegments_per_segment);
@@ -233,14 +243,22 @@ pub fn snake_mesh(
 
     // draw bodies of non-dying snakes first, so that black holes appear
     // on top of them
-    for (snake, subsegments_per_segment, segment_styles) in
-        izip!(
-            snakes.iter_mut(),
-            subsegments_per_segment_all.iter().copied(),
-            segment_styles_all.iter(),
-        ).filter(|(s, _, _)| s.state != State::Dying)
+    for (snake, subsegments_per_segment, segment_styles) in izip!(
+        snakes.iter_mut(),
+        subsegments_per_segment_all.iter().copied(),
+        segment_styles_all.iter(),
+    )
+    .filter(|(s, _, _)| s.state != State::Dying)
     {
-        build_snake_body(snake, frame_fraction, subsegments_per_segment, segment_styles, gtx, stats,  &mut builder)?;
+        build_snake_body(
+            snake,
+            frame_fraction,
+            subsegments_per_segment,
+            segment_styles,
+            gtx,
+            stats,
+            &mut builder,
+        )?;
     }
 
     // draw black holes and crashed heads
@@ -252,18 +270,27 @@ pub fn snake_mesh(
     // place are still drawn multiple times)
     for (segment_description, _, _, frame_fraction) in &black_holes {
         let destination = segment_description.destination + gtx.cell_dim.center();
-        let real_cell_dim;
         let SegmentFraction { start, end } = segment_description.fraction;
-        if (start - end).abs() < f32::EPSILON {
+        let real_cell_dim = if (start - end).abs() < f32::EPSILON {
             // snake has died, animate black hole out
-            assert!(*frame_fraction >= 0.5, "{} < 0.5", frame_fraction);
+            assert!(
+                *frame_fraction >= 0.5,
+                "frame fraction ({}) < 0.5",
+                frame_fraction
+            );
             let animation_fraction = frame_fraction - 0.5;
-            real_cell_dim = gtx.cell_dim * (1. - animation_fraction);
+            gtx.cell_dim * (1. - animation_fraction)
         } else {
-            real_cell_dim = gtx.cell_dim;
-        }
+            gtx.cell_dim
+        };
         stats.polygons += 1;
-        builder.circle(DrawMode::fill(), destination, real_cell_dim.side, 0.1, black_hole_color)?;
+        builder.circle(
+            DrawMode::fill(),
+            destination,
+            real_cell_dim.side,
+            0.1,
+            black_hole_color,
+        )?;
     }
 
     // draw the heads of snakes falling into black holes
@@ -272,14 +299,22 @@ pub fn snake_mesh(
     }
 
     // draw other bodies
-    for (snake, subsegments_per_segment, segment_styles) in
-        izip!(
-            snakes.iter_mut(),
-            subsegments_per_segment_all,
-            &segment_styles_all,
-        ).filter(|(s, _, _)| s.state == State::Dying)
+    for (snake, subsegments_per_segment, segment_styles) in izip!(
+        snakes.iter_mut(),
+        subsegments_per_segment_all,
+        &segment_styles_all,
+    )
+    .filter(|(s, _, _)| s.state == State::Dying)
     {
-        build_snake_body(snake, frame_fraction, subsegments_per_segment, segment_styles, gtx, stats,  &mut builder)?;
+        build_snake_body(
+            snake,
+            frame_fraction,
+            subsegments_per_segment,
+            segment_styles,
+            gtx,
+            stats,
+            &mut builder,
+        )?;
     }
 
     // draw other heads

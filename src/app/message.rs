@@ -1,10 +1,12 @@
-use crate::basic::Point;
+use crate::{
+    app::app_error::{AppResult, GameResultExtension},
+    basic::Point,
+};
 use ggez::{
     graphics::{self, Color, DrawParam, Font, PxScale, Text},
     Context,
 };
 use std::time::{Duration, Instant};
-use crate::app::app_error::{AppResult, GameResultExtension};
 
 /// Finite number of possible messages
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
@@ -98,7 +100,8 @@ impl Message {
             }
         }
 
-        ggez::graphics::draw(ctx, &text, DrawParam::from((location, color))).into_with_trace("Message::draw")?;
+        ggez::graphics::draw(ctx, &text, DrawParam::from((location, color)))
+            .into_with_trace("Message::draw")?;
         Ok(true)
     }
 }

@@ -27,14 +27,11 @@ impl HexPoint {
 
     pub fn from_cartesian(point: Point, cell_dim: CellDim) -> Self {
         // top-right of the desired cell
-        let Point { x, y } = point;// - cell_dim.center();
+        let Point { x, y } = point; // - cell_dim.center();
         let CellDim { side, sin, cos } = cell_dim;
         let h = (x - cos / 2.) / (side + cos);
         let v = (y / sin - h % 2.) / 2.;
-        Self {
-            h: h as isize,
-            v: v as isize,
-        }
+        Self { h: h as isize, v: v as isize }
     }
 
     // approximate straight-line distance in units of side length
