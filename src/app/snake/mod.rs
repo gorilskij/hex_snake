@@ -30,6 +30,7 @@ pub enum Type {
     Simulated,
     Competitor { life: Option<Frames> },
     Killer { life: Option<Frames> },
+    Rain,
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]

@@ -1,6 +1,7 @@
 #![feature(stmt_expr_attributes)]
 #![feature(if_let_guard)]
 #![feature(try_blocks)]
+// #![feature(never_type)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
 
@@ -36,7 +37,10 @@ mod support;
 //  - diagnose high cpu use when paused
 
 // TODO
-//  implement snake rain, snakes fall from the sky and flow along other snakes, it would look awesome
+//  make rain snakes ignore food
+//  split EatBehavior::Ignore into "pass in front" and "pass behind"
+//   use "pass behind for rain"
+//  make head-to-head collision with rain also ignore
 
 fn main() {
     let width = 2000.;

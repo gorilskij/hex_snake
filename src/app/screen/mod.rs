@@ -55,10 +55,12 @@ impl DerefMut for Screen {
     }
 }
 
+// TODO: refactor this awful mess
 pub trait Environment<R: Rng = ThreadRng> {
     fn snakes(&self) -> &[Snake];
     fn apples(&self) -> &[Apple];
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext);
+    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut R);
     fn add_snake(&mut self, seed: &Seed);
     fn remove_snake(&mut self, index: usize) -> Snake;
     fn remove_apple(&mut self, index: usize) -> Apple;

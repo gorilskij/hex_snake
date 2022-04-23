@@ -32,9 +32,10 @@ pub fn apple_mesh(
 
     let res: AppResult<Mesh> = try {
         for apple in apples {
+            use apple::Type::*;
             let color = match apple.apple_type {
-                apple::Type::Normal(_) => gtx.palette.apple_color,
-                apple::Type::SpawnSnake(_) => {
+                Food(_) => gtx.palette.apple_color,
+                SpawnSnake(_) | SpawnRain => {
                     let hue = 360. * (gtx.elapsed_millis as f64 / 1000. % 1.);
                     let hsl = HSL { h: hue, s: 1., l: 0.3 };
                     Color::from(hsl.to_rgb())

@@ -630,10 +630,10 @@ impl EventHandler<AppError> for Game {
                     // replace special apples with normal apples
                     let apple_food = self.gtx.prefs.apple_food;
                     self.apples.iter_mut().for_each(|apple| {
-                        if !matches!(apple.apple_type, apple::Type::Normal(_)) {
+                        if !matches!(apple.apple_type, apple::Type::Food(_)) {
                             *apple = Apple {
                                 pos: apple.pos,
-                                apple_type: apple::Type::Normal(apple_food),
+                                apple_type: apple::Type::Food(apple_food),
                             }
                         }
                     });
@@ -651,7 +651,7 @@ impl EventHandler<AppError> for Game {
                 self.gtx.prefs.apple_food = new_food;
                 // change existing apples
                 for apple in & mut self.apples {
-                    if let apple::Type::Normal(food) = &mut apple.apple_type {
+                    if let apple::Type::Food(food) = &mut apple.apple_type {
                         *food = new_food;
                     }
                 }
@@ -698,6 +698,10 @@ impl Environment for Game {
 
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {
         (&mut self.snakes, &mut self.apples, &mut self.gtx)
+    }
+
+    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut ThreadRng) {
+        (&mut self.snakes, &mut self.apples, &mut self.rng)
     }
 
     fn add_snake(&mut self, seed: &Seed) {

@@ -14,6 +14,7 @@ use crate::{
                 killer::Killer,
                 mouse::Mouse,
                 programmed::{Move, Programmed},
+                rain::Rain,
             },
             utils::OtherSnakes,
             Body,
@@ -33,6 +34,7 @@ mod keyboard_clock;
 mod killer;
 mod mouse;
 pub mod programmed;
+mod rain;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -45,6 +47,7 @@ pub enum Template {
     Competitor2,
     Killer,
     AStar,
+    Rain,
 }
 
 pub trait Controller {
@@ -188,6 +191,7 @@ impl Template {
                 path: vec![],
                 steps_since_update: 0,
             }),
+            Template::Rain => Box::new(Rain),
         }
     }
 }

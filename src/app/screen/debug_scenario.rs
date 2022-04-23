@@ -463,6 +463,10 @@ impl Environment for DebugScenario {
         (&mut self.snakes, &mut self.apples, &mut self.gtx)
     }
 
+    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut ThreadRng) {
+        (&mut self.snakes, &mut self.apples, &mut self.rng)
+    }
+
     fn add_snake(&mut self, seed: &Seed) {
         self.snakes.push(Snake::from(seed))
     }

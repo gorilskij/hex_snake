@@ -59,7 +59,9 @@ impl App {
                 snake_type: snake::Type::Player,
                 eat_mechanics: EatMechanics {
                     eat_self: EatBehavior::Cut,
-                    eat_other: hash_map! {},
+                    eat_other: hash_map! {
+                        snake::Type::Rain => EatBehavior::Cut,
+                    },
                     default: EatBehavior::Crash,
                 },
                 palette: snake::PaletteTemplate::rainbow(true),

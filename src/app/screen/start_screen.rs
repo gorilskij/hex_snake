@@ -5,7 +5,7 @@ use ggez::{
     graphics::Color,
     Context,
 };
-use rand::{prelude::*, rngs::ThreadRng};
+use rand::{prelude::*, rngs::ThreadRng, Error};
 
 use crate::{
     app,
@@ -193,7 +193,27 @@ impl SnakeDemo {
     }
 }
 
-impl Environment for SnakeDemo {
+enum NoRng {}
+
+impl RngCore for NoRng {
+    fn next_u32(&mut self) -> u32 {
+        unimplemented!()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        unimplemented!()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        unimplemented!()
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
+        unimplemented!()
+    }
+}
+
+impl Environment<NoRng> for SnakeDemo {
     fn snakes(&self) -> &[Snake] {
         slice::from_ref(&self.snake)
     }
@@ -205,6 +225,10 @@ impl Environment for SnakeDemo {
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {
         unimplemented!()
         // (slice::from_mut(&mut self.snake), &mut self.apples)
+    }
+
+    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut NoRng) {
+        panic!("tried to get rng of SnakeDemo")
     }
 
     fn add_snake(&mut self, seed: &Seed) {
@@ -239,7 +263,7 @@ impl Environment for SnakeDemo {
             .frame_stamp()
     }
 
-    fn rng(&mut self) -> &mut ThreadRng {
+    fn rng(&mut self) -> &mut NoRng {
         panic!("tried to get rng of SnakeDemo")
     }
 }
