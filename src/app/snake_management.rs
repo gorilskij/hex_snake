@@ -132,7 +132,7 @@ pub fn handle_collisions<E: Environment>(
                             dir: Some(Dir::D),
                             len: None,
                         };
-                        for h in (0..board_width).step_by(5) {
+                        for h in (0..board_width).step_by(3) {
                             spawn_snakes.push(snake::Seed {
                                 pos: Some(HexPoint { h, v: 0 }),
                                 len: Some(rng.gen_range(3, 10)),
