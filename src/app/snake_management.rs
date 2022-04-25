@@ -3,15 +3,15 @@
 
 use crate::{
     app::{
+        app_error::{AppError, AppErrorConversion, AppResult},
         apple::{self},
         screen::Environment,
-        snake::{self, controller, utils::split_snakes_mut, EatBehavior, Seed, SegmentType, State},
+        snake::{self, controller, utils::split_snakes_mut, EatBehavior, SegmentType, State},
         utils::{get_occupied_cells, random_free_spot},
     },
     basic::{Dir, HexPoint},
 };
 use ggez::Context;
-use itertools::Itertools;
 use rand::Rng;
 
 #[derive(Copy, Clone)]
@@ -95,7 +95,7 @@ pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
 pub fn handle_collisions<E: Environment>(
     env: &mut E,
     collisions: &[Collision],
-) -> (Vec<snake::Seed>, bool) {
+) -> (Vec<snake::Builder>, bool) {
     let board_width = env.board_dim().h;
     let (snakes, apples, rng) = env.snakes_apples_rng_mut();
 
@@ -115,29 +115,28 @@ pub fn handle_collisions<E: Environment>(
                             food_left: *food,
                         }
                     }
-                    SpawnSnake(seed) => spawn_snakes.push(seed.clone()),
+                    SpawnSnake(seed) => spawn_snakes.push((**seed).clone()),
                     SpawnRain => {
-                        let rain_seed = snake::Seed {
-                            snake_type: snake::Type::Rain,
-                            eat_mechanics: snake::EatMechanics {
+                        let seed = snake::Builder::default()
+                            .snake_type(snake::Type::Rain)
+                            .eat_mechanics(snake::EatMechanics {
                                 eat_self: EatBehavior::Die,
-                                eat_other: Default::default(),
+                                eat_other: hash_map! {},
                                 default: EatBehavior::Die,
-                            },
+                            })
                             // TODO: factor out palette into game palette
                             // palette: snake::PaletteTemplate::alternating_white(),
-                            palette: snake::PaletteTemplate::gray_gradient(false),
-                            controller: controller::Template::Rain,
-                            pos: None,
-                            dir: Some(Dir::D),
-                            len: None,
-                        };
+                            .palette(snake::PaletteTemplate::gray_gradient(false))
+                            .controller(controller::Template::Rain)
+                            .dir(Dir::D);
+
                         for h in (0..board_width).step_by(5) {
-                            spawn_snakes.push(snake::Seed {
-                                pos: Some(HexPoint { h, v: 0 }),
-                                len: Some(rng.gen_range(3, 10)),
-                                ..rain_seed.clone()
-                            });
+                            spawn_snakes.push(
+                                seed.clone()
+                                    .pos(HexPoint { h, v: 0 })
+                                    .len(rng.gen_range(3, 10))
+                                    .speed(rng.gen_range(0.2, 1.5)),
+                            );
                         }
                     }
                 }
@@ -194,10 +193,10 @@ pub fn handle_collisions<E: Environment>(
     (spawn_snakes, game_over)
 }
 
-pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {
+pub fn spawn_snakes<E: Environment>(env: &mut E, snake_builders: Vec<snake::Builder>) -> AppResult {
     let board_dim = env.board_dim();
 
-    for mut seed in seeds {
+    for mut snake_builder in snake_builders {
         // avoid spawning too close to player snake heads
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
 
@@ -213,7 +212,7 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {
         occupied_cells.sort_unstable();
         occupied_cells.dedup();
 
-        match seed.pos {
+        match snake_builder.pos {
             Some(pos) => {
                 let is_occupied = env
                     .snakes()
@@ -228,7 +227,7 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {
             }
             None => {
                 if let Some(pos) = random_free_spot(&occupied_cells, board_dim, env.rng()) {
-                    seed.pos = Some(pos);
+                    snake_builder.pos = Some(pos);
                 } else {
                     eprintln!("warning: failed to spawn snake, no free spaces left");
                     continue;
@@ -236,16 +235,19 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, seeds: Vec<Seed>) {
             }
         }
 
-        if seed.dir.is_none() {
-            seed.dir = Some(Dir::random(env.rng()));
-        }
+        snake_builder
+            .dir
+            .get_or_insert_with(|| Dir::random(env.rng()));
+        snake_builder
+            .len
+            .get_or_insert_with(|| env.rng().gen_range(7, 15));
 
-        if seed.len.is_none() {
-            seed.len = Some(env.rng().gen_range(7, 15));
-        }
-
-        env.add_snake(&seed);
+        env.add_snake(&snake_builder)
+            .map_err(AppError::from)
+            .with_trace_step("spawn_snakes")?;
     }
+
+    Ok(())
 }
 
 /// Returns the indices of snakes to be deleted (in reverse order so they

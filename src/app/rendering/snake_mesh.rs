@@ -6,7 +6,7 @@ use itertools::izip;
 
 use crate::{
     app::{
-        app_error::{AppResult, GameResultExtension},
+        app_error::{AppError, AppErrorConversion, AppResult},
         game_context::GameContext,
         rendering::segments::{
             descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
@@ -16,7 +16,7 @@ use crate::{
         stats::Stats,
     },
     basic::{transformations::translate, CellDim, Point},
-    partial_min_max::partial_min,
+    support::partial_min_max::partial_min,
 };
 
 const DRAW_WHITE_AURA: bool = false;
@@ -31,7 +31,8 @@ fn build_hexagon_at(
     translate(&mut hexagon_points, location);
     builder
         .polygon(DrawMode::fill(), &hexagon_points, color)
-        .into_with_trace("build_hexagon_at")?;
+        .map_err(AppError::from)
+        .with_trace_step("build_hexagon_at")?;
     Ok(())
 }
 
@@ -322,5 +323,8 @@ pub fn snake_mesh(
         stats.polygons += segment_description.build(&mut builder, subsegments_per_segment, turn)?;
     }
 
-    builder.build(ctx).into_with_trace("snake_mesh")
+    builder
+        .build(ctx)
+        .map_err(AppError::from)
+        .with_trace_step("snake_mesh")
 }

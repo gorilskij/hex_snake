@@ -16,6 +16,7 @@ use ggez::Context;
 pub mod controller;
 pub mod palette;
 pub mod utils;
+// mod seed;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum State {
@@ -124,17 +125,10 @@ impl Body {
     }
 }
 
-// impl Deref for Body {
-//     type Target = VecDeque<Segment>;
-//
-//     fn deref(&self) -> &Self::Target {
-//         &self.cells
-//     }
-// }
-
 pub struct Snake {
     pub snake_type: Type,
     pub eat_mechanics: EatMechanics,
+    pub speed: f32,
 
     pub body: Body,
     pub state: State,
@@ -143,32 +137,77 @@ pub struct Snake {
     pub palette: Box<dyn Palette>,
 }
 
-#[derive(Clone, Debug)]
-pub struct Seed {
-    pub snake_type: Type,
-    pub eat_mechanics: EatMechanics,
-    pub palette: PaletteTemplate,
-    pub controller: controller::Template,
+#[derive(Debug)]
+#[must_use]
+pub struct BuilderError(pub &'static str);
+
+#[derive(Default, Clone, Debug)]
+pub struct Builder {
+    pub snake_type: Option<Type>,
+    pub eat_mechanics: Option<EatMechanics>,
+
     pub pos: Option<HexPoint>,
     pub dir: Option<Dir>,
     pub len: Option<usize>,
+    pub speed: Option<f32>,
+
+    pub palette: Option<PaletteTemplate>,
+    pub controller: Option<controller::Template>,
 }
 
-impl From<&Seed> for Snake {
-    fn from(seed: &Seed) -> Self {
-        let Seed {
-            snake_type,
-            eat_mechanics,
-            palette,
-            controller,
-            pos,
-            dir,
-            len,
-        } = (*seed).clone();
+// TODO: write a macro to generate builders
+impl Builder {
+    #[must_use]
+    pub fn snake_type(mut self, value: Type) -> Self {
+        self.snake_type = Some(value);
+        self
+    }
 
-        let pos = pos.expect("starting position not provided");
-        let dir = dir.expect("starting direction not provided");
-        let len = len.expect("starting length not provided");
+    #[must_use]
+    pub fn eat_mechanics(mut self, value: EatMechanics) -> Self {
+        self.eat_mechanics = Some(value);
+        self
+    }
+
+    #[must_use]
+    pub fn pos(mut self, value: HexPoint) -> Self {
+        self.pos = Some(value);
+        self
+    }
+
+    #[must_use]
+    pub fn dir(mut self, value: Dir) -> Self {
+        self.dir = Some(value);
+        self
+    }
+
+    #[must_use]
+    pub fn len(mut self, value: usize) -> Self {
+        self.len = Some(value);
+        self
+    }
+
+    #[must_use]
+    pub fn speed(mut self, value: f32) -> Self {
+        self.speed = Some(value);
+        self
+    }
+
+    #[must_use]
+    pub fn palette(mut self, value: PaletteTemplate) -> Self {
+        self.palette = Some(value);
+        self
+    }
+
+    #[must_use]
+    pub fn controller(mut self, value: controller::Template) -> Self {
+        self.controller = Some(value);
+        self
+    }
+
+    pub fn build(&self) -> Result<Snake, BuilderError> {
+        let pos = self.pos.ok_or(BuilderError("missing field `pos`"))?;
+        let dir = self.dir.ok_or(BuilderError("missing field `dir`"))?;
 
         eprintln!(
             "spawn snake at {:?} coming from {:?} going to {:?}",
@@ -182,27 +221,42 @@ impl From<&Seed> for Snake {
             teleported: None,
         };
 
-        let mut body = VecDeque::new();
-        body.push_back(head);
+        let mut cells = VecDeque::new();
+        cells.push_back(head);
 
-        Self {
-            snake_type,
-            eat_mechanics,
+        let body = Body {
+            cells,
+            missing_front: 0,
+            dir,
+            turn_start: None,
+            dir_grace: false,
+            grow: self.len.ok_or(BuilderError("missing field `len`"))?,
+            search_trace: None,
+        };
 
-            body: Body {
-                cells: body,
-                missing_front: 0,
-                dir,
-                turn_start: None,
-                dir_grace: false,
-                grow: len,
-                search_trace: None,
-            },
+        Ok(Snake {
+            snake_type: self
+                .snake_type
+                .ok_or(BuilderError("missing field `snake_type`"))?,
+            eat_mechanics: self
+                .eat_mechanics
+                .as_ref()
+                .ok_or(BuilderError("missing field `eat_mechanics`"))?
+                .clone(),
+            speed: self.speed.ok_or(BuilderError("missing field `speed`"))?,
+            body,
             state: State::Living,
-
-            controller: controller.into_controller(dir),
-            palette: palette.into(),
-        }
+            controller: self
+                .controller
+                .as_ref()
+                .ok_or(BuilderError("mssing field `controller`"))?
+                .clone()
+                .into_controller(dir),
+            palette: self
+                .palette
+                .ok_or(BuilderError("mssing field `palette`"))?
+                .into(),
+        })
     }
 }
 

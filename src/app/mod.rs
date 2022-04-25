@@ -17,7 +17,7 @@ use apple::spawn::SpawnPolicy;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
-use snake::{controller, EatBehavior, EatMechanics, Seed};
+use snake::{controller, EatBehavior, EatMechanics};
 
 pub mod keyboard_control;
 mod palette;
@@ -55,24 +55,23 @@ impl App {
 
         let seeds: Vec<_> = players
             .into_iter()
-            .map(|cs| Seed {
-                snake_type: snake::Type::Player,
-                eat_mechanics: EatMechanics {
-                    eat_self: EatBehavior::Cut,
-                    eat_other: hash_map! {
-                        snake::Type::Rain => EatBehavior::Cut,
-                    },
-                    default: EatBehavior::Crash,
-                },
-                palette: snake::PaletteTemplate::rainbow(true),
-                // palette: PaletteTemplate::dark_blue_to_red(false),
-                // palette: PaletteTemplate::zebra(),
-                controller: controller::Template::Keyboard(cs),
-                // controller: controller::Template::Mouse,
-                // controller: SnakeControllerTemplate::PlayerController12,
-                pos: None,
-                dir: None,
-                len: None,
+            .map(|cs| {
+                snake::Builder::default()
+                    .snake_type(snake::Type::Player)
+                    .eat_mechanics(EatMechanics {
+                        eat_self: EatBehavior::Cut,
+                        eat_other: hash_map! {
+                            snake::Type::Rain => EatBehavior::Cut,
+                        },
+                        default: EatBehavior::Crash,
+                    })
+                    .palette(snake::PaletteTemplate::rainbow(true))
+                    // .palette(PaletteTemplate::dark_blue_to_red(false))
+                    // .palette(PaletteTemplate::zebra())
+                    .controller(controller::Template::Keyboard(cs))
+                    .speed(1.)
+                // .controller(controller::Template::Mouse)
+                // .controller(SnakeControllerTemplate::PlayerController12)
             })
             .collect();
 

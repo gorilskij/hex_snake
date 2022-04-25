@@ -7,10 +7,9 @@ use crate::{
             Body, Type,
         },
     },
-    basic::{Dir, HexDim, HexPoint},
+    basic::Dir,
 };
 use ggez::Context;
-use std::iter::once;
 
 pub struct Rain;
 
@@ -43,7 +42,7 @@ mod find3 {
         }
 
         fn consume_until(&mut self, find: I::Item) {
-            while let Some(x) = self.iter.next() {
+            for x in &mut self.iter {
                 if !self.found_d && x == self.find_d {
                     self.found_d = true;
                 }
@@ -113,14 +112,12 @@ impl Controller for Rain {
 
         if !find3.contains_d() {
             Some(Dir::D)
+        } else if !find3.contains_dl() {
+            Some(Dir::Dl)
+        } else if !find3.contains_dr() {
+            Some(Dir::Dr)
         } else {
-            if !find3.contains_dl() {
-                Some(Dir::Dl)
-            } else if !find3.contains_dr() {
-                Some(Dir::Dr)
-            } else {
-                None
-            }
+            None
         }
     }
 }

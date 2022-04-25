@@ -100,27 +100,21 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
         choose! {
             let rand: f64 <- rng;
             prefs.prob_spawn_competitor => {
-                apple::Type::SpawnSnake(snake::Seed {
-                    snake_type: snake::Type::Competitor { life: Some(200) },
-                    eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                    palette: snake::PaletteTemplate::pastel_rainbow(true),
-                    controller: Template::AStar,
-                    pos: None,
-                    dir: None,
-                    len: None,
-                })
+                apple::Type::SpawnSnake(Box::new(snake::Builder::default()
+                        .snake_type(snake::Type::Competitor { life: Some(200) })
+                        .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                        .palette(snake::PaletteTemplate::pastel_rainbow(true))
+                        .controller(Template::AStar)
+                ))
             },
             prefs.prob_spawn_killer => {
-                apple::Type::SpawnSnake(snake::Seed {
-                    snake_type: snake::Type::Killer { life: Some(200) },
-                    eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                    palette: snake::PaletteTemplate::dark_blue_to_red(false),
-                    // palette: snake::PaletteTemplate::dark_rainbow(true),
-                    controller: Template::Killer,
-                    pos: None,
-                    dir: None,
-                    len: None,
-                })
+                apple::Type::SpawnSnake(Box::new(snake::Builder::default()
+                    .snake_type(snake::Type::Killer { life: Some(200) })
+                    .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                    .palette(snake::PaletteTemplate::dark_blue_to_red(false))
+                    // .palette(snake::PaletteTemplate::dark_rainbow(true))
+                    .controller(Template::Killer)
+                ))
             },
             prefs.prob_spawn_rain => {
                 apple::Type::SpawnRain

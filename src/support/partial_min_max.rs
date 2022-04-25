@@ -27,6 +27,7 @@ where
 
 impl<I: Iterator> PartialMinMax for I {}
 
+#[allow(dead_code)]
 pub fn partial_min<T: PartialOrd>(a: T, b: T) -> Option<T> {
     match a.partial_cmp(&b)? {
         Ordering::Less | Ordering::Equal => Some(a),
@@ -34,6 +35,7 @@ pub fn partial_min<T: PartialOrd>(a: T, b: T) -> Option<T> {
     }
 }
 
+#[allow(dead_code)]
 pub fn partial_max<T: PartialOrd>(a: T, b: T) -> Option<T> {
     match a.partial_cmp(&b)? {
         Ordering::Greater => Some(a),

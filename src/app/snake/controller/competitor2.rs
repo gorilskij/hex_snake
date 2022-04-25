@@ -8,7 +8,7 @@ use crate::{
         },
     },
     basic::{angle_distance, CellDim, Dir, Dir12, HexPoint},
-    partial_min_max::PartialMinMax,
+    support::partial_min_max::PartialMinMax,
 };
 use ggez::Context;
 use itertools::Itertools;
@@ -30,7 +30,7 @@ impl Controller for Competitor2 {
         body: &mut Body,
         other_snakes: OtherSnakes,
         apples: &[Apple],
-        gtx: &GameContext,
+        _gtx: &GameContext,
         _ctx: &Context,
     ) -> Option<Dir> {
         // this also sets the target apple on the first frame

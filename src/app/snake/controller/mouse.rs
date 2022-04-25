@@ -1,6 +1,6 @@
 use crate::{
     app::{
-        app_error::{AppResult, GameResultExtension},
+        app_error::{AppError, AppErrorConversion, AppResult},
         apple::Apple,
         game_context::GameContext,
         rendering::segments::render_hexagon,
@@ -53,7 +53,8 @@ impl Controller for Mouse {
         );
         Some(
             Mesh::new_polygon(ctx, draw_mode, &hexagon, Color::CYAN)
-                .into_with_trace("controller::Mouse::get_mesh"),
+                .map_err(AppError::from)
+                .with_trace_step("controller::Mouse::get_mesh"),
         )
     }
 }
