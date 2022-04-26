@@ -139,7 +139,7 @@ pub struct Snake {
 
 #[derive(Debug)]
 #[must_use]
-pub struct BuilderError(pub &'static str);
+pub struct BuilderError(pub Builder, pub &'static str);
 
 #[derive(Default, Clone, Debug)]
 pub struct Builder {
@@ -206,8 +206,12 @@ impl Builder {
     }
 
     pub fn build(&self) -> Result<Snake, BuilderError> {
-        let pos = self.pos.ok_or(BuilderError("missing field `pos`"))?;
-        let dir = self.dir.ok_or(BuilderError("missing field `dir`"))?;
+        let pos = self
+            .pos
+            .ok_or_else(|| BuilderError(self.clone(), "missing field `pos`"))?;
+        let dir = self
+            .dir
+            .ok_or_else(|| BuilderError(self.clone(), "missing field `dir`"))?;
 
         eprintln!(
             "spawn snake at {:?} coming from {:?} going to {:?}",
@@ -230,31 +234,35 @@ impl Builder {
             dir,
             turn_start: None,
             dir_grace: false,
-            grow: self.len.ok_or(BuilderError("missing field `len`"))?,
+            grow: self
+                .len
+                .ok_or_else(|| BuilderError(self.clone(), "missing field `len`"))?,
             search_trace: None,
         };
 
         Ok(Snake {
             snake_type: self
                 .snake_type
-                .ok_or(BuilderError("missing field `snake_type`"))?,
+                .ok_or_else(|| BuilderError(self.clone(), "missing field `snake_type`"))?,
             eat_mechanics: self
                 .eat_mechanics
                 .as_ref()
-                .ok_or(BuilderError("missing field `eat_mechanics`"))?
+                .ok_or_else(|| BuilderError(self.clone(), "missing field `eat_mechanics`"))?
                 .clone(),
-            speed: self.speed.ok_or(BuilderError("missing field `speed`"))?,
+            speed: self
+                .speed
+                .ok_or_else(|| BuilderError(self.clone(), "missing field `speed`"))?,
             body,
             state: State::Living,
             controller: self
                 .controller
                 .as_ref()
-                .ok_or(BuilderError("mssing field `controller`"))?
+                .ok_or_else(|| BuilderError(self.clone(), "mssing field `controller`"))?
                 .clone()
                 .into_controller(dir),
             palette: self
                 .palette
-                .ok_or(BuilderError("mssing field `palette`"))?
+                .ok_or_else(|| BuilderError(self.clone(), "mssing field `palette`"))?
                 .into(),
         })
     }

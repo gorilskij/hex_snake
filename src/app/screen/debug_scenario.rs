@@ -455,7 +455,12 @@ impl Environment for DebugScenario {
     }
 
     fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult {
-        self.snakes.push(snake_builder.build()?);
+        self.snakes.push(
+            snake_builder
+                .build()
+                .map_err(AppError::from)
+                .with_trace_step("Game::add_snake")?,
+        );
         Ok(())
     }
 

@@ -41,6 +41,7 @@ mod keyboard;
 //  split EatBehavior::Ignore into "pass in front" and "pass behind"
 //   use "pass behind for rain"
 //  make head-to-head collision with rain also ignore
+//  allow snake to pass (tunnel) under is eaten segments
 
 fn main() {
     let width = 2000.;

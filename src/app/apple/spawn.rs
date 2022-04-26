@@ -105,6 +105,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                         .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                         .palette(snake::PaletteTemplate::pastel_rainbow(true))
                         .controller(Template::AStar)
+                        .speed(1.)
                 ))
             },
             prefs.prob_spawn_killer => {
@@ -114,6 +115,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                     .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                     // .palette(snake::PaletteTemplate::dark_rainbow(true))
                     .controller(Template::Killer)
+                    .speed(1.)
                 ))
             },
             prefs.prob_spawn_rain => {
