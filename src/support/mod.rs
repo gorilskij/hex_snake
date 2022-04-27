@@ -1,3 +1,5 @@
+pub mod map_with_default;
+
 use std::collections::VecDeque;
 
 pub trait Limits {

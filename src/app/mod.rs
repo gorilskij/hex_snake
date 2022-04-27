@@ -18,6 +18,7 @@ use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
 use snake::{controller, EatBehavior, EatMechanics, Seed};
+use crate::app::snake::{SegmentRawType};
 
 pub mod keyboard_control;
 mod palette;
@@ -58,9 +59,15 @@ impl App {
             .map(|cs| Seed {
                 snake_type: snake::Type::Player,
                 eat_mechanics: EatMechanics {
-                    eat_self: EatBehavior::Cut,
-                    eat_other: hash_map! {},
-                    default: EatBehavior::Crash,
+                    eat_self: hash_map_with_default! {
+                        default => EatBehavior::Cut,
+                        SegmentRawType::Eaten => EatBehavior::PassUnder,
+                    },
+                    eat_other: hash_map_with_default! {
+                        default => hash_map_with_default! {
+                            default => EatBehavior::Crash,
+                        },
+                    },
                 },
                 palette: snake::PaletteTemplate::rainbow(true),
                 // palette: PaletteTemplate::dark_blue_to_red(false),
