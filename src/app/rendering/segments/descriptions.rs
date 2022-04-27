@@ -1,7 +1,10 @@
 // This file contains structs describing various aspects of a segment
 
 use crate::{
-    app::{rendering, snake::palette::SegmentStyle},
+    app::{
+        rendering,
+        snake::{palette::SegmentStyle, SegmentType, ZIndex},
+    },
     basic::{CellDim, Dir, Point},
 };
 
@@ -57,6 +60,7 @@ pub enum TurnType {
 pub struct TurnDescription {
     pub coming_from: Dir,
     pub going_to: Dir,
+    pub fraction: f32,
 }
 
 // impl Default for TurnDescription {
@@ -91,6 +95,8 @@ pub struct SegmentDescription {
     pub turn: TurnDescription,
     pub fraction: SegmentFraction,
     pub draw_style: rendering::Style,
+    pub segment_type: SegmentType,
     pub segment_style: SegmentStyle,
+    pub z_index: ZIndex,
     pub cell_dim: CellDim,
 }

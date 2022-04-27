@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 pub use palette::{Palette, PaletteTemplate};
 
@@ -10,6 +10,7 @@ use crate::{
         utils::Frames,
     },
     basic::{Dir, FrameStamp, HexDim, HexPoint},
+    support::map_with_default::HashMapWithDefault,
 };
 use ggez::Context;
 
@@ -32,6 +33,15 @@ pub enum Type {
     Killer { life: Option<Frames> },
 }
 
+// for usage as map keys
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
+pub enum SegmentRawType {
+    Normal,
+    Eaten,
+    Crashed,
+    BlackHole,
+}
+
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SegmentType {
     Normal,
@@ -41,6 +51,19 @@ pub enum SegmentType {
     BlackHole { just_created: bool },
 }
 
+impl SegmentType {
+    pub fn raw_type(&self) -> SegmentRawType {
+        match self {
+            SegmentType::Normal => SegmentRawType::Normal,
+            SegmentType::Eaten { .. } => SegmentRawType::Eaten,
+            SegmentType::Crashed => SegmentRawType::Crashed,
+            SegmentType::BlackHole { .. } => SegmentRawType::BlackHole,
+        }
+    }
+}
+
+pub type ZIndex = i32;
+
 #[derive(Copy, Clone, Debug)]
 pub struct Segment {
     pub segment_type: SegmentType,
@@ -48,29 +71,30 @@ pub struct Segment {
     /// Direction from this segment to the next one (towards the tail)
     pub coming_from: Dir,
     pub teleported: Option<Dir>,
+    pub z_index: ZIndex,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum EatBehavior {
-    Ignore, // pass through
-    Cut,    // cut the other snake's tail off
-    Crash,  // stop the game
-    Die,    // disappear
+    Cut,       // cut the other snake's tail off
+    Crash,     // stop the game
+    Die,       // disappear
+    PassUnder, // pass under the other snake
+    PassOver,  // pass over the other snake
 }
 
+// TODO: if this is too big, make it shared between snakes as an Rc
 #[derive(Clone, Debug)]
 pub struct EatMechanics {
-    pub eat_self: EatBehavior,
-    pub eat_other: HashMap<Type, EatBehavior>,
-    pub default: EatBehavior,
+    pub eat_self: HashMapWithDefault<SegmentRawType, EatBehavior>,
+    pub eat_other: HashMapWithDefault<Type, HashMapWithDefault<SegmentRawType, EatBehavior>>,
 }
 
 impl EatMechanics {
     pub fn always(behavior: EatBehavior) -> Self {
         Self {
-            eat_self: behavior,
-            eat_other: hash_map! {},
-            default: behavior,
+            eat_self: HashMapWithDefault::new(behavior),
+            eat_other: HashMapWithDefault::new(HashMapWithDefault::new(behavior)),
         }
     }
 }
@@ -179,6 +203,7 @@ impl From<&Seed> for Snake {
             pos,
             coming_from: -dir,
             teleported: None,
+            z_index: 0,
         };
 
         let mut body = VecDeque::new();
@@ -319,6 +344,7 @@ impl Snake {
                     pos: self.head().pos.wrapping_translate(dir, 1, gtx.board_dim),
                     coming_from: -dir,
                     teleported: None,
+                    z_index: 0,
                 };
                 self.body.cells.push_front(new_head);
             }
