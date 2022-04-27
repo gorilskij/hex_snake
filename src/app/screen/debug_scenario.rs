@@ -58,11 +58,7 @@ impl DebugScenario {
             .dir(Dir::U)
             .len(5)
             .snake_type(snake::Type::Simulated)
-            .eat_mechanics(EatMechanics {
-                eat_self: EatBehavior::Crash,
-                eat_other: hash_map! {},
-                default: EatBehavior::Crash,
-            })
+            .eat_mechanics(EatMechanics::always(EatBehavior::Crash))
             .palette(snake::PaletteTemplate::solid_white_red())
             .controller(controller::Template::Programmed(vec![]));
 
@@ -71,11 +67,7 @@ impl DebugScenario {
             .dir(Dir::Ul)
             .len(5)
             .snake_type(snake::Type::Simulated)
-            .eat_mechanics(EatMechanics {
-                eat_self: EatBehavior::Crash,
-                eat_other: hash_map! {},
-                default: EatBehavior::Die,
-            })
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
             // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
             .palette(snake::PaletteTemplate::rainbow(true))
             .controller(controller::Template::Programmed(vec![]));
@@ -117,11 +109,7 @@ impl DebugScenario {
             .dir(Dir::Ur)
             .len(5)
             .snake_type(snake::Type::Simulated)
-            .eat_mechanics(EatMechanics {
-                eat_self: EatBehavior::Crash,
-                eat_other: hash_map! {},
-                default: EatBehavior::Die,
-            })
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
             .palette(snake::PaletteTemplate::solid_white_red())
             .controller(controller::Template::Programmed(vec![]));
 
@@ -130,11 +118,7 @@ impl DebugScenario {
             .dir(Dir::Ul)
             .len(5)
             .snake_type(snake::Type::Simulated)
-            .eat_mechanics(EatMechanics {
-                eat_self: EatBehavior::Crash,
-                eat_other: hash_map! {},
-                default: EatBehavior::Die,
-            })
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
             .palette(snake::PaletteTemplate::Solid {
                 color: Color::RED,
                 eaten: Color::WHITE,
@@ -186,11 +170,7 @@ impl DebugScenario {
                     .dir(Dir::random(rng))
                     .len(5)
                     .snake_type(snake::Type::Competitor { life: None })
-                    .eat_mechanics(EatMechanics {
-                        eat_self: EatBehavior::Ignore,
-                        eat_other: hash_map! {},
-                        default: EatBehavior::Ignore,
-                    })
+                    .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
                     .palette(snake::PaletteTemplate::pastel_rainbow(true))
                     .controller(controller::Template::AStar)
             })
@@ -233,11 +213,7 @@ impl DebugScenario {
             .dir(Dir::U)
             .len(15)
             .snake_type(snake::Type::Simulated)
-            .eat_mechanics(EatMechanics {
-                eat_self: EatBehavior::Crash,
-                eat_other: hash_map! {},
-                default: EatBehavior::Crash,
-            })
+            .eat_mechanics(EatMechanics::always(EatBehavior::Crash))
             .palette(snake::PaletteTemplate::solid_white_red())
             .controller(controller::Template::Programmed(vec![]));
 
@@ -247,11 +223,7 @@ impl DebugScenario {
                 .dir(Dir::Ul)
                 .len(5)
                 .snake_type(snake::Type::Simulated)
-                .eat_mechanics(EatMechanics {
-                    eat_self: EatBehavior::Crash,
-                    eat_other: hash_map! {},
-                    default: EatBehavior::Die,
-                })
+                .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::dark_blue_to_red(true))
                 .controller(controller::Template::Programmed(vec![])),
@@ -260,11 +232,7 @@ impl DebugScenario {
                 .dir(Dir::Ul)
                 .len(5)
                 .snake_type(snake::Type::Simulated)
-                .eat_mechanics(EatMechanics {
-                    eat_self: EatBehavior::Crash,
-                    eat_other: hash_map! {},
-                    default: EatBehavior::Die,
-                })
+                .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .controller(controller::Template::Programmed(vec![])),
@@ -273,12 +241,8 @@ impl DebugScenario {
                 .dir(Dir::Ul)
                 .len(5)
                 .snake_type(snake::Type::Simulated)
-                .eat_mechanics(EatMechanics {
-                    eat_self: EatBehavior::Crash,
-                    eat_other: hash_map! {},
-                    default: EatBehavior::Die,
-                })
-                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
+                .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::rainbow(true))
                 .controller(controller::Template::Programmed(vec![])),
             snake::Builder::default()
@@ -286,11 +250,7 @@ impl DebugScenario {
                 .dir(Dir::Ul)
                 .len(5)
                 .snake_type(snake::Type::Simulated)
-                .eat_mechanics(EatMechanics {
-                    eat_self: EatBehavior::Crash,
-                    eat_other: hash_map! {},
-                    default: EatBehavior::Die,
-                })
+                .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::rainbow(false))
                 .controller(controller::Template::Programmed(vec![])),

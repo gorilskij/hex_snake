@@ -15,11 +15,11 @@ impl SegmentRenderer for HexagonSegments {
     fn render_default_straight_segment(_: &SegmentDescription) -> Vec<Point> {
         unreachable!()
     }
-    fn render_default_curved_segment(_: &SegmentDescription, _turn: f32) -> Vec<Point> {
+    fn render_default_curved_segment(_: &SegmentDescription, _turn_fraction: f32) -> Vec<Point> {
         unreachable!()
     }
 
-    fn render_segment(description: SegmentDescription, _turn: f32) -> Vec<Point> {
+    fn render_segment(description: SegmentDescription, _turn_fraction: f32) -> Vec<Point> {
         let mut points = render_hexagon(description.cell_dim);
         translate(&mut points, description.destination);
         points
