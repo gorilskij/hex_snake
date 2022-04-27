@@ -69,11 +69,7 @@ impl SnakeDemo {
 
         let seed = snake::Builder::default()
             .snake_type(snake::Type::Simulated)
-            .eat_mechanics(EatMechanics {
-                eat_self: EatBehavior::Cut,
-                eat_other: hash_map! {},
-                default: EatBehavior::Cut,
-            })
+            .eat_mechanics(EatMechanics::always(EatBehavior::Cut))
             // placeholder, updated immediately
             .palette(snake::PaletteTemplate::Solid {
                 color: Color::RED,

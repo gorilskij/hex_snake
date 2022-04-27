@@ -181,48 +181,56 @@ pub struct Builder {
 
 // TODO: write a macro to generate builders
 impl Builder {
+    #[inline(always)]
     #[must_use]
     pub fn snake_type(mut self, value: Type) -> Self {
         self.snake_type = Some(value);
         self
     }
 
+    #[inline(always)]
     #[must_use]
     pub fn eat_mechanics(mut self, value: EatMechanics) -> Self {
         self.eat_mechanics = Some(value);
         self
     }
 
+    #[inline(always)]
     #[must_use]
     pub fn pos(mut self, value: HexPoint) -> Self {
         self.pos = Some(value);
         self
     }
 
+    #[inline(always)]
     #[must_use]
     pub fn dir(mut self, value: Dir) -> Self {
         self.dir = Some(value);
         self
     }
 
+    #[inline(always)]
     #[must_use]
     pub fn len(mut self, value: usize) -> Self {
         self.len = Some(value);
         self
     }
 
+    #[inline(always)]
     #[must_use]
     pub fn speed(mut self, value: f32) -> Self {
         self.speed = Some(value);
         self
     }
 
+    #[inline(always)]
     #[must_use]
     pub fn palette(mut self, value: PaletteTemplate) -> Self {
         self.palette = Some(value);
         self
     }
 
+    #[inline(always)]
     #[must_use]
     pub fn controller(mut self, value: controller::Template) -> Self {
         self.controller = Some(value);

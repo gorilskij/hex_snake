@@ -13,6 +13,7 @@ use crate::{
 };
 use ggez::Context;
 use rand::Rng;
+use crate::app::snake::EatMechanics;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -121,13 +122,9 @@ pub fn handle_collisions<E: Environment>(
                     SpawnRain => {
                         let seed = snake::Builder::default()
                             .snake_type(snake::Type::Rain)
-                            .eat_mechanics(snake::EatMechanics {
-                                eat_self: EatBehavior::Die,
-                                eat_other: hash_map! {},
-                                default: EatBehavior::Die,
-                            })
+                            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                             // TODO: factor out palette into game palette
-                            // palette: snake::PaletteTemplate::alternating_white(),
+                            // .palette(snake::PaletteTemplate::alternating_white())
                             .palette(snake::PaletteTemplate::gray_gradient(false))
                             .controller(controller::Template::Rain)
                             .dir(Dir::D);
