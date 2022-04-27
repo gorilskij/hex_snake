@@ -1,8 +1,8 @@
 use std::{
     collections::HashMap,
+    hash::Hash,
     ops::{Index, IndexMut},
 };
-use std::hash::Hash;
 
 #[derive(Deref, DerefMut, Clone, Debug)]
 pub struct HashMapWithDefault<K, V> {

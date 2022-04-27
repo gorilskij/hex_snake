@@ -10,6 +10,7 @@ use crate::{
     app::{
         app_error::{AppError, AppErrorConversion, AppResult},
         screen::{DebugScenario, StartScreen},
+        snake::SegmentRawType,
     },
     basic::CellDim,
 };
@@ -18,7 +19,6 @@ use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
 use snake::{controller, EatBehavior, EatMechanics, Seed};
-use crate::app::snake::{SegmentRawType};
 
 pub mod keyboard_control;
 mod palette;

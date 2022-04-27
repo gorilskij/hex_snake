@@ -53,11 +53,11 @@ impl SegmentRenderer for SmoothSegments {
 
     fn render_default_curved_segment(
         description: &SegmentDescription,
-        mut turn: f32,
+        mut turn_fraction: f32,
     ) -> Vec<Point> {
         // a blunt turn is equivalent to half a sharp turn
         if let TurnType::Blunt(_) = description.turn.turn_type() {
-            turn /= 2.;
+            turn_fraction /= 2.;
         }
 
         let SegmentDescription { cell_dim, fraction, .. } = description;
@@ -66,7 +66,7 @@ impl SegmentRenderer for SmoothSegments {
 
         let pivot = {
             // distance of the pivot from where it is for a sharp turn
-            let pivot_dist = 2. * cos * (1. / turn - 1.);
+            let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
             // too straight to be drawn as curved, default to straight drawing
             if pivot_dist.is_infinite() {
                 return Self::render_default_straight_segment(description);
@@ -83,7 +83,7 @@ impl SegmentRenderer for SmoothSegments {
         // angle (amount of path) to actually trace.
         // The angle is the same for both inner and outer circles, the
         // calculation would be equivalent for the inner circle.
-        let total_angle = if (turn - 1.).abs() < f32::EPSILON {
+        let total_angle = if (turn_fraction - 1.).abs() < f32::EPSILON {
             // shortcut for a complete turn
             TAU / 3.
         } else {

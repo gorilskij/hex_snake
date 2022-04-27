@@ -123,7 +123,9 @@ pub fn handle_collisions<E: Environment>(
                 let snake1 = &snakes[snake1_index];
                 let snake2 = &snakes[snake2_index];
                 let snake2_type = snake2.snake_type;
-                let snake2_segment_type = snake2.body.cells[snake2_segment_index].segment_type.raw_type();
+                let snake2_segment_type = snake2.body.cells[snake2_segment_index]
+                    .segment_type
+                    .raw_type();
                 let behavior = snake1.eat_mechanics.eat_other[&snake2_type][&snake2_segment_type];
 
                 match behavior {
@@ -153,7 +155,9 @@ pub fn handle_collisions<E: Environment>(
             }
             Collision::Itself { snake_index, snake_segment_index } => {
                 let snake = &snakes[snake_index];
-                let segment_type = snake.body.cells[snake_segment_index].segment_type.raw_type();
+                let segment_type = snake.body.cells[snake_segment_index]
+                    .segment_type
+                    .raw_type();
                 let behavior = snake.eat_mechanics.eat_self[&segment_type];
                 match behavior {
                     Cut => snakes[snake_index].cut_at(snake_segment_index),
