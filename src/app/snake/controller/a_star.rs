@@ -6,7 +6,11 @@ use crate::{
     basic::{Dir, HexDim, HexPoint},
 };
 
-use crate::app::{apple::Apple, game_context::GameContext};
+use crate::app::{
+    apple::Apple,
+    game_context::GameContext,
+    snake::{Segment, SegmentRawType},
+};
 use ggez::Context;
 use itertools::Itertools;
 use std::{
@@ -14,7 +18,6 @@ use std::{
     collections::HashSet,
     rc::Rc,
 };
-use crate::app::snake::{Segment, SegmentRawType};
 
 pub struct AStar {
     pub pass_through_eaten: bool,
@@ -102,10 +105,14 @@ impl AStar {
             parent: None,
         }];
 
-        let mut forbidden_positions: Box<dyn Iterator<Item=&Segment>> = Box::new(body.cells.iter());
+        let mut forbidden_positions: Box<dyn Iterator<Item = &Segment>> =
+            Box::new(body.cells.iter());
 
         if self.pass_through_eaten {
-            forbidden_positions = Box::new(forbidden_positions.filter(|seg| seg.segment_type.raw_type() != SegmentRawType::Eaten))
+            forbidden_positions = Box::new(
+                forbidden_positions
+                    .filter(|seg| seg.segment_type.raw_type() != SegmentRawType::Eaten),
+            )
         }
 
         let mut forbidden_positions: HashSet<_> = forbidden_positions

@@ -91,7 +91,7 @@ impl Controller for Killer {
         let mut target = player_snake.head().pos;
         // how many cells ahead of the player to target
         for _ in 0..1 {
-            target = target.wrapping_translate(player_snake.dir(), 1, gtx.board_dim);
+            target = target.wrapping_translate(player_snake.body.dir, 1, gtx.board_dim);
         }
         rough_direction(body.cells[0].pos, target, body, other_snakes, gtx.board_dim)
     }

@@ -163,7 +163,7 @@ pub struct Snake {
 
 #[derive(Debug)]
 #[must_use]
-pub struct BuilderError(pub Builder, pub &'static str);
+pub struct BuilderError(pub Box<Builder>, pub &'static str);
 
 #[derive(Default, Clone, Debug)]
 pub struct Builder {
@@ -240,10 +240,10 @@ impl Builder {
     pub fn build(&self) -> Result<Snake, BuilderError> {
         let pos = self
             .pos
-            .ok_or_else(|| BuilderError(self.clone(), "missing field `pos`"))?;
+            .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `pos`"))?;
         let dir = self
             .dir
-            .ok_or_else(|| BuilderError(self.clone(), "missing field `dir`"))?;
+            .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `dir`"))?;
 
         eprintln!(
             "spawn snake at {:?} coming from {:?} going to {:?}",
@@ -269,43 +269,41 @@ impl Builder {
             dir_grace: false,
             grow: self
                 .len
-                .ok_or_else(|| BuilderError(self.clone(), "missing field `len`"))?,
+                .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `len`"))?,
             search_trace: None,
         };
 
         Ok(Snake {
-            snake_type: self
-                .snake_type
-                .ok_or_else(|| BuilderError(self.clone(), "missing field `snake_type`"))?,
+            snake_type: self.snake_type.ok_or_else(|| {
+                BuilderError(Box::new(self.clone()), "missing field `snake_type`")
+            })?,
             eat_mechanics: self
                 .eat_mechanics
                 .as_ref()
-                .ok_or_else(|| BuilderError(self.clone(), "missing field `eat_mechanics`"))?
+                .ok_or_else(|| {
+                    BuilderError(Box::new(self.clone()), "missing field `eat_mechanics`")
+                })?
                 .clone(),
             speed: self
                 .speed
-                .ok_or_else(|| BuilderError(self.clone(), "missing field `speed`"))?,
+                .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,
             body,
             state: State::Living,
             controller: self
                 .controller
                 .as_ref()
-                .ok_or_else(|| BuilderError(self.clone(), "mssing field `controller`"))?
+                .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `controller`"))?
                 .clone()
                 .into_controller(dir),
             palette: self
                 .palette
-                .ok_or_else(|| BuilderError(self.clone(), "mssing field `palette`"))?
+                .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `palette`"))?
                 .into(),
         })
     }
 }
 
 impl Snake {
-    pub fn dir(&self) -> Dir {
-        self.body.dir
-    }
-
     pub fn head(&self) -> &Segment {
         &self.body.cells[0]
     }
@@ -407,7 +405,7 @@ impl Snake {
                 self.update_dir(other_snakes, apples, gtx, ctx);
 
                 // create new head for snake
-                let dir = self.dir();
+                let dir = self.body.dir;
                 let new_head = Segment {
                     segment_type: SegmentType::Normal,
                     // this gets very interesting if you move 2 cells each time

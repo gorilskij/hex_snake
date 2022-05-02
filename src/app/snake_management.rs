@@ -6,14 +6,16 @@ use crate::{
         app_error::{AppError, AppErrorConversion, AppResult},
         apple::{self},
         screen::Environment,
-        snake::{self, controller, utils::split_snakes_mut, EatBehavior, SegmentType, State},
+        snake::{
+            self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics, SegmentType,
+            State,
+        },
         utils::{get_occupied_cells, random_free_spot},
     },
     basic::{Dir, HexPoint},
 };
 use ggez::Context;
 use rand::Rng;
-use crate::app::snake::EatMechanics;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
