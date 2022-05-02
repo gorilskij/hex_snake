@@ -14,6 +14,7 @@ use crate::{
                 killer::Killer,
                 mouse::Mouse,
                 programmed::{Move, Programmed},
+                rain::Rain,
             },
             utils::OtherSnakes,
             Body,
@@ -33,6 +34,7 @@ mod keyboard_clock;
 mod killer;
 mod mouse;
 pub mod programmed;
+mod rain;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -44,7 +46,10 @@ pub enum Template {
     Competitor1,
     Competitor2,
     Killer,
-    AStar,
+    AStar {
+        pass_through_eaten: bool,
+    },
+    Rain,
 }
 
 pub trait Controller {
@@ -183,11 +188,13 @@ impl Template {
                 frames_since_update: 0,
             }),
             Template::Killer => Box::new(Killer),
-            Template::AStar => Box::new(AStar {
+            Template::AStar { pass_through_eaten } => Box::new(AStar {
+                pass_through_eaten,
                 target: None,
                 path: vec![],
                 steps_since_update: 0,
             }),
+            Template::Rain => Box::new(Rain),
         }
     }
 }

@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     app::{
-        app_error::{AppResult, GameResultExtension},
+        app_error::{AppError, AppErrorConversion, AppResult},
         rendering,
         rendering::segments::{
             descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
@@ -47,6 +47,7 @@ impl SegmentDescription {
                 let g2 = g2 as f64;
                 let b2 = b2 as f64;
 
+                // TODO: factor out this code
                 let start_subsegment = (num_subsegments as f32 * start) as usize;
                 let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
 
@@ -182,7 +183,8 @@ impl SegmentDescription {
         for (color, points) in self.render(color_resolution, turn_fraction) {
             builder
                 .polygon(DrawMode::fill(), &points, color)
-                .into_with_trace("SegmentDescription::build")?;
+                .map_err(AppError::from)
+                .with_trace_step("SegmentDescription::build")?;
             polygons += 1;
         }
         Ok(polygons)

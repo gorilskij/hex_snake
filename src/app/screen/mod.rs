@@ -4,15 +4,16 @@ pub use start_screen::StartScreen;
 
 pub use crate::app::prefs::Prefs;
 use crate::{
-    app::{
-        apple::Apple,
-        snake::{Seed, Snake},
-    },
+    app::{apple::Apple, snake::Snake},
     basic::{FrameStamp, HexDim},
 };
 
 use crate::{
-    app::{app_error::AppError, game_context::GameContext},
+    app::{
+        app_error::{AppError, AppResult},
+        game_context::GameContext,
+        snake,
+    },
     basic::CellDim,
 };
 use ggez::event::EventHandler;
@@ -55,11 +56,13 @@ impl DerefMut for Screen {
     }
 }
 
+// TODO: refactor this awful mess
 pub trait Environment<R: Rng = ThreadRng> {
     fn snakes(&self) -> &[Snake];
     fn apples(&self) -> &[Apple];
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext);
-    fn add_snake(&mut self, seed: &Seed);
+    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut R);
+    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult;
     fn remove_snake(&mut self, index: usize) -> Snake;
     fn remove_apple(&mut self, index: usize) -> Apple;
     fn gtx(&self) -> &GameContext;

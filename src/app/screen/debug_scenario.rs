@@ -8,7 +8,7 @@ use rand::prelude::*;
 use crate::{
     app,
     app::{
-        app_error::{AppError, AppResult, GameResultExtension},
+        app_error::{AppError, AppErrorConversion, AppResult},
         apple::{
             spawn::{spawn_apples, SpawnPolicy},
             Apple,
@@ -21,9 +21,7 @@ use crate::{
             board_dim::{calculate_board_dim, calculate_offset},
             Environment,
         },
-        snake::{
-            self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics, Seed, Snake,
-        },
+        snake::{self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics, Snake},
         snake_management::{advance_snakes, find_collisions, handle_collisions},
         stats::Stats,
     },
@@ -42,7 +40,7 @@ pub struct DebugScenario {
 
     apples: Vec<Apple>,
 
-    seeds: Vec<snake::Seed>,
+    seeds: Vec<snake::Builder>,
     snakes: Vec<Snake>,
 
     rng: ThreadRng,
@@ -55,28 +53,24 @@ impl DebugScenario {
     pub fn head_body_collision(cell_dim: CellDim) -> Self {
         // snake2 crashes into snake1 coming from the bottom-right
 
-        let seed1 = snake::Seed {
-            pos: Some(HexPoint { h: 5, v: 7 }),
-            dir: Some(Dir::U),
-            len: Some(5),
+        let seed1 = snake::Builder::default()
+            .pos(HexPoint { h: 5, v: 7 })
+            .dir(Dir::U)
+            .len(5)
+            .snake_type(snake::Type::Simulated)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Crash))
+            .palette(snake::PaletteTemplate::solid_white_red())
+            .controller(controller::Template::Programmed(vec![]));
 
-            snake_type: snake::Type::Simulated,
-            eat_mechanics: EatMechanics::always(EatBehavior::Crash),
-            palette: snake::PaletteTemplate::solid_white_red(),
-            controller: controller::Template::Programmed(vec![]),
-        };
-
-        let seed2 = snake::Seed {
-            pos: Some(HexPoint { h: 8, v: 7 }),
-            dir: Some(Dir::Ul),
-            len: Some(5),
-
-            snake_type: snake::Type::Simulated,
-            eat_mechanics: EatMechanics::always(EatBehavior::Die),
-            // palette: snake::PaletteTemplate::dark_blue_to_red(false),
-            palette: snake::PaletteTemplate::rainbow(true),
-            controller: controller::Template::Programmed(vec![]),
-        };
+        let seed2 = snake::Builder::default()
+            .pos(HexPoint { h: 8, v: 7 })
+            .dir(Dir::Ul)
+            .len(5)
+            .snake_type(snake::Type::Simulated)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+            // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
+            .palette(snake::PaletteTemplate::rainbow(true))
+            .controller(controller::Template::Programmed(vec![]));
 
         let mut this = Self {
             control: Control::new(3.),
@@ -110,30 +104,26 @@ impl DebugScenario {
 
     /// Head-head dying collision
     pub fn head_head_collision(cell_dim: CellDim) -> Self {
-        let seed1 = snake::Seed {
-            pos: Some(HexPoint { h: 5, v: 7 }),
-            dir: Some(Dir::Ur),
-            len: Some(5),
+        let seed1 = snake::Builder::default()
+            .pos(HexPoint { h: 5, v: 7 })
+            .dir(Dir::Ur)
+            .len(5)
+            .snake_type(snake::Type::Simulated)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+            .palette(snake::PaletteTemplate::solid_white_red())
+            .controller(controller::Template::Programmed(vec![]));
 
-            snake_type: snake::Type::Simulated,
-            eat_mechanics: EatMechanics::always(EatBehavior::Die),
-            palette: snake::PaletteTemplate::solid_white_red(),
-            controller: controller::Template::Programmed(vec![]),
-        };
-
-        let seed2 = snake::Seed {
-            pos: Some(HexPoint { h: 11, v: 7 }),
-            dir: Some(Dir::Ul),
-            len: Some(5),
-
-            snake_type: snake::Type::Simulated,
-            eat_mechanics: EatMechanics::always(EatBehavior::Die),
-            palette: snake::PaletteTemplate::Solid {
+        let seed2 = snake::Builder::default()
+            .pos(HexPoint { h: 11, v: 7 })
+            .dir(Dir::Ul)
+            .len(5)
+            .snake_type(snake::Type::Simulated)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+            .palette(snake::PaletteTemplate::Solid {
                 color: Color::RED,
                 eaten: Color::WHITE,
-            },
-            controller: controller::Template::Programmed(vec![]),
-        };
+            })
+            .controller(controller::Template::Programmed(vec![]));
 
         let mut this = Self {
             control: Control::new(3.),
@@ -171,18 +161,18 @@ impl DebugScenario {
 
         let rng = &mut thread_rng();
         let seeds: Vec<_> = (0..NUM_SNAKES)
-            .map(|i| snake::Seed {
-                pos: Some(HexPoint {
-                    h: i as isize / 7 * 2 + 3,
-                    v: i as isize % 10 * 2 + 3,
-                }),
-                dir: Some(Dir::random(rng)),
-                len: Some(5),
-
-                snake_type: snake::Type::Competitor { life: None },
-                eat_mechanics: EatMechanics::always(EatBehavior::PassOver),
-                palette: snake::PaletteTemplate::pastel_rainbow(true),
-                controller: controller::Template::AStar,
+            .map(|i| {
+                snake::Builder::default()
+                    .pos(HexPoint {
+                        h: i as isize / 7 * 2 + 3,
+                        v: i as isize % 10 * 2 + 3,
+                    })
+                    .dir(Dir::random(rng))
+                    .len(5)
+                    .snake_type(snake::Type::Competitor { life: None })
+                    .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
+                    .palette(snake::PaletteTemplate::pastel_rainbow(true))
+                    .controller(controller::Template::AStar { pass_through_eaten: false })
             })
             .collect();
 
@@ -218,62 +208,52 @@ impl DebugScenario {
 
     /// Comparison of persistent and non-persistent skins entering a black hole
     pub fn double_head_body_collision(cell_dim: CellDim) -> Self {
-        let wall_seed = snake::Seed {
-            pos: Some(HexPoint { h: 5, v: 7 }),
-            dir: Some(Dir::U),
-            len: Some(15),
-
-            snake_type: snake::Type::Simulated,
-            eat_mechanics: EatMechanics::always(EatBehavior::Crash),
-            palette: snake::PaletteTemplate::solid_white_red(),
-            controller: controller::Template::Programmed(vec![]),
-        };
+        let wall_seed = snake::Builder::default()
+            .pos(HexPoint { h: 5, v: 7 })
+            .dir(Dir::U)
+            .len(15)
+            .snake_type(snake::Type::Simulated)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Crash))
+            .palette(snake::PaletteTemplate::solid_white_red())
+            .controller(controller::Template::Programmed(vec![]));
 
         let crash_seeds = vec![
-            snake::Seed {
-                pos: Some(HexPoint { h: 14, v: 5 }),
-                dir: Some(Dir::Ul),
-                len: Some(5),
-
-                snake_type: snake::Type::Simulated,
-                eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
-                palette: snake::PaletteTemplate::dark_blue_to_red(true),
-                controller: controller::Template::Programmed(vec![]),
-            },
-            snake::Seed {
-                pos: Some(HexPoint { h: 14, v: 7 }),
-                dir: Some(Dir::Ul),
-                len: Some(5),
-
-                snake_type: snake::Type::Simulated,
-                eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
-                palette: snake::PaletteTemplate::dark_blue_to_red(false),
-                controller: controller::Template::Programmed(vec![]),
-            },
-            snake::Seed {
-                pos: Some(HexPoint { h: 14, v: 9 }),
-                dir: Some(Dir::Ul),
-                len: Some(5),
-
-                snake_type: snake::Type::Simulated,
-                eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
-                palette: snake::PaletteTemplate::rainbow(true),
-                controller: controller::Template::Programmed(vec![]),
-            },
-            snake::Seed {
-                pos: Some(HexPoint { h: 14, v: 11 }),
-                dir: Some(Dir::Ul),
-                len: Some(5),
-
-                snake_type: snake::Type::Simulated,
-                eat_mechanics: EatMechanics::always(EatBehavior::Die),
-                // palette: snake::PaletteTemplate::dark_blue_to_red(false),
-                palette: snake::PaletteTemplate::rainbow(false),
-                controller: controller::Template::Programmed(vec![]),
-            },
+            snake::Builder::default()
+                .pos(HexPoint { h: 14, v: 5 })
+                .dir(Dir::Ul)
+                .len(5)
+                .snake_type(snake::Type::Simulated)
+                .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
+                .palette(snake::PaletteTemplate::dark_blue_to_red(true))
+                .controller(controller::Template::Programmed(vec![])),
+            snake::Builder::default()
+                .pos(HexPoint { h: 14, v: 7 })
+                .dir(Dir::Ul)
+                .len(5)
+                .snake_type(snake::Type::Simulated)
+                .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
+                .palette(snake::PaletteTemplate::dark_blue_to_red(false))
+                .controller(controller::Template::Programmed(vec![])),
+            snake::Builder::default()
+                .pos(HexPoint { h: 14, v: 9 })
+                .dir(Dir::Ul)
+                .len(5)
+                .snake_type(snake::Type::Simulated)
+                .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
+                .palette(snake::PaletteTemplate::rainbow(true))
+                .controller(controller::Template::Programmed(vec![])),
+            snake::Builder::default()
+                .pos(HexPoint { h: 14, v: 11 })
+                .dir(Dir::Ul)
+                .len(5)
+                .snake_type(snake::Type::Simulated)
+                .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
+                .palette(snake::PaletteTemplate::rainbow(false))
+                .controller(controller::Template::Programmed(vec![])),
         ];
 
         let mut this = Self {
@@ -316,7 +296,12 @@ impl DebugScenario {
     }
 
     fn restart(&mut self) {
-        self.snakes = self.seeds.iter().map(Snake::from).collect();
+        self.snakes = self
+            .seeds
+            .iter()
+            .map(snake::Builder::build)
+            .map(Result::unwrap)
+            .collect();
         self.apples = vec![];
         self.gtx.apple_spawn_policy.reset();
         self.control.pause();
@@ -382,7 +367,9 @@ impl EventHandler<AppError> for DebugScenario {
             graphics::draw(ctx, &apple_mesh, draw_param)?;
         }
 
-        graphics::present(ctx).into_with_trace("DebugScenario::draw")
+        graphics::present(ctx)
+            .map_err(AppError::from)
+            .with_trace_step("DebugScenario::draw")
     }
 
     fn key_down_event(
@@ -423,8 +410,18 @@ impl Environment for DebugScenario {
         (&mut self.snakes, &mut self.apples, &mut self.gtx)
     }
 
-    fn add_snake(&mut self, seed: &Seed) {
-        self.snakes.push(Snake::from(seed))
+    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut ThreadRng) {
+        (&mut self.snakes, &mut self.apples, &mut self.rng)
+    }
+
+    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult {
+        self.snakes.push(
+            snake_builder
+                .build()
+                .map_err(AppError::from)
+                .with_trace_step("Game::add_snake")?,
+        );
+        Ok(())
     }
 
     fn remove_snake(&mut self, index: usize) -> Snake {

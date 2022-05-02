@@ -7,7 +7,7 @@ use std::{cmp::Ordering, iter::repeat};
 
 use crate::{
     app::{
-        app_error::{AppError, AppResult, GameResultExtension},
+        app_error::{AppError, AppErrorConversion, AppResult},
         game_context::GameContext,
         rendering::segments::{
             descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
@@ -17,7 +17,7 @@ use crate::{
         stats::Stats,
     },
     basic::{transformations::translate, CellDim, Point},
-    partial_min_max::partial_min,
+    support::partial_min_max::partial_min,
 };
 
 const DRAW_WHITE_AURA: bool = false;
@@ -32,7 +32,8 @@ fn build_hexagon_at(
     translate(&mut hexagon_points, location);
     builder
         .polygon(DrawMode::fill(), &hexagon_points, color)
-        .into_with_trace("build_hexagon_at")?;
+        .map_err(AppError::from)
+        .with_trace_step("build_hexagon_at")?;
     Ok(())
 }
 
@@ -92,10 +93,15 @@ fn segment_description(
             .turn_start
             .map(|(_, start_frame_fraction)| {
                 let max = 1. - start_frame_fraction;
-                let covered = frame_fraction - start_frame_fraction;
-                let linear = covered / max;
-                // apply easing
-                ezing::sine_inout(linear)
+
+                // when the snake is moving really fast, max == 0 would cause a NaN in the calculation
+                if max.abs() < f32::EPSILON {
+                    1.
+                } else {
+                    let covered = frame_fraction - start_frame_fraction;
+                    let linear = covered / max;
+                    ezing::sine_inout(linear)
+                }
             })
             .unwrap_or(1.)
     } else {
@@ -188,6 +194,7 @@ pub fn snake_mesh(
             .map(|((segment_idx, segment), style, resolution)| {
                 let desc =
                     segment_description(segment, segment_idx, snake, frame_fraction, style, gtx);
+
                 (desc, resolution)
             })
         })
@@ -237,5 +244,8 @@ pub fn snake_mesh(
         })
         .collect::<Result<_, _>>()?;
 
-    builder.build(ctx).into_with_trace("snake_mesh")
+    builder
+        .build(ctx)
+        .map_err(AppError::from)
+        .with_trace_step("snake_mesh")
 }

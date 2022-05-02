@@ -5,7 +5,7 @@ use ggez::{
     graphics::Color,
     Context,
 };
-use rand::{prelude::*, rngs::ThreadRng};
+use rand::{prelude::*, rngs::ThreadRng, Error};
 
 use crate::{
     app,
@@ -18,7 +18,7 @@ use crate::{
         rendering,
         screen::Environment,
         snake,
-        snake::{controller::Template, EatBehavior, EatMechanics, Seed, Snake},
+        snake::{controller::Template, EatBehavior, EatMechanics, Snake},
         stats::Stats,
         Screen,
     },
@@ -57,20 +57,6 @@ impl SnakeDemo {
             next_index: 0,
         };
 
-        let mut seed = Seed {
-            snake_type: snake::Type::Simulated,
-            eat_mechanics: EatMechanics::always(EatBehavior::Cut),
-            // placeholder, updated immediately
-            palette: snake::PaletteTemplate::Solid {
-                color: Color::RED,
-                eaten: Color::RED,
-            },
-            controller: Template::demo_infinity_pattern(1),
-            pos: Some(start_pos),
-            dir: Some(start_dir),
-            len: Some(start_len),
-        };
-
         let palettes = vec![
             snake::PaletteTemplate::solid_white_red(),
             // snake::PaletteTemplate::rainbow(false),
@@ -80,14 +66,27 @@ impl SnakeDemo {
             snake::PaletteTemplate::green_to_red(false),
             // snake::PaletteTemplate::zebra(),
         ];
-        seed.palette = palettes[0];
+
+        let seed = snake::Builder::default()
+            .snake_type(snake::Type::Simulated)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Cut))
+            // placeholder, updated immediately
+            .palette(snake::PaletteTemplate::Solid {
+                color: Color::RED,
+                eaten: Color::RED,
+            })
+            .controller(Template::demo_infinity_pattern(1))
+            .pos(start_pos)
+            .dir(start_dir)
+            .len(start_len)
+            .palette(palettes[0]);
 
         Self {
             location,
             board_dim,
             apples: vec![],
             apple_spawn_policy,
-            snake: Snake::from(&seed),
+            snake: seed.build().unwrap(),
             palettes,
             current_palette: 0,
 
@@ -102,7 +101,7 @@ impl SnakeDemo {
         self.snake.palette = self.palettes[self.current_palette].into();
     }
 
-    fn spawn_apples(&mut self, prefs: &Prefs, rng: &mut impl Rng) {
+    fn spawn_apples(&mut self, _prefs: &Prefs, _rng: &mut impl Rng) {
         unimplemented!("how do you use GameContext here??")
         // let new_apples = spawn_apples(
         //     slice::from_ref(&self.snake),
@@ -115,11 +114,11 @@ impl SnakeDemo {
 
     fn advance_snakes(
         &mut self,
-        cell_dim: CellDim,
-        frame_stamp: FrameStamp,
-        prefs: &Prefs,
-        ctx: &Context,
-        rng: &mut impl Rng,
+        _cell_dim: CellDim,
+        _frame_stamp: FrameStamp,
+        _prefs: &Prefs,
+        _ctx: &Context,
+        _rng: &mut impl Rng,
     ) {
         unimplemented!("how do you use GameContext here??")
         // self.snake.advance(
@@ -142,12 +141,12 @@ impl SnakeDemo {
 
     fn draw(
         &mut self,
-        ctx: &mut Context,
-        cell_dim: CellDim,
-        frame_stamp: FrameStamp,
-        draw_style: rendering::Style,
-        palette: &app::Palette,
-        stats: &mut Stats,
+        _ctx: &mut Context,
+        _cell_dim: CellDim,
+        _frame_stamp: FrameStamp,
+        _draw_style: rendering::Style,
+        _palette: &app::Palette,
+        _stats: &mut Stats,
     ) -> AppResult {
         unimplemented!("how do you use GameContext here??")
         // self.snake
@@ -189,7 +188,27 @@ impl SnakeDemo {
     }
 }
 
-impl Environment for SnakeDemo {
+enum NoRng {}
+
+impl RngCore for NoRng {
+    fn next_u32(&mut self) -> u32 {
+        unimplemented!()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        unimplemented!()
+    }
+
+    fn fill_bytes(&mut self, _dest: &mut [u8]) {
+        unimplemented!()
+    }
+
+    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), Error> {
+        unimplemented!()
+    }
+}
+
+impl Environment<NoRng> for SnakeDemo {
     fn snakes(&self) -> &[Snake] {
         slice::from_ref(&self.snake)
     }
@@ -203,8 +222,12 @@ impl Environment for SnakeDemo {
         // (slice::from_mut(&mut self.snake), &mut self.apples)
     }
 
-    fn add_snake(&mut self, seed: &Seed) {
-        panic!("tried to add snake to SnakeDemo: {:?}", seed)
+    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut NoRng) {
+        panic!("tried to get rng of SnakeDemo")
+    }
+
+    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult {
+        panic!("tried to add snake to SnakeDemo: {:?}", snake_builder)
     }
 
     fn remove_snake(&mut self, index: usize) -> Snake {
@@ -224,7 +247,7 @@ impl Environment for SnakeDemo {
     }
 
     fn cell_dim(&self) -> CellDim {
-        self.cell_dim()
+        panic!("tried to get cell_dim from StartScreen")
     }
 
     fn frame_stamp(&self) -> FrameStamp {
@@ -235,7 +258,7 @@ impl Environment for SnakeDemo {
             .frame_stamp()
     }
 
-    fn rng(&mut self) -> &mut ThreadRng {
+    fn rng(&mut self) -> &mut NoRng {
         panic!("tried to get rng of SnakeDemo")
     }
 }
@@ -303,7 +326,7 @@ impl EventHandler<AppError> for StartScreen {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> AppResult {
+    fn draw(&mut self, _ctx: &mut Context) -> AppResult {
         unimplemented!("how do you use GameContext here??")
         // self.control.borrow_mut().graphics_frame(&mut self.gtx);
         // let frame_stamp = self.control.borrow().frame_stamp();

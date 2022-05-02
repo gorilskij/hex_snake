@@ -7,7 +7,7 @@ mod grid_mesh;
 pub mod segments;
 mod snake_mesh;
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Style {
     Hexagon,
     Smooth,

@@ -11,8 +11,9 @@ pub struct Prefs {
 
     pub apple_food: Food,
     pub special_apples: bool,
-    pub prob_spawn_competitor: f32,
-    pub prob_spawn_killer: f32,
+    pub prob_spawn_competitor: f64,
+    pub prob_spawn_killer: f64,
+    pub prob_spawn_rain: f64,
 
     pub draw_style: rendering::Style,
 }
@@ -31,6 +32,7 @@ impl Default for Prefs {
             special_apples: true,
             prob_spawn_competitor: 0.025,
             prob_spawn_killer: 0.015,
+            prob_spawn_rain: 0.002,
 
             draw_style: rendering::Style::Smooth,
         }

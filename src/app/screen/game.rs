@@ -9,7 +9,7 @@ use rand::prelude::*;
 
 use crate::{
     app::{
-        app_error::{AppError, AppErrorConversion, AppResult, GameResultExtension},
+        app_error::{AppError, AppErrorConversion, AppResult},
         apple::{
             self,
             spawn::{spawn_apples, SpawnPolicy},
@@ -28,14 +28,14 @@ use crate::{
             self,
             controller::{Controller, Template},
             utils::split_snakes_mut,
-            Seed, Snake,
+            Snake,
         },
         snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes},
         stats::Stats,
         utils::Food,
     },
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
-    row::ROw,
+    support::row::ROw,
 };
 
 pub struct Game {
@@ -46,7 +46,7 @@ pub struct Game {
     /// Offset to center the grid in the window
     offset: Point,
 
-    seeds: Vec<snake::Seed>,
+    seeds: Vec<snake::Builder>,
     snakes: Vec<Snake>,
     apples: Vec<Apple>,
 
@@ -78,7 +78,7 @@ impl Game {
     pub fn new(
         cell_dim: CellDim,
         starting_fps: f64,
-        seeds: Vec<snake::Seed>,
+        seeds: Vec<snake::Builder>,
         palette: Palette,
         apple_spawn_policy: SpawnPolicy,
         ctx: &mut Context,
@@ -165,7 +165,7 @@ impl Game {
         let unpositioned = self
             .seeds
             .iter()
-            .filter(|seed| !matches!(seed.snake_type, snake::Type::Simulated { .. }))
+            .filter(|seed| !matches!(seed.snake_type, Some(snake::Type::Simulated { .. })))
             .count();
 
         // TODO: clean this mess
@@ -186,20 +186,24 @@ impl Game {
             Box::new(std::iter::empty())
         };
 
-        for mut seed in self.seeds.iter().cloned() {
+        for seed in self.seeds.iter() {
             match seed.snake_type {
-                snake::Type::Simulated => {
+                Some(snake::Type::Simulated) => {
                     // expected to have initial position, direction, and length
-                    self.snakes.push(Snake::from(&seed));
+                    self.snakes.push(seed.build().unwrap());
                 }
                 _ => {
-                    seed.pos = Some(HexPoint {
-                        h: unpositioned_h_pos.next().unwrap(),
-                        v: self.gtx.board_dim.v / 2,
-                    });
-                    seed.dir = Some(unpositioned_dir);
-                    seed.len = Some(10);
-                    self.snakes.push(Snake::from(&seed));
+                    self.snakes.push(
+                        seed.clone()
+                            .pos(HexPoint {
+                                h: unpositioned_h_pos.next().unwrap(),
+                                v: self.gtx.board_dim.v / 2,
+                            })
+                            .dir(unpositioned_dir)
+                            .len(10)
+                            .build()
+                            .unwrap(),
+                    );
 
                     // alternate
                     unpositioned_dir = -unpositioned_dir;
@@ -213,7 +217,7 @@ impl Game {
         self.spawn_apples();
     }
 
-    fn advance_snakes(&mut self, ctx: &Context) {
+    fn advance_snakes(&mut self, ctx: &Context) -> AppResult {
         advance_snakes(self, ctx);
 
         // if only ephemeral AIs are left, kill all other snakes
@@ -234,7 +238,7 @@ impl Game {
         if self.snakes.is_empty() {
             self.control.game_over();
             self.draw_cache_invalid = 5;
-            return;
+            return Ok(());
         }
 
         let collisions = find_collisions(self);
@@ -244,7 +248,9 @@ impl Game {
             self.control.game_over()
         }
 
-        spawn_snakes(self, seeds);
+        spawn_snakes(self, seeds)
+            .map_err(AppError::from)
+            .with_trace_step("Game::advance_snakes")
     }
 }
 
@@ -325,7 +331,7 @@ impl Game {
 impl EventHandler<AppError> for Game {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
         while self.control.can_update() {
-            self.advance_snakes(ctx);
+            self.advance_snakes(ctx).with_trace_step("Game::update")?;
             self.spawn_apples();
         }
 
@@ -492,7 +498,9 @@ impl EventHandler<AppError> for Game {
             self.draw_messages(ctx)?;
         }
 
-        graphics::present(ctx).into_with_trace("Game::draw")
+        graphics::present(ctx)
+            .map_err(AppError::from)
+            .with_trace_step("Game::draw")
     }
 
     fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
@@ -540,7 +548,7 @@ impl EventHandler<AppError> for Game {
             A => {
                 // only apply if there is exactly one player snake
                 if self.seeds.len() == 1 {
-                    // hacky
+                    // WARNING: hacky
                     unsafe {
                         static mut STASHED_CONTROLLER: Option<Box<dyn Controller>> = None;
 
@@ -554,7 +562,7 @@ impl EventHandler<AppError> for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    Template::AStar.into_controller(player_snake.body.dir),
+                                    Template::AStar { pass_through_eaten: true }.into_controller(player_snake.body.dir),
                                 ));
                                 "Autopilot on"
                             }
@@ -630,10 +638,10 @@ impl EventHandler<AppError> for Game {
                     // replace special apples with normal apples
                     let apple_food = self.gtx.prefs.apple_food;
                     self.apples.iter_mut().for_each(|apple| {
-                        if !matches!(apple.apple_type, apple::Type::Normal(_)) {
+                        if !matches!(apple.apple_type, apple::Type::Food(_)) {
                             *apple = Apple {
                                 pos: apple.pos,
-                                apple_type: apple::Type::Normal(apple_food),
+                                apple_type: apple::Type::Food(apple_food),
                             }
                         }
                     });
@@ -651,7 +659,7 @@ impl EventHandler<AppError> for Game {
                 self.gtx.prefs.apple_food = new_food;
                 // change existing apples
                 for apple in & mut self.apples {
-                    if let apple::Type::Normal(food) = &mut apple.apple_type {
+                    if let apple::Type::Food(food) = &mut apple.apple_type {
                         *food = new_food;
                     }
                 }
@@ -700,8 +708,18 @@ impl Environment for Game {
         (&mut self.snakes, &mut self.apples, &mut self.gtx)
     }
 
-    fn add_snake(&mut self, seed: &Seed) {
-        self.snakes.push(Snake::from(seed))
+    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut ThreadRng) {
+        (&mut self.snakes, &mut self.apples, &mut self.rng)
+    }
+
+    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult {
+        self.snakes.push(
+            snake_builder
+                .build()
+                .map_err(AppError::from)
+                .with_trace_step("Game::add_snake")?,
+        );
+        Ok(())
     }
 
     fn remove_snake(&mut self, index: usize) -> Snake {

@@ -9,7 +9,7 @@ use crate::{
 };
 
 // A full (solid) segment starts at 0. and ends at 1.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct SegmentFraction {
     pub start: f32,
     pub end: f32,
@@ -56,7 +56,7 @@ pub enum TurnType {
 /// the current cell so TurnDescription { coming_from: D, going_to == U }
 /// describes a straight segment coming from below and going up.
 /// This means that if coming_from == going_to, the state is invalid.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct TurnDescription {
     pub coming_from: Dir,
     pub going_to: Dir,
@@ -89,7 +89,7 @@ impl TurnDescription {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SegmentDescription {
     pub destination: Point,
     pub turn: TurnDescription,
