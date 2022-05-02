@@ -46,9 +46,7 @@ pub enum Template {
     Competitor1,
     Competitor2,
     Killer,
-    AStar {
-        pass_through_eaten: bool,
-    },
+    AStar { pass_through_eaten: bool },
     Rain,
 }
 

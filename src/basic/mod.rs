@@ -16,8 +16,8 @@ macro_rules! hash_map_with_default {
     { default => $def_value:expr $(, $($key:expr => $value:expr),* $(,)?)? } => {{
         let map = crate::support::map_with_default::HashMapWithDefault::new($def_value);
         $(
-            let mut map = map;
             $(
+                let mut map = map;
                 map.insert($key, $value);
             )*
         )?

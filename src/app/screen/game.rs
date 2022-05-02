@@ -562,7 +562,8 @@ impl EventHandler<AppError> for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    Template::AStar { pass_through_eaten: true }.into_controller(player_snake.body.dir),
+                                    Template::AStar { pass_through_eaten: true }
+                                        .into_controller(player_snake.body.dir),
                                 ));
                                 "Autopilot on"
                             }

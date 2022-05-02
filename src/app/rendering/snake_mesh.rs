@@ -49,7 +49,7 @@ fn segment_description(
     let going_to = segment_idx
         .checked_sub(1)
         .map(|prev_idx| -snake.body.cells[prev_idx].coming_from)
-        .unwrap_or(snake.dir());
+        .unwrap_or(snake.body.dir);
 
     let location = segment.pos.to_cartesian(gtx.cell_dim);
 
@@ -212,7 +212,7 @@ pub fn snake_mesh(
                 ordering => ordering,
             },
         )
-        .map(|(desc, resolution)| {
+        .try_for_each(|(desc, resolution)| {
             // TODO: animate black hole in
             if let SegmentType::BlackHole { .. } = desc.segment_type {
                 let destination = desc.destination + gtx.cell_dim.center();
@@ -241,8 +241,7 @@ pub fn snake_mesh(
 
             stats.polygons += desc.build(&mut builder, *resolution)?;
             Ok::<_, AppError>(())
-        })
-        .collect::<Result<_, _>>()?;
+        })?;
 
     builder
         .build(ctx)
