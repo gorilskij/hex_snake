@@ -243,14 +243,14 @@ impl SegmentStyle {
     }
 }
 
-pub trait Palette {
+pub trait Palette: Send + Sync {
     fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle>;
     // TODO: refactor as
     //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_fraction: f32) -> Color;
     //  this avoids unnecessary work for hex palette and is called exactly as many times as needed
 }
 
-impl From<PaletteTemplate> for Box<dyn Palette> {
+impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
     fn from(template: PaletteTemplate) -> Self {
         match template {
             PaletteTemplate::Solid { color, eaten } => Box::new(Solid { color, eaten }),

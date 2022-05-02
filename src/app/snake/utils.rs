@@ -1,8 +1,10 @@
 use crate::app::snake::{Body, Segment, Snake};
+use rayon::prelude::*;
 
 #[derive(Copy, Clone)]
 pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);
 
+#[allow(dead_code)]
 impl<'a> OtherSnakes<'a> {
     pub fn empty() -> Self {
         Self(&[], &[])
@@ -16,12 +18,25 @@ impl<'a> OtherSnakes<'a> {
         self.0.iter().chain(self.1.iter())
     }
 
+    pub fn par_iter_snakes(&self) -> impl ParallelIterator<Item = &Snake> {
+        self.0.par_iter().chain(self.1.par_iter())
+    }
+
     pub fn iter_bodies(&self) -> impl Iterator<Item = &Body> {
         self.iter_snakes().map(|Snake { body, .. }| body)
     }
 
+    pub fn par_iter_bodies(&self) -> impl ParallelIterator<Item = &Body> {
+        self.par_iter_snakes().map(|Snake { body, .. }| body)
+    }
+
     pub fn iter_segments(&self) -> impl Iterator<Item = &Segment> {
         self.iter_bodies().flat_map(|body| body.cells.iter())
+    }
+
+    pub fn par_iter_segments(&self) -> impl ParallelIterator<Item = &Segment> {
+        self.par_iter_bodies()
+            .flat_map(|body| body.cells.par_iter())
     }
 }
 

@@ -7,10 +7,9 @@ use crate::{
             Body, Type,
         },
     },
-    basic::{Dir, HexDim, HexPoint},
+    basic::Dir,
 };
 use ggez::Context;
-use std::iter::once;
 
 pub struct Rain;
 

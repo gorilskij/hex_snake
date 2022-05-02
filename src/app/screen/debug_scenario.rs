@@ -21,7 +21,10 @@ use crate::{
             board_dim::{calculate_board_dim, calculate_offset},
             Environment,
         },
-        snake::{self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics, Snake},
+        snake::{
+            self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics,
+            PassthroughKnowledge, Snake,
+        },
         snake_management::{advance_snakes, find_collisions, handle_collisions},
         stats::Stats,
     },
@@ -172,7 +175,9 @@ impl DebugScenario {
                     .snake_type(snake::Type::Competitor { life: None })
                     .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
                     .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                    .controller(controller::Template::AStar { pass_through_eaten: false })
+                    .controller(controller::Template::AStar {
+                        passthrough_knowledge: PassthroughKnowledge::always(false),
+                    })
             })
             .collect();
 

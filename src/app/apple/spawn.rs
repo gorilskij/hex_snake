@@ -4,7 +4,7 @@ use crate::{
         game_context::GameContext,
         screen::Prefs,
         snake,
-        snake::{controller::Template, EatBehavior, EatMechanics, Snake},
+        snake::{controller::Template, EatBehavior, EatMechanics, PassthroughKnowledge, Snake},
         utils::{get_occupied_cells, random_free_spot},
     },
     basic::HexPoint,
@@ -104,7 +104,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                         .snake_type(snake::Type::Competitor { life: Some(200) })
                         .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                         .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                        .controller(Template::AStar { pass_through_eaten: false })
+                        .controller(Template::AStar { passthrough_knowledge: PassthroughKnowledge::always(false) })
                         .speed(1.)
                 ))
             },

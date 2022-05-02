@@ -2,8 +2,9 @@ use ggez::{
     graphics::{Color, DrawMode, Mesh, MeshBuilder},
     Context,
 };
-use itertools::{izip, Itertools};
-use std::{cmp::Ordering, iter::repeat};
+use rayon::prelude::*;
+use static_assertions::assert_impl_all;
+use std::cmp::Ordering;
 
 use crate::{
     app::{
@@ -184,64 +185,78 @@ pub fn snake_mesh(
     //  - black hole
     //  - other
 
-    izip!(snakes.iter(), styles, color_resolutions.iter())
-        .flat_map(|(snake, style, resolution)| {
-            izip!(
-                snake.body.cells.iter().enumerate(),
-                style.into_iter(),
-                repeat(resolution),
-            )
-            .map(|((segment_idx, segment), style, resolution)| {
-                let desc =
-                    segment_description(segment, segment_idx, snake, frame_fraction, style, gtx);
+    assert_impl_all!(Snake: Send, Sync);
 
-                (desc, resolution)
-            })
-        })
-        .sorted_by(
-            |(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
-                Ordering::Equal => {
-                    if let SegmentType::BlackHole { .. } = desc1.segment_type {
-                        Ordering::Greater
-                    } else if let SegmentType::BlackHole { .. } = desc2.segment_type {
-                        Ordering::Less
-                    } else {
-                        Ordering::Equal
-                    }
-                }
-                ordering => ordering,
-            },
-        )
-        .try_for_each(|(desc, resolution)| {
-            // TODO: animate black hole in
-            if let SegmentType::BlackHole { .. } = desc.segment_type {
-                let destination = desc.destination + gtx.cell_dim.center();
-                let SegmentFraction { start, end } = desc.fraction;
-                let real_cell_dim = if (start - end).abs() < f32::EPSILON {
-                    // snake has died, animate black hole out
-                    assert!(
-                        frame_fraction >= 0.5,
-                        "frame fraction ({}) < 0.5",
-                        frame_fraction
+    let mut descs: Vec<_> = snakes
+        .par_iter_mut()
+        .zip(styles.into_par_iter())
+        .zip(color_resolutions.par_iter())
+        .flat_map(|((snake, style), resolution)| {
+            snake
+                .body
+                .cells
+                .par_iter()
+                .enumerate()
+                .zip(style.into_par_iter())
+                .map(|((segment_idx, segment), style)| {
+                    let desc = segment_description(
+                        segment,
+                        segment_idx,
+                        snake,
+                        frame_fraction,
+                        style,
+                        gtx,
                     );
-                    let animation_fraction = frame_fraction - 0.5;
-                    gtx.cell_dim * (1. - animation_fraction)
-                } else {
-                    gtx.cell_dim
-                };
-                stats.polygons += 1;
-                builder.circle(
-                    DrawMode::fill(),
-                    destination,
-                    real_cell_dim.side,
-                    0.1,
-                    black_hole_color,
-                )?;
-            }
 
-            stats.polygons += desc.build(&mut builder, *resolution)?;
-            Ok::<_, AppError>(())
-        })?;
+                    (desc, *resolution)
+                })
+        })
+        .collect();
+    descs.par_sort_unstable_by(
+        |(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
+            Ordering::Equal => {
+                if let SegmentType::BlackHole { .. } = desc1.segment_type {
+                    Ordering::Greater
+                } else if let SegmentType::BlackHole { .. } = desc2.segment_type {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
+                }
+            }
+            ordering => ordering,
+        },
+    );
+
+    descs.into_iter().try_for_each(|(desc, resolution)| {
+        // TODO: animate black hole in
+        if let SegmentType::BlackHole { .. } = desc.segment_type {
+            let destination = desc.destination + gtx.cell_dim.center();
+            let SegmentFraction { start, end } = desc.fraction;
+            let real_cell_dim = if (start - end).abs() < f32::EPSILON {
+                // snake has died, animate black hole out
+                assert!(
+                    frame_fraction >= 0.5,
+                    "frame fraction ({}) < 0.5",
+                    frame_fraction
+                );
+                let animation_fraction = frame_fraction - 0.5;
+                gtx.cell_dim * (1. - animation_fraction)
+            } else {
+                gtx.cell_dim
+            };
+            stats.polygons += 1;
+            builder.circle(
+                DrawMode::fill(),
+                destination,
+                real_cell_dim.side,
+                0.1,
+                black_hole_color,
+            )?;
+        }
+
+        stats.polygons += desc.build(&mut builder, resolution)?;
+        Ok::<_, AppError>(())
+    })?;
 
     builder
         .build(ctx)

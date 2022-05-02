@@ -27,6 +27,7 @@ impl<K: Hash + Eq, V> IndexMut<&K> for HashMapWithDefault<K, V> {
     }
 }
 
+#[allow(dead_code)]
 impl<K: Hash + Eq, V> HashMapWithDefault<K, V> {
     pub fn new(default: V) -> Self {
         Self { map: HashMap::new(), default }
@@ -38,5 +39,16 @@ impl<K: Hash + Eq, V> HashMapWithDefault<K, V> {
 
     pub fn get_mut(&mut self, key: &K) -> &mut V {
         &mut self[key]
+    }
+
+    pub fn map_values<W>(&self, mut f: impl FnMut(&V) -> W) -> HashMapWithDefault<K, W>
+    where
+        K: Clone,
+    {
+        let mut new_map = HashMapWithDefault::new(f(&self.default));
+        self.map.iter().for_each(|(k, v)| {
+            let _ = new_map.insert(k.clone(), f(v));
+        });
+        new_map
     }
 }

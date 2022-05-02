@@ -10,11 +10,13 @@ use crate::{
         utils::Frames,
     },
     basic::{Dir, FrameStamp, HexDim, HexPoint},
-    support::map_with_default::HashMapWithDefault,
 };
 use ggez::Context;
 
+pub use eat_mechanics::{EatBehavior, EatMechanics, PassthroughKnowledge};
+
 pub mod controller;
+mod eat_mechanics;
 pub mod palette;
 pub mod utils;
 // mod seed;
@@ -76,31 +78,6 @@ pub struct Segment {
     pub z_index: ZIndex,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum EatBehavior {
-    Cut,       // cut the other snake's tail off
-    Crash,     // stop the game
-    Die,       // disappear
-    PassUnder, // pass under the other snake
-    PassOver,  // pass over the other snake
-}
-
-// TODO: if this is too big, make it shared between snakes as an Rc
-#[derive(Clone, Debug)]
-pub struct EatMechanics {
-    pub eat_self: HashMapWithDefault<SegmentRawType, EatBehavior>,
-    pub eat_other: HashMapWithDefault<Type, HashMapWithDefault<SegmentRawType, EatBehavior>>,
-}
-
-impl EatMechanics {
-    pub fn always(behavior: EatBehavior) -> Self {
-        Self {
-            eat_self: HashMapWithDefault::new(behavior),
-            eat_other: HashMapWithDefault::new(HashMapWithDefault::new(behavior)),
-        }
-    }
-}
-
 pub struct SearchTrace {
     pub cells_searched: HashSet<HexPoint>,
     pub current_path: Vec<HexPoint>,
@@ -157,8 +134,8 @@ pub struct Snake {
     pub body: Body,
     pub state: State,
 
-    pub controller: Box<dyn Controller>,
-    pub palette: Box<dyn Palette>,
+    pub controller: Box<dyn Controller + Send + Sync>,
+    pub palette: Box<dyn Palette + Send + Sync>,
 }
 
 #[derive(Debug)]

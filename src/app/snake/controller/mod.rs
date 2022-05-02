@@ -17,7 +17,7 @@ use crate::{
                 rain::Rain,
             },
             utils::OtherSnakes,
-            Body,
+            Body, PassthroughKnowledge,
         },
     },
     basic::{Dir, Dir12, Side},
@@ -46,7 +46,9 @@ pub enum Template {
     Competitor1,
     Competitor2,
     Killer,
-    AStar { pass_through_eaten: bool },
+    AStar {
+        passthrough_knowledge: PassthroughKnowledge,
+    },
     Rain,
 }
 
@@ -160,7 +162,7 @@ impl Template {
     }
 
     // TODO: remove start_dir
-    pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller> {
+    pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         match self {
             Template::Keyboard(control_setup) => Box::new(Keyboard {
                 controls: control_setup.into(),
@@ -186,8 +188,8 @@ impl Template {
                 frames_since_update: 0,
             }),
             Template::Killer => Box::new(Killer),
-            Template::AStar { pass_through_eaten } => Box::new(AStar {
-                pass_through_eaten,
+            Template::AStar { passthrough_knowledge } => Box::new(AStar {
+                passthrough_knowledge,
                 target: None,
                 path: vec![],
                 steps_since_update: 0,

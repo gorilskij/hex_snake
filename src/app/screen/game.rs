@@ -28,7 +28,7 @@ use crate::{
             self,
             controller::{Controller, Template},
             utils::split_snakes_mut,
-            Snake,
+            PassthroughKnowledge, Snake,
         },
         snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes},
         stats::Stats,
@@ -550,7 +550,8 @@ impl EventHandler<AppError> for Game {
                 if self.seeds.len() == 1 {
                     // WARNING: hacky
                     unsafe {
-                        static mut STASHED_CONTROLLER: Option<Box<dyn Controller>> = None;
+                        static mut STASHED_CONTROLLER: Option<Box<dyn Controller + Send + Sync>> =
+                            None;
 
                         let player_snake = self
                             .snakes
@@ -562,8 +563,12 @@ impl EventHandler<AppError> for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    Template::AStar { pass_through_eaten: true }
-                                        .into_controller(player_snake.body.dir),
+                                    Template::AStar {
+                                        passthrough_knowledge: PassthroughKnowledge::accurate(
+                                            &player_snake.eat_mechanics,
+                                        ),
+                                    }
+                                    .into_controller(player_snake.body.dir),
                                 ));
                                 "Autopilot on"
                             }
