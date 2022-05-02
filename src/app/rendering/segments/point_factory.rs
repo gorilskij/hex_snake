@@ -47,6 +47,7 @@ impl SegmentDescription {
                 let g2 = g2 as f64;
                 let b2 = b2 as f64;
 
+                // TODO: factor out this code
                 let start_subsegment = (num_subsegments as f32 * start) as usize;
                 let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
 

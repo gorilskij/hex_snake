@@ -1,6 +1,6 @@
 use crate::basic::Point;
 
-#[derive(Copy, Clone, Mul)]
+#[derive(Copy, Clone, Mul, Debug)]
 pub struct CellDim {
     pub side: f32,
     // sin is longer than cos

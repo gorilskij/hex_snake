@@ -93,10 +93,15 @@ fn segment_description(
             .turn_start
             .map(|(_, start_frame_fraction)| {
                 let max = 1. - start_frame_fraction;
-                let covered = frame_fraction - start_frame_fraction;
-                let linear = covered / max;
-                // apply easing
-                ezing::sine_inout(linear)
+
+                // when the snake is moving really fast, max == 0 would cause a NaN in the calculation
+                if max.abs() < f32::EPSILON {
+                    1.
+                } else {
+                    let covered = frame_fraction - start_frame_fraction;
+                    let linear = covered / max;
+                    ezing::sine_inout(linear)
+                }
             })
             .unwrap_or(1.)
     } else {
@@ -189,6 +194,7 @@ pub fn snake_mesh(
             .map(|((segment_idx, segment), style, resolution)| {
                 let desc =
                     segment_description(segment, segment_idx, snake, frame_fraction, style, gtx);
+
                 (desc, resolution)
             })
         })
