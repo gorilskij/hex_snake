@@ -68,6 +68,9 @@ impl App {
                             default => hash_map_with_default! {
                                 default => EatBehavior::Crash,
                             },
+                            snake::Type::Rain => hash_map_with_default! {
+                                default => EatBehavior::PassUnder,
+                            },
                         },
                     })
                     .palette(snake::PaletteTemplate::rainbow(true))
