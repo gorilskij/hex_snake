@@ -548,7 +548,7 @@ impl EventHandler<AppError> for Game {
             A => {
                 // only apply if there is exactly one player snake
                 if self.seeds.len() == 1 {
-                    // hacky
+                    // WARNING: hacky
                     unsafe {
                         static mut STASHED_CONTROLLER: Option<Box<dyn Controller>> = None;
 
@@ -562,7 +562,7 @@ impl EventHandler<AppError> for Game {
                             None => {
                                 STASHED_CONTROLLER = Some(std::mem::replace(
                                     &mut player_snake.controller,
-                                    Template::AStar.into_controller(player_snake.body.dir),
+                                    Template::AStar { pass_through_eaten: true }.into_controller(player_snake.body.dir),
                                 ));
                                 "Autopilot on"
                             }

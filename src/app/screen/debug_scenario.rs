@@ -172,7 +172,7 @@ impl DebugScenario {
                     .snake_type(snake::Type::Competitor { life: None })
                     .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
                     .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                    .controller(controller::Template::AStar)
+                    .controller(controller::Template::AStar { pass_through_eaten: false })
             })
             .collect();
 

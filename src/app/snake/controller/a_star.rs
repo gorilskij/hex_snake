@@ -14,8 +14,10 @@ use std::{
     collections::HashSet,
     rc::Rc,
 };
+use crate::app::snake::{Segment, SegmentRawType};
 
 pub struct AStar {
+    pub pass_through_eaten: bool,
     pub target: Option<HexPoint>,
     pub path: Vec<Dir>,
     pub steps_since_update: usize,
@@ -100,12 +102,17 @@ impl AStar {
             parent: None,
         }];
 
-        let mut forbidden_positions: HashSet<_> = body
-            .cells
-            .iter()
+        let mut forbidden_positions: Box<dyn Iterator<Item=&Segment>> = Box::new(body.cells.iter());
+
+        if self.pass_through_eaten {
+            forbidden_positions = Box::new(forbidden_positions.filter(|seg| seg.segment_type.raw_type() != SegmentRawType::Eaten))
+        }
+
+        let mut forbidden_positions: HashSet<_> = forbidden_positions
             .chain(other_snakes.iter_segments())
             .map(|seg| seg.pos)
             .collect();
+
         // no 180° turns
         forbidden_positions.insert(body.cells[0].pos.translate(-body.dir, 1));
         let forbidden_positions = forbidden_positions;

@@ -104,7 +104,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                         .snake_type(snake::Type::Competitor { life: Some(200) })
                         .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                         .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                        .controller(Template::AStar)
+                        .controller(Template::AStar { pass_through_eaten: false })
                         .speed(1.)
                 ))
             },
