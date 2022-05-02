@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 pub use palette::{Palette, PaletteTemplate};
 
@@ -10,12 +10,14 @@ use crate::{
         utils::Frames,
     },
     basic::{Dir, FrameStamp, HexDim, HexPoint},
+    support::map_with_default::HashMapWithDefault,
 };
 use ggez::Context;
 
 pub mod controller;
 pub mod palette;
 pub mod utils;
+// mod seed;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum State {
@@ -33,6 +35,15 @@ pub enum Type {
     Rain,
 }
 
+// for usage as map keys
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
+pub enum SegmentRawType {
+    Normal,
+    Eaten,
+    Crashed,
+    BlackHole,
+}
+
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SegmentType {
     Normal,
@@ -42,6 +53,19 @@ pub enum SegmentType {
     BlackHole { just_created: bool },
 }
 
+impl SegmentType {
+    pub fn raw_type(&self) -> SegmentRawType {
+        match self {
+            SegmentType::Normal => SegmentRawType::Normal,
+            SegmentType::Eaten { .. } => SegmentRawType::Eaten,
+            SegmentType::Crashed => SegmentRawType::Crashed,
+            SegmentType::BlackHole { .. } => SegmentRawType::BlackHole,
+        }
+    }
+}
+
+pub type ZIndex = i32;
+
 #[derive(Copy, Clone, Debug)]
 pub struct Segment {
     pub segment_type: SegmentType,
@@ -49,29 +73,30 @@ pub struct Segment {
     /// Direction from this segment to the next one (towards the tail)
     pub coming_from: Dir,
     pub teleported: Option<Dir>,
+    pub z_index: ZIndex,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum EatBehavior {
-    Ignore, // pass through
-    Cut,    // cut the other snake's tail off
-    Crash,  // stop the game
-    Die,    // disappear
+    Cut,       // cut the other snake's tail off
+    Crash,     // stop the game
+    Die,       // disappear
+    PassUnder, // pass under the other snake
+    PassOver,  // pass over the other snake
 }
 
+// TODO: if this is too big, make it shared between snakes as an Rc
 #[derive(Clone, Debug)]
 pub struct EatMechanics {
-    pub eat_self: EatBehavior,
-    pub eat_other: HashMap<Type, EatBehavior>,
-    pub default: EatBehavior,
+    pub eat_self: HashMapWithDefault<SegmentRawType, EatBehavior>,
+    pub eat_other: HashMapWithDefault<Type, HashMapWithDefault<SegmentRawType, EatBehavior>>,
 }
 
 impl EatMechanics {
     pub fn always(behavior: EatBehavior) -> Self {
         Self {
-            eat_self: behavior,
-            eat_other: hash_map! {},
-            default: behavior,
+            eat_self: HashMapWithDefault::new(behavior),
+            eat_other: HashMapWithDefault::new(HashMapWithDefault::new(behavior)),
         }
     }
 }
@@ -124,17 +149,10 @@ impl Body {
     }
 }
 
-// impl Deref for Body {
-//     type Target = VecDeque<Segment>;
-//
-//     fn deref(&self) -> &Self::Target {
-//         &self.cells
-//     }
-// }
-
 pub struct Snake {
     pub snake_type: Type,
     pub eat_mechanics: EatMechanics,
+    pub speed: f32,
 
     pub body: Body,
     pub state: State,
@@ -143,32 +161,89 @@ pub struct Snake {
     pub palette: Box<dyn Palette>,
 }
 
-#[derive(Clone, Debug)]
-pub struct Seed {
-    pub snake_type: Type,
-    pub eat_mechanics: EatMechanics,
-    pub palette: PaletteTemplate,
-    pub controller: controller::Template,
+#[derive(Debug)]
+#[must_use]
+pub struct BuilderError(pub Builder, pub &'static str);
+
+#[derive(Default, Clone, Debug)]
+pub struct Builder {
+    pub snake_type: Option<Type>,
+    pub eat_mechanics: Option<EatMechanics>,
+
     pub pos: Option<HexPoint>,
     pub dir: Option<Dir>,
     pub len: Option<usize>,
+    pub speed: Option<f32>,
+
+    pub palette: Option<PaletteTemplate>,
+    pub controller: Option<controller::Template>,
 }
 
-impl From<&Seed> for Snake {
-    fn from(seed: &Seed) -> Self {
-        let Seed {
-            snake_type,
-            eat_mechanics,
-            palette,
-            controller,
-            pos,
-            dir,
-            len,
-        } = (*seed).clone();
+// TODO: write a macro to generate builders
+impl Builder {
+    #[inline(always)]
+    #[must_use]
+    pub fn snake_type(mut self, value: Type) -> Self {
+        self.snake_type = Some(value);
+        self
+    }
 
-        let pos = pos.expect("starting position not provided");
-        let dir = dir.expect("starting direction not provided");
-        let len = len.expect("starting length not provided");
+    #[inline(always)]
+    #[must_use]
+    pub fn eat_mechanics(mut self, value: EatMechanics) -> Self {
+        self.eat_mechanics = Some(value);
+        self
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub fn pos(mut self, value: HexPoint) -> Self {
+        self.pos = Some(value);
+        self
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub fn dir(mut self, value: Dir) -> Self {
+        self.dir = Some(value);
+        self
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub fn len(mut self, value: usize) -> Self {
+        self.len = Some(value);
+        self
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub fn speed(mut self, value: f32) -> Self {
+        self.speed = Some(value);
+        self
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub fn palette(mut self, value: PaletteTemplate) -> Self {
+        self.palette = Some(value);
+        self
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub fn controller(mut self, value: controller::Template) -> Self {
+        self.controller = Some(value);
+        self
+    }
+
+    pub fn build(&self) -> Result<Snake, BuilderError> {
+        let pos = self
+            .pos
+            .ok_or_else(|| BuilderError(self.clone(), "missing field `pos`"))?;
+        let dir = self
+            .dir
+            .ok_or_else(|| BuilderError(self.clone(), "missing field `dir`"))?;
 
         eprintln!(
             "spawn snake at {:?} coming from {:?} going to {:?}",
@@ -180,29 +255,49 @@ impl From<&Seed> for Snake {
             pos,
             coming_from: -dir,
             teleported: None,
+            z_index: 0,
         };
 
-        let mut body = VecDeque::new();
-        body.push_back(head);
+        let mut cells = VecDeque::new();
+        cells.push_back(head);
 
-        Self {
-            snake_type,
-            eat_mechanics,
+        let body = Body {
+            cells,
+            missing_front: 0,
+            dir,
+            turn_start: None,
+            dir_grace: false,
+            grow: self
+                .len
+                .ok_or_else(|| BuilderError(self.clone(), "missing field `len`"))?,
+            search_trace: None,
+        };
 
-            body: Body {
-                cells: body,
-                missing_front: 0,
-                dir,
-                turn_start: None,
-                dir_grace: false,
-                grow: len,
-                search_trace: None,
-            },
+        Ok(Snake {
+            snake_type: self
+                .snake_type
+                .ok_or_else(|| BuilderError(self.clone(), "missing field `snake_type`"))?,
+            eat_mechanics: self
+                .eat_mechanics
+                .as_ref()
+                .ok_or_else(|| BuilderError(self.clone(), "missing field `eat_mechanics`"))?
+                .clone(),
+            speed: self
+                .speed
+                .ok_or_else(|| BuilderError(self.clone(), "missing field `speed`"))?,
+            body,
             state: State::Living,
-
-            controller: controller.into_controller(dir),
-            palette: palette.into(),
-        }
+            controller: self
+                .controller
+                .as_ref()
+                .ok_or_else(|| BuilderError(self.clone(), "mssing field `controller`"))?
+                .clone()
+                .into_controller(dir),
+            palette: self
+                .palette
+                .ok_or_else(|| BuilderError(self.clone(), "mssing field `palette`"))?
+                .into(),
+        })
     }
 }
 
@@ -320,6 +415,7 @@ impl Snake {
                     pos: self.head().pos.wrapping_translate(dir, 1, gtx.board_dim),
                     coming_from: -dir,
                     teleported: None,
+                    z_index: 0,
                 };
                 self.body.cells.push_front(new_head);
             }

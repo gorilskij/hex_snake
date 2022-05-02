@@ -1,12 +1,15 @@
 // This file contains structs describing various aspects of a segment
 
 use crate::{
-    app::{rendering, snake::palette::SegmentStyle},
+    app::{
+        rendering,
+        snake::{palette::SegmentStyle, SegmentType, ZIndex},
+    },
     basic::{CellDim, Dir, Point},
 };
 
 // A full (solid) segment starts at 0. and ends at 1.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct SegmentFraction {
     pub start: f32,
     pub end: f32,
@@ -53,10 +56,11 @@ pub enum TurnType {
 /// the current cell so TurnDescription { coming_from: D, going_to == U }
 /// describes a straight segment coming from below and going up.
 /// This means that if coming_from == going_to, the state is invalid.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct TurnDescription {
     pub coming_from: Dir,
     pub going_to: Dir,
+    pub fraction: f32,
 }
 
 // impl Default for TurnDescription {
@@ -85,12 +89,14 @@ impl TurnDescription {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SegmentDescription {
     pub destination: Point,
     pub turn: TurnDescription,
     pub fraction: SegmentFraction,
     pub draw_style: rendering::Style,
+    pub segment_type: SegmentType,
     pub segment_style: SegmentStyle,
+    pub z_index: ZIndex,
     pub cell_dim: CellDim,
 }

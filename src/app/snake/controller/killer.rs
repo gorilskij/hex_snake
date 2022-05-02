@@ -8,7 +8,7 @@ use crate::{
         },
     },
     basic::{angle_distance, CellDim, Dir, HexDim, HexPoint},
-    partial_min_max::PartialMinMax,
+    support::partial_min_max::PartialMinMax,
 };
 use ggez::Context;
 use std::f32::consts::TAU;

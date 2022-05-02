@@ -1,24 +1,34 @@
-use ggez::{GameError, GameResult};
+use crate::app::snake;
+use ggez::GameError;
 use std::{
     error::Error,
     fmt,
     fmt::{Debug, Display, Formatter},
 };
 
+#[derive(Debug)]
+pub enum AppErrorType {
+    GameError(GameError),
+    SnakeBuilderError(snake::BuilderError),
+}
+
 /// The second member contains a trace in reverse order
-pub struct AppError(GameError, Vec<String>);
+#[must_use]
+pub struct AppError(AppErrorType, Vec<String>);
 
 impl From<GameError> for AppError {
     fn from(e: GameError) -> Self {
-        Self::from_game_error(e)
+        Self(AppErrorType::GameError(e), vec![])
+    }
+}
+
+impl From<snake::BuilderError> for AppError {
+    fn from(e: snake::BuilderError) -> Self {
+        Self(AppErrorType::SnakeBuilderError(e), vec![])
     }
 }
 
 impl AppError {
-    pub fn from_game_error(e: GameError) -> Self {
-        Self(e, vec![])
-    }
-
     pub fn with_trace_step<S: ToString>(mut self, s: S) -> Self {
         self.1.push(s.to_string());
         self
@@ -37,11 +47,7 @@ impl Debug for AppError {
 
 impl Display for AppError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Error:\n{}\nTrace:", self.0)?;
-        for t in (self.1).iter().rev() {
-            writeln!(f, " in {}", t)?;
-        }
-        Ok(())
+        Debug::fmt(self, f)
     }
 }
 
@@ -54,17 +60,7 @@ pub trait AppErrorConversion {
 }
 
 impl<T> AppErrorConversion for AppResult<T> {
-    fn with_trace_step<S: ToString>(mut self, s: S) -> Self {
+    fn with_trace_step<S: ToString>(self, s: S) -> Self {
         self.map_err(|e| e.with_trace_step(s.to_string()))
-    }
-}
-
-pub trait GameResultExtension<T> {
-    fn into_with_trace<S: ToString>(self, s: S) -> AppResult<T>;
-}
-
-impl<T> GameResultExtension<T> for GameResult<T> {
-    fn into_with_trace<S: ToString>(self, s: S) -> AppResult<T> {
-        self.map_err(AppError::from_game_error).with_trace_step(s)
     }
 }

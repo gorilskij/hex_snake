@@ -32,7 +32,7 @@ impl Default for Prefs {
             special_apples: true,
             prob_spawn_competitor: 0.025,
             prob_spawn_killer: 0.015,
-            prob_spawn_rain: 0.005,
+            prob_spawn_rain: 1.,
 
             draw_style: rendering::Style::Smooth,
         }

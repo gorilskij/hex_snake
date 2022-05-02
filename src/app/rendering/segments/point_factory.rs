@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     app::{
-        app_error::{AppResult, GameResultExtension},
+        app_error::{AppError, AppErrorConversion, AppResult},
         rendering,
         rendering::segments::{
             descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
@@ -47,6 +47,7 @@ impl SegmentDescription {
                 let g2 = g2 as f64;
                 let b2 = b2 as f64;
 
+                // TODO: factor out this code
                 let start_subsegment = (num_subsegments as f32 * start) as usize;
                 let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
 
@@ -113,7 +114,9 @@ impl SegmentDescription {
                     turn: self.turn,
                     fraction: SegmentFraction { start, end },
                     draw_style: self.draw_style,
+                    segment_type: self.segment_type,
                     segment_style: SegmentStyle::Solid(color),
+                    z_index: self.z_index,
                     cell_dim: self.cell_dim,
                 }
             })
@@ -138,14 +141,18 @@ impl SegmentDescription {
     /// `snake_len` is used to calculate how many subsegments
     /// there should be (longer snakes have lower subsegment
     /// resolution)
-    pub fn render(mut self, subsegments_per_segment: usize, turn: f32) -> Vec<(Color, Vec<Point>)> {
+    pub fn render(
+        mut self,
+        color_resolution: usize,
+        turn_fraction: f32,
+    ) -> Vec<(Color, Vec<Point>)> {
         let subsegments = if self.draw_style == rendering::Style::Hexagon {
             // hexagon segments don't support gradients
             self.fraction = SegmentFraction::solid();
             self.segment_style = self.segment_style.into_solid();
             vec![self]
         } else {
-            self.split_into_subsegments(subsegments_per_segment)
+            self.split_into_subsegments(color_resolution)
         };
 
         // self.fraction = SegmentFraction::solid();
@@ -157,8 +164,12 @@ impl SegmentDescription {
             .map(|subsegment| {
                 let color = subsegment.unwrap_solid_color();
                 let points = match subsegment.draw_style {
-                    rendering::Style::Hexagon => HexagonSegments::render_segment(subsegment, turn),
-                    rendering::Style::Smooth => SmoothSegments::render_segment(subsegment, turn),
+                    rendering::Style::Hexagon => {
+                        HexagonSegments::render_segment(subsegment, turn_fraction)
+                    }
+                    rendering::Style::Smooth => {
+                        SmoothSegments::render_segment(subsegment, turn_fraction)
+                    }
                 };
                 (color, points)
             })
@@ -166,17 +177,14 @@ impl SegmentDescription {
     }
 
     /// Returns number of polygons built
-    pub fn build(
-        self,
-        builder: &mut MeshBuilder,
-        subsegments_per_segment: usize,
-        turn: f32,
-    ) -> AppResult<usize> {
+    pub fn build(self, builder: &mut MeshBuilder, color_resolution: usize) -> AppResult<usize> {
         let mut polygons = 0;
-        for (color, points) in self.render(subsegments_per_segment, turn) {
+        let turn_fraction = self.turn.fraction;
+        for (color, points) in self.render(color_resolution, turn_fraction) {
             builder
                 .polygon(DrawMode::fill(), &points, color)
-                .into_with_trace("SegmentDescription::build")?;
+                .map_err(AppError::from)
+                .with_trace_step("SegmentDescription::build")?;
             polygons += 1;
         }
         Ok(polygons)
@@ -198,12 +206,15 @@ pub trait SegmentRenderer {
     /// `turn` describes how far along the segment is on its turn,
     /// a value of 0 means the segment is straight, a value of 1 means
     /// the turn is complete
-    fn render_default_curved_segment(description: &SegmentDescription, turn: f32) -> Vec<Point>;
+    fn render_default_curved_segment(
+        description: &SegmentDescription,
+        turn_fraction: f32,
+    ) -> Vec<Point>;
 
     /// Render a segment, rotate it and reflect it to match the desired
     /// coming-from and going-to directions, and translate it to match
     /// the desired position
-    fn render_segment(description: SegmentDescription, turn: f32) -> Vec<Point> {
+    fn render_segment(description: SegmentDescription, turn_fraction: f32) -> Vec<Point> {
         use TurnDirection::*;
         use TurnType::*;
 
@@ -211,7 +222,7 @@ pub trait SegmentRenderer {
         match description.turn.turn_type() {
             Straight => segment = Self::render_default_straight_segment(&description),
             Blunt(turn_direction) | Sharp(turn_direction) => {
-                segment = Self::render_default_curved_segment(&description, turn);
+                segment = Self::render_default_curved_segment(&description, turn_fraction);
                 if turn_direction == Clockwise {
                     flip_horizontally(&mut segment, description.cell_dim.center().x);
                 }

@@ -1,5 +1,5 @@
 use crate::{
-    app::app_error::{AppResult, GameResultExtension},
+    app::app_error::{AppError, AppErrorConversion, AppResult},
     basic::Point,
 };
 use ggez::{
@@ -101,7 +101,8 @@ impl Message {
         }
 
         ggez::graphics::draw(ctx, &text, DrawParam::from((location, color)))
-            .into_with_trace("Message::draw")?;
+            .map_err(AppError::from)
+            .with_trace_step("Message::draw")?;
         Ok(true)
     }
 }

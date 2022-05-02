@@ -7,7 +7,7 @@ use num_integer::Integer;
 
 use crate::{
     app::{
-        app_error::{AppErrorConversion, AppResult, GameResultExtension},
+        app_error::{AppError, AppErrorConversion, AppResult},
         game_context::GameContext,
     },
     basic::HexDim,
@@ -157,5 +157,8 @@ pub fn border_mesh(gtx: &GameContext, ctx: &mut Context) -> AppResult<Mesh> {
     hline.iter_mut().for_each(|p| p.y += offset);
     builder.polyline(draw_mode, &hline, color)?;
 
-    builder.build(ctx).into_with_trace("border_mesh")
+    builder
+        .build(ctx)
+        .map_err(AppError::from)
+        .with_trace_step("border_mesh")
 }

@@ -46,7 +46,9 @@ pub enum Template {
     Competitor1,
     Competitor2,
     Killer,
-    AStar,
+    AStar {
+        pass_through_eaten: bool,
+    },
     Rain,
 }
 
@@ -186,7 +188,8 @@ impl Template {
                 frames_since_update: 0,
             }),
             Template::Killer => Box::new(Killer),
-            Template::AStar => Box::new(AStar {
+            Template::AStar { pass_through_eaten } => Box::new(AStar {
+                pass_through_eaten,
                 target: None,
                 path: vec![],
                 steps_since_update: 0,

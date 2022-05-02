@@ -7,7 +7,7 @@ use crate::{
     app::snake::{Body, SegmentType},
     basic::HexPoint,
     color::oklab::OkLab,
-    support::Limits,
+    support::limits::Limits,
 };
 
 macro_rules! gray {

@@ -4,6 +4,7 @@
 // #![feature(never_type)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
+#![feature(trace_macros)]
 
 #[macro_use]
 extern crate derive_more;
@@ -20,13 +21,12 @@ use crate::{
 use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 
 #[macro_use]
+mod support;
+#[macro_use]
 mod basic;
 mod app;
 mod color;
 mod keyboard;
-mod partial_min_max;
-mod row;
-mod support;
 
 // TODO
 //  - untie frame_fraction from graphics
@@ -41,6 +41,7 @@ mod support;
 //  split EatBehavior::Ignore into "pass in front" and "pass behind"
 //   use "pass behind for rain"
 //  make head-to-head collision with rain also ignore
+//  allow snake to pass (tunnel) under is eaten segments
 
 fn main() {
     let width = 2000.;
