@@ -112,7 +112,7 @@ impl AStar {
                     .body
                     .cells
                     .par_iter()
-                    .filter(move |seg| checker.can_pass_through_other(seg))
+                    .filter(move |seg| !checker.can_pass_through_other(seg))
             }))
             .map(|seg| seg.pos)
             // no 180° turns
