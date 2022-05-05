@@ -21,8 +21,6 @@ use crate::{
     support::partial_min_max::partial_min,
 };
 
-const DRAW_WHITE_AURA: bool = false;
-
 fn build_hexagon_at(
     location: Point,
     cell_dim: CellDim,

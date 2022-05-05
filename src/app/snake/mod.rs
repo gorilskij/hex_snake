@@ -136,6 +136,9 @@ pub struct Snake {
 
     pub controller: Box<dyn Controller + Send + Sync>,
     pub palette: Box<dyn Palette + Send + Sync>,
+
+    // (searched, path)
+    pub ai_artifacts: Option<(Vec<HexPoint>, Vec<HexPoint>)>
 }
 
 #[derive(Debug)]
@@ -276,6 +279,7 @@ impl Builder {
                 .palette
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `palette`"))?
                 .into(),
+            ai_artifacts: None,
         })
     }
 }

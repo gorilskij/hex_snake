@@ -9,7 +9,7 @@ use crate::{
 use crate::app::{apple::Apple, game_context::GameContext, snake::PassthroughKnowledge};
 use ggez::Context;
 use itertools::Itertools;
-use rayon::{iter::once, prelude::*};
+use rayon::prelude::*;
 use std::{
     cmp::{max, min},
     collections::HashSet,
@@ -55,6 +55,23 @@ impl AStar {
     const UPDATE_EVERY_N_STEPS: usize = 10;
     const HEURISTIC: fn(HexPoint, HexPoint, HexDim) -> usize = Self::heuristic;
     // const SEARCH_LIMIT: Option<usize> = None;
+
+    fn occupied_positions(&self, body: &Body, other_snakes: OtherSnakes) -> HashSet<HexPoint> {
+        body
+            .cells
+            .par_iter()
+            .filter(|seg| !self.passthrough_knowledge.can_pass_through_self(seg))
+            .chain(other_snakes.par_iter_snakes().flat_map(|snake| {
+                let checker = self.passthrough_knowledge.checker(&snake.snake_type);
+                snake
+                    .body
+                    .cells
+                    .par_iter()
+                    .filter(move |seg| !checker.can_pass_through_other(seg))
+            }))
+            .map(|seg| seg.pos)
+            .collect()
+    }
 
     fn heuristic(a: HexPoint, b: HexPoint, board_dim: HexDim) -> usize {
         let h1 = (a.h - b.h).abs();
@@ -102,31 +119,12 @@ impl AStar {
             parent: None,
         }];
 
-        let forbidden_positions: HashSet<_> = body
-            .cells
-            .par_iter()
-            .filter(|seg| !self.passthrough_knowledge.can_pass_through_self(seg))
-            .chain(other_snakes.par_iter_snakes().flat_map(|snake| {
-                let checker = self.passthrough_knowledge.checker(&snake.snake_type);
-                snake
-                    .body
-                    .cells
-                    .par_iter()
-                    .filter(move |seg| !checker.can_pass_through_other(seg))
-            }))
-            .map(|seg| seg.pos)
-            // no 180° turns
-            .chain(once(body.cells[0].pos.translate(-body.dir, 1)))
-            .collect();
-
-        // let forbidden_positions: HashSet<_> = body.cells
-        //     .par_iter()
-        //     .filter(|seg| self.pass_through_eaten && seg.segment_type.raw_type() != SegmentRawType::Eaten)
-        //     .chain(other_snakes.par_iter_segments())
-        //     .map(|seg| seg.pos)
-        //     no 180° turns
-        // .chain(once(body.cells[0].pos.translate(-body.dir, 1)))
-        // .collect();
+        let forbidden_positions = {
+            let mut fp = self.occupied_positions(&body, other_snakes);
+            // pretend the position directly behind the head is occupied to avoid 180° turns
+            fp.insert(body.cells[0].pos.translate(-body.dir, 1));
+            fp
+        };
 
         loop {
             if paths.is_empty() {
@@ -207,17 +205,12 @@ impl Controller for AStar {
         }
 
         let going_to_crash = || {
-            let potential_next_head = self
+            self
                 .path
                 .get(0)
-                .map(|dir| body.cells[0].pos.translate(*dir, 1));
-            potential_next_head
-                .map(|pos| {
-                    body.cells
-                        .iter()
-                        .chain(other_snakes.iter_segments())
-                        .map(|seg| seg.pos)
-                        .contains(&pos)
+                .map(|dir| {
+                    let pos = body.cells[0].pos.translate(*dir, 1);
+                    self.occupied_positions(&body, other_snakes).contains(&pos)
                 })
                 .unwrap_or(false)
         };

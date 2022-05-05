@@ -545,6 +545,14 @@ impl EventHandler<AppError> for Game {
                     self.draw_cache_invalid = 5;
                 }
             }
+            Y => {
+                self.gtx.prefs.draw_ai_debug_artifacts = !self.gtx.prefs.draw_ai_debug_artifacts;
+                if !self.gtx.prefs.draw_ai_debug_artifacts {
+                    for snake in &mut self.snakes {
+                        snake.ai_artifacts = None;
+                    }
+                }
+            }
             A => {
                 // only apply if there is exactly one player snake
                 if self.seeds.len() == 1 {
