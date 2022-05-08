@@ -1,4 +1,4 @@
-use ggez::graphics::{Color, DrawMode, MeshBuilder};
+use ggez::graphics::{DrawMode, MeshBuilder};
 use hsl::HSL;
 use itertools::Itertools;
 
@@ -19,6 +19,8 @@ use crate::{
     },
     color::oklab::OkLab,
 };
+use crate::color::Color;
+use crate::color::to_color::ToColor;
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
@@ -37,9 +39,11 @@ impl SegmentDescription {
         let colors = match self.segment_style {
             SegmentStyle::Solid(color) => vec![color],
             SegmentStyle::RGBGradient {
-                start_rgb: (r1, g1, b1),
-                end_rgb: (r2, g2, b2),
+                start_color,
+                end_color,
             } => {
+                let (r1, g1, b1) = start_color.to_rgb();
+                let (r2, g2, b2) = end_color.to_rgb();
                 let r1 = r1 as f64;
                 let g1 = g1 as f64;
                 let b1 = b1 as f64;
@@ -68,14 +72,12 @@ impl SegmentDescription {
                 (start_subsegment..end_subsegment)
                     .map(|f| {
                         let f = f as f64 / num_subsegments as f64;
-                        Color::from(
-                            HSL {
-                                h: f * start_hue + (1. - f) * end_hue,
-                                s: 1.,
-                                l: lightness,
-                            }
-                            .to_rgb(),
-                        )
+                        HSL {
+                            h: f * start_hue + (1. - f) * end_hue,
+                            s: 1.,
+                            l: lightness,
+                        }
+                            .to_color()
                     })
                     .collect()
             }
@@ -85,10 +87,8 @@ impl SegmentDescription {
                 (start_subsegment..end_subsegment)
                     .map(|f| {
                         let f = f as f64 / num_subsegments as f64;
-                        Color::from(
                             OkLab::from_lch(lightness, 0.5, f * start_hue + (1. - f) * end_hue)
-                                .to_rgb(),
-                        )
+                                .to_color()
                     })
                     .collect()
             }
@@ -182,7 +182,7 @@ impl SegmentDescription {
         let turn_fraction = self.turn.fraction;
         for (color, points) in self.render(color_resolution, turn_fraction) {
             builder
-                .polygon(DrawMode::fill(), &points, color)
+                .polygon(DrawMode::fill(), &points, *color)
                 .map_err(AppError::from)
                 .with_trace_step("SegmentDescription::build")?;
             polygons += 1;

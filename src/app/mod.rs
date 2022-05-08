@@ -61,7 +61,7 @@ impl App {
                     .snake_type(snake::Type::Player)
                     .eat_mechanics(EatMechanics {
                         eat_self: hash_map_with_default! {
-                            default => EatBehavior::Cut,
+                            default => EatBehavior::Crash,
                             SegmentRawType::Eaten => EatBehavior::PassUnder,
                         },
                         eat_other: hash_map_with_default! {

@@ -2,7 +2,6 @@ use std::slice;
 
 use ggez::{
     event::{EventHandler, KeyCode, KeyMods},
-    graphics::Color,
     Context,
 };
 use rand::{prelude::*, rngs::ThreadRng, Error};
@@ -28,6 +27,7 @@ use std::{
     cell::RefCell,
     rc::{Rc, Weak},
 };
+use crate::color::Color;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)

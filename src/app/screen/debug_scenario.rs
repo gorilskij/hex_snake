@@ -1,6 +1,6 @@
 use ggez::{
     event::{EventHandler, KeyCode, KeyMods},
-    graphics::{self, Color, DrawParam},
+    graphics::{self, DrawParam},
     Context,
 };
 use rand::prelude::*;
@@ -30,6 +30,7 @@ use crate::{
     },
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
 };
+use crate::color::Color;
 
 pub struct DebugScenario {
     control: Control,
@@ -344,7 +345,7 @@ impl EventHandler<AppError> for DebugScenario {
     fn draw(&mut self, ctx: &mut Context) -> AppResult {
         self.control.graphics_frame(&mut self.gtx);
 
-        graphics::clear(ctx, Color::BLACK);
+        graphics::clear(ctx, *Color::BLACK);
 
         if self.offset.is_none() {
             self.update_dim(ctx)

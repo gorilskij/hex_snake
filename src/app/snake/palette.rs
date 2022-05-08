@@ -1,4 +1,4 @@
-use ggez::graphics::Color;
+use ggez::graphics;
 use hsl::HSL;
 
 use SegmentType::*;
@@ -9,15 +9,17 @@ use crate::{
     color::oklab::OkLab,
     support::limits::Limits,
 };
+use crate::color::Color;
+use crate::color::to_color::ToColor;
 
 macro_rules! gray {
     ($lightness:expr) => {
-        Color {
+        crate::color::Color(ggez::graphics::Color {
             r: $lightness,
             g: $lightness,
             b: $lightness,
             a: 1.,
-        }
+        })
     };
 }
 
@@ -34,8 +36,17 @@ pub enum EatenColor {
     // HSLInverted, // 180deg rotation?
 }
 
-fn invert_rgb(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
-    (255 - rgb.0, 255 - rgb.1, 255 - rgb.2)
+// fn invert_rgb(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
+//     (255 - rgb.0, 255 - rgb.1, 255 - rgb.2)
+// }
+
+fn invert_rgb(color: Color) -> Color {
+    Color(graphics::Color {
+        r: 1. - color.r,
+        g: 1. - color.g,
+        b: 1. - color.b,
+        a: color.a,
+    })
 }
 
 impl EatenColor {
@@ -197,14 +208,14 @@ impl PaletteTemplate {
     pub fn alternating_white() -> Self {
         Self::AlternatingFixed {
             color1: Color::WHITE,
-            color2: Color::new(0., 0., 0., 0.),
+            color2: Color::TRANSPARENT,
         }
     }
 
     pub fn zebra() -> Self {
         Self::Alternating {
             color1: Color::WHITE,
-            color2: Color { r: 0., g: 0., b: 0., a: 0. },
+            color2: Color::TRANSPARENT,
         }
     }
 }
@@ -213,8 +224,8 @@ impl PaletteTemplate {
 pub enum SegmentStyle {
     Solid(Color),
     RGBGradient {
-        start_rgb: (u8, u8, u8),
-        end_rgb: (u8, u8, u8),
+        start_color: Color,
+        end_color: Color,
     },
     HSLGradient {
         start_hue: f64,
@@ -232,12 +243,12 @@ impl SegmentStyle {
     pub fn into_solid(self) -> Self {
         match self {
             Self::Solid(_) => self,
-            Self::RGBGradient { start_rgb, .. } => Self::Solid(Color::from(start_rgb)),
+            Self::RGBGradient { start_color: start_rgb, .. } => Self::Solid(Color::from(start_rgb)),
             Self::HSLGradient { start_hue, lightness, .. } => Self::Solid(Color::from(
-                HSL { h: start_hue, s: 1., l: lightness }.to_rgb(),
+                HSL { h: start_hue, s: 1., l: lightness }.to_color(),
             )),
             Self::OkLabGradient { start_hue, lightness, .. } => Self::Solid(Color::from(
-                OkLab::from_lch(lightness, 0.5, start_hue).to_rgb(),
+                OkLab::from_lch(lightness, 0.5, start_hue).to_color(),
             )),
         }
     }
@@ -254,10 +265,15 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
     fn from(template: PaletteTemplate) -> Self {
         match template {
             PaletteTemplate::Solid { color, eaten } => Box::new(Solid { color, eaten }),
-            PaletteTemplate::RGBGradient { head, tail, eaten, persistent } => {
+            PaletteTemplate::RGBGradient {
+                head,
+                tail,
+                eaten,
+                persistent
+            } => {
                 Box::new(RGBGradient {
-                    head,
-                    tail,
+                    head_color: head,
+                    tail_color: tail,
                     eaten,
                     max_len: persistent.then(|| 0),
                 })
@@ -374,8 +390,8 @@ impl Palette for Solid {
 }
 
 pub struct RGBGradient {
-    head: Color,
-    tail: Color,
+    head_color: Color,
+    tail_color: Color,
     eaten: EatenColor,
     max_len: Option<usize>,
 }
@@ -385,28 +401,53 @@ impl Palette for RGBGradient {
         let mut styles = Vec::with_capacity(body.visible_len());
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, frame_fraction as f64) as f32;
+        let logical_len = correct_len(logical_len, body, frame_fraction as f64);
+        // for (i, seg) in body.cells.iter().enumerate() {
+        //     let color = if seg.segment_type == Crashed {
+        //         *DEFAULT_CRASHED_COLOR
+        //     } else {
+        //         let r = (i + body.missing_front) as f32 + frame_fraction;
+        //         let head_ratio = 1. - r / (logical_len - 1.);
+        //         let tail_ratio = 1. - head_ratio;
+        //         let normal_color = Color {
+        //             r: head_ratio * self.head.r + tail_ratio * self.tail.r,
+        //             g: head_ratio * self.head.g + tail_ratio * self.tail.g,
+        //             b: head_ratio * self.head.b + tail_ratio * self.tail.b,
+        //             a: 1.,
+        //         };
+        //
+        //         match seg.segment_type {
+        //             Normal | BlackHole { .. } => normal_color,
+        //             Eaten { .. } => self.eaten.paint_segment(&normal_color),
+        //             Crashed => *DEFAULT_CRASHED_COLOR,
+        //         }
+        //     };
+        //     styles.push(SegmentStyle::Solid(color));
+        // }
         for (i, seg) in body.cells.iter().enumerate() {
-            let color = if seg.segment_type == Crashed {
-                *DEFAULT_CRASHED_COLOR
+            if seg.segment_type == Crashed {
+                styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
             } else {
-                let r = (i + body.missing_front) as f32 + frame_fraction;
-                let head_ratio = 1. - r / (logical_len - 1.);
-                let tail_ratio = 1. - head_ratio;
-                let normal_color = Color {
-                    r: head_ratio * self.head.r + tail_ratio * self.tail.r,
-                    g: head_ratio * self.head.g + tail_ratio * self.tail.g,
-                    b: head_ratio * self.head.b + tail_ratio * self.tail.b,
-                    a: 1.,
-                };
+                let r = (i + body.missing_front) as f64 + frame_fraction as f64;
+                let start_color = self.head_color + (self.tail_color - self.head_color) * r / logical_len as f64;
+                let end_color = self.head_color + (self.tail_color - self.head_color) * (r + 1.) / logical_len as f64;
 
                 match seg.segment_type {
-                    Normal | BlackHole { .. } => normal_color,
-                    Eaten { .. } => self.eaten.paint_segment(&normal_color),
-                    Crashed => *DEFAULT_CRASHED_COLOR,
-                }
-            };
-            styles.push(SegmentStyle::Solid(color));
+                    Normal | BlackHole { .. } => {
+                        styles.push(SegmentStyle::RGBGradient {
+                            start_color,
+                            end_color,
+                        });
+                    }
+                    Eaten { .. } => {
+                        styles.push(SegmentStyle::RGBGradient {
+                            start_color: invert_rgb(start_color),
+                            end_color: invert_rgb(end_color),
+                        });
+                    }
+                    Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
+                };
+            }
         }
 
         styles
@@ -436,6 +477,7 @@ impl Palette for HSLGradient {
                     self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len as f64;
                 let end_hue =
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len as f64;
+
                 match seg.segment_type {
                     Normal | BlackHole { .. } => {
                         styles.push(SegmentStyle::HSLGradient {
@@ -457,8 +499,8 @@ impl Palette for HSLGradient {
                             l: 1. - self.eaten_lightness,
                         };
                         styles.push(SegmentStyle::RGBGradient {
-                            start_rgb: invert_rgb(start_hsl.to_rgb()),
-                            end_rgb: invert_rgb(end_hsl.to_rgb()),
+                            start_color: invert_rgb(start_hsl.to_color()),
+                            end_color: invert_rgb(end_hsl.to_color()),
                         });
                     }
                     Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
@@ -504,8 +546,8 @@ impl Palette for OkLabGradient {
                     let start_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, start_hue);
                     let end_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, end_hue);
                     styles.push(SegmentStyle::RGBGradient {
-                        start_rgb: invert_rgb(start_okl.to_rgb()),
-                        end_rgb: invert_rgb(end_okl.to_rgb()),
+                        start_color: invert_rgb(start_okl.to_color()),
+                        end_color: invert_rgb(end_okl.to_color()),
                     });
                 }
                 Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
@@ -563,36 +605,18 @@ pub struct Alternating {
     color2: Color,
 }
 
-fn mul_color(color: Color, factor: f32) -> Color {
-    Color {
-        r: color.r * factor,
-        g: color.g * factor,
-        b: color.b * factor,
-        a: color.a,
-    }
-}
-
-fn add_colors(color1: Color, color2: Color) -> Color {
-    Color {
-        r: color1.r + color2.r,
-        g: color1.g + color2.g,
-        b: color1.b + color2.b,
-        a: (color1.a + color2.a) / 2.,
-    }
-}
-
 impl Palette for Alternating {
     fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
         let mut styles = Vec::with_capacity(body.visible_len());
 
         for (i, seg) in body.cells.iter().enumerate() {
             // How far along the snake we currently are (in units of segments)
-            let r = (i + body.missing_front) as f32 + frame_fraction;
+            let r = (i + body.missing_front) as f64 + frame_fraction as f64;
 
             let _color = match seg.segment_type {
                 Normal | BlackHole { .. } => {
                     // Check whether there is a minimum or maximum within this segment
-                    use std::f32::consts::PI;
+                    use std::f64::consts::PI;
                     if r % PI <= PI && r % PI + 1. >= PI {
                         let diff = PI - r % PI;
                         let _cutoff = r + diff;
@@ -603,18 +627,12 @@ impl Palette for Alternating {
                     let ratio1_start = (r.cos() + 1.) / 2.;
                     let ratio1_end = ((r + 1.).cos() + 1.) / 2.;
 
-                    let start_color = add_colors(
-                        mul_color(self.color1, ratio1_start),
-                        mul_color(self.color2, 1. - ratio1_start),
-                    );
-                    let end_color = add_colors(
-                        mul_color(self.color1, ratio1_end),
-                        mul_color(self.color2, 1. - ratio1_end),
-                    );
+                    let start_color = ratio1_start * self.color1 + (1. - ratio1_start) * self.color2;
+                    let end_color = ratio1_end * self.color1 + (1. - ratio1_end) * self.color2;
 
                     styles.push(SegmentStyle::RGBGradient {
-                        start_rgb: start_color.to_rgb(),
-                        end_rgb: end_color.to_rgb(),
+                        start_color,
+                        end_color,
                     });
                 }
                 Eaten { .. } => {
