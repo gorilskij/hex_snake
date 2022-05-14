@@ -62,7 +62,7 @@ impl SnakeDemo {
             // snake::PaletteTemplate::rainbow(false),
             snake::PaletteTemplate::rainbow(true),
             snake::PaletteTemplate::alternating_white(),
-            snake::PaletteTemplate::gray_gradient(false),
+            snake::PaletteTemplate::gray_gradient(1., false),
             snake::PaletteTemplate::green_to_red(false),
             // snake::PaletteTemplate::zebra(),
         ];

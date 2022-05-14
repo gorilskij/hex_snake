@@ -127,7 +127,7 @@ pub fn handle_collisions<E: Environment>(
                             .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                             // TODO: factor out palette into game palette
                             // .palette(snake::PaletteTemplate::alternating_white())
-                            .palette(snake::PaletteTemplate::gray_gradient(false))
+                            .palette(snake::PaletteTemplate::gray_gradient(0.5, false))
                             .controller(controller::Template::Rain)
                             .dir(Dir::D);
 

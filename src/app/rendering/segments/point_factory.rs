@@ -42,15 +42,6 @@ impl SegmentDescription {
                 start_color,
                 end_color,
             } => {
-                let (r1, g1, b1) = start_color.to_rgb();
-                let (r2, g2, b2) = end_color.to_rgb();
-                let r1 = r1 as f64;
-                let g1 = g1 as f64;
-                let b1 = b1 as f64;
-                let r2 = r2 as f64;
-                let g2 = g2 as f64;
-                let b2 = b2 as f64;
-
                 // TODO: factor out this code
                 let start_subsegment = (num_subsegments as f32 * start) as usize;
                 let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
@@ -58,11 +49,7 @@ impl SegmentDescription {
                 (start_subsegment..end_subsegment)
                     .map(|f| {
                         let f = f as f64 / num_subsegments as f64;
-                        Color::from_rgb(
-                            (f * r1 + (1. - f) * r2) as u8,
-                            (f * g1 + (1. - f) * g2) as u8,
-                            (f * b1 + (1. - f) * b2) as u8,
-                        )
+                        f * start_color + (1. - f) * end_color
                     })
                     .collect()
             }

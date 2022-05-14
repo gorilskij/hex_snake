@@ -13,12 +13,13 @@ use crate::color::Color;
 use crate::color::to_color::ToColor;
 
 macro_rules! gray {
-    ($lightness:expr) => {
+    ($lightness:expr) => { gray!($lightness, 1.) };
+    ($lightness:expr, $opacity:expr) => {
         crate::color::Color(ggez::graphics::Color {
             r: $lightness,
             g: $lightness,
             b: $lightness,
-            a: 1.,
+            a: $opacity,
         })
     };
 }
@@ -119,8 +120,8 @@ impl PaletteTemplate {
         }
     }
 
-    pub fn gray_gradient(persistent: bool) -> Self {
-        Self::rgb_gradient(gray!(0.72), gray!(0.25), None, persistent)
+    pub fn gray_gradient(opacity: f32, persistent: bool) -> Self {
+        Self::rgb_gradient(gray!(0.72, opacity), gray!(0.25, opacity), None, persistent)
     }
 
     pub fn hsl_gradient(
@@ -402,28 +403,6 @@ impl Palette for RGBGradient {
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
         let logical_len = correct_len(logical_len, body, frame_fraction as f64);
-        // for (i, seg) in body.cells.iter().enumerate() {
-        //     let color = if seg.segment_type == Crashed {
-        //         *DEFAULT_CRASHED_COLOR
-        //     } else {
-        //         let r = (i + body.missing_front) as f32 + frame_fraction;
-        //         let head_ratio = 1. - r / (logical_len - 1.);
-        //         let tail_ratio = 1. - head_ratio;
-        //         let normal_color = Color {
-        //             r: head_ratio * self.head.r + tail_ratio * self.tail.r,
-        //             g: head_ratio * self.head.g + tail_ratio * self.tail.g,
-        //             b: head_ratio * self.head.b + tail_ratio * self.tail.b,
-        //             a: 1.,
-        //         };
-        //
-        //         match seg.segment_type {
-        //             Normal | BlackHole { .. } => normal_color,
-        //             Eaten { .. } => self.eaten.paint_segment(&normal_color),
-        //             Crashed => *DEFAULT_CRASHED_COLOR,
-        //         }
-        //     };
-        //     styles.push(SegmentStyle::Solid(color));
-        // }
         for (i, seg) in body.cells.iter().enumerate() {
             if seg.segment_type == Crashed {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
