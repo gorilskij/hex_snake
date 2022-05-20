@@ -164,11 +164,7 @@ impl Template {
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         match self {
-            Template::Keyboard(control_setup) => Box::new(Keyboard {
-                controls: control_setup.into(),
-                control_queue: VecDeque::with_capacity(Keyboard::CTRL_QUEUE_LIMIT),
-                dir: start_dir,
-            }),
+            Template::Keyboard(control_setup) => Box::new(Keyboard::new(control_setup, start_dir)),
             Template::KeyboardClock => Box::new(KeyboardClock {
                 dir: Dir12::Single(start_dir),
                 alternation: false,

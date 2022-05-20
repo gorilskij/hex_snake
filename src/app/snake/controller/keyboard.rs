@@ -1,26 +1,41 @@
-use crate::{
-    app::{
-        apple::Apple,
-        game_context::GameContext,
-        keyboard_control::Controls,
-        snake::{
-            controller::{Controller, OtherSnakes},
-            Body,
-        },
+use crate::{app::{
+    apple::Apple,
+    game_context::GameContext,
+    keyboard_control::Controls,
+    snake::{
+        controller::{Controller, OtherSnakes},
+        Body,
     },
-    basic::Dir,
-};
+}, basic::Dir, ControlSetup};
 use ggez::{event::KeyCode, Context};
 use std::collections::VecDeque;
 
 pub struct Keyboard {
-    pub controls: Controls,
-    pub control_queue: VecDeque<Dir>,
-    pub dir: Dir,
+    controls: Controls,
+    control_queue: VecDeque<Dir>,
+    dir: Dir,
+    // whether change of direction was deferred from the previous cell,
+    // this forces it to happen on the next cell no matter what, this
+    // prevents infinite deferral for when frame_frac is always high
+    // (high speed and laggy situations)
+    deferred: bool,
 }
 
 impl Keyboard {
-    pub const CTRL_QUEUE_LIMIT: usize = 3;
+    // How many moves ahead a player can make (this allows quick 180° turns)
+    const CTRL_QUEUE_LIMIT: usize = 3;
+    // After frame_fraction is greater than this value, the change of
+    // direction is deferred to the next cell, this gives smoother motion
+    const LAST_ACTIONABLE_THRESHOLD: f32 = 0.85;
+
+    pub fn new(control_setup: ControlSetup, start_dir: Dir) -> Self {
+        Self {
+            controls: control_setup.into(),
+            control_queue: VecDeque::with_capacity(Self::CTRL_QUEUE_LIMIT),
+            dir: start_dir,
+            deferred: false,
+        }
+    }
 }
 
 impl Controller for Keyboard {
@@ -29,15 +44,19 @@ impl Controller for Keyboard {
         _: &mut Body,
         _: OtherSnakes,
         _: &[Apple],
-        _: &GameContext,
+        gtx: &GameContext,
         _: &Context,
     ) -> Option<Dir> {
-        if let Some(queue_dir) = self.control_queue.pop_front() {
-            self.dir = queue_dir;
-            Some(self.dir)
+        if self.deferred || gtx.frame_stamp.1 < Self::LAST_ACTIONABLE_THRESHOLD {
+            self.deferred = false;
+            if let Some(queue_dir) = self.control_queue.pop_front() {
+                self.dir = queue_dir;
+                return Some(self.dir)
+            }
         } else {
-            None
+            self.deferred = true;
         }
+        None
     }
 
     fn reset(&mut self, dir: Dir) {
