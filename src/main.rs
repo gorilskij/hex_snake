@@ -4,7 +4,8 @@
 // #![feature(never_type)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
-#![feature(trace_macros)]
+// #![feature(trace_macros)]
+#![feature(const_fn_floating_point_arithmetic)]
 
 #[macro_use]
 extern crate derive_more;

@@ -5,6 +5,7 @@ use ggez::{
     graphics::{self, Color, DrawParam, Mesh},
     Context,
 };
+use itertools::Itertools;
 use rand::prelude::*;
 
 use crate::{
@@ -37,6 +38,7 @@ use crate::{
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
     support::row::ROw,
 };
+use crate::app::distance_grid;
 
 pub struct Game {
     control: Control,
@@ -468,6 +470,15 @@ impl EventHandler<AppError> for Game {
             || snake_mesh.is_some()
         {
             graphics::clear(ctx, self.gtx.palette.background_color);
+
+            // draw colored grid of distances from player snake head
+            let player_snake_idx = self.snakes
+                .iter()
+                .position(|snake| snake.snake_type == snake::Type::Player)
+                .expect("no player snake");
+            let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+            let distance_grid_mesh = distance_grid::mesh(snake, other_snakes, ctx, &self.gtx)?;
+            graphics::draw(ctx, &distance_grid_mesh, draw_param)?;
 
             if let Some(mesh) = grid_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;

@@ -19,6 +19,7 @@ use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
 use snake::{controller, EatBehavior, EatMechanics};
+use crate::app::snake::PassthroughKnowledge;
 
 pub mod keyboard_control;
 mod palette;
@@ -35,6 +36,7 @@ mod rendering;
 mod screen;
 pub mod stats;
 mod utils;
+mod distance_grid;
 
 pub struct App {
     screen: Screen,
@@ -56,27 +58,34 @@ impl App {
 
         let seeds: Vec<_> = players
             .into_iter()
-            .map(|cs| {
+            .map(|control_setup| {
+                let eat_mechanics = EatMechanics {
+                    eat_self: hash_map_with_default! {
+                        default => EatBehavior::Crash,
+                        SegmentRawType::Eaten => EatBehavior::PassUnder,
+                    },
+                    eat_other: hash_map_with_default! {
+                        default => hash_map_with_default! {
+                            default => EatBehavior::Crash,
+                        },
+                        snake::Type::Rain => hash_map_with_default! {
+                            default => EatBehavior::PassUnder,
+                        },
+                    },
+                };
+
+                let passthrough_knowledge = PassthroughKnowledge::accurate(&eat_mechanics);
+
                 snake::Builder::default()
                     .snake_type(snake::Type::Player)
-                    .eat_mechanics(EatMechanics {
-                        eat_self: hash_map_with_default! {
-                            default => EatBehavior::Crash,
-                            SegmentRawType::Eaten => EatBehavior::PassUnder,
-                        },
-                        eat_other: hash_map_with_default! {
-                            default => hash_map_with_default! {
-                                default => EatBehavior::Crash,
-                            },
-                            snake::Type::Rain => hash_map_with_default! {
-                                default => EatBehavior::PassUnder,
-                            },
-                        },
-                    })
+                    .eat_mechanics(eat_mechanics)
                     .palette(snake::PaletteTemplate::rainbow(true))
                     // .palette(PaletteTemplate::dark_blue_to_red(false))
                     // .palette(PaletteTemplate::zebra())
-                    .controller(controller::Template::Keyboard(cs))
+                    .controller(controller::Template::Keyboard {
+                        control_setup,
+                        passthrough_knowledge,
+                    })
                     .speed(1.)
                 // .controller(controller::Template::Mouse)
                 // .controller(SnakeControllerTemplate::PlayerController12)

@@ -68,6 +68,8 @@ impl PassthroughKnowledge {
         }
     }
 
+    /// Checks whether the snake can safely pass through a given segment
+    /// belonging to itself
     pub fn can_pass_through_self(&self, seg: &Segment) -> bool {
         self.through_self[&seg.segment_type.raw_type()]
     }
