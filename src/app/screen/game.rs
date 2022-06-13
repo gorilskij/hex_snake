@@ -66,6 +66,7 @@ pub struct Game {
     /// display a message fade or animated apple)
     cached_snake_mesh: Option<Mesh>,
     cached_apple_mesh: Option<Mesh>,
+    cached_distance_grid_mesh: Option<Mesh>,
 
     // TODO: move this mechanism to Control
     /// Consider the draw cache invalid for the
@@ -115,6 +116,7 @@ impl Game {
 
             cached_snake_mesh: None,
             cached_apple_mesh: None,
+            cached_distance_grid_mesh: None,
 
             draw_cache_invalid: 0,
         };
@@ -156,6 +158,7 @@ impl Game {
             self.border_mesh = None;
             self.cached_apple_mesh = None;
             self.cached_snake_mesh = None;
+            self.cached_distance_grid_mesh = None;
         }
     }
 
@@ -363,8 +366,9 @@ impl EventHandler<AppError> for Game {
         // selectively set to Some(_) if they need to be updated
         let mut grid_mesh = None;
         let mut border_mesh = None;
-        let mut snake_mesh = None;
         let mut apple_mesh = None;
+        let mut snake_mesh = None;
+        let mut distance_grid_mesh = None;
 
         let mut stats = Stats::default();
 
@@ -381,19 +385,37 @@ impl EventHandler<AppError> for Game {
 
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
+            self.cached_distance_grid_mesh = None;
 
-            snake_mesh = Some(ROw::Owned(rendering::snake_mesh(
-                &mut self.snakes,
-                &self.gtx,
-                ctx,
-                &mut stats,
-            )?));
+            // TODO: refactor this utter mess of a code
             apple_mesh = Some(ROw::Owned(rendering::apple_mesh(
                 &self.apples,
                 &self.gtx,
                 ctx,
                 &mut stats,
             )?));
+            snake_mesh = Some(ROw::Owned(rendering::snake_mesh(
+                &mut self.snakes,
+                &self.gtx,
+                ctx,
+                &mut stats,
+            )?));
+            distance_grid_mesh = Some(ROw::Owned({
+                // draw colored grid of distances from player snake head
+                let player_snake_idx = self.snakes
+                    .iter()
+                    .position(|snake| snake.snake_type == snake::Type::Player)
+                    .expect("no player snake");
+                let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+
+                distance_grid::mesh(
+                    &snake,
+                    other_snakes,
+                    ctx,
+                    &self.gtx,
+                )?
+            }));
+
             if self.gtx.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
                     self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
@@ -435,6 +457,22 @@ impl EventHandler<AppError> for Game {
                 update = true;
             }
 
+            if self.cached_distance_grid_mesh.is_none() {
+                // draw colored grid of distances from player snake head
+                let player_snake_idx = self.snakes
+                    .iter()
+                    .position(|snake| snake.snake_type == snake::Type::Player)
+                    .expect("no player snake");
+                let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+
+                self.cached_distance_grid_mesh = Some(distance_grid::mesh(
+                    snake,
+                    other_snakes,
+                    ctx,
+                    &self.gtx
+                )?);
+            }
+
             if !self.messages.is_empty() {
                 update = true;
             }
@@ -459,6 +497,7 @@ impl EventHandler<AppError> for Game {
                 }
                 apple_mesh = Some(ROw::Ref(self.cached_apple_mesh.as_ref().unwrap()));
                 snake_mesh = Some(ROw::Ref(self.cached_snake_mesh.as_ref().unwrap()));
+                distance_grid_mesh = Some(ROw::Ref(self.cached_distance_grid_mesh.as_ref().unwrap()));
             }
         }
 
@@ -468,17 +507,13 @@ impl EventHandler<AppError> for Game {
             || border_mesh.is_some()
             || apple_mesh.is_some()
             || snake_mesh.is_some()
+            || distance_grid_mesh.is_some()
         {
             graphics::clear(ctx, self.gtx.palette.background_color);
 
-            // draw colored grid of distances from player snake head
-            let player_snake_idx = self.snakes
-                .iter()
-                .position(|snake| snake.snake_type == snake::Type::Player)
-                .expect("no player snake");
-            let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
-            let distance_grid_mesh = distance_grid::mesh(snake, other_snakes, ctx, &self.gtx)?;
-            graphics::draw(ctx, &distance_grid_mesh, draw_param)?;
+            if let Some(mesh) = distance_grid_mesh {
+                graphics::draw(ctx, mesh.get(), draw_param)?;
+            }
 
             if let Some(mesh) = grid_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;

@@ -67,34 +67,13 @@ fn find_distances(
     other_snakes: OtherSnakes,
     board_dim: HexDim,
 ) -> Iter {
-    // let occupied_positions = snake.body.cells
-    //     .iter()
-    //     .map(|cell| cell.pos)
-    //     .chain(other_snakes.iter_segments().map(|seg| seg.pos))
-    //     .collect();
-
-    let occupied_positions = if let Some(passthrough_knowledge) = player_snake.controller.passthrough_knowledge() {
-        player_snake.body.cells
-            .iter()
-            .chain(other_snakes.iter_segments())
-            .filter(|seg| !passthrough_knowledge.can_pass_through_self(seg))
-            .map(|seg| seg.pos)
-            .collect()
-    } else {
-        player_snake.body.cells
-            .iter()
-            .chain(other_snakes.iter_segments())
-            .map(|seg| seg.pos)
-            .collect()
-    };
-
     // setup bfs
     Iter {
         board_dim,
-        seen: occupied_positions,
+        seen: HashSet::new(),
         dist: 0,
         generation: vec![player_snake.head().pos],
-        output_idx: 1, // trigger bfs step immediately
+        output_idx: 0, // trigger bfs step immediately
     }
 }
 
