@@ -19,6 +19,7 @@ pub struct GameContext {
     /// note that the speed of graphics frames is decided
     /// by the ggez runtime
     pub frame_stamp: FrameStamp,
+    pub game_frame_num: usize,
     /// Total number of milliseconds that have elapsed
     /// since the game was started
     pub elapsed_millis: u128,

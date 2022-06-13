@@ -85,7 +85,8 @@ impl DebugScenario {
                 palette: app::Palette::dark(),
                 prefs: Default::default(),
                 apple_spawn_policy: SpawnPolicy::None,
-                frame_stamp: Default::default(),
+                frame_stamp: (0, 0.0),
+                game_frame_num: 0,
                 elapsed_millis: 0,
             },
 
@@ -138,7 +139,8 @@ impl DebugScenario {
                 palette: app::Palette::dark(),
                 prefs: Default::default(),
                 apple_spawn_policy: SpawnPolicy::None,
-                frame_stamp: Default::default(),
+                frame_stamp: (0, 0.0),
+                game_frame_num: 0,
                 elapsed_millis: 0,
             },
 
@@ -191,7 +193,8 @@ impl DebugScenario {
                 palette: app::Palette::dark(),
                 prefs: Prefs::default().special_apples(false),
                 apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
-                frame_stamp: Default::default(),
+                frame_stamp: (0, 0.0),
+                game_frame_num: 0,
                 elapsed_millis: 0,
             },
 
@@ -271,7 +274,8 @@ impl DebugScenario {
                 palette: app::Palette::dark(),
                 prefs: Default::default(),
                 apple_spawn_policy: SpawnPolicy::None,
-                frame_stamp: Default::default(),
+                frame_stamp: (0, 0.0),
+                game_frame_num: 0,
                 elapsed_millis: 0,
             },
 
@@ -336,7 +340,7 @@ impl DebugScenario {
 
 impl EventHandler<AppError> for DebugScenario {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
-        while self.control.can_update() {
+        while self.control.can_update(&mut self.gtx) {
             self.advance_snakes(ctx);
         }
         Ok(())

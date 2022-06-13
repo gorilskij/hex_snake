@@ -1,5 +1,5 @@
 use std::cmp::{max, min};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::mem;
 use ggez::Context;
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
@@ -12,8 +12,10 @@ use crate::app::snake::utils::OtherSnakes;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint};
 use crate::basic::transformations::translate;
 use crate::color::Color;
+use crate::support::copied2::Copied2;
 
-type Distance = usize;
+type Distance = f32;
+type GridData = HashMap<HexPoint, Distance>;
 
 struct Iter {
     board_dim: HexDim,
@@ -23,7 +25,7 @@ struct Iter {
     seen: HashSet<HexPoint>,
     occupied: HashSet<HexPoint>,
     // all the positions in a generation have the same distance
-    dist: Distance,
+    dist: usize,
     // search will only continue from generation_alive
     generation_alive: Vec<HexPoint>,
     generation_dead: Vec<HexPoint>,
@@ -42,11 +44,11 @@ impl Iterator for Iter {
         if self.output_idx < num_alive {
             let ret = self.generation_alive[self.output_idx];
             self.output_idx += 1;
-            Some((ret, self.dist))
+            Some((ret, self.dist as Distance))
         } else if self.output_idx < num_alive + num_dead {
             let ret = self.generation_dead[self.output_idx - num_alive];
             self.output_idx += 1;
-            Some((ret, self.dist))
+            Some((ret, self.dist as Distance))
         } else {
             // bfs step
             let board_dim = self.board_dim;
@@ -78,7 +80,7 @@ impl Iterator for Iter {
                 self.seen.extend(&self.generation_dead);
                 self.dist += 1;
                 self.output_idx = 1;
-                Some((self.generation_alive[0], self.dist))
+                Some((self.generation_alive[0], self.dist as Distance))
             }
         }
     }
@@ -88,7 +90,7 @@ fn find_distances(
     player_snake: &Snake,
     other_snakes: OtherSnakes,
     board_dim: HexDim,
-) -> Iter {
+) -> GridData {
     let occupied = if let Some(passthrough_knowledge) = player_snake.controller.passthrough_knowledge() {
         player_snake.body.cells
             .iter()
@@ -113,22 +115,16 @@ fn find_distances(
         generation_alive: vec![player_snake.head().pos],
         generation_dead: vec![],
         output_idx: 1, // trigger bfs step immediately
-    }
+    }.collect()
 }
 
-pub fn mesh(
-    snake: &Snake,
-    other_snakes: OtherSnakes,
-    ctx: &mut Context,
-    gtx: &GameContext,
-) -> AppResult<Mesh> {
+fn generate_mesh(iter: impl Iterator<Item = (HexPoint, Distance)>, ctx: &mut Context, gtx: &GameContext) -> AppResult<Mesh> {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
-    let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64 / 2.0;
-    let mid_dist = max_dist as f64 / 2.0;
+    let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
 
     let mut builder = MeshBuilder::new();
-    find_distances(snake, other_snakes, gtx.board_dim)
+    iter
         .map(|(pos, dist)| {
             const ALPHA: f32 = 0.3;
             const CLOSEST_COLOR: Color = Color::from_rgb(51, 204, 51).with_alpha(ALPHA);
@@ -155,4 +151,63 @@ pub fn mesh(
         })
         .collect::<Result<(), _>>()?;
     Ok(builder.build(ctx)?)
+}
+
+pub struct DistanceGrid {
+    last: Option<GridData>,
+    current: Option<GridData>,
+    last_update: usize, // frame
+}
+
+impl DistanceGrid {
+    pub fn new() -> Self {
+        Self {
+            last: None,
+            current: None,
+            last_update: 0,
+        }
+    }
+
+    pub fn mesh(
+        &mut self,
+        player_snake: &Snake,
+        other_snakes: OtherSnakes,
+        ctx: &mut Context,
+        gtx: &GameContext,
+    ) -> AppResult<Mesh> {
+        if gtx.game_frame_num > self.last_update {
+            self.last = mem::replace(
+                &mut self.current,
+                Some(find_distances(player_snake, other_snakes, gtx.board_dim))
+            );
+        }
+
+        match &self.current {
+            None => unreachable!(),
+            Some(current) => match &self.last {
+                None => {
+                    generate_mesh(current.iter().copied2(), ctx, gtx)
+                }
+                Some(last) => {
+                    let frame_frac = gtx.frame_stamp.1;
+                    let iter = last
+                        .iter()
+                        .map(|(pos, &dist_a)| {
+                            let dist = match current.get(pos) {
+                                Some(&dist_b) =>
+                                    (1. - frame_frac) * dist_a as f32 + frame_frac * dist_b as f32,
+                                None => dist_a,
+                            };
+                            (*pos, dist)
+                        });
+                    generate_mesh(iter, ctx, gtx)
+                }
+            }
+        }
+    }
+
+    pub fn invalidate(&mut self) {
+        self.last = None;
+        self.current = None;
+    }
 }

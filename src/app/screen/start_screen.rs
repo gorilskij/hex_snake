@@ -306,24 +306,25 @@ impl StartScreen {
 
 impl EventHandler<AppError> for StartScreen {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
-        while self.control.borrow_mut().can_update() {
-            let frame_stamp = self.control.borrow().frame_stamp();
-            self.player1_demo.advance_snakes(
-                self.cell_dim,
-                frame_stamp,
-                &self.prefs,
-                ctx,
-                &mut self.rng,
-            );
-            self.player2_demo.advance_snakes(
-                self.cell_dim,
-                frame_stamp,
-                &self.prefs,
-                ctx,
-                &mut self.rng,
-            );
-        }
-        Ok(())
+        unimplemented!("how do you use GameContext here??")
+        // while self.control.borrow_mut().can_update(&mut self.gtx) {
+        //     let frame_stamp = self.control.borrow().frame_stamp();
+        //     self.player1_demo.advance_snakes(
+        //         self.cell_dim,
+        //         frame_stamp,
+        //         &self.prefs,
+        //         ctx,
+        //         &mut self.rng,
+        //     );
+        //     self.player2_demo.advance_snakes(
+        //         self.cell_dim,
+        //         frame_stamp,
+        //         &self.prefs,
+        //         ctx,
+        //         &mut self.rng,
+        //     );
+        // }
+        // Ok(())
     }
 
     fn draw(&mut self, _ctx: &mut Context) -> AppResult {

@@ -108,7 +108,7 @@ pub struct Control {
     // TODO: zero this when it gets too large to prevent lag
     missed_updates: Option<usize>,
 
-    // counting graphics frames
+    // counting frames
     graphics_frame_num: usize,
 
     // empirical measurement of framerates unrelated to
@@ -183,11 +183,12 @@ impl Control {
     // WARN: this will perform as many updates as the framerate requires
     //  this can cause strong lag a high framerates
     // TODO: automatically lower game framerate to keep up graphics framerate
-    pub fn can_update(&mut self) -> bool {
+    pub fn can_update(&mut self, gtx: &mut GameContext) -> bool {
         if self.game_state != State::Playing {
             return false;
         }
 
+        gtx.game_frame_num += 1;
         match &mut self.missed_updates {
             Some(0) => {
                 self.missed_updates = None;
@@ -271,6 +272,7 @@ impl Control {
         }
     }
 
+    // TODO: why graphics frame num? is it correct? refactor this mechanism
     pub fn frame_stamp(&self) -> FrameStamp {
         (self.graphics_frame_num, self.frame_fraction())
     }

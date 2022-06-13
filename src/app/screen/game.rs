@@ -39,6 +39,7 @@ use crate::{
     support::row::ROw,
 };
 use crate::app::distance_grid;
+use crate::app::distance_grid::DistanceGrid;
 
 pub struct Game {
     control: Control,
@@ -53,6 +54,8 @@ pub struct Game {
     apples: Vec<Apple>,
 
     rng: ThreadRng,
+
+    distance_grid: DistanceGrid,
 
     /// These meshes are always cached and only
     /// recalculated when the board is resized
@@ -98,7 +101,8 @@ impl Game {
                 palette,
                 prefs: Default::default(),
                 apple_spawn_policy,
-                frame_stamp: Default::default(),
+                frame_stamp: (0, 0.0),
+                game_frame_num: 0,
                 elapsed_millis: 0,
             },
             // updated immediately after creation
@@ -109,6 +113,9 @@ impl Game {
             apples: vec![],
 
             rng: thread_rng(),
+
+            distance_grid: DistanceGrid::new(),
+
             grid_mesh: None,
             border_mesh: None,
 
@@ -159,6 +166,7 @@ impl Game {
             self.cached_apple_mesh = None;
             self.cached_snake_mesh = None;
             self.cached_distance_grid_mesh = None;
+            self.distance_grid.invalidate();
         }
     }
 
@@ -335,7 +343,7 @@ impl Game {
 
 impl EventHandler<AppError> for Game {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
-        while self.control.can_update() {
+        while self.control.can_update(&mut self.gtx) {
             self.advance_snakes(ctx).with_trace_step("Game::update")?;
             self.spawn_apples();
         }
@@ -407,10 +415,10 @@ impl EventHandler<AppError> for Game {
                     .iter()
                     .position(|snake| snake.snake_type == snake::Type::Player)
                     .expect("no player snake");
-                let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+                let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
 
-                distance_grid::mesh(
-                    &snake,
+                self.distance_grid.mesh(
+                    &player_snake,
                     other_snakes,
                     ctx,
                     &self.gtx,
@@ -464,10 +472,10 @@ impl EventHandler<AppError> for Game {
                     .iter()
                     .position(|snake| snake.snake_type == snake::Type::Player)
                     .expect("no player snake");
-                let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+                let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
 
-                self.cached_distance_grid_mesh = Some(distance_grid::mesh(
-                    snake,
+                self.cached_distance_grid_mesh = Some(self.distance_grid.mesh(
+                    player_snake,
                     other_snakes,
                     ctx,
                     &self.gtx
