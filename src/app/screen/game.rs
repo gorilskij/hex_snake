@@ -361,7 +361,8 @@ impl EventHandler<AppError> for Game {
         //     L = Some(Instant::now());
         // }
 
-        // TODO: fix this mess, reintroduce a short grace period after
+        // TODO: fix this mess
+        // TODO: reintroduce a short grace period after
         //  game over for all the graphics to properly update
         // selectively set to Some(_) if they need to be updated
         let mut grid_mesh = None;

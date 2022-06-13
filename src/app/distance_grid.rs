@@ -1,5 +1,6 @@
 use std::cmp::{max, min};
 use std::collections::HashSet;
+use std::mem;
 use ggez::Context;
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
 use itertools::Itertools;
@@ -20,9 +21,12 @@ struct Iter {
     // -- bfs --
     // also used to store positions occupied by snakes
     seen: HashSet<HexPoint>,
+    occupied: HashSet<HexPoint>,
     // all the positions in a generation have the same distance
     dist: Distance,
-    generation: Vec<HexPoint>,
+    // search will only continue from generation_alive
+    generation_alive: Vec<HexPoint>,
+    generation_dead: Vec<HexPoint>,
     // once a new generation is computed, it's iterated over to
     // return the values one by one
     output_idx: usize,
@@ -32,16 +36,26 @@ impl Iterator for Iter {
     type Item = (HexPoint, Distance);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.output_idx < self.generation.len() {
-            let ret = self.generation[self.output_idx];
+        let num_alive = self.generation_alive.len();
+        let num_dead = self.generation_dead.len();
+
+        if self.output_idx < num_alive {
+            let ret = self.generation_alive[self.output_idx];
+            self.output_idx += 1;
+            Some((ret, self.dist))
+        } else if self.output_idx < num_alive + num_dead {
+            let ret = self.generation_dead[self.output_idx - num_alive];
             self.output_idx += 1;
             Some((ret, self.dist))
         } else {
             // bfs step
             let board_dim = self.board_dim;
-            self.generation = self.generation
-                .iter()
-                .copied()
+
+            self.generation_dead = vec![];
+            let generation_alive = mem::replace(&mut self.generation_alive, vec![]);
+
+            generation_alive
+                .into_iter()
                 .flat_map(move |pos| {
                     Dir::iter()
                         .map(move |dir| pos.wrapping_translate(dir, 1, board_dim))
@@ -49,14 +63,22 @@ impl Iterator for Iter {
                 .filter(|new_pos| !self.seen.contains(new_pos))
                 .sorted_unstable()
                 .dedup()
-                .collect();
-            if self.generation.is_empty() {
+                .for_each(|pos| {
+                    if self.occupied.contains(&pos) {
+                        self.generation_dead.push(pos)
+                    } else {
+                        self.generation_alive.push(pos)
+                    }
+                });
+
+            if self.generation_alive.is_empty() {
                 None
             } else {
-                self.seen.extend(&self.generation);
+                self.seen.extend(&self.generation_alive);
+                self.seen.extend(&self.generation_dead);
                 self.dist += 1;
                 self.output_idx = 1;
-                Some((self.generation[0], self.dist))
+                Some((self.generation_alive[0], self.dist))
             }
         }
     }
@@ -67,13 +89,30 @@ fn find_distances(
     other_snakes: OtherSnakes,
     board_dim: HexDim,
 ) -> Iter {
+    let occupied = if let Some(passthrough_knowledge) = player_snake.controller.passthrough_knowledge() {
+        player_snake.body.cells
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .filter(|seg| !passthrough_knowledge.can_pass_through_self(seg))
+            .map(|seg| seg.pos)
+            .collect()
+    } else {
+        player_snake.body.cells
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .map(|seg| seg.pos)
+            .collect()
+    };
+
     // setup bfs
     Iter {
         board_dim,
         seen: HashSet::new(),
+        occupied,
         dist: 0,
-        generation: vec![player_snake.head().pos],
-        output_idx: 0, // trigger bfs step immediately
+        generation_alive: vec![player_snake.head().pos],
+        generation_dead: vec![],
+        output_idx: 1, // trigger bfs step immediately
     }
 }
 
