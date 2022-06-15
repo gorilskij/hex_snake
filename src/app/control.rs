@@ -188,8 +188,7 @@ impl Control {
             return false;
         }
 
-        gtx.game_frame_num += 1;
-        match &mut self.missed_updates {
+        let can_update = match &mut self.missed_updates {
             Some(0) => {
                 self.missed_updates = None;
                 false
@@ -219,7 +218,13 @@ impl Control {
                     false
                 }
             }
+        };
+
+        if can_update {
+            gtx.game_frame_num += 1;
         }
+
+        can_update
     }
 
     // call in draw()

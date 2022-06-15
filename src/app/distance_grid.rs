@@ -118,32 +118,43 @@ fn find_distances(
     }.collect()
 }
 
-fn generate_mesh(iter: impl Iterator<Item = (HexPoint, Distance)>, ctx: &mut Context, gtx: &GameContext) -> AppResult<Mesh> {
+fn generate_mesh(
+    iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
+    ctx: &mut Context,
+    gtx: &GameContext,
+) -> AppResult<Mesh> {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
     let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
 
     let mut builder = MeshBuilder::new();
     iter
-        .map(|(pos, dist)| {
+        .map(|(pos, dist_a, dist_b)| {
             const ALPHA: f32 = 0.3;
             const CLOSEST_COLOR: Color = Color::from_rgb(51, 204, 51).with_alpha(ALPHA);
             const MIDWAY_COLOR: Color = Color::from_rgb(255, 255, 0).with_alpha(ALPHA);
             const FARTHEST_COLOR: Color = Color::from_rgb(204, 0, 0).with_alpha(ALPHA);
 
-            let dist = dist as f64;
-
-            let mut dist_ratio = dist / max_dist;
-            if dist_ratio > 1.0 {
-                dist_ratio = 1.0;
-            }
-            let color = if dist_ratio < 0.5 {
-                let ratio = dist_ratio * 2.0;
-                (1. - ratio) * CLOSEST_COLOR + ratio * MIDWAY_COLOR
-            } else {
-                let ratio = dist_ratio * 2.0 - 1.0;
-                (1. - ratio) * MIDWAY_COLOR + ratio * FARTHEST_COLOR
+            let calculate_color = |dist: Distance| -> Color {
+                let mut ratio = dist as f64 / max_dist;
+                if ratio > 1.0 { ratio = 1.0 }
+                if ratio < 0.5 {
+                    let ratio = ratio * 2.0;
+                    (1. - ratio) * CLOSEST_COLOR + ratio * MIDWAY_COLOR
+                } else {
+                    let ratio = ratio * 2.0 - 1.0;
+                    (1. - ratio) * MIDWAY_COLOR + ratio * FARTHEST_COLOR
+                }
             };
+
+            let color_a = calculate_color(dist_a);
+            let color_b = match dist_b {
+                None => Color::BLACK,
+                Some(d) => calculate_color(d),
+            };
+
+            let frame_frac = gtx.frame_stamp.1;
+            let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
 
             let mut hexagon = render_hexagon(gtx.cell_dim);
             translate(&mut hexagon, pos.to_cartesian(gtx.cell_dim));
@@ -176,6 +187,7 @@ impl DistanceGrid {
         gtx: &GameContext,
     ) -> AppResult<Mesh> {
         if gtx.game_frame_num > self.last_update {
+            self.last_update = gtx.game_frame_num;
             self.last = mem::replace(
                 &mut self.current,
                 Some(find_distances(player_snake, other_snakes, gtx.board_dim))
@@ -186,19 +198,16 @@ impl DistanceGrid {
             None => unreachable!(),
             Some(current) => match &self.last {
                 None => {
-                    generate_mesh(current.iter().copied2(), ctx, gtx)
+                    // TODO: this is a terrible hack, rewrite this
+                    generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), ctx, gtx)
                 }
                 Some(last) => {
                     let frame_frac = gtx.frame_stamp.1;
                     let iter = last
                         .iter()
                         .map(|(pos, &dist_a)| {
-                            let dist = match current.get(pos) {
-                                Some(&dist_b) =>
-                                    (1. - frame_frac) * dist_a as f32 + frame_frac * dist_b as f32,
-                                None => dist_a,
-                            };
-                            (*pos, dist)
+                            let dist_b = current.get(pos).copied();
+                            (*pos, dist_a, dist_b)
                         });
                     generate_mesh(iter, ctx, gtx)
                 }
