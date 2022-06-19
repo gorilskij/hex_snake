@@ -40,6 +40,7 @@ use crate::{
 };
 use crate::app::distance_grid;
 use crate::app::distance_grid::DistanceGrid;
+use crate::support::flip::Flip;
 
 pub struct Game {
     control: Control,
@@ -409,21 +410,6 @@ impl EventHandler<AppError> for Game {
                 ctx,
                 &mut stats,
             )?));
-            distance_grid_mesh = Some(ROw::Owned({
-                // draw colored grid of distances from player snake head
-                let player_snake_idx = self.snakes
-                    .iter()
-                    .position(|snake| snake.snake_type == snake::Type::Player)
-                    .expect("no player snake");
-                let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
-
-                self.distance_grid.mesh(
-                    &player_snake,
-                    other_snakes,
-                    ctx,
-                    &self.gtx,
-                )?
-            }));
 
             if self.gtx.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
@@ -436,6 +422,23 @@ impl EventHandler<AppError> for Game {
                     self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
                 }
                 border_mesh = Some(self.border_mesh.as_ref().unwrap());
+            }
+            if self.gtx.prefs.draw_distance_grid {
+                distance_grid_mesh = Some(ROw::Owned({
+                    // draw colored grid of distances from player snake head
+                    let player_snake_idx = self.snakes
+                        .iter()
+                        .position(|snake| snake.snake_type == snake::Type::Player)
+                        .expect("no player snake");
+                    let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+
+                    self.distance_grid.mesh(
+                        &player_snake,
+                        other_snakes,
+                        ctx,
+                        &self.gtx,
+                    )?
+                }));
             }
         } else {
             let mut update = false;
@@ -504,9 +507,11 @@ impl EventHandler<AppError> for Game {
                     }
                     border_mesh = Some(self.border_mesh.as_ref().unwrap());
                 }
+                if self.gtx.prefs.draw_distance_grid {
+                    distance_grid_mesh = Some(ROw::Ref(self.cached_distance_grid_mesh.as_ref().unwrap()));
+                }
                 apple_mesh = Some(ROw::Ref(self.cached_apple_mesh.as_ref().unwrap()));
                 snake_mesh = Some(ROw::Ref(self.cached_snake_mesh.as_ref().unwrap()));
-                distance_grid_mesh = Some(ROw::Ref(self.cached_distance_grid_mesh.as_ref().unwrap()));
             }
         }
 
@@ -577,8 +582,7 @@ impl EventHandler<AppError> for Game {
                 control::State::Paused => self.control.play(),
             },
             G => {
-                self.gtx.prefs.draw_grid = !self.gtx.prefs.draw_grid;
-                self.gtx.prefs.draw_border = self.gtx.prefs.draw_grid;
+                self.gtx.prefs.draw_border = self.gtx.prefs.draw_grid.flip();
                 let text = if self.gtx.prefs.draw_grid {
                     "Grid on"
                 } else {
@@ -586,23 +590,28 @@ impl EventHandler<AppError> for Game {
                 };
                 self.display_notification(text);
             }
+            D => {
+                let text = if self.gtx.prefs.draw_distance_grid.flip() {
+                    "Distance grid on"
+                } else {
+                    "Distance grid off"
+                };
+                self.display_notification(text);
+            }
             F => {
-                self.gtx.prefs.display_fps = !self.gtx.prefs.display_fps;
-                if !self.gtx.prefs.display_fps {
+                if !self.gtx.prefs.display_fps.flip() {
                     self.messages.remove(&MessageID::Fps);
                     self.draw_cache_invalid = 5;
                 }
             }
             S => {
-                self.gtx.prefs.display_stats = !self.gtx.prefs.display_stats;
-                if !self.gtx.prefs.display_stats {
+                if !self.gtx.prefs.display_stats.flip() {
                     self.messages.remove(&MessageID::Stats);
                     self.draw_cache_invalid = 5;
                 }
             }
             Y => {
-                self.gtx.prefs.draw_ai_debug_artifacts = !self.gtx.prefs.draw_ai_debug_artifacts;
-                if !self.gtx.prefs.draw_ai_debug_artifacts {
+                if !self.gtx.prefs.draw_ai_debug_artifacts.flip() {
                     for snake in &mut self.snakes {
                         snake.ai_artifacts = None;
                     }
@@ -700,8 +709,7 @@ impl EventHandler<AppError> for Game {
                 }
             }
             X => {
-                self.gtx.prefs.special_apples = !self.gtx.prefs.special_apples;
-                let text = if self.gtx.prefs.special_apples {
+                let text = if self.gtx.prefs.special_apples.flip() {
                     "Special apples enabled"
                 } else {
                     // replace special apples with normal apples

@@ -12,7 +12,6 @@ use crate::app::snake::utils::OtherSnakes;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint};
 use crate::basic::transformations::translate;
 use crate::color::Color;
-use crate::support::copied2::Copied2;
 
 type Distance = f32;
 type GridData = HashMap<HexPoint, Distance>;
