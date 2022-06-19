@@ -4,6 +4,7 @@ use std::time::Duration;
 pub struct Prefs {
     pub draw_grid: bool,
     pub draw_border: bool,
+    pub draw_distance_grid: bool,
 
     pub display_fps: bool,
     pub display_stats: bool,
@@ -23,8 +24,9 @@ pub struct Prefs {
 impl Default for Prefs {
     fn default() -> Self {
         Self {
-            draw_grid: true,
+            draw_grid: false,
             draw_border: true,
+            draw_distance_grid: true,
 
             display_fps: false,
             display_stats: false,

@@ -5,6 +5,7 @@ use ggez::{
     graphics::{self, Color, DrawParam, Mesh},
     Context,
 };
+use itertools::Itertools;
 use rand::prelude::*;
 
 use crate::{
@@ -37,6 +38,9 @@ use crate::{
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
     support::row::ROw,
 };
+use crate::app::distance_grid;
+use crate::app::distance_grid::DistanceGrid;
+use crate::support::flip::Flip;
 
 pub struct Game {
     control: Control,
@@ -52,6 +56,8 @@ pub struct Game {
 
     rng: ThreadRng,
 
+    distance_grid: DistanceGrid,
+
     /// These meshes are always cached and only
     /// recalculated when the board is resized
     grid_mesh: Option<Mesh>,
@@ -64,6 +70,7 @@ pub struct Game {
     /// display a message fade or animated apple)
     cached_snake_mesh: Option<Mesh>,
     cached_apple_mesh: Option<Mesh>,
+    cached_distance_grid_mesh: Option<Mesh>,
 
     // TODO: move this mechanism to Control
     /// Consider the draw cache invalid for the
@@ -95,7 +102,8 @@ impl Game {
                 palette,
                 prefs: Default::default(),
                 apple_spawn_policy,
-                frame_stamp: Default::default(),
+                frame_stamp: (0, 0.0),
+                game_frame_num: 0,
                 elapsed_millis: 0,
             },
             // updated immediately after creation
@@ -106,6 +114,9 @@ impl Game {
             apples: vec![],
 
             rng: thread_rng(),
+
+            distance_grid: DistanceGrid::new(),
+
             grid_mesh: None,
             border_mesh: None,
 
@@ -113,6 +124,7 @@ impl Game {
 
             cached_snake_mesh: None,
             cached_apple_mesh: None,
+            cached_distance_grid_mesh: None,
 
             draw_cache_invalid: 0,
         };
@@ -154,6 +166,8 @@ impl Game {
             self.border_mesh = None;
             self.cached_apple_mesh = None;
             self.cached_snake_mesh = None;
+            self.cached_distance_grid_mesh = None;
+            self.distance_grid.invalidate();
         }
     }
 
@@ -330,7 +344,7 @@ impl Game {
 
 impl EventHandler<AppError> for Game {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
-        while self.control.can_update() {
+        while self.control.can_update(&mut self.gtx) {
             self.advance_snakes(ctx).with_trace_step("Game::update")?;
             self.spawn_apples();
         }
@@ -356,13 +370,15 @@ impl EventHandler<AppError> for Game {
         //     L = Some(Instant::now());
         // }
 
-        // TODO: fix this mess, reintroduce a short grace period after
+        // TODO: fix this mess
+        // TODO: reintroduce a short grace period after
         //  game over for all the graphics to properly update
         // selectively set to Some(_) if they need to be updated
         let mut grid_mesh = None;
         let mut border_mesh = None;
-        let mut snake_mesh = None;
         let mut apple_mesh = None;
+        let mut snake_mesh = None;
+        let mut distance_grid_mesh = None;
 
         let mut stats = Stats::default();
 
@@ -379,19 +395,22 @@ impl EventHandler<AppError> for Game {
 
             self.cached_snake_mesh = None;
             self.cached_apple_mesh = None;
+            self.cached_distance_grid_mesh = None;
 
-            snake_mesh = Some(ROw::Owned(rendering::snake_mesh(
-                &mut self.snakes,
-                &self.gtx,
-                ctx,
-                &mut stats,
-            )?));
+            // TODO: refactor this utter mess of a code
             apple_mesh = Some(ROw::Owned(rendering::apple_mesh(
                 &self.apples,
                 &self.gtx,
                 ctx,
                 &mut stats,
             )?));
+            snake_mesh = Some(ROw::Owned(rendering::snake_mesh(
+                &mut self.snakes,
+                &self.gtx,
+                ctx,
+                &mut stats,
+            )?));
+
             if self.gtx.prefs.draw_grid {
                 if self.grid_mesh.is_none() {
                     self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
@@ -403,6 +422,23 @@ impl EventHandler<AppError> for Game {
                     self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
                 }
                 border_mesh = Some(self.border_mesh.as_ref().unwrap());
+            }
+            if self.gtx.prefs.draw_distance_grid {
+                distance_grid_mesh = Some(ROw::Owned({
+                    // draw colored grid of distances from player snake head
+                    let player_snake_idx = self.snakes
+                        .iter()
+                        .position(|snake| snake.snake_type == snake::Type::Player)
+                        .expect("no player snake");
+                    let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+
+                    self.distance_grid.mesh(
+                        &player_snake,
+                        other_snakes,
+                        ctx,
+                        &self.gtx,
+                    )?
+                }));
             }
         } else {
             let mut update = false;
@@ -433,6 +469,22 @@ impl EventHandler<AppError> for Game {
                 update = true;
             }
 
+            if self.cached_distance_grid_mesh.is_none() {
+                // draw colored grid of distances from player snake head
+                let player_snake_idx = self.snakes
+                    .iter()
+                    .position(|snake| snake.snake_type == snake::Type::Player)
+                    .expect("no player snake");
+                let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+
+                self.cached_distance_grid_mesh = Some(self.distance_grid.mesh(
+                    player_snake,
+                    other_snakes,
+                    ctx,
+                    &self.gtx
+                )?);
+            }
+
             if !self.messages.is_empty() {
                 update = true;
             }
@@ -455,6 +507,9 @@ impl EventHandler<AppError> for Game {
                     }
                     border_mesh = Some(self.border_mesh.as_ref().unwrap());
                 }
+                if self.gtx.prefs.draw_distance_grid {
+                    distance_grid_mesh = Some(ROw::Ref(self.cached_distance_grid_mesh.as_ref().unwrap()));
+                }
                 apple_mesh = Some(ROw::Ref(self.cached_apple_mesh.as_ref().unwrap()));
                 snake_mesh = Some(ROw::Ref(self.cached_snake_mesh.as_ref().unwrap()));
             }
@@ -466,8 +521,13 @@ impl EventHandler<AppError> for Game {
             || border_mesh.is_some()
             || apple_mesh.is_some()
             || snake_mesh.is_some()
+            || distance_grid_mesh.is_some()
         {
             graphics::clear(ctx, self.gtx.palette.background_color);
+
+            if let Some(mesh) = distance_grid_mesh {
+                graphics::draw(ctx, mesh.get(), draw_param)?;
+            }
 
             if let Some(mesh) = grid_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
@@ -522,8 +582,7 @@ impl EventHandler<AppError> for Game {
                 control::State::Paused => self.control.play(),
             },
             G => {
-                self.gtx.prefs.draw_grid = !self.gtx.prefs.draw_grid;
-                self.gtx.prefs.draw_border = self.gtx.prefs.draw_grid;
+                self.gtx.prefs.draw_border = self.gtx.prefs.draw_grid.flip();
                 let text = if self.gtx.prefs.draw_grid {
                     "Grid on"
                 } else {
@@ -531,23 +590,28 @@ impl EventHandler<AppError> for Game {
                 };
                 self.display_notification(text);
             }
+            D => {
+                let text = if self.gtx.prefs.draw_distance_grid.flip() {
+                    "Distance grid on"
+                } else {
+                    "Distance grid off"
+                };
+                self.display_notification(text);
+            }
             F => {
-                self.gtx.prefs.display_fps = !self.gtx.prefs.display_fps;
-                if !self.gtx.prefs.display_fps {
+                if !self.gtx.prefs.display_fps.flip() {
                     self.messages.remove(&MessageID::Fps);
                     self.draw_cache_invalid = 5;
                 }
             }
             S => {
-                self.gtx.prefs.display_stats = !self.gtx.prefs.display_stats;
-                if !self.gtx.prefs.display_stats {
+                if !self.gtx.prefs.display_stats.flip() {
                     self.messages.remove(&MessageID::Stats);
                     self.draw_cache_invalid = 5;
                 }
             }
             Y => {
-                self.gtx.prefs.draw_ai_debug_artifacts = !self.gtx.prefs.draw_ai_debug_artifacts;
-                if !self.gtx.prefs.draw_ai_debug_artifacts {
+                if !self.gtx.prefs.draw_ai_debug_artifacts.flip() {
                     for snake in &mut self.snakes {
                         snake.ai_artifacts = None;
                     }
@@ -645,8 +709,7 @@ impl EventHandler<AppError> for Game {
                 }
             }
             X => {
-                self.gtx.prefs.special_apples = !self.gtx.prefs.special_apples;
-                let text = if self.gtx.prefs.special_apples {
+                let text = if self.gtx.prefs.special_apples.flip() {
                     "Special apples enabled"
                 } else {
                     // replace special apples with normal apples

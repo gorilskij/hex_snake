@@ -15,6 +15,9 @@ use std::{
     collections::HashSet,
     rc::Rc,
 };
+use ggez::graphics::Mesh;
+use ggez::winit::event::VirtualKeyCode;
+use crate::app::app_error::AppResult;
 
 pub struct AStar {
     pub passthrough_knowledge: PassthroughKnowledge,
@@ -240,5 +243,9 @@ impl Controller for AStar {
         } else {
             Self::least_damage(body.cells[0].pos, body, other_snakes, gtx.board_dim)
         }
+    }
+
+    fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> {
+        Some(&self.passthrough_knowledge)
     }
 }

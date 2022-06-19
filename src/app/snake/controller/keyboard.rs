@@ -9,6 +9,9 @@ use crate::{app::{
 }, basic::Dir, ControlSetup};
 use ggez::{event::KeyCode, Context};
 use std::collections::VecDeque;
+use ggez::graphics::Mesh;
+use crate::app::app_error::AppResult;
+use crate::app::snake::PassthroughKnowledge;
 
 pub struct Keyboard {
     controls: Controls,
@@ -19,6 +22,9 @@ pub struct Keyboard {
     // prevents infinite deferral for when frame_frac is always high
     // (high speed and laggy situations)
     deferred: bool,
+
+    // assumes the player knows everything
+    passthrough_knowledge: PassthroughKnowledge,
 }
 
 impl Keyboard {
@@ -28,12 +34,18 @@ impl Keyboard {
     // direction is deferred to the next cell, this gives smoother motion
     const LAST_ACTIONABLE_THRESHOLD: f32 = 0.85;
 
-    pub fn new(control_setup: ControlSetup, start_dir: Dir) -> Self {
+    pub fn new(
+        control_setup: ControlSetup,
+        start_dir: Dir,
+        passthrough_knowledge: PassthroughKnowledge
+    ) -> Self {
         Self {
             controls: control_setup.into(),
             control_queue: VecDeque::with_capacity(Self::CTRL_QUEUE_LIMIT),
             dir: start_dir,
             deferred: false,
+
+            passthrough_knowledge,
         }
     }
 }
@@ -87,5 +99,9 @@ impl Controller for Keyboard {
                 self.control_queue.push_back(new_dir);
             }
         }
+    }
+
+    fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> {
+        Some(&self.passthrough_knowledge)
     }
 }

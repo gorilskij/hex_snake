@@ -44,8 +44,22 @@ impl Color {
     // }
 
     #[inline(always)]
-    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
-        Self(graphics::Color::from_rgb(r, g, b))
+    pub const fn from_rgb(r: u8, g: u8, b: u8) -> Self {
+        Self(graphics::Color::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            1.0,
+        ))
+    }
+
+    pub const fn with_alpha(self, a: f32) -> Self {
+        Self(graphics::Color {
+            r: self.0.r,
+            g: self.0.g,
+            b: self.0.b,
+            a,
+        })
     }
 }
 

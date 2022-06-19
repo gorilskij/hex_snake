@@ -39,7 +39,10 @@ mod rain;
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Template {
-    Keyboard(ControlSetup),
+    Keyboard {
+        control_setup: ControlSetup,
+        passthrough_knowledge: PassthroughKnowledge,
+    },
     KeyboardClock,
     Mouse,
     Programmed(Vec<Move>),
@@ -72,6 +75,8 @@ pub trait Controller {
     fn get_mesh(&self, _gtx: &GameContext, _ctx: &mut Context) -> Option<AppResult<Mesh>> {
         None
     }
+
+    fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> { None }
 }
 
 // Group contiguous instances of Move::Wait together
@@ -164,7 +169,7 @@ impl Template {
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         match self {
-            Template::Keyboard(control_setup) => Box::new(Keyboard::new(control_setup, start_dir)),
+            Template::Keyboard { control_setup, passthrough_knowledge } => Box::new(Keyboard::new(control_setup, start_dir, passthrough_knowledge)),
             Template::KeyboardClock => Box::new(KeyboardClock {
                 dir: Dir12::Single(start_dir),
                 alternation: false,
