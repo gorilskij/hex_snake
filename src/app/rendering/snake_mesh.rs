@@ -141,7 +141,7 @@ pub fn snake_mesh(
     // Desired total number of subsegments for the whole snake
     // smaller snakes have higher resolution to show more detail
     // (this is intended to work with rainbows)
-    const TOTAL_SUBSEGMENTS: usize = 250;
+    const TOTAL_SUBSEGMENTS: usize = 1000;
 
     // Bounds on the number of subsegments per segment to avoid
     // very high numbers of polygons or empty segments

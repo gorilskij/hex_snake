@@ -186,7 +186,7 @@ impl DistanceGrid {
         ctx: &mut Context,
         gtx: &GameContext,
     ) -> AppResult<Mesh> {
-        if gtx.game_frame_num > self.last_update {
+        if self.current.is_none() || gtx.game_frame_num > self.last_update {
             self.last_update = gtx.game_frame_num;
             self.last = mem::replace(
                 &mut self.current,
