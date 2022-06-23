@@ -16,6 +16,7 @@ use crate::{
 };
 use ggez::Context;
 use rand::Rng;
+use crate::app::portal;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -35,6 +36,7 @@ pub enum Collision {
         snake_index: usize,
         snake_segment_index: usize,
     },
+    Portal(portal::Behavior),
 }
 
 pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
@@ -54,7 +56,9 @@ pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
                 collisions.push(Collision::Apple {
                     snake_index: snake1_index,
                     apple_index,
-                })
+                });
+                // snakes and apples cannot overlap
+                continue 'outer;
             }
         }
 

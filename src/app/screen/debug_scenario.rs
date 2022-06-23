@@ -30,6 +30,8 @@ use crate::{
     },
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
 };
+use crate::app::portal::Portal;
+use crate::basic::FrameStamp;
 use crate::color::Color;
 
 pub struct DebugScenario {
@@ -414,6 +416,10 @@ impl Environment for DebugScenario {
 
     fn apples(&self) -> &[Apple] {
         &self.apples
+    }
+
+    fn portals(&self) -> &[Portal] {
+        &[]
     }
 
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {

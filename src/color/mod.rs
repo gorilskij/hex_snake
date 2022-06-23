@@ -28,6 +28,7 @@ impl Color {
     pub const WHITE: Self = Self(graphics::Color::WHITE);
     pub const BLACK: Self = Self(graphics::Color::BLACK);
     pub const RED: Self = Self(graphics::Color::RED);
+    pub const GREEN: Self = Self(graphics::Color::GREEN);
 
     #[inline(always)]
     fn assert_in_range(&self) {

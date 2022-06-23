@@ -1,4 +1,4 @@
-use std::cmp::{max, min};
+use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 use ggez::Context;
@@ -9,7 +9,7 @@ use crate::app::game_context::GameContext;
 use crate::app::rendering::segments::render_hexagon;
 use crate::app::snake::Snake;
 use crate::app::snake::utils::OtherSnakes;
-use crate::basic::{CellDim, Dir, HexDim, HexPoint};
+use crate::basic::{Dir, HexDim, HexPoint};
 use crate::basic::transformations::translate;
 use crate::color::Color;
 

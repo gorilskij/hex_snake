@@ -24,7 +24,6 @@ use crate::{
 };
 use ggez::{event::KeyCode, graphics::Mesh, Context};
 use itertools::{repeat_n, Itertools};
-use std::collections::VecDeque;
 
 mod a_star;
 mod competitor1;

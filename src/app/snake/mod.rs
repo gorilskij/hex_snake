@@ -14,6 +14,7 @@ use crate::{
 use ggez::Context;
 
 pub use eat_mechanics::{EatBehavior, EatMechanics, PassthroughKnowledge};
+use crate::app::portal::{Behavior, Portal};
 
 pub mod controller;
 mod eat_mechanics;
@@ -367,6 +368,7 @@ impl Snake {
         &mut self,
         other_snakes: OtherSnakes,
         apples: &[Apple],
+        portals: &[Portal],
         gtx: &GameContext,
         ctx: &Context,
     ) {
@@ -387,6 +389,20 @@ impl Snake {
 
                 // create new head for snake
                 let dir = self.body.dir;
+
+                let head_pos = self.head().pos;
+                let new_head_pos = head_pos.wrapping_translate(dir, 1, gtx.board_dim);
+
+                for portal in portals {
+                    match portal.check(head_pos, new_head_pos) {
+                        Some(Behavior::Die) => self.die(),
+                        Some(Behavior::Teleport) => {
+
+                        }
+                        Some(Behavior::PassThrough) | None => {}
+                    }
+                }
+
                 let new_head = Segment {
                     segment_type: SegmentType::Normal,
                     // this gets very interesting if you move 2 cells each time

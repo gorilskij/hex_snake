@@ -181,6 +181,24 @@ impl HexPoint {
         new_pos
     }
 
+    /// Taking a line parallel to the given axis going through this point,
+    /// what is the length of the intersection of that line and the board?
+    /// This also works for points outside the board.
+    fn chord_length(self, board_dim: HexDim, axis: Axis) -> usize {
+        use Axis::*;
+        match axis {
+            UD => if (0..board_dim.h).contains(&self.h) {
+                board_dim.v
+            } else {
+                0
+            }
+            UrDl =>
+            UlDr =>
+        }
+
+        todo!()
+    }
+
     // basically mod width, mod height
     // if the point is n cells out of bounds, it will be n cells from the edge
     // TODO: improve efficiency

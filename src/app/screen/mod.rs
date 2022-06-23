@@ -19,6 +19,7 @@ use crate::{
 use ggez::event::EventHandler;
 use rand::{rngs::ThreadRng, Rng};
 use std::ops::{Deref, DerefMut};
+use crate::app::portal::Portal;
 
 mod board_dim;
 mod debug_scenario;
@@ -60,6 +61,7 @@ impl DerefMut for Screen {
 pub trait Environment<R: Rng = ThreadRng> {
     fn snakes(&self) -> &[Snake];
     fn apples(&self) -> &[Apple];
+    fn portals(&self) -> &[Portal];
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext);
     fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut R);
     fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult;

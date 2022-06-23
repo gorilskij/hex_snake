@@ -5,7 +5,7 @@ use ggez::{
     graphics::{self, Color, DrawParam, Mesh},
     Context,
 };
-use itertools::Itertools;
+use ggez::graphics::MeshBuilder;
 use rand::prelude::*;
 
 use crate::{
@@ -38,8 +38,9 @@ use crate::{
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
     support::row::ROw,
 };
-use crate::app::distance_grid;
 use crate::app::distance_grid::DistanceGrid;
+use crate::app::portal::Portal;
+use crate::basic::FrameStamp;
 use crate::support::flip::Flip;
 
 pub struct Game {
@@ -49,6 +50,8 @@ pub struct Game {
 
     /// Offset to center the grid in the window
     offset: Point,
+
+    portals: Vec<Portal>,
 
     seeds: Vec<snake::Builder>,
     snakes: Vec<Snake>,
@@ -62,6 +65,7 @@ pub struct Game {
     /// recalculated when the board is resized
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
+    portal_mesh: Option<Mesh>,
 
     messages: HashMap<MessageID, Message>,
 
@@ -109,6 +113,10 @@ impl Game {
             // updated immediately after creation
             offset: Point { x: 0., y: 0. },
 
+            portals: vec![
+                Portal::test(),
+            ],
+
             seeds: seeds.into_iter().map(Into::into).collect(),
             snakes: vec![],
             apples: vec![],
@@ -119,6 +127,7 @@ impl Game {
 
             grid_mesh: None,
             border_mesh: None,
+            portal_mesh: None,
 
             messages: HashMap::new(),
 
@@ -164,6 +173,7 @@ impl Game {
             // invalidate
             self.grid_mesh = None;
             self.border_mesh = None;
+            self.portal_mesh = None;
             self.cached_apple_mesh = None;
             self.cached_snake_mesh = None;
             self.cached_distance_grid_mesh = None;
@@ -379,6 +389,7 @@ impl EventHandler<AppError> for Game {
         let mut apple_mesh = None;
         let mut snake_mesh = None;
         let mut distance_grid_mesh = None;
+        let mut portal_mesh = None;
 
         let mut stats = Stats::default();
 
@@ -423,6 +434,14 @@ impl EventHandler<AppError> for Game {
                 }
                 border_mesh = Some(self.border_mesh.as_ref().unwrap());
             }
+            if self.portal_mesh.is_none() && !self.portals.is_empty() {
+                let mut builder = MeshBuilder::new();
+                for portal in &self.portals {
+                    portal.build(&self.gtx, &mut builder)?;
+                }
+                self.portal_mesh = Some(builder.build(ctx)?);
+            }
+            portal_mesh = self.portal_mesh.as_ref();
             if self.gtx.prefs.draw_distance_grid {
                 distance_grid_mesh = Some(ROw::Owned({
                     // draw colored grid of distances from player snake head
@@ -507,6 +526,14 @@ impl EventHandler<AppError> for Game {
                     }
                     border_mesh = Some(self.border_mesh.as_ref().unwrap());
                 }
+                if self.portal_mesh.is_none() && !self.portals.is_empty() {
+                    let mut builder = MeshBuilder::new();
+                    for portal in &self.portals {
+                        portal.build(&self.gtx, &mut builder)?;
+                    }
+                    self.portal_mesh = Some(builder.build(ctx)?);
+                }
+                portal_mesh = self.portal_mesh.as_ref();
                 if self.gtx.prefs.draw_distance_grid {
                     distance_grid_mesh = Some(ROw::Ref(self.cached_distance_grid_mesh.as_ref().unwrap()));
                 }
@@ -522,6 +549,7 @@ impl EventHandler<AppError> for Game {
             || apple_mesh.is_some()
             || snake_mesh.is_some()
             || distance_grid_mesh.is_some()
+            || portal_mesh.is_some()
         {
             graphics::clear(ctx, self.gtx.palette.background_color);
 
@@ -539,6 +567,9 @@ impl EventHandler<AppError> for Game {
                 graphics::draw(ctx, mesh.get(), draw_param)?;
             }
             if let Some(mesh) = border_mesh {
+                graphics::draw(ctx, mesh, draw_param)?;
+            }
+            if let Some(mesh) = portal_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
             }
             // only draw controller artifacts for player snake(s)
@@ -779,6 +810,10 @@ impl Environment for Game {
 
     fn apples(&self) -> &[Apple] {
         &self.apples
+    }
+
+    fn portals(&self) -> &[Portal] {
+        &self.portals
     }
 
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {

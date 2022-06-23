@@ -9,8 +9,6 @@ use crate::{app::{
 }, basic::Dir, ControlSetup};
 use ggez::{event::KeyCode, Context};
 use std::collections::VecDeque;
-use ggez::graphics::Mesh;
-use crate::app::app_error::AppResult;
 use crate::app::snake::PassthroughKnowledge;
 
 pub struct Keyboard {

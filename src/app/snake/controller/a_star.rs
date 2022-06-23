@@ -15,9 +15,6 @@ use std::{
     collections::HashSet,
     rc::Rc,
 };
-use ggez::graphics::Mesh;
-use ggez::winit::event::VirtualKeyCode;
-use crate::app::app_error::AppResult;
 
 pub struct AStar {
     pub passthrough_knowledge: PassthroughKnowledge,

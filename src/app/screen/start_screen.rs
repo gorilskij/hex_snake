@@ -27,6 +27,7 @@ use std::{
     cell::RefCell,
     rc::{Rc, Weak},
 };
+use crate::app::portal::Portal;
 use crate::color::Color;
 
 // position of the snake within the demo box is relative,
@@ -215,6 +216,10 @@ impl Environment<NoRng> for SnakeDemo {
 
     fn apples(&self) -> &[Apple] {
         &self.apples
+    }
+
+    fn portals(&self) -> &[Portal] {
+        &[]
     }
 
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {
