@@ -35,6 +35,7 @@ mod killer;
 mod mouse;
 pub mod programmed;
 mod rain;
+mod breadth_first;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]

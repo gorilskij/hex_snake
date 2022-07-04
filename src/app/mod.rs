@@ -37,6 +37,7 @@ mod screen;
 pub mod stats;
 mod utils;
 mod distance_grid;
+mod guidance;
 
 pub struct App {
     screen: Screen,

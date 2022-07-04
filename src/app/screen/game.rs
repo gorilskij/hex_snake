@@ -5,6 +5,7 @@ use ggez::{
     graphics::{self, Color, DrawParam, Mesh},
     Context,
 };
+use ggez::graphics::{DrawMode, MeshBuilder};
 use itertools::Itertools;
 use rand::prelude::*;
 
@@ -38,7 +39,7 @@ use crate::{
     basic::{CellDim, Dir, HexDim, HexPoint, Point},
     support::row::ROw,
 };
-use crate::app::distance_grid;
+use crate::app::{distance_grid, guidance};
 use crate::app::distance_grid::DistanceGrid;
 use crate::support::flip::Flip;
 
@@ -340,6 +341,10 @@ impl Game {
             ),
         );
     }
+
+    fn first_player_snake_idx(&self) -> Option<usize> {
+        self.snakes.iter().position(|snake| snake.snake_type == snake::Type::Player)
+    }
 }
 
 impl EventHandler<AppError> for Game {
@@ -537,6 +542,23 @@ impl EventHandler<AppError> for Game {
             }
             if let Some(mesh) = apple_mesh {
                 graphics::draw(ctx, mesh.get(), draw_param)?;
+            }
+            {
+                let mut builder = MeshBuilder::new();
+                let idx = self.first_player_snake_idx().unwrap();
+                let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, idx);
+                for pos in guidance::get_guidance_path(
+                    player_snake,
+                    other_snakes,
+                    &self.apples,
+                    ctx,
+                    &self.gtx,
+                ) {
+                    let dest = pos.to_cartesian(self.gtx.cell_dim) + self.gtx.cell_dim.center();
+                    builder.circle(DrawMode::fill(), dest, self.gtx.cell_dim.side / 2.5, 0.1, Color::WHITE)?;
+                }
+                let mesh = builder.build(ctx)?;
+                graphics::draw(ctx, &mesh, draw_param)?;
             }
             if let Some(mesh) = border_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;

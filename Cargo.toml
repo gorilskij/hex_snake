@@ -19,6 +19,8 @@ lyon_geom = "0.17"
 #derive_builder = "0.11.2"
 rayon = "1.5.2"
 static_assertions = "1.1.0"
+# local dependencies
+map_with_state = { path = "../map_with_state" }
 
 [profile.release]
 debug = true
