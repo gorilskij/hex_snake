@@ -4,17 +4,16 @@ pub use start_screen::StartScreen;
 
 pub use crate::app::prefs::Prefs;
 use crate::{
-    app::{apple::Apple, snake::Snake},
     basic::{FrameStamp, HexDim},
+    snake,
 };
 
 use crate::{
-    app::{
-        app_error::{AppError, AppResult},
-        game_context::GameContext,
-        snake,
-    },
+    app::game_context::GameContext,
+    apple::Apple,
     basic::CellDim,
+    error::{AppResult, Error},
+    snake::Snake,
 };
 use ggez::event::EventHandler;
 use rand::{rngs::ThreadRng, Rng};
@@ -33,7 +32,7 @@ pub enum Screen {
 }
 
 impl Deref for Screen {
-    type Target = dyn EventHandler<AppError>;
+    type Target = dyn EventHandler<Error>;
 
     fn deref(&self) -> &Self::Target {
         use Screen::*;
@@ -56,7 +55,7 @@ impl DerefMut for Screen {
     }
 }
 
-// TODO: refactor this awful mess
+// TODO: refactor into view
 pub trait Environment<R: Rng = ThreadRng> {
     fn snakes(&self) -> &[Snake];
     fn apples(&self) -> &[Apple];

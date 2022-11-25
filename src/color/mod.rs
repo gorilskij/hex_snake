@@ -1,5 +1,5 @@
-use std::ops::{Add, Deref, DerefMut, Div, Mul, Sub};
 use ggez::graphics;
+use std::ops::{Add, Deref, DerefMut, Div, Mul, Sub};
 
 pub mod oklab;
 pub mod to_color;
@@ -93,14 +93,12 @@ impl Mul<f64> for Color {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
-        Self(
-            graphics::Color {
-                r: (self.r as f64 * rhs) as f32,
-                g: (self.g as f64 * rhs) as f32,
-                b: (self.b as f64 * rhs) as f32,
-                a: (self.a as f64 * rhs) as f32,
-            }
-        )
+        Self(graphics::Color {
+            r: (self.r as f64 * rhs) as f32,
+            g: (self.g as f64 * rhs) as f32,
+            b: (self.b as f64 * rhs) as f32,
+            a: (self.a as f64 * rhs) as f32,
+        })
     }
 }
 
@@ -108,14 +106,12 @@ impl Mul<Color> for f64 {
     type Output = Color;
 
     fn mul(self, rhs: Color) -> Self::Output {
-        Color(
-            graphics::Color {
-                r: (self * rhs.r as f64) as f32,
-                g: (self * rhs.g as f64) as f32,
-                b: (self * rhs.b as f64) as f32,
-                a: (self * rhs.a as f64) as f32,
-            }
-        )
+        Color(graphics::Color {
+            r: (self * rhs.r as f64) as f32,
+            g: (self * rhs.g as f64) as f32,
+            b: (self * rhs.b as f64) as f32,
+            a: (self * rhs.a as f64) as f32,
+        })
     }
 }
 
@@ -123,13 +119,11 @@ impl Div<f64> for Color {
     type Output = Self;
 
     fn div(self, rhs: f64) -> Self::Output {
-        Self(
-            graphics::Color {
-                r: (self.r as f64 / rhs) as f32,
-                g: (self.g as f64 / rhs) as f32,
-                b: (self.b as f64 / rhs) as f32,
-                a: (self.a as f64 / rhs) as f32,
-            }
-        )
+        Self(graphics::Color {
+            r: (self.r as f64 / rhs) as f32,
+            g: (self.g as f64 / rhs) as f32,
+            b: (self.b as f64 / rhs) as f32,
+            a: (self.a as f64 / rhs) as f32,
+        })
     }
 }

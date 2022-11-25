@@ -6,6 +6,9 @@
 // #![deny(unsafe_code)]
 // #![feature(trace_macros)]
 #![feature(const_fn_floating_point_arithmetic)]
+#![feature(associated_type_defaults)]
+#![feature(type_alias_impl_trait)]
+// #![feature(return_position_impl_trait_in_trait)]
 
 #[macro_use]
 extern crate derive_more;
@@ -28,6 +31,14 @@ mod basic;
 mod app;
 mod color;
 mod keyboard;
+mod pathfinding;
+mod snake;
+mod view;
+#[macro_use]
+mod apple;
+mod error;
+mod rendering;
+pub mod snake_control;
 
 // TODO
 //  - untie frame_fraction from graphics

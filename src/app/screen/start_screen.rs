@@ -1,33 +1,29 @@
 use std::slice;
 
+use crate::{
+    app,
+    app::{
+        fps_control::FpsControl, game_context::GameContext, prefs::Prefs, screen::Environment,
+        stats::Stats, Screen,
+    },
+    apple::{spawn::SpawnPolicy, Apple},
+    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint},
+    color::Color,
+    error::{AppResult, Error},
+    rendering, snake,
+    snake::{EatBehavior, EatMechanics, Snake},
+    snake_control::Template,
+    spawn_schedule,
+};
 use ggez::{
     event::{EventHandler, KeyCode, KeyMods},
     Context,
 };
-use rand::{prelude::*, rngs::ThreadRng, Error};
-
-use crate::{
-    app,
-    app::{
-        app_error::{AppError, AppResult},
-        apple::{spawn::SpawnPolicy, Apple},
-        control::Control,
-        game_context::GameContext,
-        prefs::Prefs,
-        rendering,
-        screen::Environment,
-        snake,
-        snake::{controller::Template, EatBehavior, EatMechanics, Snake},
-        stats::Stats,
-        Screen,
-    },
-    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint},
-};
+use rand::{prelude::*, rngs::ThreadRng};
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
 };
-use crate::color::Color;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -40,11 +36,11 @@ struct SnakeDemo {
     palettes: Vec<snake::PaletteTemplate>,
     current_palette: usize,
 
-    control: Weak<RefCell<Control>>,
+    fps_control: Weak<RefCell<FpsControl>>,
 }
 
 impl SnakeDemo {
-    fn new(location: HexPoint, control: Weak<RefCell<Control>>) -> Self {
+    fn new(location: HexPoint, control: Weak<RefCell<FpsControl>>) -> Self {
         let board_dim = HexPoint { h: 11, v: 8 };
         let start_pos = HexPoint { h: 1, v: 4 };
         let start_dir = Dir::U;
@@ -90,7 +86,7 @@ impl SnakeDemo {
             palettes,
             current_palette: 0,
 
-            control,
+            fps_control: control,
         }
     }
 }
@@ -203,7 +199,7 @@ impl RngCore for NoRng {
         unimplemented!()
     }
 
-    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), Error> {
+    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), rand::Error> {
         unimplemented!()
     }
 }
@@ -251,7 +247,7 @@ impl Environment<NoRng> for SnakeDemo {
     }
 
     fn frame_stamp(&self) -> FrameStamp {
-        self.control
+        self.fps_control
             .upgrade()
             .expect("Weak pointer dropped")
             .borrow()
@@ -264,7 +260,7 @@ impl Environment<NoRng> for SnakeDemo {
 }
 
 pub struct StartScreen {
-    control: Rc<RefCell<Control>>,
+    fps_control: Rc<RefCell<FpsControl>>,
     cell_dim: CellDim,
 
     palettes: Vec<app::Palette>,
@@ -282,12 +278,12 @@ pub struct StartScreen {
 impl StartScreen {
     #[allow(dead_code)]
     pub fn new(cell_dim: CellDim) -> Self {
-        let control = Rc::new(RefCell::new(Control::new(7.)));
-        let weak1 = Rc::downgrade(&control);
-        let weak2 = Rc::downgrade(&control);
+        let fps_control = Rc::new(RefCell::new(FpsControl::new(7.)));
+        let weak1 = Rc::downgrade(&fps_control);
+        let weak2 = Rc::downgrade(&fps_control);
 
         Self {
-            control,
+            fps_control,
             cell_dim,
 
             palettes: vec![app::Palette::dark()],
@@ -304,7 +300,7 @@ impl StartScreen {
     }
 }
 
-impl EventHandler<AppError> for StartScreen {
+impl EventHandler<Error> for StartScreen {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
         unimplemented!("how do you use GameContext here??")
         // while self.control.borrow_mut().can_update(&mut self.gtx) {

@@ -1,20 +1,32 @@
-use std::collections::HashSet;
-use std::rc::Rc;
+use crate::{
+    app::game_context::GameContext,
+    apple::Apple,
+    basic::{Dir, HexDim, HexPoint},
+    snake::Snake,
+    view::snakes::Snakes,
+};
 use ggez::Context;
 use itertools::Itertools;
-use crate::app::game_context::GameContext;
-use crate::app::snake::Snake;
-use crate::app::snake::utils::OtherSnakes;
-use crate::basic::{Dir, HexDim, HexPoint};
 use map_with_state::IntoMapWithState;
-use crate::app::apple::Apple;
+use std::{
+    cell::RefCell,
+    cmp::min,
+    collections::{
+        hash_map::Entry::{Occupied, Vacant},
+        HashMap, HashSet,
+    },
+    rc::Rc,
+};
 
-
+// TODO: instead of cloning, use more Rcs
+#[derive(Clone)]
 struct SearchPoint {
     parent: Option<Rc<Self>>,
     pos: HexPoint,
     dir: Dir,
-    turns: usize,
+    len: usize,
+    num_turns: usize,
+    num_teleports: usize,
 }
 
 // reverse order iterator of positions
@@ -31,81 +43,148 @@ impl Iterator for Iter<'_> {
 }
 
 impl SearchPoint {
-    // blind trust with the length
-    fn get_path(&self, length: usize) -> Vec<HexPoint> {
-        let mut  vec = vec![HexPoint { h: 0, v: 0 }; length];
+    fn get_path(&self) -> Vec<HexPoint> {
+        let mut vec = vec![HexPoint { h: 0, v: 0 }; self.len];
         for (i, pos) in Iter(Some(self)).enumerate() {
-            vec[length - i - 1] = pos;
+            vec[self.len - i - 1] = pos;
         }
         vec
     }
 }
 
+impl SearchPoint {
+    const TURN_COST: usize = 5;
+    const TELEPORT_COST: usize = 15;
+
+    fn cost(&self) -> usize {
+        self.len + self.num_turns * Self::TURN_COST + self.num_teleports * Self::TELEPORT_COST
+    }
+
+    fn is_successful(&self, apples: &[Apple]) -> bool {
+        apples.iter().any(|apple| apple.pos == self.pos)
+    }
+}
+
 pub fn get_guidance_path(
     player_snake: &Snake,
-    other_snakes: OtherSnakes,
+    other_snakes: impl Snakes,
     apples: &[Apple],
     ctx: &mut Context,
     gtx: &GameContext,
 ) -> Vec<HexPoint> {
-    let mut seen: HashSet<_> = if let Some(passthrough_knowledge) = player_snake.controller.passthrough_knowledge() {
-        player_snake.body.cells
-            .iter()
-            .chain(other_snakes.iter_segments())
-            .filter(|seg| !passthrough_knowledge.can_pass_through_self(seg))
-            .map(|seg| seg.pos)
-            .collect()
-    } else {
-        player_snake.body.cells
-            .iter()
-            .chain(other_snakes.iter_segments())
-            .map(|seg| seg.pos)
-            .collect()
-    };
+    let off_limits: HashSet<_> =
+        if let Some(passthrough_knowledge) = player_snake.controller.passthrough_knowledge() {
+            player_snake
+                .body
+                .segments
+                .iter()
+                .chain(other_snakes.iter_segments())
+                .filter(|seg| !passthrough_knowledge.can_pass_through_self(seg))
+                .map(|seg| seg.pos)
+                .collect()
+        } else {
+            player_snake
+                .body
+                .segments
+                .iter()
+                .chain(other_snakes.iter_segments())
+                .map(|seg| seg.pos)
+                .collect()
+        };
+
+    let shortest_paths: RefCell<HashMap<HexPoint, SearchPoint>> = Default::default();
+
     let mut generation = vec![SearchPoint {
         parent: None,
         pos: player_snake.head().pos,
         dir: player_snake.body.dir,
-        turns: 0,
+        len: 1,
+        num_turns: 0,
+        num_teleports: 0,
     }];
-    let mut length: usize = 1;
+
+    let best: RefCell<Option<(HexPoint, usize)>> = Default::default();
 
     // bfs
     loop {
         // advance
-        generation = generation.into_iter()
+        generation = generation
+            .into_iter()
             .flat_map(|sp| {
                 let pos = sp.pos;
                 let rc = Rc::new(sp);
+                let rc_clone = rc.clone();
+
                 Dir::iter()
-                    .map(move |dir| (dir, pos.wrapping_translate(dir, 1, gtx.board_dim)))
-                    .filter(|(_, new_pos)| !seen.contains(new_pos))
-                    .map_with_state(rc, |rc, (dir, new_pos)| {
+                    .map(move |dir| {
+                        let (new_pos, teleported) =
+                            pos.explicit_wrapping_translate(dir, 1, gtx.board_dim);
+                        let turned = dir != rc.dir;
+                        (dir, new_pos, turned, teleported)
+                    })
+                    .filter(|(_, new_pos, _, _)| !off_limits.contains(new_pos))
+                    .map_with_state(rc_clone, |rc, (dir, new_pos, turned, teleported)| {
                         let new_sp = SearchPoint {
                             parent: Some(rc.clone()),
                             pos: new_pos,
                             dir,
-                            turns: if dir == rc.dir { rc.turns } else { rc.turns + 1 },
+                            len: rc.len + 1,
+                            num_turns: rc.num_turns + turned as usize,
+                            num_teleports: rc.num_teleports + teleported as usize,
                         };
                         (rc, new_sp)
                     })
-            })
-            .group_by(|sp| sp.pos)
-            .into_iter()
-            .map(|(_, group)| {
-                group.min_by_key(|sp| sp.turns).unwrap()
+                    .filter(|sp| {
+                        // keep track of the shortest path to each position
+                        // match shortest_paths.borrow().get(&sp.pos) {
+                        //     Some(other_sp) if other_sp.cost() <= sp.cost() => false,
+                        //     other => {
+                        //         drop(other);
+                        //         shortest_paths.borrow_mut().insert(sp.pos, sp.clone());
+                        //         match *best.borrow() {
+                        //             Some((_, cost)) if cost <= sp.cost() => {}
+                        //             _ => *best.borrow_mut() = Some((sp.pos, sp.cost()))
+                        //         }
+                        //         true
+                        //     }
+                        // }
+                        match shortest_paths.borrow_mut().entry(sp.pos) {
+                            Occupied(mut occupied) => {
+                                let other_sp = occupied.get();
+                                if sp.cost() < other_sp.cost() {
+                                    occupied.insert(sp.clone());
+                                    if sp.is_successful(apples) {
+                                        match &mut *best.borrow_mut() {
+                                            Some((_, cost)) if *cost <= sp.cost() => {}
+                                            other => *other = Some((sp.pos, sp.cost())),
+                                        }
+                                    }
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            Vacant(mut vacant) => {
+                                vacant.insert(sp.clone());
+                                if sp.is_successful(apples) {
+                                    match &mut *best.borrow_mut() {
+                                        Some((_, cost)) if *cost <= sp.cost() => {}
+                                        other => *other = Some((sp.pos, sp.cost())),
+                                    }
+                                }
+                                true
+                            }
+                        }
+                    })
             })
             .collect();
-        length += 1;
 
-        seen.extend(generation.iter().map(|sp| sp.pos));
-
-        // check exit condition
-        for sp in &generation {
-            for apple in apples {
-                if sp.pos == apple.pos {
-                    return sp.get_path(length);
-                }
+        // check exit condition (when the live path with the lowest cost is successful)
+        if let Some((best_pos, best_cost)) = *best.borrow() {
+            let gen_min_cost = generation.iter().map(|sp| sp.cost()).min();
+            match gen_min_cost {
+                Some(cost) if cost < best_cost - 1 => {}
+                _ => return shortest_paths.borrow()[&best_pos].get_path(),
             }
         }
 

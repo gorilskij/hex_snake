@@ -1,6 +1,7 @@
 use crate::{
     app,
-    app::{apple::spawn::SpawnPolicy, prefs::Prefs},
+    app::prefs::Prefs,
+    apple::spawn::SpawnPolicy,
     basic::{CellDim, FrameStamp, HexDim},
 };
 

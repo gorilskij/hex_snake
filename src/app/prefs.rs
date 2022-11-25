@@ -1,4 +1,4 @@
-use crate::app::{rendering, utils::Food};
+use crate::{basic::Food, rendering};
 use std::time::Duration;
 
 pub struct Prefs {
@@ -25,8 +25,8 @@ impl Default for Prefs {
     fn default() -> Self {
         Self {
             draw_grid: false,
-            draw_border: true,
-            draw_distance_grid: true,
+            draw_border: false,
+            draw_distance_grid: false,
 
             display_fps: false,
             display_stats: false,
