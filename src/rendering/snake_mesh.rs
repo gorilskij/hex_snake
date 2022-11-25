@@ -1,22 +1,21 @@
-use ggez::{
-    graphics::{Color, DrawMode, Mesh, MeshBuilder},
-    Context,
-};
+use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use ggez::Context;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 use std::cmp::Ordering;
 
-use crate::{
-    app::{game_context::GameContext, stats::Stats},
-    basic::{transformations::translate, CellDim, Point},
-    error::{AppErrorConversion, AppResult, Error},
-    rendering::segments::{
-        descriptions::{SegmentDescription, SegmentFraction, TurnDescription},
-        render_hexagon,
-    },
-    snake::{palette::SegmentStyle, Segment, SegmentType, Snake},
-    support::partial_min_max::partial_min,
+use crate::app::game_context::GameContext;
+use crate::app::stats::Stats;
+use crate::basic::transformations::translate;
+use crate::basic::{CellDim, Point};
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::rendering::segments::descriptions::{
+    SegmentDescription, SegmentFraction, TurnDescription,
 };
+use crate::rendering::segments::render_hexagon;
+use crate::snake::palette::SegmentStyle;
+use crate::snake::{Segment, SegmentType, Snake};
+use crate::support::partial_min_max::partial_min;
 
 fn build_hexagon_at(
     location: Point,

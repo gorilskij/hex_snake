@@ -1,19 +1,15 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
-use crate::{
-    app::screen::Environment,
-    apple::{self},
-    basic::{
-        board::{get_occupied_cells, random_free_spot},
-        Dir, HexPoint,
-    },
-    error::{AppErrorConversion, AppResult, Error},
-    snake,
-    snake::{EatBehavior, EatMechanics, SegmentType, State},
-    snake_control,
-    view::snakes::OtherSnakes,
+use crate::app::screen::Environment;
+use crate::basic::board::{get_occupied_cells, random_free_spot};
+use crate::basic::{Dir, HexPoint};
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::snake::{
+    EatBehavior, EatMechanics, SegmentType, State, {self},
 };
+use crate::snake_control;
+use crate::view::snakes::OtherSnakes;
 use ggez::Context;
 use rand::Rng;
 

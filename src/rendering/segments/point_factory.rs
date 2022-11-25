@@ -2,21 +2,19 @@ use ggez::graphics::{DrawMode, MeshBuilder};
 use hsl::HSL;
 use itertools::Itertools;
 
-use crate::{
-    basic::{
-        transformations::{flip_horizontally, rotate_clockwise, translate},
-        Dir, Point,
-    },
-    color::{oklab::OkLab, to_color::ToColor, Color},
-    error::{AppErrorConversion, AppResult, Error},
-    rendering,
-    rendering::segments::{
-        descriptions::{SegmentDescription, SegmentFraction, TurnDirection, TurnType},
-        hexagon_segments::HexagonSegments,
-        smooth_segments::SmoothSegments,
-    },
-    snake::palette::SegmentStyle,
+use crate::basic::transformations::{flip_horizontally, rotate_clockwise, translate};
+use crate::basic::{Dir, Point};
+use crate::color::oklab::OkLab;
+use crate::color::to_color::ToColor;
+use crate::color::Color;
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::rendering::segments::descriptions::{
+    SegmentDescription, SegmentFraction, TurnDirection, TurnType,
 };
+use crate::rendering::segments::hexagon_segments::HexagonSegments;
+use crate::rendering::segments::smooth_segments::SmoothSegments;
+use crate::rendering::{self};
+use crate::snake::palette::SegmentStyle;
 
 impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,

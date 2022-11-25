@@ -1,29 +1,27 @@
 use std::slice;
 
-use crate::{
-    app,
-    app::{
-        fps_control::FpsControl, game_context::GameContext, prefs::Prefs, screen::Environment,
-        stats::Stats, Screen,
-    },
-    apple::{spawn::SpawnPolicy, Apple},
-    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint},
-    color::Color,
-    error::{AppResult, Error},
-    rendering, snake,
-    snake::{EatBehavior, EatMechanics, Snake},
-    snake_control::Template,
-    spawn_schedule,
+use crate::app::fps_control::FpsControl;
+use crate::app::game_context::GameContext;
+use crate::app::prefs::Prefs;
+use crate::app::screen::Environment;
+use crate::app::stats::Stats;
+use crate::app::Screen;
+use crate::apple::spawn::SpawnPolicy;
+use crate::apple::Apple;
+use crate::basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint};
+use crate::color::Color;
+use crate::error::{AppResult, Error};
+use crate::snake::{
+    EatBehavior, EatMechanics, Snake, {self},
 };
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    Context,
-};
-use rand::{prelude::*, rngs::ThreadRng};
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
+use crate::snake_control::Template;
+use crate::{app, rendering, spawn_schedule};
+use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::Context;
+use rand::prelude::*;
+use rand::rngs::ThreadRng;
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -301,7 +299,7 @@ impl StartScreen {
 }
 
 impl EventHandler<Error> for StartScreen {
-    fn update(&mut self, ctx: &mut Context) -> AppResult {
+    fn update(&mut self, _ctx: &mut Context) -> AppResult {
         unimplemented!("how do you use GameContext here??")
         // while self.control.borrow_mut().can_update(&mut self.gtx) {
         //     let frame_stamp = self.control.borrow().frame_stamp();

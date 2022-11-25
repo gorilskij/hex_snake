@@ -1,21 +1,15 @@
 use crate::basic::{Dir, HexDim, HexPoint};
 
-use crate::{
-    app::game_context::GameContext,
-    apple::Apple,
-    error::AppResult,
-    snake::{Body, PassthroughKnowledge},
-    snake_control::Controller,
-    view::snakes::{OtherSnakes, Snakes},
-};
-use ggez::{graphics::Mesh, winit::event::VirtualKeyCode, Context};
+use crate::app::game_context::GameContext;
+use crate::apple::Apple;
+use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake_control::Controller;
+use crate::view::snakes::{ Snakes};
+use ggez::Context;
 use itertools::Itertools;
-use rayon::prelude::*;
-use std::{
-    cmp::{max, min},
-    collections::HashSet,
-    rc::Rc,
-};
+use std::cmp::{max, min};
+use std::collections::HashSet;
+use std::rc::Rc;
 
 pub struct AStar {
     pub passthrough_knowledge: PassthroughKnowledge,

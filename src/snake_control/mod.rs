@@ -1,15 +1,15 @@
-use crate::{
-    app::{game_context::GameContext, keyboard_control::ControlSetup},
-    apple::Apple,
-    basic::{Dir, Dir12, Side},
-    error::AppResult,
-    snake::{Body, PassthroughKnowledge},
-    view::snakes::{OtherSnakes, Snakes},
-};
-use ggez::{event::KeyCode, graphics::Mesh, Context};
+use crate::app::game_context::GameContext;
+use crate::app::keyboard_control::ControlSetup;
+use crate::apple::Apple;
+use crate::basic::{Dir, Dir12, Side};
+use crate::error::AppResult;
+use crate::snake::{Body, PassthroughKnowledge};
+use crate::view::snakes::{ Snakes};
+use ggez::event::KeyCode;
+use ggez::graphics::Mesh;
+use ggez::Context;
 use itertools::{repeat_n, Itertools};
 use programmed::Move;
-use std::collections::VecDeque;
 
 mod a_star;
 mod breadth_first;
@@ -156,11 +156,15 @@ impl Template {
 
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
-        use crate::snake_control::{
-            a_star::AStar, competitor1::Competitor1, competitor2::Competitor2, keyboard::Keyboard,
-            keyboard_clock::KeyboardClock, killer::Killer, mouse::Mouse, programmed::Programmed,
-            rain::Rain,
-        };
+        use crate::snake_control::a_star::AStar;
+        use crate::snake_control::competitor1::Competitor1;
+        use crate::snake_control::competitor2::Competitor2;
+        use crate::snake_control::keyboard::Keyboard;
+        use crate::snake_control::keyboard_clock::KeyboardClock;
+        use crate::snake_control::killer::Killer;
+        use crate::snake_control::mouse::Mouse;
+        use crate::snake_control::programmed::Programmed;
+        use crate::snake_control::rain::Rain;
 
         match self {
             Template::Keyboard {

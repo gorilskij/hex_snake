@@ -1,9 +1,7 @@
 use super::dir::{Axis, Dir};
 use crate::basic::{CellDim, Point};
-use std::{
-    cmp::{max, Ordering},
-    fmt::{Debug, Error, Formatter},
-};
+use std::cmp::{max, Ordering};
+use std::fmt::{Debug, Error, Formatter};
 use Dir::*;
 
 // INVARIANT: even columns are half a cell higher than odd columns

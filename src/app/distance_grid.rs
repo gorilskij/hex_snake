@@ -1,22 +1,17 @@
-use crate::{
-    app::game_context::GameContext,
-    basic::{transformations::translate, CellDim, Dir, HexDim, HexPoint},
-    color::Color,
-    error::AppResult,
-    rendering::segments::render_hexagon,
-    snake::Snake,
-    view::snakes::Snakes,
-};
-use ggez::{
-    graphics::{DrawMode, Mesh, MeshBuilder},
-    Context,
-};
+use crate::app::game_context::GameContext;
+use crate::basic::transformations::translate;
+use crate::basic::{ Dir, HexDim, HexPoint};
+use crate::color::Color;
+use crate::error::AppResult;
+use crate::rendering::segments::render_hexagon;
+use crate::snake::Snake;
+use crate::view::snakes::Snakes;
+use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
+use ggez::Context;
 use itertools::Itertools;
-use std::{
-    cmp::{max, min},
-    collections::{HashMap, HashSet},
-    mem,
-};
+use std::cmp::{max};
+use std::collections::{HashMap, HashSet};
+use std::mem;
 
 type Distance = f32;
 type GridData = HashMap<HexPoint, Distance>;

@@ -1,35 +1,29 @@
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    graphics::{self, DrawParam},
-    Context,
+use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::graphics::{
+    DrawParam, {self},
 };
+use ggez::Context;
 use rand::prelude::*;
 
-use crate::{
-    app,
-    app::{
-        fps_control::{self, FpsControl},
-        game_context::GameContext,
-        prefs::Prefs,
-        screen::{
-            board_dim::{calculate_board_dim, calculate_offset},
-            Environment,
-        },
-        snake_management::{advance_snakes, find_collisions, handle_collisions},
-        stats::Stats,
-    },
-    apple::{
-        spawn::{spawn_apples, SpawnPolicy},
-        Apple,
-    },
-    basic::{CellDim, Dir, HexDim, HexPoint, Point},
-    color::Color,
-    error::{AppErrorConversion, AppResult, Error},
-    rendering, snake,
-    snake::{EatBehavior, EatMechanics, PassthroughKnowledge, Snake},
-    snake_control,
-    view::snakes::OtherSnakes,
+use crate::app::fps_control::{
+    FpsControl, {self},
 };
+use crate::app::game_context::GameContext;
+use crate::app::prefs::Prefs;
+use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
+use crate::app::screen::Environment;
+use crate::app::snake_management::{advance_snakes, find_collisions, handle_collisions};
+use crate::app::stats::Stats;
+use crate::apple::spawn::{spawn_apples, SpawnPolicy};
+use crate::apple::Apple;
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
+use crate::color::Color;
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::snake::{
+    EatBehavior, EatMechanics, PassthroughKnowledge, Snake, {self},
+};
+use crate::view::snakes::OtherSnakes;
+use crate::{app, rendering, snake_control};
 
 pub struct DebugScenario {
     fps_control: FpsControl,

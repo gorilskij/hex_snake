@@ -1,15 +1,11 @@
 use crate::basic::{CellDim, Point};
-use ggez::{
-    graphics::{DrawMode, Mesh, MeshBuilder},
-    Context,
-};
+use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
+use ggez::Context;
 use num_integer::Integer;
 
-use crate::{
-    app::game_context::GameContext,
-    basic::HexDim,
-    error::{AppErrorConversion, AppResult, Error},
-};
+use crate::app::game_context::GameContext;
+use crate::basic::HexDim;
+use crate::error::{AppErrorConversion, AppResult, Error};
 
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh

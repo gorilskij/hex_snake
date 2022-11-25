@@ -2,21 +2,19 @@ use std::collections::{HashSet, VecDeque};
 
 pub use palette::{Palette, PaletteTemplate};
 
-use crate::{
-    self,
-    app::game_context::GameContext,
-    basic::{Dir, FrameStamp, HexDim, HexPoint},
-    snake, snake_control,
-};
+use crate::app::game_context::GameContext;
+use crate::basic::{Dir, FrameStamp, HexDim, HexPoint};
+use crate::{ snake_control};
 use ggez::Context;
 
-use crate::{apple::Apple, basic::Frames, snake_control::Controller, view::snakes::Snakes};
+use crate::apple::Apple;
+use crate::basic::Frames;
+use crate::snake_control::Controller;
+use crate::view::snakes::Snakes;
 pub use eat_mechanics::{EatBehavior, EatMechanics, PassthroughKnowledge};
 
 mod eat_mechanics;
 pub mod palette;
-pub mod utils;
-// mod seed;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum State {

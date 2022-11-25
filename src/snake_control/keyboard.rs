@@ -1,14 +1,13 @@
-use crate::{
-    app::{game_context::GameContext, keyboard_control::Controls},
-    apple::Apple,
-    basic::Dir,
-    error::AppResult,
-    snake::{Body, PassthroughKnowledge},
-    snake_control::Controller,
-    view::snakes::{OtherSnakes, Snakes},
-    ControlSetup,
-};
-use ggez::{event::KeyCode, graphics::Mesh, Context};
+use crate::app::game_context::GameContext;
+use crate::app::keyboard_control::Controls;
+use crate::apple::Apple;
+use crate::basic::Dir;
+use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake_control::Controller;
+use crate::view::snakes::Snakes;
+use crate::ControlSetup;
+use ggez::event::KeyCode;
+use ggez::Context;
 use std::collections::VecDeque;
 
 pub struct Keyboard {

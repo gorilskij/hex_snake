@@ -1,2 +1,2 @@
-imports_granularity="Crate"
+imports_granularity="Module"
 struct_lit_width = 35

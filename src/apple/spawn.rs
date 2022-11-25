@@ -1,14 +1,14 @@
-use crate::{
-    app::{game_context::GameContext, screen::Prefs},
-    apple::{self, Apple},
-    basic::{
-        board::{get_occupied_cells, random_free_spot},
-        HexPoint,
-    },
-    snake,
-    snake::{EatBehavior, EatMechanics, PassthroughKnowledge, Snake},
-    snake_control,
+use crate::app::game_context::GameContext;
+use crate::app::screen::Prefs;
+use crate::apple::{
+    Apple, {self},
 };
+use crate::basic::board::{get_occupied_cells, random_free_spot};
+use crate::basic::HexPoint;
+use crate::snake::{
+    EatBehavior, EatMechanics, PassthroughKnowledge, Snake, {self},
+};
+use crate::snake_control;
 use rand::Rng;
 
 #[allow(unused_macros)]

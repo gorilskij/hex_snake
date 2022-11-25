@@ -1,22 +1,14 @@
-use crate::{
-    app::game_context::GameContext,
-    apple::Apple,
-    basic::{Dir, HexDim, HexPoint},
-    snake::Snake,
-    view::snakes::Snakes,
-};
+use crate::app::game_context::GameContext;
+use crate::apple::Apple;
+use crate::basic::{Dir, HexPoint};
+use crate::snake::Snake;
+use crate::view::snakes::Snakes;
 use ggez::Context;
-use itertools::Itertools;
 use map_with_state::IntoMapWithState;
-use std::{
-    cell::RefCell,
-    cmp::min,
-    collections::{
-        hash_map::Entry::{Occupied, Vacant},
-        HashMap, HashSet,
-    },
-    rc::Rc,
-};
+use std::cell::RefCell;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 // TODO: instead of cloning, use more Rcs
 #[derive(Clone)]
@@ -69,7 +61,7 @@ pub fn get_guidance_path(
     player_snake: &Snake,
     other_snakes: impl Snakes,
     apples: &[Apple],
-    ctx: &mut Context,
+    _ctx: &mut Context,
     gtx: &GameContext,
 ) -> Vec<HexPoint> {
     let off_limits: HashSet<_> =
@@ -164,7 +156,7 @@ pub fn get_guidance_path(
                                     false
                                 }
                             }
-                            Vacant(mut vacant) => {
+                            Vacant(vacant) => {
                                 vacant.insert(sp.clone());
                                 if sp.is_successful(apples) {
                                     match &mut *best.borrow_mut() {

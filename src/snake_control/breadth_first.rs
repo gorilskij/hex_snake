@@ -1,16 +1,7 @@
 use crate::basic::{Dir, HexDim, HexPoint};
 
-use crate::{
-    app::game_context::GameContext, apple::Apple, error::AppResult, snake::PassthroughKnowledge,
-};
-use ggez::{graphics::Mesh, winit::event::VirtualKeyCode, Context};
-use itertools::Itertools;
-use rayon::prelude::*;
-use std::{
-    cmp::{max, min},
-    collections::HashSet,
-    rc::Rc,
-};
+use crate::snake::PassthroughKnowledge;
+use std::rc::Rc;
 
 pub struct BreadthFirst {
     pub passthrough_knowledge: PassthroughKnowledge,

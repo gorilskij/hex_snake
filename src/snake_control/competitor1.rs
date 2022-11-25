@@ -1,11 +1,9 @@
-use crate::{
-    app::game_context::GameContext,
-    apple::Apple,
-    basic::{Dir, HexDim, HexPoint},
-    snake::Body,
-    snake_control::Controller,
-    view::snakes::{OtherSnakes, Snakes},
-};
+use crate::app::game_context::GameContext;
+use crate::apple::Apple;
+use crate::basic::{Dir, HexDim, HexPoint};
+use crate::snake::Body;
+use crate::snake_control::Controller;
+use crate::view::snakes::{ Snakes};
 use ggez::Context;
 use std::iter::once;
 

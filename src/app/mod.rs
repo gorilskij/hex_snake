@@ -1,20 +1,18 @@
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    graphics,
-    graphics::Rect,
-    Context,
+use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::graphics::{
+    Rect, self,
 };
+use ggez::Context;
 use itertools::Itertools;
 
-use crate::{
-    app::screen::{DebugScenario, StartScreen},
-    apple::spawn::SpawnPolicy,
-    basic::CellDim,
-    error::{AppErrorConversion, AppResult, Error},
-    snake,
-    snake::{EatBehavior, EatMechanics, PassthroughKnowledge, SegmentRawType},
-    snake_control,
+use crate::app::screen::{DebugScenario, StartScreen};
+use crate::apple::spawn::SpawnPolicy;
+use crate::basic::CellDim;
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::snake::{
+    EatBehavior, EatMechanics, PassthroughKnowledge, SegmentRawType, {self},
 };
+use crate::snake_control;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};

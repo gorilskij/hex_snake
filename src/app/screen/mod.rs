@@ -3,20 +3,17 @@ pub use game::Game;
 pub use start_screen::StartScreen;
 
 pub use crate::app::prefs::Prefs;
-use crate::{
-    basic::{FrameStamp, HexDim},
-    snake,
-};
+use crate::basic::{FrameStamp, HexDim};
+use crate::snake;
 
-use crate::{
-    app::game_context::GameContext,
-    apple::Apple,
-    basic::CellDim,
-    error::{AppResult, Error},
-    snake::Snake,
-};
+use crate::app::game_context::GameContext;
+use crate::apple::Apple;
+use crate::basic::CellDim;
+use crate::error::{AppResult, Error};
+use crate::snake::Snake;
 use ggez::event::EventHandler;
-use rand::{rngs::ThreadRng, Rng};
+use rand::rngs::ThreadRng;
+use rand::Rng;
 use std::ops::{Deref, DerefMut};
 
 mod board_dim;

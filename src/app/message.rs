@@ -1,11 +1,9 @@
-use crate::{
-    basic::Point,
-    error::{AppErrorConversion, AppResult, Error},
+use crate::basic::Point;
+use crate::error::{AppErrorConversion, AppResult, Error};
+use ggez::graphics::{
+    Color, DrawParam, Font, PxScale, Text, {self},
 };
-use ggez::{
-    graphics::{self, Color, DrawParam, Font, PxScale, Text},
-    Context,
-};
+use ggez::Context;
 use std::time::{Duration, Instant};
 
 /// Finite number of possible messages

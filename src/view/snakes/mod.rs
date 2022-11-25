@@ -1,6 +1,5 @@
-use crate::snake::{Body, Segment, Snake};
+use crate::snake::{ Segment, Snake};
 use rayon::prelude::ParallelIterator;
-use std::{collections::vec_deque, iter, slice};
 
 pub use other_snakes::OtherSnakes;
 

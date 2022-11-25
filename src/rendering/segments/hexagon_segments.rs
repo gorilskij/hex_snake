@@ -1,9 +1,8 @@
-use crate::{
-    basic::{transformations::translate, Point},
-    rendering::segments::{
-        descriptions::SegmentDescription, point_factory::SegmentRenderer, render_hexagon,
-    },
-};
+use crate::basic::transformations::translate;
+use crate::basic::Point;
+use crate::rendering::segments::descriptions::SegmentDescription;
+use crate::rendering::segments::point_factory::SegmentRenderer;
+use crate::rendering::segments::render_hexagon;
 
 pub struct HexagonSegments;
 

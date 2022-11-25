@@ -1,12 +1,9 @@
-use std::{f32::consts::TAU, iter};
+use std::f32::consts::TAU;
+use std::iter;
 
-use crate::{
-    basic::{CellDim, Point},
-    rendering::segments::{
-        descriptions::{SegmentDescription, SegmentFraction, TurnType},
-        point_factory::SegmentRenderer,
-    },
-};
+use crate::basic::{CellDim, Point};
+use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnType};
+use crate::rendering::segments::point_factory::SegmentRenderer;
 use itertools::Itertools;
 use lyon_geom::{Angle, Arc};
 

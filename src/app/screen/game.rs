@@ -1,43 +1,42 @@
 use std::collections::HashMap;
 
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBuilder},
-    Context,
+use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::graphics::{
+    Color, DrawMode, DrawParam, Mesh, MeshBuilder, {self},
 };
-use itertools::Itertools;
+use ggez::Context;
 use rand::prelude::*;
 
-use crate::{
-    app::{
-        distance_grid,
-        distance_grid::DistanceGrid,
-        fps_control::{self, FpsControl},
-        game_context::GameContext,
-        guidance,
-        message::{Message, MessageID},
-        palette::Palette,
-        screen::{
-            board_dim::{calculate_board_dim, calculate_offset},
-            Environment,
-        },
-        snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes},
-        stats::Stats,
-    },
-    apple::{
-        self,
-        spawn::{spawn_apples, SpawnPolicy},
-        Apple,
-    },
-    basic::{CellDim, Dir, Food, HexDim, HexPoint, Point},
-    error::{AppErrorConversion, AppResult, Error},
-    rendering, snake,
-    snake::{PassthroughKnowledge, Snake},
-    snake_control,
-    snake_control::{Controller, Template},
-    support::{flip::Flip, row::ROw},
-    view::snakes::OtherSnakes,
+use crate::app::distance_grid::DistanceGrid;
+use crate::app::fps_control::{
+    FpsControl, {self},
 };
+use crate::app::game_context::GameContext;
+use crate::app::message::{Message, MessageID};
+use crate::app::palette::Palette;
+use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
+use crate::app::screen::Environment;
+use crate::app::snake_management::{
+    advance_snakes, find_collisions, handle_collisions, spawn_snakes,
+};
+use crate::app::stats::Stats;
+use crate::app::{ guidance};
+use crate::apple::spawn::{spawn_apples, SpawnPolicy};
+use crate::apple::{
+    Apple, {self},
+};
+use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::rendering;
+use crate::snake::{
+    PassthroughKnowledge, Snake, {self},
+};
+use crate::snake_control::{
+    Controller, {self},
+};
+use crate::support::flip::Flip;
+use crate::support::row::ROw;
+use crate::view::snakes::OtherSnakes;
 
 pub struct Game {
     fps_control: FpsControl,

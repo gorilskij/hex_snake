@@ -1,4 +1,5 @@
-use crate::{basic::Food, rendering};
+use crate::basic::Food;
+use crate::rendering;
 use std::time::Duration;
 
 pub struct Prefs {

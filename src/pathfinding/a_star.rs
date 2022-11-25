@@ -10,5 +10,5 @@ pub fn a_star(
     sharp_turn_cost: f64,
     teleport_cost: f64,
 ) -> (Vec<HexPoint>, f64) {
-    panic!()
+    unimplemented!()
 }

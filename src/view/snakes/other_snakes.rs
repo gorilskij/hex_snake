@@ -1,9 +1,6 @@
-use crate::{
-    snake::{Body, Segment, Snake},
-    view::snakes::{ObjectSafeParallelIterator, Snakes},
-};
+use crate::snake::{ Snake};
+use crate::view::snakes::{ObjectSafeParallelIterator, Snakes};
 use rayon::prelude::*;
-use std::{iter, slice};
 
 #[derive(Copy, Clone)]
 pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);

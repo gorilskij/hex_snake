@@ -1,12 +1,12 @@
 use ggez::graphics;
 use hsl::HSL;
 
-use crate::{
-    basic::HexPoint,
-    color::{oklab::OkLab, to_color::ToColor, Color},
-    snake::{Body, SegmentType},
-    support::limits::Limits,
-};
+use crate::basic::HexPoint;
+use crate::color::oklab::OkLab;
+use crate::color::to_color::ToColor;
+use crate::color::Color;
+use crate::snake::{Body, SegmentType};
+use crate::support::limits::Limits;
 
 macro_rules! gray {
     ($lightness:expr) => {

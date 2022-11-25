@@ -1,5 +1,3 @@
-use crate::basic::HexDim;
-
 mod a_star;
 
 trait PathFinder {

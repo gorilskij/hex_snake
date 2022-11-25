@@ -1,17 +1,16 @@
-use ggez::{
-    graphics::{Color, DrawMode, Mesh, MeshBuilder},
-    Context,
-};
+use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use ggez::Context;
 use hsl::HSL;
 
-use crate::{
-    app::{game_context::GameContext, stats::Stats},
-    apple::{self, Apple},
-    basic::transformations::translate,
-    error::{AppErrorConversion, AppResult},
-    rendering,
-    rendering::segments::render_hexagon,
+use crate::app::game_context::GameContext;
+use crate::app::stats::Stats;
+use crate::apple::{
+    Apple,
 };
+use crate::basic::transformations::translate;
+use crate::error::{AppErrorConversion, AppResult};
+use crate::rendering::segments::render_hexagon;
+use crate::rendering::{self};
 
 pub fn apple_mesh(
     apples: &[Apple],

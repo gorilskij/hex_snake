@@ -1,6 +1,5 @@
+use crate::basic::{Food, HexPoint};
 use crate::{
-    self,
-    basic::{Food, HexPoint},
     snake,
 };
 

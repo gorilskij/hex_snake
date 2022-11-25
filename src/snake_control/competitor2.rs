@@ -1,12 +1,10 @@
-use crate::{
-    app::game_context::GameContext,
-    apple::Apple,
-    basic::{angle_distance, CellDim, Dir, Dir12, HexPoint},
-    snake::Body,
-    snake_control::Controller,
-    support::partial_min_max::PartialMinMax,
-    view::snakes::{OtherSnakes, Snakes},
-};
+use crate::app::game_context::GameContext;
+use crate::apple::Apple;
+use crate::basic::{angle_distance, CellDim, Dir, Dir12, HexPoint};
+use crate::snake::Body;
+use crate::snake_control::Controller;
+use crate::support::partial_min_max::PartialMinMax;
+use crate::view::snakes::{ Snakes};
 use ggez::Context;
 use itertools::Itertools;
 use std::f32::consts::PI;

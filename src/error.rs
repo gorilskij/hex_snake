@@ -1,9 +1,7 @@
 use crate::snake;
 use ggez::GameError;
-use std::{
-    fmt,
-    fmt::{Debug, Display, Formatter},
-};
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Debug)]
 pub enum ErrorType {

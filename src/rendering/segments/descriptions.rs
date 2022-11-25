@@ -1,10 +1,10 @@
 // This file contains structs describing various aspects of a segment
 
+use crate::basic::{CellDim, Dir, Point};
+use crate::snake::palette::SegmentStyle;
+use crate::snake::{SegmentType, ZIndex};
 use crate::{
-    self,
-    basic::{CellDim, Dir, Point},
     rendering,
-    snake::{palette::SegmentStyle, SegmentType, ZIndex},
 };
 
 // A full (solid) segment starts at 0. and ends at 1.

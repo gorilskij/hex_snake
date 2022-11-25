@@ -1,8 +1,6 @@
-use crate::{
-    apple::Apple,
-    basic::{HexDim, HexPoint},
-    snake::Snake,
-};
+use crate::apple::Apple;
+use crate::basic::{HexDim, HexPoint};
+use crate::snake::Snake;
 use rand::Rng;
 
 pub fn get_occupied_cells(snakes: &[Snake], apples: &[Apple]) -> Vec<HexPoint> {

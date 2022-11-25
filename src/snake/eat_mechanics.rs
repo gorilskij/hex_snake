@@ -1,8 +1,5 @@
-use crate::{
-    self, snake,
-    snake::{Segment, SegmentRawType},
-    support::map_with_default::HashMapWithDefault,
-};
+use crate::snake::{self, Segment, SegmentRawType};
+use crate::support::map_with_default::HashMapWithDefault;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum EatBehavior {

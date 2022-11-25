@@ -15,13 +15,13 @@ extern crate derive_more;
 #[macro_use]
 extern crate lazy_static;
 
-use ggez::{event::run, ContextBuilder};
+use ggez::event::run;
+use ggez::ContextBuilder;
 
-use crate::{
-    app::{keyboard_control::ControlSetup, App},
-    basic::Side,
-    keyboard::Layout,
-};
+use crate::app::keyboard_control::ControlSetup;
+use crate::app::App;
+use crate::basic::Side;
+use crate::keyboard::Layout;
 use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 
 #[macro_use]

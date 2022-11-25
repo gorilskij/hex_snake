@@ -4,7 +4,8 @@ use itertools::Itertools;
 
 use crate::basic::angle_distance;
 use rand::Rng;
-use std::{cmp::Ordering, f32::consts::TAU};
+use std::cmp::Ordering;
+use std::f32::consts::TAU;
 use Dir::*;
 
 // defined in clockwise order starting at U
