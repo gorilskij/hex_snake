@@ -1,9 +1,7 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{angle_distance, CellDim, Dir, HexDim, HexPoint};
-use crate::snake::{
-    Body, Segment, {self},
-};
+use crate::snake::{Body, Segment, {self}, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::support::partial_min_max::PartialMinMax;
 use crate::view::snakes::{ Snakes};
@@ -81,6 +79,7 @@ impl Controller for Killer {
     fn next_dir(
         &mut self,
         body: &mut Body,
+        _: Option<&PassthroughKnowledge>,
         other_snakes: &dyn Snakes,
         _apples: &[Apple],
         gtx: &GameContext,

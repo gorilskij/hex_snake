@@ -1,9 +1,7 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::Dir;
-use crate::snake::{
-    Body, {self},
-};
+use crate::snake::{Body, {self}, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::view::snakes::{ Snakes};
 use ggez::Context;
@@ -14,6 +12,7 @@ impl Controller for Rain {
     fn next_dir(
         &mut self,
         body: &mut Body,
+        _: Option<&PassthroughKnowledge>,
         other_snakes: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,

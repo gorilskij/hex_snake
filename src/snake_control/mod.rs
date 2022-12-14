@@ -10,6 +10,7 @@ use ggez::graphics::Mesh;
 use ggez::Context;
 use itertools::{repeat_n, Itertools};
 use programmed::Move;
+use crate::app::guidance::{Path, PathFinder, PathFinderTemplate};
 
 mod a_star;
 mod breadth_first;
@@ -21,6 +22,7 @@ mod killer;
 mod mouse;
 mod programmed;
 mod rain;
+mod algorithm;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -35,9 +37,10 @@ pub enum Template {
     Competitor1,
     Competitor2,
     Killer,
-    AStar {
-        passthrough_knowledge: PassthroughKnowledge,
-    },
+    // AStar {
+    //     passthrough_knowledge: PassthroughKnowledge,
+    // },
+    Algorithm(PathFinderTemplate),
     Rain,
 }
 
@@ -48,20 +51,32 @@ pub trait Controller {
     fn next_dir(
         &mut self,
         body: &mut Body,
+        passthrough_knowledge: Option<&PassthroughKnowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
         ctx: &Context,
     ) -> Option<Dir>;
 
+    // only implemented for autopilot-like controllers
+    fn get_path(
+        &mut self,
+        body: &Body,
+        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        other_snakes: &dyn Snakes,
+        apples: &[Apple],
+        gtx: &GameContext,
+    ) -> Option<&Path> { None }
+
     fn reset(&mut self, _dir: Dir) {}
 
     fn key_pressed(&mut self, _key: KeyCode) {}
 
-    fn get_mesh(&self, _gtx: &GameContext, _ctx: &mut Context) -> Option<AppResult<Mesh>> {
-        None
-    }
+    // fn get_mesh(&self, _gtx: &GameContext, _ctx: &mut Context) -> Option<AppResult<Mesh>> {
+    //     None
+    // }
 
+    // TODO: deprecate
     fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> {
         None
     }
@@ -156,7 +171,8 @@ impl Template {
 
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
-        use crate::snake_control::a_star::AStar;
+        // use crate::snake_control::a_star::AStar;
+        use crate::snake_control::algorithm::Algorithm;
         use crate::snake_control::competitor1::Competitor1;
         use crate::snake_control::competitor2::Competitor2;
         use crate::snake_control::keyboard::Keyboard;
@@ -194,11 +210,15 @@ impl Template {
                 frames_since_update: 0,
             }),
             Template::Killer => Box::new(Killer),
-            Template::AStar { passthrough_knowledge } => Box::new(AStar {
-                passthrough_knowledge,
-                target: None,
-                path: vec![],
-                steps_since_update: 0,
+            // Template::AStar { passthrough_knowledge } => Box::new(AStar {
+            //     passthrough_knowledge,
+            //     target: None,
+            //     path: vec![],
+            //     steps_since_update: 0,
+            // }),
+            Template::Algorithm(template) => Box::new(Algorithm {
+                pathfinder: template.into_pathfinder(start_dir),
+                path: None,
             }),
             Template::Rain => Box::new(Rain),
         }

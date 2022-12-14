@@ -51,6 +51,7 @@ impl Controller for Keyboard {
     fn next_dir(
         &mut self,
         _: &mut Body,
+        _: Option<&PassthroughKnowledge>,
         _: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,

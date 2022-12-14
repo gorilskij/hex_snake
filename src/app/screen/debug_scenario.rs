@@ -155,58 +155,58 @@ impl DebugScenario {
     }
 
     /// Stress test
-    pub fn many_snakes() -> Self {
-        const NUM_SNAKES: usize = 100;
-
-        let rng = &mut thread_rng();
-        let seeds: Vec<_> = (0..NUM_SNAKES)
-            .map(|i| {
-                snake::Builder::default()
-                    .pos(HexPoint {
-                        h: i as isize / 7 * 2 + 3,
-                        v: i as isize % 10 * 2 + 3,
-                    })
-                    .dir(Dir::random(rng))
-                    .len(5)
-                    .snake_type(snake::Type::Competitor { life: None })
-                    .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
-                    .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                    .controller(snake_control::Template::AStar {
-                        passthrough_knowledge: PassthroughKnowledge::always(false),
-                    })
-            })
-            .collect();
-
-        let mut this = Self {
-            fps_control: FpsControl::new(3.),
-
-            gtx: GameContext {
-                board_dim: HexDim { h: 0, v: 0 },
-                cell_dim: Default::default(),
-                palette: app::Palette::dark(),
-                prefs: Prefs::default().special_apples(false),
-                apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
-                frame_stamp: (0, 0.0),
-                game_frame_num: 0,
-                elapsed_millis: 0,
-            },
-
-            offset: None,
-            fit_to_window: true,
-
-            stats: Stats::default(),
-
-            apples: vec![],
-
-            seeds,
-            snakes: vec![],
-
-            rng: thread_rng(),
-        };
-        this.restart();
-        this.fps_control.pause();
-        this
-    }
+    // pub fn many_snakes() -> Self {
+    //     const NUM_SNAKES: usize = 100;
+    //
+    //     let rng = &mut thread_rng();
+    //     let seeds: Vec<_> = (0..NUM_SNAKES)
+    //         .map(|i| {
+    //             snake::Builder::default()
+    //                 .pos(HexPoint {
+    //                     h: i as isize / 7 * 2 + 3,
+    //                     v: i as isize % 10 * 2 + 3,
+    //                 })
+    //                 .dir(Dir::random(rng))
+    //                 .len(5)
+    //                 .snake_type(snake::Type::Competitor { life: None })
+    //                 .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
+    //                 .palette(snake::PaletteTemplate::pastel_rainbow(true))
+    //                 .controller(snake_control::Template::AStar {
+    //                     passthrough_knowledge: PassthroughKnowledge::always(false),
+    //                 })
+    //         })
+    //         .collect();
+    //
+    //     let mut this = Self {
+    //         fps_control: FpsControl::new(3.),
+    //
+    //         gtx: GameContext {
+    //             board_dim: HexDim { h: 0, v: 0 },
+    //             cell_dim: Default::default(),
+    //             palette: app::Palette::dark(),
+    //             prefs: Prefs::default().special_apples(false),
+    //             apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
+    //             frame_stamp: (0, 0.0),
+    //             game_frame_num: 0,
+    //             elapsed_millis: 0,
+    //         },
+    //
+    //         offset: None,
+    //         fit_to_window: true,
+    //
+    //         stats: Stats::default(),
+    //
+    //         apples: vec![],
+    //
+    //         seeds,
+    //         snakes: vec![],
+    //
+    //         rng: thread_rng(),
+    //     };
+    //     this.restart();
+    //     this.fps_control.pause();
+    //     this
+    // }
 
     /// Comparison of persistent and non-persistent skins entering a black hole
     pub fn double_head_body_collision(cell_dim: CellDim) -> Self {

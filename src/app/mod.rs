@@ -16,11 +16,12 @@ use crate::snake_control;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
+use crate::app::guidance::PathFinderTemplate;
 
 mod distance_grid;
 mod fps_control;
 pub mod game_context;
-mod guidance;
+pub mod guidance;
 pub mod keyboard_control;
 mod message;
 mod palette;
@@ -78,6 +79,7 @@ impl App {
                         passthrough_knowledge,
                     })
                     .speed(1.)
+                    .autopilot(PathFinderTemplate::Algorithm1)
                 // .snake_control(snake_control::Template::Mouse)
                 // .snake_control(SnakeControllerTemplate::PlayerController12)
             })
@@ -89,7 +91,7 @@ impl App {
         Self {
             screen: match 0 {
                 5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
-                4 => Screen::DebugScenario(DebugScenario::many_snakes()),
+                // 4 => Screen::DebugScenario(DebugScenario::many_snakes()),
                 3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
                 2 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
                 1 => Screen::StartScreen(StartScreen::new(cell_dim)),

@@ -4,7 +4,7 @@ use crate::basic::transformations::translate;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::error::{AppErrorConversion, AppResult, Error};
 use crate::rendering::segments::render_hexagon;
-use crate::snake::Body;
+use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::view::snakes::{ Snakes};
 use ggez::graphics::{Color, DrawMode, Mesh, StrokeOptions};
@@ -18,6 +18,7 @@ impl Controller for Mouse {
     fn next_dir(
         &mut self,
         body: &mut Body,
+        _: Option<&PassthroughKnowledge>,
         _: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,
@@ -38,20 +39,22 @@ impl Controller for Mouse {
             .find(|dir| *dir != -body.dir)
     }
 
-    fn get_mesh(&self, gtx: &GameContext, ctx: &mut Context) -> Option<AppResult<Mesh>> {
-        let mouse_position: Point = mouse::position(ctx).into();
-        // let position = mouse_position - self.cell_dim.center();
-        let position =
-            HexPoint::from_cartesian(mouse_position, gtx.cell_dim).to_cartesian(gtx.cell_dim);
-        let mut hexagon = render_hexagon(gtx.cell_dim);
-        translate(&mut hexagon, position);
-        let draw_mode = DrawMode::Stroke(
-            StrokeOptions::default().with_line_width(gtx.palette.border_thickness),
-        );
-        Some(
-            Mesh::new_polygon(ctx, draw_mode, &hexagon, Color::CYAN)
-                .map_err(Error::from)
-                .with_trace_step("snake_control::Mouse::get_mesh"),
-        )
-    }
+    // TODO: implement get_path
+
+    // fn get_mesh(&self, gtx: &GameContext, ctx: &mut Context) -> Option<AppResult<Mesh>> {
+    //     let mouse_position: Point = mouse::position(ctx).into();
+    //     // let position = mouse_position - self.cell_dim.center();
+    //     let position =
+    //         HexPoint::from_cartesian(mouse_position, gtx.cell_dim).to_cartesian(gtx.cell_dim);
+    //     let mut hexagon = render_hexagon(gtx.cell_dim);
+    //     translate(&mut hexagon, position);
+    //     let draw_mode = DrawMode::Stroke(
+    //         StrokeOptions::default().with_line_width(gtx.palette.border_thickness),
+    //     );
+    //     Some(
+    //         Mesh::new_polygon(ctx, draw_mode, &hexagon, Color::CYAN)
+    //             .map_err(Error::from)
+    //             .with_trace_step("snake_control::Mouse::get_mesh"),
+    //     )
+    // }
 }

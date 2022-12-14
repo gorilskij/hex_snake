@@ -19,7 +19,7 @@ pub struct Prefs {
 
     pub draw_style: rendering::Style,
 
-    pub draw_ai_debug_artifacts: bool,
+    // pub draw_ai_debug_artifacts: bool,
 }
 
 impl Default for Prefs {
@@ -41,7 +41,7 @@ impl Default for Prefs {
 
             draw_style: rendering::Style::Smooth,
 
-            draw_ai_debug_artifacts: false,
+            // draw_ai_debug_artifacts: false,
         }
     }
 }

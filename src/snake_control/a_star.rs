@@ -11,6 +11,7 @@ use std::cmp::{max, min};
 use std::collections::HashSet;
 use std::rc::Rc;
 
+// TODO: deprecate
 pub struct AStar {
     pub passthrough_knowledge: PassthroughKnowledge,
     pub target: Option<HexPoint>,
@@ -186,6 +187,7 @@ impl Controller for AStar {
     fn next_dir(
         &mut self,
         body: &mut Body,
+        _: Option<&PassthroughKnowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,

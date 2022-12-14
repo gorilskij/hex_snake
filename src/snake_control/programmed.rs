@@ -1,7 +1,7 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::Dir;
-use crate::snake::Body;
+use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::view::snakes::{ Snakes};
 use ggez::Context;
@@ -37,6 +37,7 @@ impl Controller for Programmed {
     fn next_dir(
         &mut self,
         _: &mut Body,
+        _: Option<&PassthroughKnowledge>,
         _: &dyn Snakes,
         _: &[Apple],
         _: &GameContext,

@@ -10,6 +10,7 @@ use crate::snake::{
 };
 use crate::snake_control;
 use rand::Rng;
+use crate::app::guidance::PathFinderTemplate;
 
 #[allow(unused_macros)]
 #[macro_export]
@@ -101,12 +102,19 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
         choose! {
             let rand: f64 <- rng;
             prefs.prob_spawn_competitor => {
+                // apple::Type::SpawnSnake(Box::new(snake::Builder::default()
+                //         .snake_type(snake::Type::Competitor { life: Some(200) })
+                //         .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                //         .palette(snake::PaletteTemplate::pastel_rainbow(true))
+                //         .controller(snake_control::Template::AStar { passthrough_knowledge: PassthroughKnowledge::always(false) })
+                //         .speed(1.)
+                // ))
                 apple::Type::SpawnSnake(Box::new(snake::Builder::default()
-                        .snake_type(snake::Type::Competitor { life: Some(200) })
-                        .eat_mechanics(EatMechanics::always(EatBehavior::Die))
-                        .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                        .controller(snake_control::Template::AStar { passthrough_knowledge: PassthroughKnowledge::always(false) })
-                        .speed(1.)
+                    .snake_type(snake::Type::Competitor { life: Some(200) })
+                    .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                    .palette(snake::PaletteTemplate::pastel_rainbow(true))
+                    .controller(snake_control::Template::Algorithm(PathFinderTemplate::Algorithm1))
+                    .speed(1.)
                 ))
             },
             prefs.prob_spawn_killer => {
