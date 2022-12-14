@@ -1,49 +1,45 @@
 use std::collections::HashMap;
 
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    graphics::{self, Color, DrawParam, Mesh},
-    Context,
+use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::graphics::{
+    Color, DrawMode, DrawParam, Mesh, MeshBuilder, {self},
 };
-use itertools::Itertools;
+use ggez::Context;
 use rand::prelude::*;
 
-use crate::{
-    app::{
-        app_error::{AppError, AppErrorConversion, AppResult},
-        apple::{
-            self,
-            spawn::{spawn_apples, SpawnPolicy},
-            Apple,
-        },
-        control::{self, Control},
-        game_context::GameContext,
-        message::{Message, MessageID},
-        palette::Palette,
-        rendering,
-        screen::{
-            board_dim::{calculate_board_dim, calculate_offset},
-            Environment,
-        },
-        snake::{
-            self,
-            controller::{Controller, Template},
-            utils::split_snakes_mut,
-            PassthroughKnowledge, Snake,
-        },
-        snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes},
-        stats::Stats,
-        utils::Food,
-    },
-    basic::{CellDim, Dir, HexDim, HexPoint, Point},
-    support::row::ROw,
-};
-use crate::app::distance_grid;
 use crate::app::distance_grid::DistanceGrid;
+use crate::app::fps_control::{
+    FpsControl, {self},
+};
+use crate::app::game_context::GameContext;
+use crate::app::message::{Message, MessageID};
+use crate::app::palette::Palette;
+use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
+use crate::app::screen::Environment;
+use crate::app::snake_management::{
+    advance_snakes, find_collisions, handle_collisions, spawn_snakes,
+};
+use crate::app::stats::Stats;
+use crate::app::{ guidance};
+use crate::apple::spawn::{spawn_apples, SpawnPolicy};
+use crate::apple::{
+    Apple, {self},
+};
+use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::rendering;
+use crate::snake::{
+    PassthroughKnowledge, Snake, {self},
+};
+use crate::snake_control::{
+    Controller, {self},
+};
 use crate::support::flip::Flip;
+use crate::support::row::ROw;
+use crate::view::snakes::OtherSnakes;
 
 pub struct Game {
-    control: Control,
+    fps_control: FpsControl,
 
     gtx: GameContext,
 
@@ -52,6 +48,8 @@ pub struct Game {
 
     seeds: Vec<snake::Builder>,
     snakes: Vec<Snake>,
+    // TODO: keep apples in order of position to allow for binary search
+    // TODO: specialized Vec for that
     apples: Vec<Apple>,
 
     rng: ThreadRng,
@@ -93,7 +91,7 @@ impl Game {
         assert!(!seeds.is_empty(), "No players specified");
 
         let mut this = Self {
-            control: Control::new(starting_fps),
+            fps_control: FpsControl::new(starting_fps),
 
             gtx: GameContext {
                 // updated immediately after creation
@@ -250,7 +248,7 @@ impl Game {
         }
 
         if self.snakes.is_empty() {
-            self.control.game_over();
+            self.fps_control.game_over();
             self.draw_cache_invalid = 5;
             return Ok(());
         }
@@ -259,11 +257,11 @@ impl Game {
         let (seeds, game_over) = handle_collisions(self, &collisions);
 
         if game_over {
-            self.control.game_over()
+            self.fps_control.game_over()
         }
 
         spawn_snakes(self, seeds)
-            .map_err(AppError::from)
+            .map_err(Error::from)
             .with_trace_step("Game::advance_snakes")
     }
 }
@@ -315,10 +313,10 @@ impl Game {
     /// Show game and graphics FPS information in the
     /// top-left corner
     fn update_fps_message(&mut self) {
-        let game_fps = self.control.measured_game_fps();
-        let graphics_fps = self.control.measured_graphics_fps();
+        let game_fps = self.fps_control.measured_game_fps();
+        let graphics_fps = self.fps_control.measured_graphics_fps();
 
-        let game_fps_undershoot = (self.control.fps() as f64 - game_fps) / game_fps;
+        let game_fps_undershoot = (self.fps_control.fps() as f64 - game_fps) / game_fps;
         let graphics_fps_undershoot = (60. - graphics_fps) / graphics_fps;
         let color = if game_fps_undershoot > 0.05 || graphics_fps_undershoot > 0.05 {
             // > 5% undershoot: red
@@ -340,11 +338,17 @@ impl Game {
             ),
         );
     }
+
+    fn first_player_snake_idx(&self) -> Option<usize> {
+        self.snakes
+            .iter()
+            .position(|snake| snake.snake_type == snake::Type::Player)
+    }
 }
 
-impl EventHandler<AppError> for Game {
+impl EventHandler<Error> for Game {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
-        while self.control.can_update(&mut self.gtx) {
+        while self.fps_control.can_update(&mut self.gtx) {
             self.advance_snakes(ctx).with_trace_step("Game::update")?;
             self.spawn_apples();
         }
@@ -353,7 +357,7 @@ impl EventHandler<AppError> for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> AppResult {
-        self.control.graphics_frame(&mut self.gtx);
+        self.fps_control.graphics_frame(&mut self.gtx);
 
         if self.gtx.prefs.display_fps {
             self.update_fps_message();
@@ -382,14 +386,14 @@ impl EventHandler<AppError> for Game {
 
         let mut stats = Stats::default();
 
-        if self.control.state() == control::State::Playing {
+        if self.fps_control.state() == fps_control::State::Playing {
             // Update the direction of the snake early
             // to see it turning as soon as possible,
             // this could happen in the middle of a
             // game frame. Repeated updates during the
             // same game frame are blocked
             for idx in 0..self.snakes.len() {
-                let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, idx);
+                let (snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, idx);
                 snake.update_dir(other_snakes, &self.apples, &self.gtx, ctx);
             }
 
@@ -426,18 +430,16 @@ impl EventHandler<AppError> for Game {
             if self.gtx.prefs.draw_distance_grid {
                 distance_grid_mesh = Some(ROw::Owned({
                     // draw colored grid of distances from player snake head
-                    let player_snake_idx = self.snakes
+                    let player_snake_idx = self
+                        .snakes
                         .iter()
                         .position(|snake| snake.snake_type == snake::Type::Player)
                         .expect("no player snake");
-                    let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+                    let (player_snake, other_snakes) =
+                        OtherSnakes::split_snakes(&mut self.snakes, player_snake_idx);
 
-                    self.distance_grid.mesh(
-                        &player_snake,
-                        other_snakes,
-                        ctx,
-                        &self.gtx,
-                    )?
+                    self.distance_grid
+                        .mesh(player_snake, other_snakes, ctx, &self.gtx)?
                 }));
             }
         } else {
@@ -471,18 +473,19 @@ impl EventHandler<AppError> for Game {
 
             if self.cached_distance_grid_mesh.is_none() {
                 // draw colored grid of distances from player snake head
-                let player_snake_idx = self.snakes
+                let player_snake_idx = self
+                    .snakes
                     .iter()
                     .position(|snake| snake.snake_type == snake::Type::Player)
                     .expect("no player snake");
-                let (player_snake, other_snakes) = split_snakes_mut(&mut self.snakes, player_snake_idx);
+                let (player_snake, other_snakes) =
+                    OtherSnakes::split_snakes(&mut self.snakes, player_snake_idx);
 
-                self.cached_distance_grid_mesh = Some(self.distance_grid.mesh(
-                    player_snake,
-                    other_snakes,
-                    ctx,
-                    &self.gtx
-                )?);
+                self.cached_distance_grid_mesh =
+                    Some(
+                        self.distance_grid
+                            .mesh(player_snake, other_snakes, ctx, &self.gtx)?,
+                    );
             }
 
             if !self.messages.is_empty() {
@@ -508,7 +511,8 @@ impl EventHandler<AppError> for Game {
                     border_mesh = Some(self.border_mesh.as_ref().unwrap());
                 }
                 if self.gtx.prefs.draw_distance_grid {
-                    distance_grid_mesh = Some(ROw::Ref(self.cached_distance_grid_mesh.as_ref().unwrap()));
+                    distance_grid_mesh =
+                        Some(ROw::Ref(self.cached_distance_grid_mesh.as_ref().unwrap()));
                 }
                 apple_mesh = Some(ROw::Ref(self.cached_apple_mesh.as_ref().unwrap()));
                 snake_mesh = Some(ROw::Ref(self.cached_snake_mesh.as_ref().unwrap()));
@@ -532,6 +536,31 @@ impl EventHandler<AppError> for Game {
             if let Some(mesh) = grid_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
             }
+            {
+                let idx = self.first_player_snake_idx().unwrap();
+                let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, idx);
+
+                if let Some(autopilot) = &mut player_snake.autopilot {
+                    let mut builder = MeshBuilder::new();
+                    // TODO: this conversion is too expensive
+                    let passthrough_knowledge = PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
+                    let path = autopilot
+                        .get_path(&player_snake.body, Some(&passthrough_knowledge), &other_snakes, &self.apples, &self.gtx)
+                        .expect("autopilot didn't provide path");
+                    for pos in path {
+                        let dest = pos.to_cartesian(self.gtx.cell_dim) + self.gtx.cell_dim.center();
+                        builder.circle(
+                            DrawMode::fill(),
+                            dest,
+                            self.gtx.cell_dim.side / 2.5,
+                            0.1,
+                            Color::WHITE,
+                        )?;
+                    }
+                    let mesh = builder.build(ctx)?;
+                    graphics::draw(ctx, &mesh, draw_param)?;
+                }
+            }
             if let Some(mesh) = snake_mesh {
                 graphics::draw(ctx, mesh.get(), draw_param)?;
             }
@@ -541,14 +570,14 @@ impl EventHandler<AppError> for Game {
             if let Some(mesh) = border_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
             }
-            // only draw controller artifacts for player snake(s)
-            for snake in &self.snakes {
-                if snake.snake_type == snake::Type::Player {
-                    if let Some(mesh) = snake.controller.get_mesh(&self.gtx, ctx) {
-                        graphics::draw(ctx, &mesh?, draw_param)?;
-                    }
-                }
-            }
+            // // only draw snake_control artifacts for player snake(s)
+            // for snake in &self.snakes {
+            //     if snake.snake_type == snake::Type::Player {
+            //         if let Some(mesh) = snake.controller.get_mesh(&self.gtx, ctx) {
+            //             graphics::draw(ctx, &mesh?, draw_param)?;
+            //         }
+            //     }
+            // }
 
             if self.gtx.prefs.display_stats {
                 let message = stats.get_stats_message();
@@ -559,7 +588,7 @@ impl EventHandler<AppError> for Game {
         }
 
         graphics::present(ctx)
-            .map_err(AppError::from)
+            .map_err(Error::from)
             .with_trace_step("Game::draw")
     }
 
@@ -570,16 +599,16 @@ impl EventHandler<AppError> for Game {
 
         // TODO: also tie these to a keymap (dvorak-centric for now)
         match key {
-            Space => match self.control.state() {
-                control::State::GameOver => {
+            Space => match self.fps_control.state() {
+                fps_control::State::GameOver => {
                     self.restart();
-                    self.control.play();
+                    self.fps_control.play();
                 }
-                control::State::Playing => {
-                    self.control.pause();
+                fps_control::State::Playing => {
+                    self.fps_control.pause();
                     self.draw_cache_invalid = 5;
                 }
-                control::State::Paused => self.control.play(),
+                fps_control::State::Paused => self.fps_control.play(),
             },
             G => {
                 self.gtx.prefs.draw_border = self.gtx.prefs.draw_grid.flip();
@@ -610,53 +639,33 @@ impl EventHandler<AppError> for Game {
                     self.draw_cache_invalid = 5;
                 }
             }
-            Y => {
-                if !self.gtx.prefs.draw_ai_debug_artifacts.flip() {
-                    for snake in &mut self.snakes {
-                        snake.ai_artifacts = None;
-                    }
-                }
-            }
             A => {
                 // only apply if there is exactly one player snake
                 if self.seeds.len() == 1 {
                     // WARNING: hacky
-                    unsafe {
-                        static mut STASHED_CONTROLLER: Option<Box<dyn Controller + Send + Sync>> =
-                            None;
+                    let player_snake = self
+                        .snakes
+                        .iter_mut()
+                        .find(|snake| snake.snake_type == snake::Type::Player)
+                        .unwrap();
 
-                        let player_snake = self
-                            .snakes
-                            .iter_mut()
-                            .find(|snake| snake.snake_type == snake::Type::Player)
-                            .unwrap();
-
-                        let text = match &STASHED_CONTROLLER {
-                            None => {
-                                STASHED_CONTROLLER = Some(std::mem::replace(
-                                    &mut player_snake.controller,
-                                    Template::AStar {
-                                        passthrough_knowledge: PassthroughKnowledge::accurate(
-                                            &player_snake.eat_mechanics,
-                                        ),
-                                    }
-                                    .into_controller(player_snake.body.dir),
-                                ));
-                                "Autopilot on"
-                            }
-                            Some(_) => {
-                                let mut controller = STASHED_CONTROLLER.take().unwrap();
-                                controller.reset(player_snake.body.dir);
-                                player_snake.controller = controller;
-                                "Autopilot off"
-                            }
+                    if player_snake.autopilot.is_some() {
+                        let text = if player_snake.autopilot_control.flip() {
+                            "Autopilot on"
+                        } else {
+                            "Autopilot off"
                         };
                         self.display_notification(text);
+                    } else {
+                        println!("warning: autopilot not available");
                     }
+                } else {
+                    // TODO: use logger
+                    println!("warning: can't use autopilot with {} players", self.seeds.len());
                 }
             }
             LBracket => {
-                let mut new_fps = match self.control.fps() {
+                let mut new_fps = match self.fps_control.fps() {
                     f if f <= 0.2 => 0.1,
                     f if f <= 1. => f - 0.1,
                     f if f <= 20. => f - 1.,
@@ -669,11 +678,11 @@ impl EventHandler<AppError> for Game {
                 };
                 new_fps = (new_fps * 10.).round() / 10.;
 
-                self.control.set_game_fps(new_fps);
+                self.fps_control.set_game_fps(new_fps);
                 self.display_notification(format!("fps: {}", new_fps));
             }
             RBracket => {
-                let mut new_fps = match self.control.fps() {
+                let mut new_fps = match self.fps_control.fps() {
                     f if f <= 0.1 => 0.2,
                     f if f < 1. => f + 0.1,
                     f if f < 20. => (f + 1.).floor(),
@@ -686,7 +695,7 @@ impl EventHandler<AppError> for Game {
                 };
                 new_fps = (new_fps * 10.).round() / 10.;
 
-                self.control.set_game_fps(new_fps);
+                self.fps_control.set_game_fps(new_fps);
                 self.display_notification(format!("fps: {}", new_fps));
             }
             Escape => {
@@ -702,7 +711,7 @@ impl EventHandler<AppError> for Game {
                     }
                 }
                 self.display_notification(text);
-                if self.control.state() != control::State::Playing {
+                if self.fps_control.state() != fps_control::State::Playing {
                     self.draw_cache_invalid = 5;
                     self.cached_snake_mesh = None;
                     self.cached_apple_mesh = None;
@@ -755,7 +764,7 @@ impl EventHandler<AppError> for Game {
                 self.display_notification(format!("Cell side: {}", new_side_length));
             }
             k => {
-                if self.control.state() == control::State::Playing {
+                if self.fps_control.state() == fps_control::State::Playing {
                     for snake in &mut self.snakes {
                         snake.controller.key_pressed(k)
                     }
@@ -793,7 +802,7 @@ impl Environment for Game {
         self.snakes.push(
             snake_builder
                 .build()
-                .map_err(AppError::from)
+                .map_err(Error::from)
                 .with_trace_step("Game::add_snake")?,
         );
         Ok(())
@@ -803,8 +812,11 @@ impl Environment for Game {
         self.snakes.remove(index)
     }
 
+    // TODO: notification system so autopilots can adapt
     fn remove_apple(&mut self, index: usize) -> Apple {
-        self.apples.remove(index)
+        let ret = self.apples.remove(index);
+        // self.guidance_path = None; // invalidate
+        ret
     }
 
     fn gtx(&self) -> &GameContext {

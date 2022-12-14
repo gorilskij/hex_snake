@@ -6,19 +6,22 @@
 // #![deny(unsafe_code)]
 // #![feature(trace_macros)]
 #![feature(const_fn_floating_point_arithmetic)]
+#![feature(associated_type_defaults)]
+#![feature(type_alias_impl_trait)]
+// #![feature(return_position_impl_trait_in_trait)]
 
 #[macro_use]
 extern crate derive_more;
 #[macro_use]
 extern crate lazy_static;
 
-use ggez::{event::run, ContextBuilder};
+use ggez::event::run;
+use ggez::ContextBuilder;
 
-use crate::{
-    app::{keyboard_control::ControlSetup, App},
-    basic::Side,
-    keyboard::Layout,
-};
+use crate::app::keyboard_control::ControlSetup;
+use crate::app::App;
+use crate::basic::Side;
+use crate::keyboard::Layout;
 use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 
 #[macro_use]
@@ -28,6 +31,14 @@ mod basic;
 mod app;
 mod color;
 mod keyboard;
+mod pathfinding;
+mod snake;
+mod view;
+#[macro_use]
+mod apple;
+mod error;
+mod rendering;
+pub mod snake_control;
 
 // TODO
 //  - untie frame_fraction from graphics

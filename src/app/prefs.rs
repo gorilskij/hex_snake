@@ -1,4 +1,5 @@
-use crate::app::{rendering, utils::Food};
+use crate::basic::Food;
+use crate::rendering;
 use std::time::Duration;
 
 pub struct Prefs {
@@ -18,15 +19,15 @@ pub struct Prefs {
 
     pub draw_style: rendering::Style,
 
-    pub draw_ai_debug_artifacts: bool,
+    // pub draw_ai_debug_artifacts: bool,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
         Self {
             draw_grid: false,
-            draw_border: true,
-            draw_distance_grid: true,
+            draw_border: false,
+            draw_distance_grid: false,
 
             display_fps: false,
             display_stats: false,
@@ -40,7 +41,7 @@ impl Default for Prefs {
 
             draw_style: rendering::Style::Smooth,
 
-            draw_ai_debug_artifacts: false,
+            // draw_ai_debug_artifacts: false,
         }
     }
 }
