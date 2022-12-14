@@ -5,6 +5,7 @@ pub use hex_point::{HexDim, HexPoint};
 pub use point::Point;
 use std::f32::consts::TAU;
 
+pub mod board;
 mod cell_dim;
 mod dir;
 mod dir12;
@@ -24,6 +25,9 @@ macro_rules! hash_map_with_default {
         map
     }};
 }
+
+pub type Frames = u64;
+pub type Food = u32;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[allow(dead_code)]

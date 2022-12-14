@@ -3,21 +3,17 @@ pub use game::Game;
 pub use start_screen::StartScreen;
 
 pub use crate::app::prefs::Prefs;
-use crate::{
-    app::{apple::Apple, snake::Snake},
-    basic::{FrameStamp, HexDim},
-};
+use crate::basic::{FrameStamp, HexDim};
+use crate::snake;
 
-use crate::{
-    app::{
-        app_error::{AppError, AppResult},
-        game_context::GameContext,
-        snake,
-    },
-    basic::CellDim,
-};
+use crate::app::game_context::GameContext;
+use crate::apple::Apple;
+use crate::basic::CellDim;
+use crate::error::{AppResult, Error};
+use crate::snake::Snake;
 use ggez::event::EventHandler;
-use rand::{rngs::ThreadRng, Rng};
+use rand::rngs::ThreadRng;
+use rand::Rng;
 use std::ops::{Deref, DerefMut};
 
 mod board_dim;
@@ -33,7 +29,7 @@ pub enum Screen {
 }
 
 impl Deref for Screen {
-    type Target = dyn EventHandler<AppError>;
+    type Target = dyn EventHandler<Error>;
 
     fn deref(&self) -> &Self::Target {
         use Screen::*;
@@ -56,7 +52,7 @@ impl DerefMut for Screen {
     }
 }
 
-// TODO: refactor this awful mess
+// TODO: refactor into view
 pub trait Environment<R: Rng = ThreadRng> {
     fn snakes(&self) -> &[Snake];
     fn apples(&self) -> &[Apple];

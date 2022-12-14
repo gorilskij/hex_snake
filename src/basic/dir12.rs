@@ -1,9 +1,7 @@
 use crate::basic::Dir;
-use std::{
-    cmp::Ordering,
-    f32::consts::TAU,
-    ops::{Add, AddAssign, Neg, Sub, SubAssign},
-};
+use std::cmp::Ordering;
+use std::f32::consts::TAU;
+use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 use Dir::*;
 use Dir12::*;
 

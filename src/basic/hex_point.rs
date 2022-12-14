@@ -1,9 +1,7 @@
 use super::dir::{Axis, Dir};
 use crate::basic::{CellDim, Point};
-use std::{
-    cmp::{max, Ordering},
-    fmt::{Debug, Error, Formatter},
-};
+use std::cmp::{max, Ordering};
+use std::fmt::{Debug, Error, Formatter};
 use Dir::*;
 
 // INVARIANT: even columns are half a cell higher than odd columns
@@ -185,7 +183,7 @@ impl HexPoint {
     // if the point is n cells out of bounds, it will be n cells from the edge
     // TODO: improve efficiency
     #[must_use]
-    pub fn wrap_around(mut self, board_dim: HexDim, axis: Axis) -> Option<Self> {
+    fn wrap_around(mut self, board_dim: HexDim, axis: Axis) -> Option<Self> {
         use Axis::*;
 
         if !board_dim.contains(self) {
@@ -268,6 +266,30 @@ impl HexPoint {
                     self, translated, board_dim, dir
                 )
             })
+    }
+
+    // tells you if it teleported or not
+    #[must_use]
+    pub fn explicit_wrapping_translate(
+        self,
+        dir: Dir,
+        dist: usize,
+        board_dim: HexDim,
+    ) -> (Self, bool) {
+        let translated = self.translate(dir, dist);
+        if board_dim.contains(translated) {
+            (translated, false)
+        } else {
+            let wrapped = translated
+                .wrap_around(board_dim, dir.axis())
+                .unwrap_or_else(|| {
+                    panic!(
+                        "failed to wrap pos: {:?}, translated: {:?} (board_dim: {:?}, dir: {:?})",
+                        self, translated, board_dim, dir
+                    )
+                });
+            (wrapped, true)
+        }
     }
 
     pub fn contains(self, pos: Self) -> bool {

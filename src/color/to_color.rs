@@ -1,7 +1,7 @@
+use super::Color;
+use crate::color::oklab::OkLab;
 use ggez::graphics;
 use hsl::HSL;
-use crate::color::oklab::OkLab;
-use super::Color;
 
 pub trait ToColor {
     fn to_color(self) -> Color;

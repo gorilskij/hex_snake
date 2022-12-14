@@ -1,11 +1,9 @@
-use crate::{
-    app::app_error::{AppError, AppErrorConversion, AppResult},
-    basic::Point,
+use crate::basic::Point;
+use crate::error::{AppErrorConversion, AppResult, Error};
+use ggez::graphics::{
+    Color, DrawParam, Font, PxScale, Text, {self},
 };
-use ggez::{
-    graphics::{self, Color, DrawParam, Font, PxScale, Text},
-    Context,
-};
+use ggez::Context;
 use std::time::{Duration, Instant};
 
 /// Finite number of possible messages
@@ -101,7 +99,7 @@ impl Message {
         }
 
         ggez::graphics::draw(ctx, &text, DrawParam::from((location, color)))
-            .map_err(AppError::from)
+            .map_err(Error::from)
             .with_trace_step("Message::draw")?;
         Ok(true)
     }

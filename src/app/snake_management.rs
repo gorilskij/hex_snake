@@ -1,19 +1,15 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
-use crate::{
-    app::{
-        app_error::{AppError, AppErrorConversion, AppResult},
-        apple::{self},
-        screen::Environment,
-        snake::{
-            self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics, SegmentType,
-            State,
-        },
-        utils::{get_occupied_cells, random_free_spot},
-    },
-    basic::{Dir, HexPoint},
+use crate::app::screen::Environment;
+use crate::basic::board::{get_occupied_cells, random_free_spot};
+use crate::basic::{Dir, HexPoint};
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::snake::{
+    EatBehavior, EatMechanics, SegmentType, State, {self},
 };
+use crate::snake_control;
+use crate::view::snakes::OtherSnakes;
 use ggez::Context;
 use rand::Rng;
 
@@ -59,7 +55,7 @@ pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
         }
 
         for (snake2_index, other) in snakes.iter().enumerate() {
-            let mut iter = other.body.cells.iter().enumerate();
+            let mut iter = other.body.segments.iter().enumerate();
 
             // ignore head-head collision with itself
             if snake1_index == snake2_index {
@@ -112,10 +108,10 @@ pub fn handle_collisions<E: Environment>(
             Collision::Apple { snake_index, apple_index } => {
                 remove_apples.push(apple_index);
 
-                use apple::Type::*;
+                use crate::apple::Type::*;
                 match &apples[apple_index].apple_type {
                     Food(food) => {
-                        snakes[snake_index].body.cells[0].segment_type = SegmentType::Eaten {
+                        snakes[snake_index].body.segments[0].segment_type = SegmentType::Eaten {
                             original_food: *food,
                             food_left: *food,
                         }
@@ -128,7 +124,7 @@ pub fn handle_collisions<E: Environment>(
                             // TODO: factor out palette into game palette
                             // .palette(snake::PaletteTemplate::alternating_white())
                             .palette(snake::PaletteTemplate::gray_gradient(0.5, false))
-                            .controller(controller::Template::Rain)
+                            .controller(snake_control::Template::Rain)
                             .dir(Dir::D);
 
                         for h in (0..board_width).step_by(5) {
@@ -150,7 +146,7 @@ pub fn handle_collisions<E: Environment>(
                 let snake1 = &snakes[snake1_index];
                 let snake2 = &snakes[snake2_index];
                 let snake2_type = snake2.snake_type;
-                let snake2_segment_type = snake2.body.cells[snake2_segment_index]
+                let snake2_segment_type = snake2.body.segments[snake2_segment_index]
                     .segment_type
                     .raw_type();
                 let behavior = snake1.eat_mechanics.eat_other[&snake2_type][&snake2_segment_type];
@@ -171,18 +167,18 @@ pub fn handle_collisions<E: Environment>(
                     }
                     Die => snakes[snake1_index].die(),
                     PassUnder => {
-                        snakes[snake1_index].body.cells[0].z_index =
-                            snakes[snake2_index].body.cells[snake2_segment_index].z_index - 1
+                        snakes[snake1_index].body.segments[0].z_index =
+                            snakes[snake2_index].body.segments[snake2_segment_index].z_index - 1
                     }
                     PassOver => {
-                        snakes[snake1_index].body.cells[0].z_index =
-                            snakes[snake2_index].body.cells[snake2_segment_index].z_index + 1
+                        snakes[snake1_index].body.segments[0].z_index =
+                            snakes[snake2_index].body.segments[snake2_segment_index].z_index + 1
                     }
                 }
             }
             Collision::Itself { snake_index, snake_segment_index } => {
                 let snake = &snakes[snake_index];
-                let segment_type = snake.body.cells[snake_segment_index]
+                let segment_type = snake.body.segments[snake_segment_index]
                     .segment_type
                     .raw_type();
                 let behavior = snake.eat_mechanics.eat_self[&segment_type];
@@ -194,12 +190,12 @@ pub fn handle_collisions<E: Environment>(
                     }
                     Die => snakes[snake_index].die(),
                     PassUnder => {
-                        snakes[snake_index].body.cells[0].z_index =
-                            snakes[snake_index].body.cells[snake_segment_index].z_index - 1
+                        snakes[snake_index].body.segments[0].z_index =
+                            snakes[snake_index].body.segments[snake_segment_index].z_index - 1
                     }
                     PassOver => {
-                        snakes[snake_index].body.cells[0].z_index =
-                            snakes[snake_index].body.cells[snake_segment_index].z_index + 1
+                        snakes[snake_index].body.segments[0].z_index =
+                            snakes[snake_index].body.segments[snake_segment_index].z_index + 1
                     }
                 }
             }
@@ -238,7 +234,7 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, snake_builders: Vec<snake::Buil
                 let is_occupied = env
                     .snakes()
                     .iter()
-                    .flat_map(|snake| snake.body.cells.iter().map(|seg| seg.pos))
+                    .flat_map(|snake| snake.body.segments.iter().map(|seg| seg.pos))
                     .any(|p| p == pos);
 
                 if is_occupied {
@@ -264,7 +260,7 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, snake_builders: Vec<snake::Buil
             .get_or_insert_with(|| env.rng().gen_range(7, 15));
 
         env.add_snake(&snake_builder)
-            .map_err(AppError::from)
+            .map_err(Error::from)
             .with_trace_step("spawn_snakes")?;
     }
 
@@ -291,7 +287,7 @@ pub fn advance_snakes<E: Environment>(env: &mut E, ctx: &Context) {
             _ => (),
         }
 
-        let (snake, other_snakes) = split_snakes_mut(snakes, snake_idx);
+        let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
 
         // advance the snake
         snake.advance(other_snakes, apples, gtx, ctx);
