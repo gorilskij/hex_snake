@@ -32,6 +32,7 @@ use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;
 use crate::snake::{self, PassthroughKnowledge, Snake};
 use crate::support::flip::Flip;
+use crate::support::invert::Invert;
 use crate::support::row::ROw;
 use crate::view::snakes::OtherSnakes;
 
@@ -53,20 +54,14 @@ pub struct Game {
 
     distance_grid: DistanceGrid,
 
-    /// These meshes are always cached and only
-    /// recalculated when the board is resized
-    grid_mesh: Option<Mesh>,
-    border_mesh: Option<Mesh>,
-
     messages: HashMap<MessageID, Message>,
 
-    /// Cached meshes used when the game is paused
-    /// but redrawing still needs to occur (e.g. to
-    /// display a message fade or animated apple)
-    cached_snake_mesh: Option<Mesh>,
-    cached_apple_mesh: Option<Mesh>,
-    cached_distance_grid_mesh: Option<Mesh>,
-    cached_player_path_mesh: Option<Mesh>,
+    grid_mesh: Option<Mesh>,
+    border_mesh: Option<Mesh>,
+    snake_mesh: Option<Mesh>,
+    apple_mesh: Option<Mesh>,
+    distance_grid_mesh: Option<Mesh>,
+    player_path_mesh: Option<Mesh>,
 
     // TODO: move this mechanism to Control
     /// Consider the draw cache invalid for the
@@ -113,15 +108,15 @@ impl Game {
 
             distance_grid: DistanceGrid::new(),
 
-            grid_mesh: None,
-            border_mesh: None,
-
             messages: HashMap::new(),
 
-            cached_snake_mesh: None,
-            cached_apple_mesh: None,
-            cached_distance_grid_mesh: None,
-            cached_player_path_mesh: None,
+
+            grid_mesh: None,
+            border_mesh: None,
+            snake_mesh: None,
+            apple_mesh: None,
+            distance_grid_mesh: None,
+            player_path_mesh: None,
 
             draw_cache_invalid: 0,
         };
@@ -161,9 +156,9 @@ impl Game {
             // invalidate
             self.grid_mesh = None;
             self.border_mesh = None;
-            self.cached_apple_mesh = None;
-            self.cached_snake_mesh = None;
-            self.cached_distance_grid_mesh = None;
+            self.apple_mesh = None;
+            self.snake_mesh = None;
+            self.distance_grid_mesh = None;
             self.distance_grid.invalidate();
         }
     }
@@ -373,17 +368,6 @@ impl EventHandler<Error> for Game {
         //     L = Some(Instant::now());
         // }
 
-        // TODO: fix this mess
-        // TODO: reintroduce a short grace period after
-        //  game over for all the graphics to properly update
-        // selectively set to Some(_) if they need to be updated
-        let mut grid_mesh = None;
-        let mut border_mesh = None;
-        let mut apple_mesh = None;
-        let mut snake_mesh = None;
-        let mut distance_grid_mesh = None;
-        let mut player_path_mesh = None;
-
         let mut stats = Stats::default();
 
         if self.fps_control.state() == fps_control::State::Playing {
@@ -397,226 +381,76 @@ impl EventHandler<Error> for Game {
                 snake.update_dir(other_snakes, &self.apples, &self.gtx, ctx);
             }
 
-            self.cached_snake_mesh = None;
-            self.cached_apple_mesh = None;
-            self.cached_distance_grid_mesh = None;
+            if self.gtx.prefs.draw_grid && self.grid_mesh.is_none() {
+                self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
+            }
 
-            // TODO: refactor this utter mess of a code
-            apple_mesh = Some(ROw::Owned(rendering::apple_mesh(
-                &self.apples,
-                &self.gtx,
-                ctx,
-                &mut stats,
-            )?));
-            snake_mesh = Some(ROw::Owned(rendering::snake_mesh(
+            if self.gtx.prefs.draw_border && self.border_mesh.is_none() {
+                self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
+            }
+
+            self.snake_mesh = Some(rendering::snake_mesh(
                 &mut self.snakes,
                 &self.gtx,
                 ctx,
                 &mut stats,
-            )?));
+            )?);
 
-            if self.gtx.prefs.draw_grid {
-                if self.grid_mesh.is_none() {
-                    self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
-                };
-                grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
-            }
-            if self.gtx.prefs.draw_border {
-                if self.border_mesh.is_none() {
-                    self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
-                }
-                border_mesh = Some(self.border_mesh.as_ref().unwrap());
-            }
+            // TODO: only recompute apple mesh if there are animated apples
+            self.apple_mesh = Some(rendering::apple_mesh(
+                &self.apples,
+                &self.gtx,
+                ctx,
+                &mut stats,
+            )?);
+
+            let player_idx = self.first_player_snake_idx().expect("no player snake");
+            let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, player_idx);
+
             if self.gtx.prefs.draw_distance_grid {
-                distance_grid_mesh = Some(ROw::Owned({
-                    // draw colored grid of distances from player snake head
-                    let player_snake_idx = self
-                        .snakes
-                        .iter()
-                        .position(|snake| snake.snake_type == snake::Type::Player)
-                        .expect("no player snake");
-                    let (player_snake, other_snakes) =
-                        OtherSnakes::split_snakes(&mut self.snakes, player_snake_idx);
-
-                    self.distance_grid
-                        .mesh(player_snake, other_snakes, ctx, &self.gtx)?
-                }));
+                self.distance_grid_mesh = Some(
+                    self.distance_grid.mesh(player_snake, other_snakes, ctx, &self.gtx)?);
             }
+
             if self.gtx.prefs.draw_player_path {
-                let idx = self.first_player_snake_idx().unwrap();
-                let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, idx);
-                if let Some(autopilot) = &mut player_snake.autopilot {
-                    player_path_mesh = Some(ROw::Owned({
-                        let mut builder = MeshBuilder::new();
-                        // TODO: this conversion is too expensive
-                        let passthrough_knowledge =
-                            PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
-                        let path = autopilot
-                            .get_path(
-                                &player_snake.body,
-                                Some(&passthrough_knowledge),
-                                &other_snakes,
-                                &self.apples,
-                                &self.gtx,
-                            )
-                            .expect("autopilot didn't provide path");
-                        for (pos, next_pos) in path.iter().zip(path.iter().skip(1).map(Some).chain(iter::once(None))) {
-                            let dest = pos.to_cartesian(self.gtx.cell_dim) + self.gtx.cell_dim.center();
-
-                            let mut arrow = next_pos
-                                .and_then(|next_pos|
-                                    pos.single_step_dir_to(*next_pos, self.gtx.board_dim)
-                                        .and_then(|dir|
-                                            pos.explicit_wrapping_translate(dir, 1, self.gtx.board_dim)
-                                                .1.then_some(dir)));
-
-                            let radius = self.gtx.cell_dim.side / 2.5;
-                            builder.circle(
-                                DrawMode::fill(),
-                                dest,
-                                radius,
-                                0.1,
-                                Color::WHITE,
-                            )?;
-                            if let Some(dir) = arrow {
-                                // pointing down
-                                let mut points = vec![
-                                    Point { x: 0.0, y: radius * 2_f32.sqrt() },
-                                    Point { x: radius * (PI / 4.).cos(), y: radius * (PI / 4.).sin() },
-                                    Point { x: -radius * (PI / 4.).cos(), y: radius * (PI / 4.).sin() },
-                                ];
-                                rotate_clockwise(&mut points, Point::zero(), Dir::D.clockwise_angle_to(dir));
-                                translate(&mut points, dest);
-                                builder.polygon(
-                                    DrawMode::fill(),
-                                    &points,
-                                    Color::WHITE,
-                                )?;
-                            }
-                        }
-                        builder.build(ctx)?
-                    }))
-                }
-            }
-        } else {
-            let mut update = false;
-
-            // update apples if there are any animated ones
-            if self.cached_apple_mesh.is_none()
-                || self
-                    .apples
-                    .iter()
-                    .any(|apple| matches!(apple.apple_type, apple::Type::SpawnSnake(_)))
-            {
-                self.cached_apple_mesh = Some(rendering::apple_mesh(
+                // could still be None if the player snake doesn't have an autopilot
+                self.player_path_mesh = rendering::player_path_mesh(
+                    player_snake,
+                    other_snakes,
                     &self.apples,
-                    &self.gtx,
                     ctx,
-                    &mut stats,
-                )?);
-                update = true;
-            }
-
-            if self.cached_snake_mesh.is_none() {
-                self.cached_snake_mesh = Some(rendering::snake_mesh(
-                    &mut self.snakes,
                     &self.gtx,
-                    ctx,
                     &mut stats,
-                )?);
-                update = true;
-            }
-
-            if self.cached_distance_grid_mesh.is_none() {
-                // draw colored grid of distances from player snake head
-                let player_snake_idx = self
-                    .snakes
-                    .iter()
-                    .position(|snake| snake.snake_type == snake::Type::Player)
-                    .expect("no player snake");
-                let (player_snake, other_snakes) =
-                    OtherSnakes::split_snakes(&mut self.snakes, player_snake_idx);
-
-                self.cached_distance_grid_mesh =
-                    Some(
-                        self.distance_grid
-                            .mesh(player_snake, other_snakes, ctx, &self.gtx)?,
-                    );
-            }
-
-            if self.cached_player_path_mesh.is_none() {
-
-            }
-
-            if !self.messages.is_empty() {
-                update = true;
-            }
-
-            if self.draw_cache_invalid > 0 {
-                self.draw_cache_invalid -= 1;
-                update = true;
-            }
-
-            if update {
-                if self.gtx.prefs.draw_grid {
-                    if self.grid_mesh.is_none() {
-                        self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
-                    };
-                    grid_mesh = Some(self.grid_mesh.as_ref().unwrap());
-                }
-                if self.gtx.prefs.draw_border {
-                    if self.border_mesh.is_none() {
-                        self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
-                    }
-                    border_mesh = Some(self.border_mesh.as_ref().unwrap());
-                }
-                if self.gtx.prefs.draw_distance_grid {
-                    distance_grid_mesh =
-                        Some(ROw::Ref(self.cached_distance_grid_mesh.as_ref().unwrap()));
-                }
-                apple_mesh = Some(ROw::Ref(self.cached_apple_mesh.as_ref().unwrap()));
-                snake_mesh = Some(ROw::Ref(self.cached_snake_mesh.as_ref().unwrap()));
+                ).invert()?;
             }
         }
 
+        // TODO: implement freezing mechanism, if nothing changed, don't redraw at all
         let draw_param = DrawParam::default().dest(self.offset);
 
-        if grid_mesh.is_some()
-            || border_mesh.is_some()
-            || apple_mesh.is_some()
-            || snake_mesh.is_some()
-            || distance_grid_mesh.is_some()
-            || player_path_mesh.is_some()
-        {
-            graphics::clear(ctx, self.gtx.palette.background_color);
+        graphics::clear(ctx, self.gtx.palette.background_color);
 
-            if let Some(mesh) = distance_grid_mesh {
-                graphics::draw(ctx, mesh.get(), draw_param)?;
-            }
+        let meshes = [
+            &self.distance_grid_mesh,
+            &self.grid_mesh,
+            &self.player_path_mesh,
+            &self.snake_mesh,
+            &self.apple_mesh,
+            &self.border_mesh,
+        ];
 
-            if let Some(mesh) = grid_mesh {
+        for mesh in meshes {
+            if let Some(mesh) = mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
             }
-            if let Some(mesh) = player_path_mesh {
-                graphics::draw(ctx, mesh.get(), draw_param)?;
-            }
-            if let Some(mesh) = snake_mesh {
-                graphics::draw(ctx, mesh.get(), draw_param)?;
-            }
-            if let Some(mesh) = apple_mesh {
-                graphics::draw(ctx, mesh.get(), draw_param)?;
-            }
-            if let Some(mesh) = border_mesh {
-                graphics::draw(ctx, mesh, draw_param)?;
-            }
-
-            if self.gtx.prefs.display_stats {
-                let message = stats.get_stats_message();
-                self.messages.insert(MessageID::Stats, message);
-            }
-
-            self.draw_messages(ctx)?;
         }
+
+        if self.gtx.prefs.display_stats {
+            let message = stats.get_stats_message();
+            self.messages.insert(MessageID::Stats, message);
+        }
+
+        self.draw_messages(ctx)?;
 
         graphics::present(ctx)
             .map_err(Error::from)
@@ -753,8 +587,8 @@ impl EventHandler<Error> for Game {
                 self.display_notification(text);
                 if self.fps_control.state() != fps_control::State::Playing {
                     self.draw_cache_invalid = 5;
-                    self.cached_snake_mesh = None;
-                    self.cached_apple_mesh = None;
+                    self.snake_mesh = None;
+                    self.apple_mesh = None;
                 }
             }
             X => {
@@ -771,7 +605,7 @@ impl EventHandler<Error> for Game {
                             }
                         }
                     });
-                    self.cached_apple_mesh = None;
+                    self.apple_mesh = None;
                     "Special apples disabled"
                 };
                 self.display_notification(text);

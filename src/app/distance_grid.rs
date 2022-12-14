@@ -181,6 +181,7 @@ impl DistanceGrid {
         }
     }
 
+    // TODO: move to rendering module
     pub fn mesh(
         &mut self,
         player_snake: &Snake,
