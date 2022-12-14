@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::f32::consts::PI;
+use std::iter;
 
 use ggez::event::{EventHandler, KeyCode, KeyMods};
 use ggez::graphics::{
@@ -25,6 +27,7 @@ use crate::apple::{
     Apple, {self},
 };
 use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
+use crate::basic::transformations::{rotate_clockwise, translate};
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;
 use crate::snake::{self, PassthroughKnowledge, Snake};
@@ -63,6 +66,7 @@ pub struct Game {
     cached_snake_mesh: Option<Mesh>,
     cached_apple_mesh: Option<Mesh>,
     cached_distance_grid_mesh: Option<Mesh>,
+    cached_player_path_mesh: Option<Mesh>,
 
     // TODO: move this mechanism to Control
     /// Consider the draw cache invalid for the
@@ -117,6 +121,7 @@ impl Game {
             cached_snake_mesh: None,
             cached_apple_mesh: None,
             cached_distance_grid_mesh: None,
+            cached_player_path_mesh: None,
 
             draw_cache_invalid: 0,
         };
@@ -377,6 +382,7 @@ impl EventHandler<Error> for Game {
         let mut apple_mesh = None;
         let mut snake_mesh = None;
         let mut distance_grid_mesh = None;
+        let mut player_path_mesh = None;
 
         let mut stats = Stats::default();
 
@@ -384,7 +390,7 @@ impl EventHandler<Error> for Game {
             // Update the direction of the snake early
             // to see it turning as soon as possible,
             // this could happen in the middle of a
-            // game frame. Repeated updates during the
+            // game frame. Repeated update s during the
             // same game frame are blocked
             for idx in 0..self.snakes.len() {
                 let (snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, idx);
@@ -436,6 +442,62 @@ impl EventHandler<Error> for Game {
                         .mesh(player_snake, other_snakes, ctx, &self.gtx)?
                 }));
             }
+            if self.gtx.prefs.draw_player_path {
+                let idx = self.first_player_snake_idx().unwrap();
+                let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, idx);
+                if let Some(autopilot) = &mut player_snake.autopilot {
+                    player_path_mesh = Some(ROw::Owned({
+                        let mut builder = MeshBuilder::new();
+                        // TODO: this conversion is too expensive
+                        let passthrough_knowledge =
+                            PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
+                        let path = autopilot
+                            .get_path(
+                                &player_snake.body,
+                                Some(&passthrough_knowledge),
+                                &other_snakes,
+                                &self.apples,
+                                &self.gtx,
+                            )
+                            .expect("autopilot didn't provide path");
+                        for (pos, next_pos) in path.iter().zip(path.iter().skip(1).map(Some).chain(iter::once(None))) {
+                            let dest = pos.to_cartesian(self.gtx.cell_dim) + self.gtx.cell_dim.center();
+
+                            let mut arrow = next_pos
+                                .and_then(|next_pos|
+                                    pos.single_step_dir_to(*next_pos, self.gtx.board_dim)
+                                        .and_then(|dir|
+                                            pos.explicit_wrapping_translate(dir, 1, self.gtx.board_dim)
+                                                .1.then_some(dir)));
+
+                            let radius = self.gtx.cell_dim.side / 2.5;
+                            builder.circle(
+                                DrawMode::fill(),
+                                dest,
+                                radius,
+                                0.1,
+                                Color::WHITE,
+                            )?;
+                            if let Some(dir) = arrow {
+                                // pointing down
+                                let mut points = vec![
+                                    Point { x: 0.0, y: radius * 2_f32.sqrt() },
+                                    Point { x: radius * (PI / 4.).cos(), y: radius * (PI / 4.).sin() },
+                                    Point { x: -radius * (PI / 4.).cos(), y: radius * (PI / 4.).sin() },
+                                ];
+                                rotate_clockwise(&mut points, Point::zero(), Dir::D.clockwise_angle_to(dir));
+                                translate(&mut points, dest);
+                                builder.polygon(
+                                    DrawMode::fill(),
+                                    &points,
+                                    Color::WHITE,
+                                )?;
+                            }
+                        }
+                        builder.build(ctx)?
+                    }))
+                }
+            }
         } else {
             let mut update = false;
 
@@ -482,6 +544,10 @@ impl EventHandler<Error> for Game {
                     );
             }
 
+            if self.cached_player_path_mesh.is_none() {
+
+            }
+
             if !self.messages.is_empty() {
                 update = true;
             }
@@ -520,6 +586,7 @@ impl EventHandler<Error> for Game {
             || apple_mesh.is_some()
             || snake_mesh.is_some()
             || distance_grid_mesh.is_some()
+            || player_path_mesh.is_some()
         {
             graphics::clear(ctx, self.gtx.palette.background_color);
 
@@ -530,37 +597,8 @@ impl EventHandler<Error> for Game {
             if let Some(mesh) = grid_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
             }
-            {
-                let idx = self.first_player_snake_idx().unwrap();
-                let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, idx);
-
-                if let Some(autopilot) = &mut player_snake.autopilot {
-                    let mut builder = MeshBuilder::new();
-                    // TODO: this conversion is too expensive
-                    let passthrough_knowledge =
-                        PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
-                    let path = autopilot
-                        .get_path(
-                            &player_snake.body,
-                            Some(&passthrough_knowledge),
-                            &other_snakes,
-                            &self.apples,
-                            &self.gtx,
-                        )
-                        .expect("autopilot didn't provide path");
-                    for pos in path {
-                        let dest = pos.to_cartesian(self.gtx.cell_dim) + self.gtx.cell_dim.center();
-                        builder.circle(
-                            DrawMode::fill(),
-                            dest,
-                            self.gtx.cell_dim.side / 2.5,
-                            0.1,
-                            Color::WHITE,
-                        )?;
-                    }
-                    let mesh = builder.build(ctx)?;
-                    graphics::draw(ctx, &mesh, draw_param)?;
-                }
+            if let Some(mesh) = player_path_mesh {
+                graphics::draw(ctx, mesh.get(), draw_param)?;
             }
             if let Some(mesh) = snake_mesh {
                 graphics::draw(ctx, mesh.get(), draw_param)?;
@@ -571,14 +609,6 @@ impl EventHandler<Error> for Game {
             if let Some(mesh) = border_mesh {
                 graphics::draw(ctx, mesh, draw_param)?;
             }
-            // // only draw snake_control artifacts for player snake(s)
-            // for snake in &self.snakes {
-            //     if snake.snake_type == snake::Type::Player {
-            //         if let Some(mesh) = snake.controller.get_mesh(&self.gtx, ctx) {
-            //             graphics::draw(ctx, &mesh?, draw_param)?;
-            //         }
-            //     }
-            // }
 
             if self.gtx.prefs.display_stats {
                 let message = stats.get_stats_message();
@@ -628,6 +658,14 @@ impl EventHandler<Error> for Game {
                 };
                 self.display_notification(text);
             }
+            P => {
+                let text = if self.gtx.prefs.draw_player_path.flip() {
+                    "Path on"
+                } else {
+                    "Path off"
+                };
+                self.display_notification(text);
+            }
             F => {
                 if !self.gtx.prefs.display_fps.flip() {
                     self.messages.remove(&MessageID::Fps);
@@ -643,7 +681,6 @@ impl EventHandler<Error> for Game {
             A => {
                 // only apply if there is exactly one player snake
                 if self.seeds.len() == 1 {
-                    // WARNING: hacky
                     let player_snake = self
                         .snakes
                         .iter_mut()
@@ -658,14 +695,13 @@ impl EventHandler<Error> for Game {
                         };
                         self.display_notification(text);
                     } else {
-                        println!("warning: autopilot not available");
+                        self.display_notification("Autopilot not available");
                     }
                 } else {
-                    // TODO: use logger
-                    println!(
-                        "warning: can't use autopilot with {} players",
+                    self.display_notification(format!(
+                        "Can't use autopilot with {} players",
                         self.seeds.len()
-                    );
+                    ));
                 }
             }
             LBracket => {

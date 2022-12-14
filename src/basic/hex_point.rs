@@ -67,6 +67,13 @@ impl HexPoint {
         None
     }
 
+    // TODO: improve efficiency
+    // Considers wrapping, None if there is no 1-step path
+    pub fn single_step_dir_to(self, other: Self, board_dim: HexDim) -> Option<Dir> {
+        Dir::iter()
+            .find(|&dir| self.wrapping_translate(dir, 1, board_dim) == other)
+    }
+
     // None if the two points are not on the same line or are farther than 1 unit apart
     // This version allows wrapping around the board
     pub fn wrapping_dir_to_1(self, other: Self, board_dim: HexDim) -> Option<Dir> {

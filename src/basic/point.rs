@@ -75,6 +75,10 @@ impl Div<f32> for Point {
 }
 
 impl Point {
+    pub fn zero() -> Self {
+        Self { x: 0., y: 0. }
+    }
+
     /// Equal x and y
     pub fn square(side: f32) -> Self {
         Self { x: side, y: side }

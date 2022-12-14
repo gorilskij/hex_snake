@@ -6,6 +6,7 @@ pub struct Prefs {
     pub draw_grid: bool,
     pub draw_border: bool,
     pub draw_distance_grid: bool,
+    pub draw_player_path: bool,
 
     pub display_fps: bool,
     pub display_stats: bool,
@@ -27,6 +28,7 @@ impl Default for Prefs {
             draw_grid: false,
             draw_border: false,
             draw_distance_grid: false,
+            draw_player_path: false,
 
             display_fps: false,
             display_stats: false,
