@@ -1,17 +1,20 @@
+use crate::app::game_context::GameContext;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
-use std::mem;
-use ggez::Context;
-use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
-use itertools::Itertools;
 use crate::app::app_error::AppResult;
-use crate::app::game_context::GameContext;
 use crate::app::rendering::segments::render_hexagon;
 use crate::app::snake::Snake;
 use crate::app::snake::utils::OtherSnakes;
-use crate::basic::{Dir, HexDim, HexPoint};
 use crate::basic::transformations::translate;
+use crate::basic::{ Dir, HexDim, HexPoint};
 use crate::color::Color;
+use crate::error::AppResult;
+use crate::rendering::segments::render_hexagon;
+use crate::view::snakes::Snakes;
+use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
+use ggez::Context;
+use itertools::Itertools;
+use std::mem;
 
 type Distance = f32;
 type GridData = HashMap<HexPoint, Distance>;
@@ -58,8 +61,7 @@ impl Iterator for Iter {
             generation_alive
                 .into_iter()
                 .flat_map(move |pos| {
-                    Dir::iter()
-                        .map(move |dir| pos.wrapping_translate(dir, 1, board_dim))
+                    Dir::iter().map(move |dir| pos.wrapping_translate(dir, 1, board_dim))
                 })
                 .filter(|new_pos| !self.seen.contains(new_pos))
                 .sorted_unstable()
@@ -85,25 +87,26 @@ impl Iterator for Iter {
     }
 }
 
-fn find_distances(
-    player_snake: &Snake,
-    other_snakes: OtherSnakes,
-    board_dim: HexDim,
-) -> GridData {
-    let occupied = if let Some(passthrough_knowledge) = player_snake.controller.passthrough_knowledge() {
-        player_snake.body.cells
-            .iter()
-            .chain(other_snakes.iter_segments())
-            .filter(|seg| !passthrough_knowledge.can_pass_through_self(seg))
-            .map(|seg| seg.pos)
-            .collect()
-    } else {
-        player_snake.body.cells
-            .iter()
-            .chain(other_snakes.iter_segments())
-            .map(|seg| seg.pos)
-            .collect()
-    };
+fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: HexDim) -> GridData {
+    let occupied =
+        if let Some(passthrough_knowledge) = player_snake.controller.passthrough_knowledge() {
+            player_snake
+                .body
+                .segments
+                .iter()
+                .chain(other_snakes.iter_segments())
+                .filter(|seg| !passthrough_knowledge.can_pass_through_self(seg))
+                .map(|seg| seg.pos)
+                .collect()
+        } else {
+            player_snake
+                .body
+                .segments
+                .iter()
+                .chain(other_snakes.iter_segments())
+                .map(|seg| seg.pos)
+                .collect()
+        };
 
     // setup bfs
     Iter {
@@ -114,7 +117,8 @@ fn find_distances(
         generation_alive: vec![player_snake.head().pos],
         generation_dead: vec![],
         output_idx: 1, // trigger bfs step immediately
-    }.collect()
+    }
+    .collect()
 }
 
 fn generate_mesh(
@@ -127,39 +131,42 @@ fn generate_mesh(
     let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
 
     let mut builder = MeshBuilder::new();
-    iter
-        .map(|(pos, dist_a, dist_b)| {
-            const ALPHA: f32 = 0.3;
-            const CLOSEST_COLOR: Color = Color::from_rgb(51, 204, 51).with_alpha(ALPHA);
-            const MIDWAY_COLOR: Color = Color::from_rgb(255, 255, 0).with_alpha(ALPHA);
-            const FARTHEST_COLOR: Color = Color::from_rgb(204, 0, 0).with_alpha(ALPHA);
+    iter.map(|(pos, dist_a, dist_b)| {
+        const ALPHA: f32 = 0.3;
+        const CLOSEST_COLOR: Color = Color::from_rgb(51, 204, 51).with_alpha(ALPHA);
+        const MIDWAY_COLOR: Color = Color::from_rgb(255, 255, 0).with_alpha(ALPHA);
+        const FARTHEST_COLOR: Color = Color::from_rgb(204, 0, 0).with_alpha(ALPHA);
 
-            let calculate_color = |dist: Distance| -> Color {
-                let mut ratio = dist as f64 / max_dist;
-                if ratio > 1.0 { ratio = 1.0 }
-                if ratio < 0.5 {
-                    let ratio = ratio * 2.0;
-                    (1. - ratio) * CLOSEST_COLOR + ratio * MIDWAY_COLOR
-                } else {
-                    let ratio = ratio * 2.0 - 1.0;
-                    (1. - ratio) * MIDWAY_COLOR + ratio * FARTHEST_COLOR
-                }
-            };
+        let calculate_color = |dist: Distance| -> Color {
+            let mut ratio = dist as f64 / max_dist;
+            if ratio > 1.0 {
+                ratio = 1.0
+            }
+            if ratio < 0.5 {
+                let ratio = ratio * 2.0;
+                (1. - ratio) * CLOSEST_COLOR + ratio * MIDWAY_COLOR
+            } else {
+                let ratio = ratio * 2.0 - 1.0;
+                (1. - ratio) * MIDWAY_COLOR + ratio * FARTHEST_COLOR
+            }
+        };
 
-            let color_a = calculate_color(dist_a);
-            let color_b = match dist_b {
-                None => Color::BLACK,
-                Some(d) => calculate_color(d),
-            };
+        let color_a = calculate_color(dist_a);
+        let color_b = match dist_b {
+            None => Color::BLACK,
+            Some(d) => calculate_color(d),
+        };
 
-            let frame_frac = gtx.frame_stamp.1;
-            let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
+        let frame_frac = gtx.frame_stamp.1;
+        let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
 
-            let mut hexagon = render_hexagon(gtx.cell_dim);
-            translate(&mut hexagon, pos.to_cartesian(gtx.cell_dim));
-            builder.polygon(DrawMode::fill(), &hexagon, *color).map(|_| ())
-        })
-        .collect::<Result<(), _>>()?;
+        let mut hexagon = render_hexagon(gtx.cell_dim);
+        translate(&mut hexagon, pos.to_cartesian(gtx.cell_dim));
+        builder
+            .polygon(DrawMode::fill(), &hexagon, *color)
+            .map(|_| ())
+    })
+    .collect::<Result<(), _>>()?;
     Ok(builder.build(ctx)?)
 }
 
@@ -181,7 +188,7 @@ impl DistanceGrid {
     pub fn mesh(
         &mut self,
         player_snake: &Snake,
-        other_snakes: OtherSnakes,
+        other_snakes: impl Snakes,
         ctx: &mut Context,
         gtx: &GameContext,
     ) -> AppResult<Mesh> {
@@ -189,7 +196,7 @@ impl DistanceGrid {
             self.last_update = gtx.game_frame_num;
             self.last = mem::replace(
                 &mut self.current,
-                Some(find_distances(player_snake, other_snakes, gtx.board_dim))
+                Some(find_distances(player_snake, other_snakes, gtx.board_dim)),
             );
         }
 
@@ -198,19 +205,21 @@ impl DistanceGrid {
             Some(current) => match &self.last {
                 None => {
                     // TODO: this is a terrible hack, rewrite this
-                    generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), ctx, gtx)
+                    generate_mesh(
+                        current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))),
+                        ctx,
+                        gtx,
+                    )
                 }
                 Some(last) => {
                     let frame_frac = gtx.frame_stamp.1;
-                    let iter = last
-                        .iter()
-                        .map(|(pos, &dist_a)| {
-                            let dist_b = current.get(pos).copied();
-                            (*pos, dist_a, dist_b)
-                        });
+                    let iter = last.iter().map(|(pos, &dist_a)| {
+                        let dist_b = current.get(pos).copied();
+                        (*pos, dist_a, dist_b)
+                    });
                     generate_mesh(iter, ctx, gtx)
                 }
-            }
+            },
         }
     }
 

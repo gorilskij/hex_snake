@@ -1,8 +1,7 @@
-use crate::{
-    app,
-    app::{apple::spawn::SpawnPolicy, prefs::Prefs},
-    basic::{CellDim, FrameStamp, HexDim},
-};
+use crate::app;
+use crate::app::prefs::Prefs;
+use crate::apple::spawn::SpawnPolicy;
+use crate::basic::{CellDim, FrameStamp, HexDim};
 
 pub struct GameContext {
     /// Dimension of the game board in hexagons

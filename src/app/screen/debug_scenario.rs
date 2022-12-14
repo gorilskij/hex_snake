@@ -1,41 +1,34 @@
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    graphics::{self, DrawParam},
-    Context,
+use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::graphics::{
+    DrawParam, {self},
 };
+use ggez::Context;
 use rand::prelude::*;
 
-use crate::{
-    app,
-    app::{
-        app_error::{AppError, AppErrorConversion, AppResult},
-        apple::{
-            spawn::{spawn_apples, SpawnPolicy},
-            Apple,
-        },
-        control::{self, Control},
-        game_context::GameContext,
-        prefs::Prefs,
-        rendering,
-        screen::{
-            board_dim::{calculate_board_dim, calculate_offset},
-            Environment,
-        },
-        snake::{
-            self, controller, utils::split_snakes_mut, EatBehavior, EatMechanics,
-            PassthroughKnowledge, Snake,
-        },
-        snake_management::{advance_snakes, find_collisions, handle_collisions},
-        stats::Stats,
-    },
-    basic::{CellDim, Dir, HexDim, HexPoint, Point},
+use crate::app::fps_control::{
+    FpsControl, {self},
 };
+use crate::app::game_context::GameContext;
+use crate::app::prefs::Prefs;
+use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
+use crate::app::screen::Environment;
+use crate::app::snake_management::{advance_snakes, find_collisions, handle_collisions};
+use crate::app::stats::Stats;
+use crate::apple::spawn::{spawn_apples, SpawnPolicy};
+use crate::apple::Apple;
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::app::portal::Portal;
 use crate::basic::FrameStamp;
 use crate::color::Color;
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::snake::{
+    EatBehavior, EatMechanics, PassthroughKnowledge, Snake, {self},
+};
+use crate::view::snakes::OtherSnakes;
+use crate::{app, rendering, snake_control};
 
 pub struct DebugScenario {
-    control: Control,
+    fps_control: FpsControl,
 
     gtx: GameContext,
 
@@ -66,7 +59,7 @@ impl DebugScenario {
             .snake_type(snake::Type::Simulated)
             .eat_mechanics(EatMechanics::always(EatBehavior::Crash))
             .palette(snake::PaletteTemplate::solid_white_red())
-            .controller(controller::Template::Programmed(vec![]));
+            .controller(snake_control::Template::Programmed(vec![]));
 
         let seed2 = snake::Builder::default()
             .pos(HexPoint { h: 8, v: 7 })
@@ -76,10 +69,10 @@ impl DebugScenario {
             .eat_mechanics(EatMechanics::always(EatBehavior::Die))
             // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
             .palette(snake::PaletteTemplate::rainbow(true))
-            .controller(controller::Template::Programmed(vec![]));
+            .controller(snake_control::Template::Programmed(vec![]));
 
         let mut this = Self {
-            control: Control::new(3.),
+            fps_control: FpsControl::new(3.),
 
             gtx: GameContext {
                 board_dim: HexDim { h: 20, v: 10 },
@@ -105,7 +98,7 @@ impl DebugScenario {
             rng: thread_rng(),
         };
         this.restart();
-        this.control.pause();
+        this.fps_control.pause();
         this
     }
 
@@ -118,7 +111,7 @@ impl DebugScenario {
             .snake_type(snake::Type::Simulated)
             .eat_mechanics(EatMechanics::always(EatBehavior::Die))
             .palette(snake::PaletteTemplate::solid_white_red())
-            .controller(controller::Template::Programmed(vec![]));
+            .controller(snake_control::Template::Programmed(vec![]));
 
         let seed2 = snake::Builder::default()
             .pos(HexPoint { h: 11, v: 7 })
@@ -130,10 +123,10 @@ impl DebugScenario {
                 color: Color::RED,
                 eaten: Color::WHITE,
             })
-            .controller(controller::Template::Programmed(vec![]));
+            .controller(snake_control::Template::Programmed(vec![]));
 
         let mut this = Self {
-            control: Control::new(3.),
+            fps_control: FpsControl::new(3.),
 
             gtx: GameContext {
                 board_dim: HexDim { h: 20, v: 10 },
@@ -159,63 +152,63 @@ impl DebugScenario {
             rng: thread_rng(),
         };
         this.restart();
-        this.control.pause();
+        this.fps_control.pause();
         this
     }
 
     /// Stress test
-    pub fn many_snakes() -> Self {
-        const NUM_SNAKES: usize = 100;
-
-        let rng = &mut thread_rng();
-        let seeds: Vec<_> = (0..NUM_SNAKES)
-            .map(|i| {
-                snake::Builder::default()
-                    .pos(HexPoint {
-                        h: i as isize / 7 * 2 + 3,
-                        v: i as isize % 10 * 2 + 3,
-                    })
-                    .dir(Dir::random(rng))
-                    .len(5)
-                    .snake_type(snake::Type::Competitor { life: None })
-                    .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
-                    .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                    .controller(controller::Template::AStar {
-                        passthrough_knowledge: PassthroughKnowledge::always(false),
-                    })
-            })
-            .collect();
-
-        let mut this = Self {
-            control: Control::new(3.),
-
-            gtx: GameContext {
-                board_dim: HexDim { h: 0, v: 0 },
-                cell_dim: Default::default(),
-                palette: app::Palette::dark(),
-                prefs: Prefs::default().special_apples(false),
-                apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
-                frame_stamp: (0, 0.0),
-                game_frame_num: 0,
-                elapsed_millis: 0,
-            },
-
-            offset: None,
-            fit_to_window: true,
-
-            stats: Stats::default(),
-
-            apples: vec![],
-
-            seeds,
-            snakes: vec![],
-
-            rng: thread_rng(),
-        };
-        this.restart();
-        this.control.pause();
-        this
-    }
+    // pub fn many_snakes() -> Self {
+    //     const NUM_SNAKES: usize = 100;
+    //
+    //     let rng = &mut thread_rng();
+    //     let seeds: Vec<_> = (0..NUM_SNAKES)
+    //         .map(|i| {
+    //             snake::Builder::default()
+    //                 .pos(HexPoint {
+    //                     h: i as isize / 7 * 2 + 3,
+    //                     v: i as isize % 10 * 2 + 3,
+    //                 })
+    //                 .dir(Dir::random(rng))
+    //                 .len(5)
+    //                 .snake_type(snake::Type::Competitor { life: None })
+    //                 .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
+    //                 .palette(snake::PaletteTemplate::pastel_rainbow(true))
+    //                 .controller(snake_control::Template::AStar {
+    //                     passthrough_knowledge: PassthroughKnowledge::always(false),
+    //                 })
+    //         })
+    //         .collect();
+    //
+    //     let mut this = Self {
+    //         fps_control: FpsControl::new(3.),
+    //
+    //         gtx: GameContext {
+    //             board_dim: HexDim { h: 0, v: 0 },
+    //             cell_dim: Default::default(),
+    //             palette: app::Palette::dark(),
+    //             prefs: Prefs::default().special_apples(false),
+    //             apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
+    //             frame_stamp: (0, 0.0),
+    //             game_frame_num: 0,
+    //             elapsed_millis: 0,
+    //         },
+    //
+    //         offset: None,
+    //         fit_to_window: true,
+    //
+    //         stats: Stats::default(),
+    //
+    //         apples: vec![],
+    //
+    //         seeds,
+    //         snakes: vec![],
+    //
+    //         rng: thread_rng(),
+    //     };
+    //     this.restart();
+    //     this.fps_control.pause();
+    //     this
+    // }
 
     /// Comparison of persistent and non-persistent skins entering a black hole
     pub fn double_head_body_collision(cell_dim: CellDim) -> Self {
@@ -226,7 +219,7 @@ impl DebugScenario {
             .snake_type(snake::Type::Simulated)
             .eat_mechanics(EatMechanics::always(EatBehavior::Crash))
             .palette(snake::PaletteTemplate::solid_white_red())
-            .controller(controller::Template::Programmed(vec![]));
+            .controller(snake_control::Template::Programmed(vec![]));
 
         let crash_seeds = vec![
             snake::Builder::default()
@@ -237,7 +230,7 @@ impl DebugScenario {
                 .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::dark_blue_to_red(true))
-                .controller(controller::Template::Programmed(vec![])),
+                .controller(snake_control::Template::Programmed(vec![])),
             snake::Builder::default()
                 .pos(HexPoint { h: 14, v: 7 })
                 .dir(Dir::Ul)
@@ -246,7 +239,7 @@ impl DebugScenario {
                 .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::dark_blue_to_red(false))
-                .controller(controller::Template::Programmed(vec![])),
+                .controller(snake_control::Template::Programmed(vec![])),
             snake::Builder::default()
                 .pos(HexPoint { h: 14, v: 9 })
                 .dir(Dir::Ul)
@@ -255,7 +248,7 @@ impl DebugScenario {
                 .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::rainbow(true))
-                .controller(controller::Template::Programmed(vec![])),
+                .controller(snake_control::Template::Programmed(vec![])),
             snake::Builder::default()
                 .pos(HexPoint { h: 14, v: 11 })
                 .dir(Dir::Ul)
@@ -264,11 +257,11 @@ impl DebugScenario {
                 .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::rainbow(false))
-                .controller(controller::Template::Programmed(vec![])),
+                .controller(snake_control::Template::Programmed(vec![])),
         ];
 
         let mut this = Self {
-            control: Control::new(3.),
+            fps_control: FpsControl::new(3.),
 
             gtx: GameContext {
                 board_dim: HexDim { h: 20, v: 15 },
@@ -294,7 +287,7 @@ impl DebugScenario {
             rng: thread_rng(),
         };
         this.restart();
-        this.control.pause();
+        this.fps_control.pause();
         this
     }
 }
@@ -316,7 +309,7 @@ impl DebugScenario {
             .collect();
         self.apples = vec![];
         self.gtx.apple_spawn_policy.reset();
-        self.control.pause();
+        self.fps_control.pause();
     }
 
     fn spawn_apples(&mut self) {
@@ -331,7 +324,7 @@ impl DebugScenario {
         let (spawn_snakes, game_over) = handle_collisions(self, &collisions);
 
         if game_over {
-            self.control.game_over();
+            self.fps_control.game_over();
         }
 
         assert!(spawn_snakes.is_empty(), "unimplemented");
@@ -340,16 +333,16 @@ impl DebugScenario {
     }
 }
 
-impl EventHandler<AppError> for DebugScenario {
+impl EventHandler<Error> for DebugScenario {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
-        while self.control.can_update(&mut self.gtx) {
+        while self.fps_control.can_update(&mut self.gtx) {
             self.advance_snakes(ctx);
         }
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> AppResult {
-        self.control.graphics_frame(&mut self.gtx);
+        self.fps_control.graphics_frame(&mut self.gtx);
 
         graphics::clear(ctx, *Color::BLACK);
 
@@ -367,7 +360,7 @@ impl EventHandler<AppError> for DebugScenario {
         graphics::draw(ctx, &border_mesh, draw_param)?;
 
         for snake_index in 0..self.snakes.len() {
-            let (snake, other_snakes) = split_snakes_mut(&mut self.snakes, snake_index);
+            let (snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, snake_index);
             snake.update_dir(other_snakes, &self.apples, &self.gtx, ctx);
         }
 
@@ -380,7 +373,7 @@ impl EventHandler<AppError> for DebugScenario {
         }
 
         graphics::present(ctx)
-            .map_err(AppError::from)
+            .map_err(Error::from)
             .with_trace_step("DebugScenario::draw")
     }
 
@@ -391,12 +384,12 @@ impl EventHandler<AppError> for DebugScenario {
         _keymods: KeyMods,
         _repeat: bool,
     ) {
-        use control::State::*;
+        use fps_control::State::*;
 
         if keycode == KeyCode::Space {
-            match self.control.state() {
-                Playing => self.control.pause(),
-                Paused => self.control.play(),
+            match self.fps_control.state() {
+                Playing => self.fps_control.pause(),
+                Paused => self.fps_control.play(),
                 GameOver => self.restart(),
             }
         } else if keycode == KeyCode::R {
@@ -434,7 +427,7 @@ impl Environment for DebugScenario {
         self.snakes.push(
             snake_builder
                 .build()
-                .map_err(AppError::from)
+                .map_err(Error::from)
                 .with_trace_step("Game::add_snake")?,
         );
         Ok(())

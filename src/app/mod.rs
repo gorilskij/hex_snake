@@ -1,42 +1,34 @@
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    graphics,
-    graphics::Rect,
-    Context,
+use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::graphics::{
+    Rect, self,
 };
+use ggez::Context;
 use itertools::Itertools;
 
-use crate::{
-    app::{
-        app_error::{AppError, AppErrorConversion, AppResult},
-        screen::{DebugScenario, StartScreen},
-        snake::SegmentRawType,
-    },
-    basic::CellDim,
+use crate::app::screen::{DebugScenario, StartScreen};
+use crate::apple::spawn::SpawnPolicy;
+use crate::basic::CellDim;
+use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::snake::{
+    EatBehavior, EatMechanics, PassthroughKnowledge, SegmentRawType, {self},
 };
-use apple::spawn::SpawnPolicy;
+use crate::snake_control;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
-use snake::{controller, EatBehavior, EatMechanics};
-use crate::app::snake::PassthroughKnowledge;
+use crate::app::guidance::PathFinderTemplate;
 
-pub mod keyboard_control;
-mod palette;
-mod snake;
-mod snake_management;
-#[macro_use]
-mod apple;
-mod app_error;
-mod control;
-mod game_context;
-mod message;
-mod prefs;
-mod rendering;
-mod screen;
-pub mod stats;
-mod utils;
 mod distance_grid;
+mod fps_control;
+pub mod game_context;
+pub mod guidance;
+pub mod keyboard_control;
+mod message;
+mod palette;
+mod prefs;
+pub(crate) mod screen;
+mod snake_management;
+pub mod stats;
 pub mod portal;
 
 pub struct App {
@@ -83,13 +75,14 @@ impl App {
                     .palette(snake::PaletteTemplate::rainbow(true))
                     // .palette(PaletteTemplate::dark_blue_to_red(false))
                     // .palette(PaletteTemplate::zebra())
-                    .controller(controller::Template::Keyboard {
+                    .controller(snake_control::Template::Keyboard {
                         control_setup,
                         passthrough_knowledge,
                     })
                     .speed(1.)
-                // .controller(controller::Template::Mouse)
-                // .controller(SnakeControllerTemplate::PlayerController12)
+                    .autopilot(PathFinderTemplate::Algorithm1)
+                // .snake_control(snake_control::Template::Mouse)
+                // .snake_control(SnakeControllerTemplate::PlayerController12)
             })
             .collect();
 
@@ -99,7 +92,7 @@ impl App {
         Self {
             screen: match 0 {
                 5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
-                4 => Screen::DebugScenario(DebugScenario::many_snakes()),
+                // 4 => Screen::DebugScenario(DebugScenario::many_snakes()),
                 3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
                 2 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
                 1 => Screen::StartScreen(StartScreen::new(cell_dim)),
@@ -123,7 +116,7 @@ impl App {
         //     },
         //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::rainbow(),
-        //     controller: SnakeControllerTemplate::demo_triangle_pattern(0, Side::Right),
+        //     snake_control: SnakeControllerTemplate::demo_triangle_pattern(0, Side::Right),
         // }];
         //
         // Self {
@@ -147,14 +140,14 @@ impl App {
         //     snake_type: SnakeType::PlayerSnake,
         //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::rainbow(),
-        //     controller: SnakeControllerTemplate::demo_hexagon_pattern(0),
+        //     snake_control: SnakeControllerTemplate::demo_hexagon_pattern(0),
         // }];
 
         // let seeds = vec![SnakeSeed {
         //     snake_type: SnakeType::PlayerSnake,
         //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::rainbow(),
-        //     controller: SnakeControllerTemplate::DemoController(vec![
+        //     snake_control: SnakeControllerTemplate::DemoController(vec![
         //         SimMove::Move(Dir::U),
         //         SimMove::Move(Dir::Dr),
         //         SimMove::Move(Dir::Dl),
@@ -165,7 +158,7 @@ impl App {
         //     snake_type: SnakeType::PlayerSnake,
         //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::gray_gradient(),
-        //     controller: SnakeControllerTemplate::CompetitorAI2,
+        //     snake_control: SnakeControllerTemplate::CompetitorAI2,
         // }];
         //
         // Self {
@@ -183,7 +176,7 @@ impl App {
     }
 }
 
-impl EventHandler<AppError> for App {
+impl EventHandler<Error> for App {
     fn update(&mut self, ctx: &mut Context) -> AppResult {
         if let Screen::StartScreen(start_screen) = &self.screen {
             if let Some(next_screen) = start_screen.next_screen() {
