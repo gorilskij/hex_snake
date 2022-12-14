@@ -1,15 +1,15 @@
 use crate::app::game_context::GameContext;
 use crate::basic::transformations::translate;
-use crate::basic::{ Dir, HexDim, HexPoint};
+use crate::basic::{Dir, HexDim, HexPoint};
 use crate::color::Color;
-use crate::error::AppResult;
+use crate::error::Result;
 use crate::rendering::segments::render_hexagon;
 use crate::snake::Snake;
 use crate::view::snakes::Snakes;
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
 use itertools::Itertools;
-use std::cmp::{max};
+use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 
@@ -53,7 +53,7 @@ impl Iterator for Iter {
             let board_dim = self.board_dim;
 
             self.generation_dead = vec![];
-            let generation_alive = mem::replace(&mut self.generation_alive, vec![]);
+            let generation_alive = mem::take(&mut self.generation_alive);
 
             generation_alive
                 .into_iter()
@@ -119,16 +119,16 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
 }
 
 fn generate_mesh(
-    iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
+    mut iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
     ctx: &mut Context,
     gtx: &GameContext,
-) -> AppResult<Mesh> {
+) -> Result<Mesh> {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
     let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
 
     let mut builder = MeshBuilder::new();
-    iter.map(|(pos, dist_a, dist_b)| {
+    iter.try_for_each(|(pos, dist_a, dist_b)| {
         const ALPHA: f32 = 0.3;
         const CLOSEST_COLOR: Color = Color::from_rgb(51, 204, 51).with_alpha(ALPHA);
         const MIDWAY_COLOR: Color = Color::from_rgb(255, 255, 0).with_alpha(ALPHA);
@@ -162,8 +162,7 @@ fn generate_mesh(
         builder
             .polygon(DrawMode::fill(), &hexagon, *color)
             .map(|_| ())
-    })
-    .collect::<Result<(), _>>()?;
+    })?;
     Ok(builder.build(ctx)?)
 }
 
@@ -188,7 +187,7 @@ impl DistanceGrid {
         other_snakes: impl Snakes,
         ctx: &mut Context,
         gtx: &GameContext,
-    ) -> AppResult<Mesh> {
+    ) -> Result<Mesh> {
         if self.current.is_none() || gtx.game_frame_num > self.last_update {
             self.last_update = gtx.game_frame_num;
             self.last = mem::replace(
@@ -209,7 +208,7 @@ impl DistanceGrid {
                     )
                 }
                 Some(last) => {
-                    let frame_frac = gtx.frame_stamp.1;
+                    // let frame_frac = gtx.frame_stamp.1;
                     let iter = last.iter().map(|(pos, &dist_a)| {
                         let dist_b = current.get(pos).copied();
                         (*pos, dist_a, dist_b)

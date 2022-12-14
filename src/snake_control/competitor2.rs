@@ -4,7 +4,7 @@ use crate::basic::{angle_distance, CellDim, Dir, Dir12, HexPoint};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::support::partial_min_max::PartialMinMax;
-use crate::view::snakes::{ Snakes};
+use crate::view::snakes::Snakes;
 use ggez::Context;
 use itertools::Itertools;
 use std::f32::consts::PI;

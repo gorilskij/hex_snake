@@ -18,7 +18,6 @@ pub struct Prefs {
     pub prob_spawn_rain: f64,
 
     pub draw_style: rendering::Style,
-
     // pub draw_ai_debug_artifacts: bool,
 }
 
@@ -40,7 +39,6 @@ impl Default for Prefs {
             prob_spawn_rain: 0.002,
 
             draw_style: rendering::Style::Smooth,
-
             // draw_ai_debug_artifacts: false,
         }
     }

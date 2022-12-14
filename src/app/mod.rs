@@ -1,14 +1,13 @@
 use ggez::event::{EventHandler, KeyCode, KeyMods};
-use ggez::graphics::{
-    Rect, self,
-};
+use ggez::graphics::{self, Rect};
 use ggez::Context;
 use itertools::Itertools;
 
+use crate::app::guidance::PathFinderTemplate;
 use crate::app::screen::{DebugScenario, StartScreen};
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::CellDim;
-use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::error::{Error, ErrorConversion, Result};
 use crate::snake::{
     EatBehavior, EatMechanics, PassthroughKnowledge, SegmentRawType, {self},
 };
@@ -16,7 +15,6 @@ use crate::snake_control;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
-use crate::app::guidance::PathFinderTemplate;
 
 mod distance_grid;
 mod fps_control;
@@ -176,7 +174,7 @@ impl App {
 }
 
 impl EventHandler<Error> for App {
-    fn update(&mut self, ctx: &mut Context) -> AppResult {
+    fn update(&mut self, ctx: &mut Context) -> Result {
         if let Screen::StartScreen(start_screen) = &self.screen {
             if let Some(next_screen) = start_screen.next_screen() {
                 self.screen = next_screen
@@ -185,7 +183,7 @@ impl EventHandler<Error> for App {
         self.screen.update(ctx).with_trace_step("App::update")
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> AppResult {
+    fn draw(&mut self, ctx: &mut Context) -> Result {
         self.screen.draw(ctx).with_trace_step("App::draw")
     }
 

@@ -4,14 +4,14 @@ pub use palette::{Palette, PaletteTemplate};
 
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, FrameStamp, HexDim, HexPoint};
-use crate::{ snake_control};
+use crate::snake_control;
 use ggez::Context;
 
+use crate::app::guidance::PathFinderTemplate;
 use crate::apple::Apple;
 use crate::basic::Frames;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
-use crate::app::guidance::{Path, PathFinderTemplate};
 pub use eat_mechanics::{EatBehavior, EatMechanics, PassthroughKnowledge};
 
 mod eat_mechanics;
@@ -239,7 +239,10 @@ impl Builder {
             .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `dir`"))?;
 
         if self.autopilot_control && self.autopilot.is_none() {
-            return Err(BuilderError(Box::new(self.clone()), "autopilot_control set to true but autopilot missing"));
+            return Err(BuilderError(
+                Box::new(self.clone()),
+                "autopilot_control set to true but autopilot missing",
+            ));
         }
 
         eprintln!(
@@ -298,12 +301,10 @@ impl Builder {
                 .palette
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `palette`"))?
                 .into(),
-            autopilot: self
-                .autopilot
-                .map(|template| {
-                    let controller_template = snake_control::Template::Algorithm(template);
-                    controller_template.into_controller(dir)
-                }),
+            autopilot: self.autopilot.map(|template| {
+                let controller_template = snake_control::Template::Algorithm(template);
+                controller_template.into_controller(dir)
+            }),
             autopilot_control: self.autopilot_control,
         })
     }
@@ -375,15 +376,26 @@ impl Snake {
 
         // advance controller
         let passthrough_knowledge = PassthroughKnowledge::accurate(&self.eat_mechanics);
-        let controller_dir = self
-            .controller
-            .next_dir(&mut self.body, Some(&passthrough_knowledge), &other_snakes, apples, gtx, ctx);
+        let controller_dir = self.controller.next_dir(
+            &mut self.body,
+            Some(&passthrough_knowledge),
+            &other_snakes,
+            apples,
+            gtx,
+            ctx,
+        );
 
         // advance autopilot
-        let autopilot_dir = self
-            .autopilot
-            .as_mut()
-            .map(|mut autopilot| autopilot.next_dir(&mut self.body, Some(&passthrough_knowledge), &other_snakes, apples, gtx, ctx));
+        let autopilot_dir = self.autopilot.as_mut().map(|autopilot| {
+            autopilot.next_dir(
+                &mut self.body,
+                Some(&passthrough_knowledge),
+                &other_snakes,
+                apples,
+                gtx,
+                ctx,
+            )
+        });
 
         let new_dir = if self.autopilot_control {
             autopilot_dir.expect("autopilot_control == true with missing autopilot")
@@ -415,7 +427,8 @@ impl Snake {
         ctx: &Context,
     ) {
         let last_idx = self.body.visible_len() - 1;
-        if let SegmentType::Eaten { food_left, .. } = &mut self.body.segments[last_idx].segment_type {
+        if let SegmentType::Eaten { food_left, .. } = &mut self.body.segments[last_idx].segment_type
+        {
             if *food_left == 0 {
                 self.body.segments[last_idx].segment_type = SegmentType::Normal;
             } else {

@@ -3,7 +3,7 @@ use crate::apple::Apple;
 use crate::basic::Dir;
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
-use crate::view::snakes::{ Snakes};
+use crate::view::snakes::Snakes;
 use ggez::Context;
 #[allow(unused_macros)]
 macro_rules! move_sequence {

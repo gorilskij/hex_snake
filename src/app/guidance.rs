@@ -1,15 +1,13 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
-use crate::snake::{Body, PassthroughKnowledge, Snake};
-use crate::view::snakes::{OtherSnakes, Snakes};
-use ggez::Context;
+use crate::snake::{Body, PassthroughKnowledge};
+use crate::view::snakes::Snakes;
 use map_with_state::IntoMapWithState;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
-
 
 // TODO: factor this out
 pub type Path = VecDeque<HexPoint>;
@@ -32,7 +30,7 @@ pub enum PathFinderTemplate {
 }
 
 impl PathFinderTemplate {
-    pub fn into_pathfinder(self, start_dir: Dir) -> Box<dyn PathFinder + Send + Sync> {
+    pub fn into_pathfinder(self, _start_dir: Dir) -> Box<dyn PathFinder + Send + Sync> {
         match self {
             PathFinderTemplate::Algorithm1 => Box::new(Algorithm1),
         }
@@ -98,23 +96,20 @@ impl PathFinder for Algorithm1 {
         apples: &[Apple],
         gtx: &GameContext,
     ) -> Path {
-        let off_limits: HashSet<_> =
-            if let Some(pk) = passthrough_knowledge {
-                body
-                    .segments
-                    .iter()
-                    .chain(other_snakes.iter_segments())
-                    .filter(|seg| !pk.can_pass_through_self(seg))
-                    .map(|seg| seg.pos)
-                    .collect()
-            } else {
-                body
-                    .segments
-                    .iter()
-                    .chain(other_snakes.iter_segments())
-                    .map(|seg| seg.pos)
-                    .collect()
-            };
+        let off_limits: HashSet<_> = if let Some(pk) = passthrough_knowledge {
+            body.segments
+                .iter()
+                .chain(other_snakes.iter_segments())
+                .filter(|seg| !pk.can_pass_through_self(seg))
+                .map(|seg| seg.pos)
+                .collect()
+        } else {
+            body.segments
+                .iter()
+                .chain(other_snakes.iter_segments())
+                .map(|seg| seg.pos)
+                .collect()
+        };
 
         let shortest_paths: RefCell<HashMap<HexPoint, SearchPoint>> = Default::default();
 

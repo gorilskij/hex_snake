@@ -20,20 +20,14 @@ use crate::app::snake_management::{
     advance_snakes, find_collisions, handle_collisions, spawn_snakes,
 };
 use crate::app::stats::Stats;
-use crate::app::{ guidance};
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::{
     Apple, {self},
 };
 use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
-use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;
-use crate::snake::{
-    PassthroughKnowledge, Snake, {self},
-};
-use crate::snake_control::{
-    Controller, {self},
-};
+use crate::snake::{self, PassthroughKnowledge, Snake};
 use crate::support::flip::Flip;
 use crate::support::row::ROw;
 use crate::view::snakes::OtherSnakes;
@@ -229,7 +223,7 @@ impl Game {
         self.spawn_apples();
     }
 
-    fn advance_snakes(&mut self, ctx: &Context) -> AppResult {
+    fn advance_snakes(&mut self, ctx: &Context) -> Result {
         advance_snakes(self, ctx);
 
         // if only ephemeral AIs are left, kill all other snakes
@@ -276,7 +270,7 @@ impl Game {
         self.apples.extend(new_apples.into_iter())
     }
 
-    fn draw_messages(&mut self, ctx: &mut Context) -> AppResult {
+    fn draw_messages(&mut self, ctx: &mut Context) -> Result {
         // draw messages and remove the ones that have
         // outlived their durations
         let remove = self
@@ -287,7 +281,7 @@ impl Game {
                     .draw(ctx)
                     .map(|keep| if !keep { Some(*id) } else { None })
             })
-            .collect::<AppResult<Vec<_>>>()
+            .collect::<Result<Vec<_>>>()
             .with_trace_step("draw_messages")?;
         remove
             .iter()
@@ -316,7 +310,7 @@ impl Game {
         let game_fps = self.fps_control.measured_game_fps();
         let graphics_fps = self.fps_control.measured_graphics_fps();
 
-        let game_fps_undershoot = (self.fps_control.fps() as f64 - game_fps) / game_fps;
+        let game_fps_undershoot = (self.fps_control.fps() - game_fps) / game_fps;
         let graphics_fps_undershoot = (60. - graphics_fps) / graphics_fps;
         let color = if game_fps_undershoot > 0.05 || graphics_fps_undershoot > 0.05 {
             // > 5% undershoot: red
@@ -347,7 +341,7 @@ impl Game {
 }
 
 impl EventHandler<Error> for Game {
-    fn update(&mut self, ctx: &mut Context) -> AppResult {
+    fn update(&mut self, ctx: &mut Context) -> Result {
         while self.fps_control.can_update(&mut self.gtx) {
             self.advance_snakes(ctx).with_trace_step("Game::update")?;
             self.spawn_apples();
@@ -356,7 +350,7 @@ impl EventHandler<Error> for Game {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> AppResult {
+    fn draw(&mut self, ctx: &mut Context) -> Result {
         self.fps_control.graphics_frame(&mut self.gtx);
 
         if self.gtx.prefs.display_fps {
@@ -543,9 +537,16 @@ impl EventHandler<Error> for Game {
                 if let Some(autopilot) = &mut player_snake.autopilot {
                     let mut builder = MeshBuilder::new();
                     // TODO: this conversion is too expensive
-                    let passthrough_knowledge = PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
+                    let passthrough_knowledge =
+                        PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
                     let path = autopilot
-                        .get_path(&player_snake.body, Some(&passthrough_knowledge), &other_snakes, &self.apples, &self.gtx)
+                        .get_path(
+                            &player_snake.body,
+                            Some(&passthrough_knowledge),
+                            &other_snakes,
+                            &self.apples,
+                            &self.gtx,
+                        )
                         .expect("autopilot didn't provide path");
                     for pos in path {
                         let dest = pos.to_cartesian(self.gtx.cell_dim) + self.gtx.cell_dim.center();
@@ -661,7 +662,10 @@ impl EventHandler<Error> for Game {
                     }
                 } else {
                     // TODO: use logger
-                    println!("warning: can't use autopilot with {} players", self.seeds.len());
+                    println!(
+                        "warning: can't use autopilot with {} players",
+                        self.seeds.len()
+                    );
                 }
             }
             LBracket => {
@@ -754,11 +758,7 @@ impl EventHandler<Error> for Game {
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
                 let mut new_side_length = self.gtx.cell_dim.side * factor;
-                if new_side_length < Self::CELL_SIDE_MIN {
-                    new_side_length = Self::CELL_SIDE_MIN
-                } else if new_side_length > Self::CELL_SIDE_MAX {
-                    new_side_length = Self::CELL_SIDE_MAX
-                }
+                new_side_length = new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
                 self.gtx.cell_dim = CellDim::from(new_side_length);
                 self.update_dim(ctx);
                 self.display_notification(format!("Cell side: {}", new_side_length));
@@ -798,7 +798,7 @@ impl Environment for Game {
         (&mut self.snakes, &mut self.apples, &mut self.rng)
     }
 
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult {
+    fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result {
         self.snakes.push(
             snake_builder
                 .build()
@@ -814,9 +814,7 @@ impl Environment for Game {
 
     // TODO: notification system so autopilots can adapt
     fn remove_apple(&mut self, index: usize) -> Apple {
-        let ret = self.apples.remove(index);
-        // self.guidance_path = None; // invalidate
-        ret
+        self.apples.remove(index)
     }
 
     fn gtx(&self) -> &GameContext {

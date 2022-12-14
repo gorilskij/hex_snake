@@ -5,12 +5,12 @@ use num_integer::Integer;
 
 use crate::app::game_context::GameContext;
 use crate::basic::HexDim;
-use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::error::{Error, ErrorConversion, Result};
 
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh
 //  when border is drawn separately
-pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> AppResult<Mesh> {
+pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
@@ -31,7 +31,7 @@ pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> AppResult<Mesh> {
     let draw_mode = DrawMode::stroke(gtx.palette.grid_thickness);
     let color = gtx.palette.grid_color;
 
-    let res: AppResult<_> = try {
+    let res: Result<_> = try {
         for h in 0..(board_h + 1) / 2 {
             if h == 0 {
                 builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
@@ -89,7 +89,7 @@ pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> AppResult<Mesh> {
     res.with_trace_step("grid_mesh")
 }
 
-pub fn border_mesh(gtx: &GameContext, ctx: &mut Context) -> AppResult<Mesh> {
+pub fn border_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 

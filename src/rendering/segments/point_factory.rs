@@ -7,7 +7,7 @@ use crate::basic::{Dir, Point};
 use crate::color::oklab::OkLab;
 use crate::color::to_color::ToColor;
 use crate::color::Color;
-use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::segments::descriptions::{
     SegmentDescription, SegmentFraction, TurnDirection, TurnType,
 };
@@ -155,7 +155,7 @@ impl SegmentDescription {
     }
 
     /// Returns number of polygons built
-    pub fn build(self, builder: &mut MeshBuilder, color_resolution: usize) -> AppResult<usize> {
+    pub fn build(self, builder: &mut MeshBuilder, color_resolution: usize) -> Result<usize> {
         let mut polygons = 0;
         let turn_fraction = self.turn.fraction;
         for (color, points) in self.render(color_resolution, turn_fraction) {

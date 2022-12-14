@@ -1,4 +1,4 @@
-use crate::snake::{ Segment, Snake};
+use crate::snake::{Segment, Snake};
 use rayon::prelude::ParallelIterator;
 
 pub use other_snakes::OtherSnakes;

@@ -1,4 +1,5 @@
 use crate::app::game_context::GameContext;
+use crate::app::guidance::PathFinderTemplate;
 use crate::app::screen::Prefs;
 use crate::apple::{
     Apple, {self},
@@ -6,11 +7,10 @@ use crate::apple::{
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::HexPoint;
 use crate::snake::{
-    EatBehavior, EatMechanics, PassthroughKnowledge, Snake, {self},
+    EatBehavior, EatMechanics, Snake, {self},
 };
 use crate::snake_control;
 use rand::Rng;
-use crate::app::guidance::PathFinderTemplate;
 
 #[allow(unused_macros)]
 #[macro_export]

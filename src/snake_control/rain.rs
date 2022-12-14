@@ -1,9 +1,11 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::Dir;
-use crate::snake::{Body, {self}, PassthroughKnowledge};
+use crate::snake::{
+    Body, PassthroughKnowledge, {self},
+};
 use crate::snake_control::Controller;
-use crate::view::snakes::{ Snakes};
+use crate::view::snakes::Snakes;
 use ggez::Context;
 
 pub struct Rain;

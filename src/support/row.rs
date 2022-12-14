@@ -9,7 +9,7 @@ pub enum ROw<'a, T: 'a> {
 impl<'a, T: 'a> ROw<'a, T> {
     pub fn get(&self) -> &T {
         match self {
-            Self::Ref(x) => *x,
+            Self::Ref(x) => x,
             Self::Owned(ref x) => x,
         }
     }

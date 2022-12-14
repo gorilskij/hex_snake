@@ -4,11 +4,9 @@ use hsl::HSL;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
-use crate::apple::{
-    Apple,
-};
+use crate::apple::Apple;
 use crate::basic::transformations::translate;
-use crate::error::{AppErrorConversion, AppResult};
+use crate::error::{ErrorConversion, Result};
 use crate::rendering::segments::render_hexagon;
 use crate::rendering::{self};
 
@@ -17,7 +15,7 @@ pub fn apple_mesh(
     gtx: &GameContext,
     ctx: &mut Context,
     stats: &mut Stats,
-) -> AppResult<Mesh> {
+) -> Result<Mesh> {
     if apples.is_empty() {
         panic!("tried to draw a mesh with 0 apples")
     }
@@ -26,7 +24,7 @@ pub fn apple_mesh(
 
     let mut builder = MeshBuilder::new();
 
-    let res: AppResult<Mesh> = try {
+    let res: Result<Mesh> = try {
         for apple in apples {
             use crate::apple::Type::*;
             let color = match apple.apple_type {

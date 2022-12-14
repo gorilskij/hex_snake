@@ -9,7 +9,7 @@ use crate::snake;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::CellDim;
-use crate::error::{AppResult, Error};
+use crate::error::{Error, Result};
 use crate::snake::Snake;
 use ggez::event::EventHandler;
 use rand::rngs::ThreadRng;
@@ -58,7 +58,7 @@ pub trait Environment<R: Rng = ThreadRng> {
     fn apples(&self) -> &[Apple];
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext);
     fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut R);
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult;
+    fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result;
     fn remove_snake(&mut self, index: usize) -> Snake;
     fn remove_apple(&mut self, index: usize) -> Apple;
     fn gtx(&self) -> &GameContext;

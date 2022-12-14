@@ -10,7 +10,7 @@ use crate::apple::spawn::SpawnPolicy;
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint};
 use crate::color::Color;
-use crate::error::{AppResult, Error};
+use crate::error::{Error, Result};
 use crate::snake::{
     EatBehavior, EatMechanics, Snake, {self},
 };
@@ -22,6 +22,7 @@ use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
+use std::result;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -141,7 +142,7 @@ impl SnakeDemo {
         _draw_style: rendering::Style,
         _palette: &app::Palette,
         _stats: &mut Stats,
-    ) -> AppResult {
+    ) -> Result {
         unimplemented!("how do you use GameContext here??")
         // self.snake
         //     .update_dir(OtherSnakes::empty(), &[], self.board_dim, cell_dim, ctx, frame_stamp);
@@ -197,7 +198,7 @@ impl RngCore for NoRng {
         unimplemented!()
     }
 
-    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), rand::Error> {
+    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> result::Result<(), rand::Error> {
         unimplemented!()
     }
 }
@@ -220,7 +221,7 @@ impl Environment<NoRng> for SnakeDemo {
         panic!("tried to get rng of SnakeDemo")
     }
 
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult {
+    fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result {
         panic!("tried to add snake to SnakeDemo: {:?}", snake_builder)
     }
 
@@ -299,7 +300,7 @@ impl StartScreen {
 }
 
 impl EventHandler<Error> for StartScreen {
-    fn update(&mut self, _ctx: &mut Context) -> AppResult {
+    fn update(&mut self, _ctx: &mut Context) -> Result {
         unimplemented!("how do you use GameContext here??")
         // while self.control.borrow_mut().can_update(&mut self.gtx) {
         //     let frame_stamp = self.control.borrow().frame_stamp();
@@ -321,7 +322,7 @@ impl EventHandler<Error> for StartScreen {
         // Ok(())
     }
 
-    fn draw(&mut self, _ctx: &mut Context) -> AppResult {
+    fn draw(&mut self, _ctx: &mut Context) -> Result {
         unimplemented!("how do you use GameContext here??")
         // self.control.borrow_mut().graphics_frame(&mut self.gtx);
         // let frame_stamp = self.control.borrow().frame_stamp();

@@ -242,13 +242,13 @@ impl SegmentStyle {
     pub fn into_solid(self) -> Self {
         match self {
             Self::Solid(_) => self,
-            Self::RGBGradient { start_color: start_rgb, .. } => Self::Solid(Color::from(start_rgb)),
-            Self::HSLGradient { start_hue, lightness, .. } => Self::Solid(Color::from(
-                HSL { h: start_hue, s: 1., l: lightness }.to_color(),
-            )),
-            Self::OkLabGradient { start_hue, lightness, .. } => Self::Solid(Color::from(
-                OkLab::from_lch(lightness, 0.5, start_hue).to_color(),
-            )),
+            Self::RGBGradient { start_color: start_rgb, .. } => Self::Solid(start_rgb),
+            Self::HSLGradient { start_hue, lightness, .. } => {
+                Self::Solid(HSL { h: start_hue, s: 1., l: lightness }.to_color())
+            }
+            Self::OkLabGradient { start_hue, lightness, .. } => {
+                Self::Solid(OkLab::from_lch(lightness, 0.5, start_hue).to_color())
+            }
         }
     }
 }
@@ -269,7 +269,7 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
                     head_color: head,
                     tail_color: tail,
                     eaten,
-                    max_len: persistent.then(|| 0),
+                    max_len: persistent.then_some(0),
                 })
             }
             PaletteTemplate::HSLGradient {
@@ -283,7 +283,7 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
                 tail_hue,
                 lightness,
                 eaten_lightness,
-                max_len: persistent.then(|| 0),
+                max_len: persistent.then_some(0),
             }),
             PaletteTemplate::OkLabGradient {
                 head_hue,
@@ -296,7 +296,7 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
                 tail_hue,
                 lightness,
                 eaten_lightness,
-                max_len: persistent.then(|| 0),
+                max_len: persistent.then_some(0),
             }),
             PaletteTemplate::AlternatingFixed { color1, color2 } => Box::new(AlternatingFixed {
                 color1,
@@ -345,14 +345,14 @@ fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
         // The actual visual length of the eaten segment
         //  at the tail of the snake
         let eaten_segment_frac =
-            (food_left as f64 + 1. - frame_fraction as f64) / (original_food + 1) as f64;
+            (food_left as f64 + 1. - frame_fraction) / (original_food + 1) as f64;
 
         len - 1. + eaten_segment_frac + frame_fraction
     } else if body.grow > 0 {
         // If growth is happening for a reason other
         //  than eating (such as at the beginning of
         //  the game), correct only for the head
-        len + frame_fraction as f64
+        len + frame_fraction
     } else {
         // If the snake isn't growing, the head and
         //  tail corrections cancel out
@@ -407,7 +407,7 @@ impl Palette for RGBGradient {
             } else {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
                 let start_color =
-                    self.head_color + (self.tail_color - self.head_color) * r / logical_len as f64;
+                    self.head_color + (self.tail_color - self.head_color) * r / logical_len;
                 let end_color = self.head_color
                     + (self.tail_color - self.head_color) * (r + 1.) / logical_len as f64;
 
@@ -451,10 +451,9 @@ impl Palette for HSLGradient {
                 styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
             } else {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
-                let start_hue =
-                    self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len as f64;
+                let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
                 let end_hue =
-                    self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len as f64;
+                    self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
 
                 match seg.segment_type {
                     Normal | BlackHole { .. } => {
@@ -509,10 +508,8 @@ impl Palette for OkLabGradient {
         let logical_len = correct_len(logical_len, body, frame_fraction);
         for (i, seg) in body.segments.iter().enumerate() {
             let r = (i + body.missing_front) as f64 + frame_fraction;
-            let start_hue =
-                self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len as f64;
-            let end_hue =
-                self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len as f64;
+            let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
+            let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
             match seg.segment_type {
                 Normal | BlackHole { .. } => {
                     styles.push(SegmentStyle::OkLabGradient {
@@ -556,7 +553,7 @@ impl Palette for AlternatingFixed {
             self.last_head = head;
             self.iteration = !self.iteration;
         }
-        let expected_mod = if self.iteration { 0 } else { 1 };
+        let expected_mod = !self.iteration as usize;
         for (i, seg) in body.segments.iter().enumerate() {
             let color = match seg.segment_type {
                 Normal | BlackHole { .. } => {
@@ -597,7 +594,7 @@ impl Palette for Alternating {
             // How far along the snake we currently are (in units of segments)
             let r = (i + body.missing_front) as f64 + frame_fraction as f64;
 
-            let _color = match seg.segment_type {
+            match seg.segment_type {
                 Normal | BlackHole { .. } => {
                     // Check whether there is a minimum or maximum within this segment
                     use std::f64::consts::PI;

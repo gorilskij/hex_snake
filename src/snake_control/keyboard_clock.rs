@@ -3,7 +3,7 @@ use crate::apple::Apple;
 use crate::basic::{Dir, Dir12};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
-use crate::view::snakes::{ Snakes};
+use crate::view::snakes::Snakes;
 use ggez::event::KeyCode;
 use ggez::Context;
 

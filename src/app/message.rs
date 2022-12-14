@@ -1,5 +1,5 @@
 use crate::basic::Point;
-use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::error::{Error, ErrorConversion, Result};
 use ggez::graphics::{
     Color, DrawParam, Font, PxScale, Text, {self},
 };
@@ -63,7 +63,7 @@ impl Message {
 
     /// Returns Ok(true) if the message should continue existing
     /// and Ok(false) if it should be removed
-    pub fn draw(&self, ctx: &mut Context) -> AppResult<bool> {
+    pub fn draw(&self, ctx: &mut Context) -> Result<bool> {
         let mut text = Text::new(self.text.as_str());
         text.set_font(Font::default(), PxScale::from(self.font_size));
 

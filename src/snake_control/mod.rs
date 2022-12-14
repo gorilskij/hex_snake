@@ -1,18 +1,16 @@
 use crate::app::game_context::GameContext;
+use crate::app::guidance::{Path, PathFinderTemplate};
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12, Side};
-use crate::error::AppResult;
 use crate::snake::{Body, PassthroughKnowledge};
-use crate::view::snakes::{ Snakes};
+use crate::view::snakes::Snakes;
 use ggez::event::KeyCode;
-use ggez::graphics::Mesh;
 use ggez::Context;
 use itertools::{repeat_n, Itertools};
 use programmed::Move;
-use crate::app::guidance::{Path, PathFinder, PathFinderTemplate};
 
-mod a_star;
+mod algorithm;
 mod breadth_first;
 mod competitor1;
 mod competitor2;
@@ -22,7 +20,6 @@ mod killer;
 mod mouse;
 mod programmed;
 mod rain;
-mod algorithm;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -61,20 +58,18 @@ pub trait Controller {
     // only implemented for autopilot-like controllers
     fn get_path(
         &mut self,
-        body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
-        other_snakes: &dyn Snakes,
-        apples: &[Apple],
-        gtx: &GameContext,
-    ) -> Option<&Path> { None }
+        _body: &Body,
+        _passthrough_knowledge: Option<&PassthroughKnowledge>,
+        _other_snakes: &dyn Snakes,
+        _apples: &[Apple],
+        _gtx: &GameContext,
+    ) -> Option<&Path> {
+        None
+    }
 
     fn reset(&mut self, _dir: Dir) {}
 
     fn key_pressed(&mut self, _key: KeyCode) {}
-
-    // fn get_mesh(&self, _gtx: &GameContext, _ctx: &mut Context) -> Option<AppResult<Mesh>> {
-    //     None
-    // }
 
     // TODO: deprecate
     fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> {

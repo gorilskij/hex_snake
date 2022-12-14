@@ -1,12 +1,11 @@
-use ggez::Context;
 use crate::app::game_context::GameContext;
 use crate::app::guidance::{Path, PathFinder};
 use crate::apple::Apple;
 use crate::basic::Dir;
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
-use crate::support::limits::Limits;
 use crate::view::snakes::Snakes;
+use ggez::Context;
 
 pub struct Algorithm {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
@@ -40,7 +39,11 @@ impl Algorithm {
         }
 
         // recalculate
-        self.path = Some(self.pathfinder.get_path(body, passthrough_knowledge, other_snakes, apples, gtx));
+        self.path =
+            Some(
+                self.pathfinder
+                    .get_path(body, passthrough_knowledge, other_snakes, apples, gtx),
+            );
     }
 }
 
@@ -52,7 +55,7 @@ impl Controller for Algorithm {
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
-        ctx: &Context,
+        _ctx: &Context,
     ) -> Option<Dir> {
         self.recalculate_path(body, passthrough_knowledge, other_snakes, apples, gtx);
 
@@ -62,8 +65,10 @@ impl Controller for Algorithm {
             return Some(body.dir);
         }
 
-        let dir = path[0].dir_to(path[1]).expect("failed to compute dir between path points");
-        return Some(dir);
+        let dir = path[0]
+            .dir_to(path[1])
+            .expect("failed to compute dir between path points");
+        Some(dir)
     }
 
     fn get_path(

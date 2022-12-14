@@ -31,7 +31,6 @@ mod basic;
 mod app;
 mod color;
 mod keyboard;
-mod pathfinding;
 mod snake;
 mod view;
 #[macro_use]

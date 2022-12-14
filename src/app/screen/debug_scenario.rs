@@ -4,11 +4,13 @@ use ggez::graphics::{
 };
 use ggez::Context;
 use rand::prelude::*;
+use std::result;
 
 use crate::app::fps_control::{
     FpsControl, {self},
 };
 use crate::app::game_context::GameContext;
+use crate::app::guidance::PathFinderTemplate;
 use crate::app::prefs::Prefs;
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
@@ -18,9 +20,9 @@ use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::color::Color;
-use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::error::{Error, ErrorConversion, Result};
 use crate::snake::{
-    EatBehavior, EatMechanics, PassthroughKnowledge, Snake, {self},
+    EatBehavior, EatMechanics, Snake, {self},
 };
 use crate::view::snakes::OtherSnakes;
 use crate::{app, rendering, snake_control};
@@ -155,58 +157,61 @@ impl DebugScenario {
     }
 
     /// Stress test
-    // pub fn many_snakes() -> Self {
-    //     const NUM_SNAKES: usize = 100;
-    //
-    //     let rng = &mut thread_rng();
-    //     let seeds: Vec<_> = (0..NUM_SNAKES)
-    //         .map(|i| {
-    //             snake::Builder::default()
-    //                 .pos(HexPoint {
-    //                     h: i as isize / 7 * 2 + 3,
-    //                     v: i as isize % 10 * 2 + 3,
-    //                 })
-    //                 .dir(Dir::random(rng))
-    //                 .len(5)
-    //                 .snake_type(snake::Type::Competitor { life: None })
-    //                 .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
-    //                 .palette(snake::PaletteTemplate::pastel_rainbow(true))
-    //                 .controller(snake_control::Template::AStar {
-    //                     passthrough_knowledge: PassthroughKnowledge::always(false),
-    //                 })
-    //         })
-    //         .collect();
-    //
-    //     let mut this = Self {
-    //         fps_control: FpsControl::new(3.),
-    //
-    //         gtx: GameContext {
-    //             board_dim: HexDim { h: 0, v: 0 },
-    //             cell_dim: Default::default(),
-    //             palette: app::Palette::dark(),
-    //             prefs: Prefs::default().special_apples(false),
-    //             apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
-    //             frame_stamp: (0, 0.0),
-    //             game_frame_num: 0,
-    //             elapsed_millis: 0,
-    //         },
-    //
-    //         offset: None,
-    //         fit_to_window: true,
-    //
-    //         stats: Stats::default(),
-    //
-    //         apples: vec![],
-    //
-    //         seeds,
-    //         snakes: vec![],
-    //
-    //         rng: thread_rng(),
-    //     };
-    //     this.restart();
-    //     this.fps_control.pause();
-    //     this
-    // }
+    pub fn many_snakes() -> Self {
+        const NUM_SNAKES: usize = 100;
+
+        let rng = &mut thread_rng();
+        let seeds: Vec<_> = (0..NUM_SNAKES)
+            .map(|i| {
+                snake::Builder::default()
+                    .pos(HexPoint {
+                        h: i as isize / 7 * 2 + 3,
+                        v: i as isize % 10 * 2 + 3,
+                    })
+                    .dir(Dir::random(rng))
+                    .len(5)
+                    .snake_type(snake::Type::Competitor { life: None })
+                    .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
+                    .palette(snake::PaletteTemplate::pastel_rainbow(true))
+                    // .controller(snake_control::Template::AStar {
+                    //     passthrough_knowledge: PassthroughKnowledge::always(false),
+                    // })
+                    .controller(snake_control::Template::Algorithm(
+                        PathFinderTemplate::Algorithm1,
+                    ))
+            })
+            .collect();
+
+        let mut this = Self {
+            fps_control: FpsControl::new(3.),
+
+            gtx: GameContext {
+                board_dim: HexDim { h: 0, v: 0 },
+                cell_dim: Default::default(),
+                palette: app::Palette::dark(),
+                prefs: Prefs::default().special_apples(false),
+                apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
+                frame_stamp: (0, 0.0),
+                game_frame_num: 0,
+                elapsed_millis: 0,
+            },
+
+            offset: None,
+            fit_to_window: true,
+
+            stats: Stats::default(),
+
+            apples: vec![],
+
+            seeds,
+            snakes: vec![],
+
+            rng: thread_rng(),
+        };
+        this.restart();
+        this.fps_control.pause();
+        this
+    }
 
     /// Comparison of persistent and non-persistent skins entering a black hole
     pub fn double_head_body_collision(cell_dim: CellDim) -> Self {
@@ -303,7 +308,7 @@ impl DebugScenario {
             .seeds
             .iter()
             .map(snake::Builder::build)
-            .map(Result::unwrap)
+            .map(result::Result::unwrap)
             .collect();
         self.apples = vec![];
         self.gtx.apple_spawn_policy.reset();
@@ -332,14 +337,14 @@ impl DebugScenario {
 }
 
 impl EventHandler<Error> for DebugScenario {
-    fn update(&mut self, ctx: &mut Context) -> AppResult {
+    fn update(&mut self, ctx: &mut Context) -> Result {
         while self.fps_control.can_update(&mut self.gtx) {
             self.advance_snakes(ctx);
         }
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> AppResult {
+    fn draw(&mut self, ctx: &mut Context) -> Result {
         self.fps_control.graphics_frame(&mut self.gtx);
 
         graphics::clear(ctx, *Color::BLACK);
@@ -417,7 +422,7 @@ impl Environment for DebugScenario {
         (&mut self.snakes, &mut self.apples, &mut self.rng)
     }
 
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult {
+    fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result {
         self.snakes.push(
             snake_builder
                 .build()

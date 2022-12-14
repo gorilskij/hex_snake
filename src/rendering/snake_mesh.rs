@@ -8,7 +8,7 @@ use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::basic::transformations::translate;
 use crate::basic::{CellDim, Point};
-use crate::error::{AppErrorConversion, AppResult, Error};
+use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::segments::descriptions::{
     SegmentDescription, SegmentFraction, TurnDescription,
 };
@@ -22,7 +22,7 @@ fn build_hexagon_at(
     cell_dim: CellDim,
     color: Color,
     builder: &mut MeshBuilder,
-) -> AppResult {
+) -> Result {
     let mut hexagon_points = render_hexagon(cell_dim);
     translate(&mut hexagon_points, location);
     builder
@@ -129,7 +129,7 @@ pub fn snake_mesh(
     gtx: &GameContext,
     ctx: &mut Context,
     stats: &mut Stats,
-) -> AppResult<Mesh> {
+) -> Result<Mesh> {
     stats.redrawing_snakes = true;
 
     let frame_fraction = gtx.frame_stamp.1;
@@ -153,11 +153,8 @@ pub fn snake_mesh(
     let color_resolutions: Vec<_> = snakes
         .iter()
         .map(|snake| {
-            let resolution = match TOTAL_SUBSEGMENTS / snake.body.visible_len() {
-                x if x < MIN_SUBSEGMENTS => MIN_SUBSEGMENTS,
-                x if x > MAX_SUBSEGMENTS => MAX_SUBSEGMENTS,
-                x => x,
-            };
+            let resolution = (TOTAL_SUBSEGMENTS / snake.body.visible_len())
+                .clamp(MIN_SUBSEGMENTS, MAX_SUBSEGMENTS);
 
             if resolution > stats.max_color_resolution {
                 stats.max_color_resolution = resolution;

@@ -1,7 +1,7 @@
 use crate::snake;
 use ggez::GameError;
-use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::{fmt, result};
 
 #[derive(Debug)]
 pub enum ErrorType {
@@ -50,13 +50,13 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
-pub type AppResult<T = ()> = Result<T, Error>;
+pub type Result<T = ()> = result::Result<T, Error>;
 
-pub trait AppErrorConversion {
+pub trait ErrorConversion {
     fn with_trace_step<S: ToString>(self, s: S) -> Self;
 }
 
-impl<T> AppErrorConversion for AppResult<T> {
+impl<T> ErrorConversion for Result<T> {
     fn with_trace_step<S: ToString>(self, s: S) -> Self {
         self.map_err(|e| e.with_trace_step(s.to_string()))
     }

@@ -1,4 +1,4 @@
-use crate::snake::{ Snake};
+use crate::snake::Snake;
 use crate::view::snakes::{ObjectSafeParallelIterator, Snakes};
 use rayon::prelude::*;
 

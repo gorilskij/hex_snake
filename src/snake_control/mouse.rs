@@ -1,13 +1,9 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
-use crate::basic::transformations::translate;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
-use crate::error::{AppErrorConversion, AppResult, Error};
-use crate::rendering::segments::render_hexagon;
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
-use crate::view::snakes::{ Snakes};
-use ggez::graphics::{Color, DrawMode, Mesh, StrokeOptions};
+use crate::view::snakes::Snakes;
 use ggez::input::mouse;
 use ggez::Context;
 use std::f32::consts::TAU;

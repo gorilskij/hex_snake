@@ -1,7 +1,5 @@
 use crate::basic::{Food, HexPoint};
-use crate::{
-    snake,
-};
+use crate::snake;
 
 #[macro_use]
 pub mod spawn;

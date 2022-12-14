@@ -24,7 +24,7 @@ impl<T> Limits for VecDeque<T> {
     }
 
     fn last(&self) -> Option<&Self::Value> {
-        self.get(self.len() - 1)
+        self.back()
     }
 
     fn last_mut(&mut self) -> Option<&mut Self::Value> {
