@@ -7,7 +7,7 @@ use crate::basic::{Dir, FrameStamp, HexDim, HexPoint};
 use crate::snake_control;
 use ggez::Context;
 
-use crate::app::guidance::PathFinderTemplate;
+use crate::snake_control::pathfinder;
 use crate::apple::Apple;
 use crate::basic::Frames;
 use crate::snake_control::Controller;
@@ -154,7 +154,7 @@ pub struct Builder {
     pub palette: Option<PaletteTemplate>,
     pub controller: Option<snake_control::Template>,
 
-    pub autopilot: Option<PathFinderTemplate>,
+    pub autopilot: Option<pathfinder::Template>,
     pub autopilot_control: bool,
 }
 
@@ -218,7 +218,7 @@ impl Builder {
 
     #[inline(always)]
     #[must_use]
-    pub fn autopilot(mut self, value: PathFinderTemplate) -> Self {
+    pub fn autopilot(mut self, value: pathfinder::Template) -> Self {
         self.autopilot = Some(value);
         self
     }
@@ -301,7 +301,7 @@ impl Builder {
                 .palette
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `palette`"))?
                 .into(),
-            autopilot: self.autopilot.map(|template| {
+            autopilot: self.autopilot.clone().map(|template| {
                 let controller_template = snake_control::Template::Algorithm(template);
                 controller_template.into_controller(dir)
             }),

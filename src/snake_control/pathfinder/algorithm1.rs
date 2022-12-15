@@ -1,41 +1,14 @@
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::rc::Rc;
+use map_with_state::IntoMapWithState;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::view::snakes::Snakes;
-use map_with_state::IntoMapWithState;
-use std::cell::RefCell;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::Rc;
-
-// TODO: factor this out
-pub type Path = VecDeque<HexPoint>;
-
-pub trait PathFinder {
-    // TODO: take PassthroughKnowledge as an argument
-    fn get_path(
-        &self,
-        body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
-        other_snakes: &dyn Snakes,
-        apples: &[Apple],
-        gtx: &GameContext,
-    ) -> Path;
-}
-
-#[derive(Copy, Clone, Debug)]
-pub enum PathFinderTemplate {
-    Algorithm1,
-}
-
-impl PathFinderTemplate {
-    pub fn into_pathfinder(self, _start_dir: Dir) -> Box<dyn PathFinder + Send + Sync> {
-        match self {
-            PathFinderTemplate::Algorithm1 => Box::new(Algorithm1),
-        }
-    }
-}
+use super::{Path, PathFinder};
 
 // TODO: instead of cloning, use more Rcs
 #[derive(Clone)]
@@ -62,16 +35,6 @@ impl Iterator for Iter<'_> {
 }
 
 impl SearchPoint {
-    fn get_path(&self) -> Path {
-        let mut vd = VecDeque::with_capacity(self.len);
-        for pos in Iter(Some(self)) {
-            vd.push_front(pos);
-        }
-        vd
-    }
-}
-
-impl SearchPoint {
     const TURN_COST: usize = 5;
     const TELEPORT_COST: usize = 15;
 
@@ -81,6 +44,14 @@ impl SearchPoint {
 
     fn is_successful(&self, apples: &[Apple]) -> bool {
         apples.iter().any(|apple| apple.pos == self.pos)
+    }
+
+    fn get_path(&self) -> Path {
+        let mut vd = VecDeque::with_capacity(self.len);
+        for pos in Iter(Some(self)) {
+            vd.push_front(pos);
+        }
+        vd
     }
 }
 
@@ -95,7 +66,7 @@ impl PathFinder for Algorithm1 {
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
-    ) -> Path {
+    ) -> Option<Path> {
         let off_limits: HashSet<_> = if let Some(pk) = passthrough_knowledge {
             body.segments
                 .iter()
@@ -203,12 +174,13 @@ impl PathFinder for Algorithm1 {
                 let gen_min_cost = generation.iter().map(|sp| sp.cost()).min();
                 match gen_min_cost {
                     Some(cost) if cost < best_cost - 1 => {}
-                    _ => return shortest_paths.borrow()[&best_pos].get_path(),
+                    _ => return Some(shortest_paths.borrow()[&best_pos].get_path()),
                 }
             }
 
-            // failsafe
-            assert!(!generation.is_empty(), "exhaustive search found no apples");
+            if generation.is_empty() {
+                return None;
+            }
         }
     }
 }

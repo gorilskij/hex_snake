@@ -1,5 +1,5 @@
 use crate::app::game_context::GameContext;
-use crate::app::guidance::PathFinderTemplate;
+use crate::snake_control::pathfinder;
 use crate::app::screen::Prefs;
 use crate::apple::{
     Apple, {self},
@@ -113,7 +113,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                     .snake_type(snake::Type::Competitor { life: Some(200) })
                     .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                     .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                    .controller(snake_control::Template::Algorithm(PathFinderTemplate::Algorithm1))
+                    .controller(snake_control::Template::Algorithm(pathfinder::Template::Algorithm1))
                     .speed(1.)
                 ))
             },

@@ -10,7 +10,7 @@ use crate::app::fps_control::{
     FpsControl, {self},
 };
 use crate::app::game_context::GameContext;
-use crate::app::guidance::PathFinderTemplate;
+use crate::snake_control::pathfinder;
 use crate::app::prefs::Prefs;
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
@@ -177,7 +177,7 @@ impl DebugScenario {
                     //     passthrough_knowledge: PassthroughKnowledge::always(false),
                     // })
                     .controller(snake_control::Template::Algorithm(
-                        PathFinderTemplate::Algorithm1,
+                        pathfinder::Template::Algorithm1,
                     ))
             })
             .collect();

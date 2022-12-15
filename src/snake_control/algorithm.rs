@@ -1,5 +1,5 @@
 use crate::app::game_context::GameContext;
-use crate::app::guidance::{Path, PathFinder};
+use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::apple::Apple;
 use crate::basic::Dir;
 use crate::snake::{Body, PassthroughKnowledge};
@@ -39,11 +39,9 @@ impl Algorithm {
         }
 
         // recalculate
-        self.path =
-            Some(
-                self.pathfinder
-                    .get_path(body, passthrough_knowledge, other_snakes, apples, gtx),
-            );
+        // println!("recalculating");
+        self.path = self.pathfinder
+            .get_path(body, passthrough_knowledge, other_snakes, apples, gtx);
     }
 }
 
@@ -59,7 +57,9 @@ impl Controller for Algorithm {
     ) -> Option<Dir> {
         self.recalculate_path(body, passthrough_knowledge, other_snakes, apples, gtx);
 
-        let path = self.path.as_mut().unwrap();
+        // TODO: detect and warn about excessive recalculation
+        // WARNING: this can cause excessive recalculation
+        let path = self.path.as_mut()?;
         if path.len() < 2 {
             // if the path has length 1, we're about to eat an apple, maintain course
             return Some(body.dir);

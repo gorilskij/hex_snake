@@ -32,6 +32,7 @@ impl EatMechanics {
     }
 }
 
+// TODO: rename
 // information an ai algorithm has about which types of segments it can pass through
 #[derive(Clone, Debug)]
 pub struct PassthroughKnowledge {

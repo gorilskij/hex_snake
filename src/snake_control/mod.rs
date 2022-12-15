@@ -1,5 +1,4 @@
 use crate::app::game_context::GameContext;
-use crate::app::guidance::{Path, PathFinderTemplate};
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12, Side};
@@ -7,8 +6,9 @@ use crate::snake::{Body, PassthroughKnowledge};
 use crate::view::snakes::Snakes;
 use ggez::event::KeyCode;
 use ggez::Context;
-use itertools::{repeat_n, Itertools};
+use itertools::{Itertools, repeat_n};
 use programmed::Move;
+use crate::snake_control::pathfinder::Path;
 
 mod algorithm;
 mod breadth_first;
@@ -20,6 +20,7 @@ mod killer;
 mod mouse;
 mod programmed;
 mod rain;
+pub mod pathfinder;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -37,7 +38,7 @@ pub enum Template {
     // AStar {
     //     passthrough_knowledge: PassthroughKnowledge,
     // },
-    Algorithm(PathFinderTemplate),
+    Algorithm(pathfinder::Template),
     Rain,
 }
 
