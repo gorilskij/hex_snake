@@ -49,6 +49,7 @@ pub struct Game {
     // TODO: keep apples in order of position to allow for binary search
     // TODO: specialized Vec for that
     apples: Vec<Apple>,
+    animated_apples: bool,
 
     rng: ThreadRng,
 
@@ -103,6 +104,7 @@ impl Game {
             seeds: seeds.into_iter().map(Into::into).collect(),
             snakes: vec![],
             apples: vec![],
+            animated_apples: false,
 
             rng: thread_rng(),
 
@@ -166,6 +168,11 @@ impl Game {
     fn restart(&mut self) {
         self.snakes.clear();
         self.apples.clear();
+
+        self.snake_mesh = None;
+        self.apple_mesh = None;
+        self.distance_grid_mesh = None;
+        self.player_path_mesh = None;
 
         // seeds without a defined spawn point
         let unpositioned = self
@@ -267,7 +274,8 @@ impl Game {
 
     fn spawn_apples(&mut self) {
         let new_apples = spawn_apples(&self.snakes, &self.apples, &mut self.gtx, &mut self.rng);
-        self.apples.extend(new_apples.into_iter())
+        self.animated_apples = self.animated_apples || new_apples.iter().any(|apple| apple.apple_type.is_animated());
+        self.apples.extend(new_apples.into_iter());
     }
 
     fn draw_messages(&mut self, ctx: &mut Context) -> Result {
@@ -370,7 +378,9 @@ impl EventHandler<Error> for Game {
 
         let mut stats = Stats::default();
 
-        if self.fps_control.state() == fps_control::State::Playing {
+        let playing = self.fps_control.state() == fps_control::State::Playing;
+
+        if playing {
             // Update the direction of the snake early
             // to see it turning as soon as possible,
             // this could happen in the middle of a
@@ -380,52 +390,55 @@ impl EventHandler<Error> for Game {
                 let (snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, idx);
                 snake.update_dir(other_snakes, &self.apples, &self.gtx, ctx);
             }
+        }
 
-            if self.gtx.prefs.draw_grid && self.grid_mesh.is_none() {
-                self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
-            }
+        if self.gtx.prefs.draw_grid && self.grid_mesh.is_none() {
+            self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
+        }
 
-            if self.gtx.prefs.draw_border && self.border_mesh.is_none() {
-                self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
-            }
+        if self.gtx.prefs.draw_border && self.border_mesh.is_none() {
+            self.border_mesh = Some(rendering::border_mesh(&self.gtx, ctx)?);
+        }
 
+        if self.snake_mesh.is_none() || playing {
             self.snake_mesh = Some(rendering::snake_mesh(
                 &mut self.snakes,
                 &self.gtx,
                 ctx,
                 &mut stats,
             )?);
+        }
 
-            // TODO: only recompute apple mesh if there are animated apples
+        // only recompute apple mesh if there are animated apples
+        if self.apple_mesh.is_none() || self.animated_apples {
             self.apple_mesh = Some(rendering::apple_mesh(
                 &self.apples,
                 &self.gtx,
                 ctx,
                 &mut stats,
             )?);
-
-            let player_idx = self.first_player_snake_idx().expect("no player snake");
-            let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, player_idx);
-
-            if self.gtx.prefs.draw_distance_grid {
-                self.distance_grid_mesh = Some(
-                    self.distance_grid.mesh(player_snake, other_snakes, ctx, &self.gtx)?);
-            }
-
-            if self.gtx.prefs.draw_player_path {
-                // could still be None if the player snake doesn't have an autopilot
-                self.player_path_mesh = rendering::player_path_mesh(
-                    player_snake,
-                    other_snakes,
-                    &self.apples,
-                    ctx,
-                    &self.gtx,
-                    &mut stats,
-                ).invert()?;
-            }
         }
 
-        // TODO: implement freezing mechanism, if nothing changed, don't redraw at all
+        let player_idx = self.first_player_snake_idx().expect("no player snake");
+        let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, player_idx);
+
+        if self.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
+            self.distance_grid_mesh = Some(
+                self.distance_grid.mesh(player_snake, other_snakes, ctx, &self.gtx)?);
+        }
+
+        if self.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
+            // could still be None if the player snake doesn't have an autopilot
+            self.player_path_mesh = rendering::player_path_mesh(
+                player_snake,
+                other_snakes,
+                &self.apples,
+                ctx,
+                &self.gtx,
+                &mut stats,
+            ).invert()?;
+        }
+
         let draw_param = DrawParam::default().dest(self.offset);
 
         graphics::clear(ctx, self.gtx.palette.background_color);
@@ -480,6 +493,8 @@ impl EventHandler<Error> for Game {
                 let text = if self.gtx.prefs.draw_grid {
                     "Grid on"
                 } else {
+                    self.grid_mesh = None;
+                    self.border_mesh = None;
                     "Grid off"
                 };
                 self.display_notification(text);
@@ -488,6 +503,7 @@ impl EventHandler<Error> for Game {
                 let text = if self.gtx.prefs.draw_distance_grid.flip() {
                     "Distance grid on"
                 } else {
+                    self.distance_grid_mesh = None;
                     "Distance grid off"
                 };
                 self.display_notification(text);
@@ -496,6 +512,7 @@ impl EventHandler<Error> for Game {
                 let text = if self.gtx.prefs.draw_player_path.flip() {
                     "Path on"
                 } else {
+                    self.player_path_mesh = None;
                     "Path off"
                 };
                 self.display_notification(text);
@@ -525,6 +542,7 @@ impl EventHandler<Error> for Game {
                         let text = if player_snake.autopilot_control.flip() {
                             "Autopilot on"
                         } else {
+                            player_snake.controller.reset(player_snake.body.dir);
                             "Autopilot off"
                         };
                         self.display_notification(text);
@@ -584,12 +602,9 @@ impl EventHandler<Error> for Game {
                         text = "draw style: hexagon";
                     }
                 }
+                self.snake_mesh = None;
+                self.apple_mesh = None;
                 self.display_notification(text);
-                if self.fps_control.state() != fps_control::State::Playing {
-                    self.draw_cache_invalid = 5;
-                    self.snake_mesh = None;
-                    self.apple_mesh = None;
-                }
             }
             X => {
                 let text = if self.gtx.prefs.special_apples.flip() {
@@ -684,7 +699,10 @@ impl Environment for Game {
 
     // TODO: notification system so autopilots can adapt
     fn remove_apple(&mut self, index: usize) -> Apple {
-        self.apples.remove(index)
+        let apple = self.apples.remove(index);
+        self.animated_apples = self.apples.iter().any(|apple| apple.apple_type.is_animated());
+        self.apple_mesh = None;
+        apple
     }
 
     fn gtx(&self) -> &GameContext {
