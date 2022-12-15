@@ -13,7 +13,6 @@ use algorithm1::Algorithm1;
 use space_filling::SpaceFilling;
 use with_backup::WithBackup;
 
-// TODO: factor this out
 pub type Path = VecDeque<HexPoint>;
 
 pub trait PathFinder {
