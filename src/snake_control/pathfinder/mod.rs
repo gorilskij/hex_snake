@@ -1,21 +1,17 @@
 mod algorithm1;
-mod with_backup;
 mod space_filling;
+mod with_backup;
 
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::view::snakes::Snakes;
-use map_with_state::IntoMapWithState;
-use std::cell::RefCell;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::Rc;
+use std::collections::VecDeque;
 
 use algorithm1::Algorithm1;
-use with_backup::WithBackup;
 use space_filling::SpaceFilling;
+use with_backup::WithBackup;
 
 // TODO: factor this out
 pub type Path = VecDeque<HexPoint>;
@@ -44,11 +40,14 @@ pub enum Template {
 }
 
 impl Template {
-    pub fn into_pathfinder(self, start_dir: Dir) -> Box<dyn PathFinder + Send + Sync> {
+    pub fn into_pathfinder(self, _start_dir: Dir) -> Box<dyn PathFinder + Send + Sync> {
         match self {
             Template::Algorithm1 => Box::new(Algorithm1),
             Template::SpaceFilling => Box::new(SpaceFilling),
-            Template::WithBackup { main, backup } => Box::new(WithBackup { main: main.into_pathfinder(start_dir), backup: backup.into_pathfinder(start_dir) }),
+            Template::WithBackup { main, backup } => Box::new(WithBackup {
+                main: main.into_pathfinder(_start_dir),
+                backup: backup.into_pathfinder(_start_dir),
+            }),
         }
     }
 }

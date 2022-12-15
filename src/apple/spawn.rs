@@ -1,27 +1,23 @@
 use crate::app::game_context::GameContext;
-use crate::snake_control::pathfinder;
 use crate::app::screen::Prefs;
-use crate::apple::{
-    Apple, {self},
-};
+use crate::apple::{self, Apple};
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::HexPoint;
-use crate::snake::{
-    EatBehavior, EatMechanics, Snake, {self},
-};
+use crate::snake::{self, EatBehavior, EatMechanics, Snake};
 use crate::snake_control;
+use crate::snake_control::pathfinder;
 use rand::Rng;
 
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! spawn_schedule {
     (@ spawn($h:expr, $v:expr) ) => {
-        crate::apple::spawn::ScheduledSpawn::Spawn(
-            crate::basic::HexPoint { h: $h, v: $v }
+        $crate::apple::spawn::ScheduledSpawn::Spawn(
+            $crate::basic::HexPoint { h: $h, v: $v }
         )
     };
     (@ wait($t:expr) ) => {
-        crate::apple::spawn::ScheduledSpawn::Wait {
+        $crate::apple::spawn::ScheduledSpawn::Wait {
             total: $t,
             current: 0,
         }

@@ -1,8 +1,6 @@
 use crate::basic::Point;
 use crate::error::{Error, ErrorConversion, Result};
-use ggez::graphics::{
-    Color, DrawParam, Font, PxScale, Text, {self},
-};
+use ggez::graphics::{self, Color, DrawParam, Font, PxScale, Text};
 use ggez::Context;
 use std::time::{Duration, Instant};
 

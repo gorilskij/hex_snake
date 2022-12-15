@@ -1,8 +1,8 @@
 use crate::app::game_context::GameContext;
-use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::apple::Apple;
 use crate::basic::Dir;
 use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::Context;
@@ -40,8 +40,9 @@ impl Algorithm {
 
         // recalculate
         // println!("recalculating");
-        self.path = self.pathfinder
-            .get_path(body, passthrough_knowledge, other_snakes, apples, gtx);
+        self.path =
+            self.pathfinder
+                .get_path(body, passthrough_knowledge, other_snakes, apples, gtx);
     }
 }
 

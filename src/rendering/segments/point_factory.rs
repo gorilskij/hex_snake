@@ -8,12 +8,12 @@ use crate::color::oklab::OkLab;
 use crate::color::to_color::ToColor;
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
+use crate::rendering;
 use crate::rendering::segments::descriptions::{
     SegmentDescription, SegmentFraction, TurnDirection, TurnType,
 };
 use crate::rendering::segments::hexagon_segments::HexagonSegments;
 use crate::rendering::segments::smooth_segments::SmoothSegments;
-use crate::rendering::{self};
 use crate::snake::palette::SegmentStyle;
 
 impl SegmentDescription {

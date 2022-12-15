@@ -3,12 +3,12 @@ use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12, Side};
 use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake_control::pathfinder::Path;
 use crate::view::snakes::Snakes;
 use ggez::event::KeyCode;
 use ggez::Context;
-use itertools::{Itertools, repeat_n};
+use itertools::{repeat_n, Itertools};
 use programmed::Move;
-use crate::snake_control::pathfinder::Path;
 
 mod algorithm;
 mod breadth_first;
@@ -18,9 +18,9 @@ mod keyboard;
 mod keyboard_clock;
 mod killer;
 mod mouse;
+pub mod pathfinder;
 mod programmed;
 mod rain;
-pub mod pathfinder;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]

@@ -1,18 +1,12 @@
 use std::collections::HashMap;
-use std::f32::consts::PI;
-use std::iter;
 
 use ggez::event::{EventHandler, KeyCode, KeyMods};
-use ggez::graphics::{
-    Color, DrawMode, DrawParam, Mesh, MeshBuilder, {self},
-};
+use ggez::graphics::{self, Color, DrawParam, Mesh};
 use ggez::Context;
 use rand::prelude::*;
 
 use crate::app::distance_grid::DistanceGrid;
-use crate::app::fps_control::{
-    FpsControl, {self},
-};
+use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
 use crate::app::message::{Message, MessageID};
 use crate::app::palette::Palette;
@@ -23,17 +17,13 @@ use crate::app::snake_management::{
 };
 use crate::app::stats::Stats;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
-use crate::apple::{
-    Apple, {self},
-};
+use crate::apple::{self, Apple};
 use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
-use crate::basic::transformations::{rotate_clockwise, translate};
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;
-use crate::snake::{self, PassthroughKnowledge, Snake};
+use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
 use crate::support::invert::Invert;
-use crate::support::row::ROw;
 use crate::view::snakes::OtherSnakes;
 
 pub struct Game {
@@ -111,7 +101,6 @@ impl Game {
             distance_grid: DistanceGrid::new(),
 
             messages: HashMap::new(),
-
 
             grid_mesh: None,
             border_mesh: None,
@@ -274,7 +263,10 @@ impl Game {
 
     fn spawn_apples(&mut self) {
         let new_apples = spawn_apples(&self.snakes, &self.apples, &mut self.gtx, &mut self.rng);
-        self.animated_apples = self.animated_apples || new_apples.iter().any(|apple| apple.apple_type.is_animated());
+        self.animated_apples = self.animated_apples
+            || new_apples
+                .iter()
+                .any(|apple| apple.apple_type.is_animated());
         self.apples.extend(new_apples.into_iter());
     }
 
@@ -423,8 +415,11 @@ impl EventHandler<Error> for Game {
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, player_idx);
 
         if self.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
-            self.distance_grid_mesh = Some(
-                self.distance_grid.mesh(player_snake, other_snakes, ctx, &self.gtx)?);
+            self.distance_grid_mesh =
+                Some(
+                    self.distance_grid
+                        .mesh(player_snake, other_snakes, ctx, &self.gtx)?,
+                );
         }
 
         if self.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
@@ -436,7 +431,8 @@ impl EventHandler<Error> for Game {
                 ctx,
                 &self.gtx,
                 &mut stats,
-            ).invert()?;
+            )
+            .invert()?;
         }
 
         let draw_param = DrawParam::default().dest(self.offset);
@@ -452,10 +448,8 @@ impl EventHandler<Error> for Game {
             &self.border_mesh,
         ];
 
-        for mesh in meshes {
-            if let Some(mesh) = mesh {
-                graphics::draw(ctx, mesh, draw_param)?;
-            }
+        for mesh in meshes.into_iter().flatten() {
+            graphics::draw(ctx, mesh, draw_param)?;
         }
 
         if self.gtx.prefs.display_stats {
@@ -700,7 +694,10 @@ impl Environment for Game {
     // TODO: notification system so autopilots can adapt
     fn remove_apple(&mut self, index: usize) -> Apple {
         let apple = self.apples.remove(index);
-        self.animated_apples = self.apples.iter().any(|apple| apple.apple_type.is_animated());
+        self.animated_apples = self
+            .apples
+            .iter()
+            .any(|apple| apple.apple_type.is_animated());
         self.apple_mesh = None;
         apple
     }

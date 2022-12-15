@@ -11,9 +11,7 @@ use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint};
 use crate::color::Color;
 use crate::error::{Error, Result};
-use crate::snake::{
-    EatBehavior, EatMechanics, Snake, {self},
-};
+use crate::snake::{self, EatBehavior, EatMechanics, Snake};
 use crate::snake_control::Template;
 use crate::{app, rendering, spawn_schedule};
 use ggez::event::{EventHandler, KeyCode, KeyMods};

@@ -1,9 +1,7 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{angle_distance, CellDim, Dir, HexDim, HexPoint};
-use crate::snake::{
-    Body, PassthroughKnowledge, Segment, {self},
-};
+use crate::snake::{self, Body, PassthroughKnowledge, Segment};
 use crate::snake_control::Controller;
 use crate::support::partial_min_max::PartialMinMax;
 use crate::view::snakes::Snakes;

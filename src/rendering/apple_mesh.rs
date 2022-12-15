@@ -7,8 +7,8 @@ use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::basic::transformations::translate;
 use crate::error::{ErrorConversion, Result};
+use crate::rendering;
 use crate::rendering::segments::render_hexagon;
-use crate::rendering::{self};
 
 pub fn apple_mesh(
     apples: &[Apple],

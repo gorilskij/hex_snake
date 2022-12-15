@@ -408,8 +408,8 @@ impl Palette for RGBGradient {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
                 let start_color =
                     self.head_color + (self.tail_color - self.head_color) * r / logical_len;
-                let end_color = self.head_color
-                    + (self.tail_color - self.head_color) * (r + 1.) / logical_len as f64;
+                let end_color =
+                    self.head_color + (self.tail_color - self.head_color) * (r + 1.) / logical_len;
 
                 match seg.segment_type {
                     Normal | BlackHole { .. } => {

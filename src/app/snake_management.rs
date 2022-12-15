@@ -5,9 +5,7 @@ use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::{Dir, HexPoint};
 use crate::error::{Error, ErrorConversion, Result};
-use crate::snake::{
-    EatBehavior, EatMechanics, SegmentType, State, {self},
-};
+use crate::snake::{self, EatBehavior, EatMechanics, SegmentType, State};
 use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
 use ggez::Context;

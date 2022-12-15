@@ -7,10 +7,9 @@ use crate::basic::{Dir, FrameStamp, HexDim, HexPoint};
 use crate::snake_control;
 use ggez::Context;
 
-use crate::snake_control::pathfinder;
 use crate::apple::Apple;
 use crate::basic::Frames;
-use crate::snake_control::Controller;
+use crate::snake_control::{pathfinder, Controller};
 use crate::view::snakes::Snakes;
 pub use eat_mechanics::{EatBehavior, EatMechanics, PassthroughKnowledge};
 

@@ -3,15 +3,13 @@ use ggez::graphics::{self, Rect};
 use ggez::Context;
 use itertools::Itertools;
 
-use crate::snake_control::pathfinder;
 use crate::app::screen::{DebugScenario, StartScreen};
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::CellDim;
 use crate::error::{Error, ErrorConversion, Result};
-use crate::snake::{
-    {self}, EatBehavior, EatMechanics, PassthroughKnowledge, SegmentRawType,
-};
+use crate::snake::{self, EatBehavior, EatMechanics, PassthroughKnowledge, SegmentRawType};
 use crate::snake_control;
+use crate::snake_control::pathfinder;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
@@ -76,7 +74,10 @@ impl App {
                         passthrough_knowledge,
                     })
                     .speed(1.)
-                    .autopilot(pathfinder::Template::WithBackup { main: Box::new(pathfinder::Template::Algorithm1), backup: Box::new(pathfinder::Template::SpaceFilling) })
+                    .autopilot(pathfinder::Template::WithBackup {
+                        main: Box::new(pathfinder::Template::Algorithm1),
+                        backup: Box::new(pathfinder::Template::SpaceFilling),
+                    })
                 // .snake_control(snake_control::Template::Mouse)
                 // .snake_control(SnakeControllerTemplate::PlayerController12)
             })

@@ -1,16 +1,11 @@
 use ggez::event::{EventHandler, KeyCode, KeyMods};
-use ggez::graphics::{
-    DrawParam, {self},
-};
+use ggez::graphics::{self, DrawParam};
 use ggez::Context;
 use rand::prelude::*;
 use std::result;
 
-use crate::app::fps_control::{
-    FpsControl, {self},
-};
+use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
-use crate::snake_control::pathfinder;
 use crate::app::prefs::Prefs;
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
@@ -21,9 +16,8 @@ use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
-use crate::snake::{
-    EatBehavior, EatMechanics, Snake, {self},
-};
+use crate::snake::{self, EatBehavior, EatMechanics, Snake};
+use crate::snake_control::pathfinder;
 use crate::view::snakes::OtherSnakes;
 use crate::{app, rendering, snake_control};
 
