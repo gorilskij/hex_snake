@@ -239,15 +239,15 @@ pub enum SegmentStyle {
 }
 
 impl SegmentStyle {
-    pub fn into_solid(self) -> Self {
+    pub fn first_color(self) -> Color {
         match self {
-            Self::Solid(_) => self,
-            Self::RGBGradient { start_color: start_rgb, .. } => Self::Solid(start_rgb),
+            Self::Solid(c) => c,
+            Self::RGBGradient { start_color: start_rgb, .. } => start_rgb,
             Self::HSLGradient { start_hue, lightness, .. } => {
-                Self::Solid(HSL { h: start_hue, s: 1., l: lightness }.to_color())
+                HSL { h: start_hue, s: 1., l: lightness }.to_color()
             }
             Self::OkLabGradient { start_hue, lightness, .. } => {
-                Self::Solid(OkLab::from_lch(lightness, 0.5, start_hue).to_color())
+                OkLab::from_lch(lightness, 0.5, start_hue).to_color()
             }
         }
     }

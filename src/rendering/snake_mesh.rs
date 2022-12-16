@@ -1,11 +1,11 @@
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
+use hsl::HSL;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 use std::cmp::Ordering;
 use std::slice;
 use std::sync::Mutex;
-use hsl::HSL;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
@@ -245,28 +245,25 @@ pub fn snake_mesh(
         } else {
             delta.y += gtx.cell_dim.sin * ((frame_fraction - 0.5) / 0.5);
         }
-        rotate_clockwise(slice::from_mut(&mut delta), Point::zero(), Dir::D.clockwise_angle_to(desc.turn.going_to));
+        rotate_clockwise(
+            slice::from_mut(&mut delta),
+            Point::zero(),
+            Dir::D.clockwise_angle_to(desc.turn.going_to),
+        );
         translate(slice::from_mut(&mut dest), delta);
 
         let color = match desc.segment_style {
             SegmentStyle::Solid(c) => c,
             SegmentStyle::RGBGradient { start_color: c, .. } => c,
-            SegmentStyle::HSLGradient { start_hue: h, lightness: l, .. } => HSL {
-                h,
-                s: 1.0,
-                l,
-            }.to_color(),
-            SegmentStyle::OkLabGradient { start_hue: h, lightness: l, .. } => OkLab::from_lch(l, 1.0, h).to_color(),
+            SegmentStyle::HSLGradient { start_hue: h, lightness: l, .. } => {
+                HSL { h, s: 1.0, l }.to_color()
+            }
+            SegmentStyle::OkLabGradient { start_hue: h, lightness: l, .. } => {
+                OkLab::from_lch(l, 1.0, h).to_color()
+            }
         };
 
-        builder
-            .circle(
-                DrawMode::fill(),
-                dest,
-                gtx.cell_dim.side / 2.,
-                0.1,
-                *color,
-            )?;
+        builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
     }
 
     descs.into_iter().try_for_each(|(desc, resolution)| {
