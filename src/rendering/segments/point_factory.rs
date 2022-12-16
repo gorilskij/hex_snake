@@ -21,6 +21,13 @@ impl SegmentDescription {
     /// this is used to assign a solid color to each subsegment and thus
     /// simulate a smooth gradient
     fn split_into_subsegments(mut self, num_subsegments: usize) -> Vec<Self> {
+        if self.draw_style == rendering::Style::Hexagon {
+            // hexagon segments don't support gradients
+            self.fraction = SegmentFraction::solid();
+            self.segment_style = self.segment_style.into_solid();
+            return vec![self];
+        }
+
         if num_subsegments == 1 {
             self.segment_style = self.segment_style.into_solid();
             return vec![self];
@@ -124,20 +131,8 @@ impl SegmentDescription {
         color_resolution: usize,
         turn_fraction: f32,
     ) -> Vec<(Color, Vec<Point>)> {
-        let subsegments = if self.draw_style == rendering::Style::Hexagon {
-            // hexagon segments don't support gradients
-            self.fraction = SegmentFraction::solid();
-            self.segment_style = self.segment_style.into_solid();
-            vec![self]
-        } else {
-            self.split_into_subsegments(color_resolution)
-        };
-
-        // self.fraction = SegmentFraction::solid();
-        // self.segment_style = self.segment_style.into_solid();
-        // let subsegments = vec![self];
-
-        subsegments
+        self
+            .split_into_subsegments(color_resolution)
             .into_iter()
             .map(|subsegment| {
                 let color = subsegment.unwrap_solid_color();
