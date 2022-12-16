@@ -1,11 +1,7 @@
 use ggez::graphics::{DrawMode, MeshBuilder};
-use hsl::HSL;
-use itertools::Itertools;
 
 use crate::basic::transformations::{flip_horizontally, rotate_clockwise, translate};
 use crate::basic::{Dir, Point};
-use crate::color::oklab::OkLab;
-use crate::color::to_color::ToColor;
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;
@@ -14,7 +10,6 @@ use crate::rendering::segments::descriptions::{
 };
 use crate::rendering::segments::hexagon_segments::HexagonSegments;
 use crate::rendering::segments::smooth_segments::SmoothSegments;
-use crate::snake::palette::SegmentStyle;
 
 struct Subsegment {
     color: Color,
@@ -27,82 +22,31 @@ impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
     /// this is used to assign a solid color to each subsegment and thus
     /// simulate a smooth gradient
-    fn get_subsegments(&self, num_subsegments: usize) -> Vec<Subsegment> {
+    fn get_subsegments(&self, num_subsegments: usize) -> impl Iterator<Item = Subsegment> + '_ {
         if self.draw_style == rendering::Style::Hexagon {
             unreachable!("hexagon segments don't support gradients")
-        }
-
-        if num_subsegments == 1 {
-            return vec![Subsegment {
-                color: self.segment_style.first_color(),
-                end: self.fraction.end,
-            }];
         }
 
         let SegmentFraction { start, end } = self.fraction;
         let segment_size = self.fraction.end - self.fraction.start;
 
-        // TODO: less collecting, keep things as iterators
-        // gradients exclude the end color because this is the same as the start color of the next segment
-        let colors = match self.segment_style {
-            SegmentStyle::Solid(color) => vec![color],
-            SegmentStyle::RGBGradient { start_color, end_color } => {
-                // TODO: factor out this code
-                let start_subsegment = (num_subsegments as f32 * start) as usize;
-                let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
+        let get_color = self.segment_style.color_at_fraction();
 
-                (start_subsegment..end_subsegment)
-                    .map(|f| {
-                        let f = f as f64 / num_subsegments as f64;
-                        f * start_color + (1. - f) * end_color
-                    })
-                    .collect()
-            }
-            SegmentStyle::HSLGradient { start_hue, end_hue, lightness } => {
-                let start_subsegment = (num_subsegments as f32 * start) as usize;
-                let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
-                (start_subsegment..end_subsegment)
-                    .map(|f| {
-                        let f = f as f64 / num_subsegments as f64;
-                        HSL {
-                            h: f * start_hue + (1. - f) * end_hue,
-                            s: 1.,
-                            l: lightness,
-                        }
-                        .to_color()
-                    })
-                    .collect()
-            }
-            SegmentStyle::OkLabGradient { start_hue, end_hue, lightness } => {
-                let start_subsegment = (num_subsegments as f32 * start) as usize;
-                let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
-                (start_subsegment..end_subsegment)
-                    .map(|f| {
-                        let f = f as f64 / num_subsegments as f64;
-                        OkLab::from_lch(lightness, 0.5, f * start_hue + (1. - f) * end_hue)
-                            .to_color()
-                    })
-                    .collect()
-            }
-        };
-
-        // Can't tell if it's more inefficient to run dedup each time or
-        // occasionally generate some extra segments
-        // colors.dedup();
-
+        let start_subsegment = (num_subsegments as f32 * start) as usize;
+        let end_subsegment = (num_subsegments as f32 * end).ceil() as usize;
         // the actual number of subsegments (partial segments will
         //  have fewer than expected)
-        let real_num_subsegments = colors.len();
+        let real_num_subsegments = (start_subsegment..end_subsegment).len();
         let subsegment_size = segment_size / real_num_subsegments as f32;
 
-        colors
-            .into_iter()
+        // TODO: make sure we're not generating duplicate colors (that num_subsegments isn't too high)
+        (start_subsegment..end_subsegment)
+            .map(move |subsegment| get_color(subsegment as f64 / num_subsegments as f64))
             .enumerate()
-            .map(|(i, color)| {
+            .map(move |(i, color)| {
                 let end = self.fraction.start + subsegment_size * (i + 1) as f32;
                 Subsegment { color, end }
             })
-            .collect_vec()
     }
 
     /// Render the segment into a list of drawable subsegments

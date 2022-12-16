@@ -239,16 +239,36 @@ pub enum SegmentStyle {
 }
 
 impl SegmentStyle {
-    pub fn first_color(self) -> Color {
+    pub fn first_color(&self) -> Color {
         match self {
-            Self::Solid(c) => c,
-            Self::RGBGradient { start_color: start_rgb, .. } => start_rgb,
-            Self::HSLGradient { start_hue, lightness, .. } => {
+            &Self::Solid(color) => color,
+            &Self::RGBGradient { start_color: start_rgb, .. } => start_rgb,
+            &Self::HSLGradient { start_hue, lightness, .. } => {
                 HSL { h: start_hue, s: 1., l: lightness }.to_color()
             }
-            Self::OkLabGradient { start_hue, lightness, .. } => {
+            &Self::OkLabGradient { start_hue, lightness, .. } => {
                 OkLab::from_lch(lightness, 0.5, start_hue).to_color()
             }
+        }
+    }
+
+    pub fn color_at_fraction(&self) -> Box<dyn Fn(f64) -> Color> {
+        match self {
+            &SegmentStyle::Solid(color) => Box::new(move |_| color),
+            &SegmentStyle::RGBGradient { start_color, end_color } => {
+                Box::new(move |f| f * start_color + (1. - f) * end_color)
+            }
+            &SegmentStyle::HSLGradient { start_hue, end_hue, lightness } => Box::new(move |f| {
+                HSL {
+                    h: f * start_hue + (1. - f) * end_hue,
+                    s: 1.,
+                    l: lightness,
+                }
+                .to_color()
+            }),
+            &SegmentStyle::OkLabGradient { start_hue, end_hue, lightness } => Box::new(move |f| {
+                OkLab::from_lch(lightness, 0.5, f * start_hue + (1. - f) * end_hue).to_color()
+            }),
         }
     }
 }
