@@ -33,11 +33,12 @@ fn upper_intersection_point(p0: Point, r0: f32, p1: Point, r1: f32) -> Point {
 }
 
 impl SegmentRenderer for SmoothSegments {
-    fn render_default_straight_segment(description: &SegmentDescription) -> Vec<Point> {
-        let SegmentDescription { cell_dim, fraction, .. } = description;
-
-        let CellDim { side, sin, cos } = *cell_dim;
-        let SegmentFraction { start, end } = *fraction;
+    fn render_default_straight_segment(
+        description: &SegmentDescription,
+        fraction: SegmentFraction,
+    ) -> Vec<Point> {
+        let CellDim { side, sin, cos } = description.cell_dim;
+        let SegmentFraction { start, end } = fraction;
 
         // top-left, top-right, bottom-right, bottom-left
         vec![
@@ -51,22 +52,21 @@ impl SegmentRenderer for SmoothSegments {
     fn render_default_curved_segment(
         description: &SegmentDescription,
         mut turn_fraction: f32,
+        fraction: SegmentFraction,
     ) -> Vec<Point> {
         // a blunt turn is equivalent to half a sharp turn
         if let TurnType::Blunt(_) = description.turn.turn_type() {
             turn_fraction /= 2.;
         }
 
-        let SegmentDescription { cell_dim, fraction, .. } = description;
-
-        let CellDim { side, sin, cos } = *cell_dim;
+        let CellDim { side, sin, cos } = description.cell_dim;
 
         let pivot = {
             // distance of the pivot from where it is for a sharp turn
             let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
             // too straight to be drawn as curved, default to straight drawing
             if pivot_dist.is_infinite() {
-                return Self::render_default_straight_segment(description);
+                return Self::render_default_straight_segment(description, fraction);
             }
             Point { x: side + cos + pivot_dist, y: 0. }
         };

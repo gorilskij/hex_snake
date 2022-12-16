@@ -1,13 +1,18 @@
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
+use hsl::HSL;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 use std::cmp::Ordering;
+use std::slice;
+use std::sync::Mutex;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
-use crate::basic::transformations::translate;
-use crate::basic::{CellDim, Point};
+use crate::basic::transformations::{rotate_clockwise, translate};
+use crate::basic::{CellDim, Dir, Point};
+use crate::color::oklab::OkLab;
+use crate::color::to_color::ToColor;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::segments::descriptions::{
     SegmentDescription, SegmentFraction, TurnDescription,
@@ -176,19 +181,28 @@ pub fn snake_mesh(
     //  - black hole
     //  - other
 
+    // needed for concurrency (par_iter, etc.)
     assert_impl_all!(Snake: Send, Sync);
 
+    // let mut heads = Mutex::new(vec![]);
+
     let mut descs: Vec<_> = snakes
-        .par_iter_mut()
-        .zip(styles.into_par_iter())
-        .zip(color_resolutions.par_iter())
+        // .par_iter_mut()
+        // .zip(styles.into_par_iter())
+        // .zip(color_resolutions.par_iter())
+        .iter_mut()
+        .zip(styles.into_iter())
+        .zip(color_resolutions.iter())
         .flat_map(|((snake, style), resolution)| {
             snake
                 .body
                 .segments
-                .par_iter()
+                // .par_iter()
+                // .enumerate()
+                // .zip(style.into_par_iter())
+                .iter()
                 .enumerate()
-                .zip(style.into_par_iter())
+                .zip(style.into_iter())
                 .map(|((segment_idx, segment), style)| {
                     let desc = segment_description(
                         segment,
@@ -199,10 +213,15 @@ pub fn snake_mesh(
                         gtx,
                     );
 
+                    // if segment_idx == 0 {
+                    //     heads.lock().unwrap().push(desc.clone());
+                    // }
+
                     (desc, *resolution)
                 })
         })
         .collect();
+
     descs.par_sort_unstable_by(
         |(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
             Ordering::Equal => {
@@ -217,6 +236,36 @@ pub fn snake_mesh(
             ordering => ordering,
         },
     );
+
+    // for desc in heads.into_inner().unwrap() {
+    //     let mut dest = desc.destination + gtx.cell_dim.center();
+    //
+    //     let mut delta = Point::zero();
+    //     if frame_fraction < 0.5 {
+    //         delta.y -= gtx.cell_dim.sin * ((0.5 - frame_fraction) / 0.5);
+    //     } else {
+    //         delta.y += gtx.cell_dim.sin * ((frame_fraction - 0.5) / 0.5);
+    //     }
+    //     rotate_clockwise(
+    //         slice::from_mut(&mut delta),
+    //         Point::zero(),
+    //         Dir::D.clockwise_angle_to(desc.turn.going_to),
+    //     );
+    //     translate(slice::from_mut(&mut dest), delta);
+    //
+    //     let color = match desc.segment_style {
+    //         SegmentStyle::Solid(c) => c,
+    //         SegmentStyle::RGBGradient { start_color: c, .. } => c,
+    //         SegmentStyle::HSLGradient { start_hue: h, lightness: l, .. } => {
+    //             HSL { h, s: 1.0, l }.to_color()
+    //         }
+    //         SegmentStyle::OkLabGradient { start_hue: h, lightness: l, .. } => {
+    //             OkLab::from_lch(l, 1.0, h).to_color()
+    //         }
+    //     };
+    //
+    //     builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
+    // }
 
     descs.into_iter().try_for_each(|(desc, resolution)| {
         // TODO: animate black hole in

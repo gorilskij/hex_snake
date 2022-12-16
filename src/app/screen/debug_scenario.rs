@@ -105,6 +105,7 @@ impl DebugScenario {
             .snake_type(snake::Type::Simulated)
             .eat_mechanics(EatMechanics::always(EatBehavior::Die))
             .palette(snake::PaletteTemplate::solid_white_red())
+            .speed(1.0)
             .controller(snake_control::Template::Programmed(vec![]));
 
         let seed2 = snake::Builder::default()
@@ -117,6 +118,7 @@ impl DebugScenario {
                 color: Color::RED,
                 eaten: Color::WHITE,
             })
+            .speed(1.0)
             .controller(snake_control::Template::Programmed(vec![]));
 
         let mut this = Self {

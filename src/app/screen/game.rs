@@ -151,6 +151,7 @@ impl Game {
             self.snake_mesh = None;
             self.distance_grid_mesh = None;
             self.distance_grid.invalidate();
+            self.player_path_mesh = None;
         }
     }
 
