@@ -56,17 +56,20 @@ pub fn player_path_mesh(
             stats.polygons += 1;
 
             if let Some(dir) = arrow {
+                // the angle of the point of the arrow
+                const THETA: f32 = PI * 3. / 8.;
+
+                let cos = radius * (THETA / 2.).cos();
+                let sin = radius * (THETA / 2.).sin();
+
                 // pointing down
                 let mut points = vec![
-                    Point { x: 0.0, y: radius * 2_f32.sqrt() },
                     Point {
-                        x: radius * (PI / 4.).cos(),
-                        y: radius * (PI / 4.).sin(),
+                        x: 0.,
+                        y: radius / (THETA / 2.).sin(),
                     },
-                    Point {
-                        x: -radius * (PI / 4.).cos(),
-                        y: radius * (PI / 4.).sin(),
-                    },
+                    Point { x: cos, y: sin },
+                    Point { x: -cos, y: sin },
                 ];
                 rotate_clockwise(&mut points, Point::zero(), Dir::D.clockwise_angle_to(dir));
                 translate(&mut points, dest);

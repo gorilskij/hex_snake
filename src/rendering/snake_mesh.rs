@@ -181,9 +181,10 @@ pub fn snake_mesh(
     //  - black hole
     //  - other
 
+    // needed for concurrency (par_iter, etc.)
     assert_impl_all!(Snake: Send, Sync);
 
-    let mut heads = Mutex::new(vec![]);
+    // let mut heads = Mutex::new(vec![]);
 
     let mut descs: Vec<_> = snakes
         // .par_iter_mut()
@@ -212,9 +213,9 @@ pub fn snake_mesh(
                         gtx,
                     );
 
-                    if segment_idx == 0 {
-                        heads.lock().unwrap().push(desc.clone());
-                    }
+                    // if segment_idx == 0 {
+                    //     heads.lock().unwrap().push(desc.clone());
+                    // }
 
                     (desc, *resolution)
                 })
@@ -236,35 +237,35 @@ pub fn snake_mesh(
         },
     );
 
-    for desc in heads.into_inner().unwrap() {
-        let mut dest = desc.destination + gtx.cell_dim.center();
-
-        let mut delta = Point::zero();
-        if frame_fraction < 0.5 {
-            delta.y -= gtx.cell_dim.sin * ((0.5 - frame_fraction) / 0.5);
-        } else {
-            delta.y += gtx.cell_dim.sin * ((frame_fraction - 0.5) / 0.5);
-        }
-        rotate_clockwise(
-            slice::from_mut(&mut delta),
-            Point::zero(),
-            Dir::D.clockwise_angle_to(desc.turn.going_to),
-        );
-        translate(slice::from_mut(&mut dest), delta);
-
-        let color = match desc.segment_style {
-            SegmentStyle::Solid(c) => c,
-            SegmentStyle::RGBGradient { start_color: c, .. } => c,
-            SegmentStyle::HSLGradient { start_hue: h, lightness: l, .. } => {
-                HSL { h, s: 1.0, l }.to_color()
-            }
-            SegmentStyle::OkLabGradient { start_hue: h, lightness: l, .. } => {
-                OkLab::from_lch(l, 1.0, h).to_color()
-            }
-        };
-
-        builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
-    }
+    // for desc in heads.into_inner().unwrap() {
+    //     let mut dest = desc.destination + gtx.cell_dim.center();
+    //
+    //     let mut delta = Point::zero();
+    //     if frame_fraction < 0.5 {
+    //         delta.y -= gtx.cell_dim.sin * ((0.5 - frame_fraction) / 0.5);
+    //     } else {
+    //         delta.y += gtx.cell_dim.sin * ((frame_fraction - 0.5) / 0.5);
+    //     }
+    //     rotate_clockwise(
+    //         slice::from_mut(&mut delta),
+    //         Point::zero(),
+    //         Dir::D.clockwise_angle_to(desc.turn.going_to),
+    //     );
+    //     translate(slice::from_mut(&mut dest), delta);
+    //
+    //     let color = match desc.segment_style {
+    //         SegmentStyle::Solid(c) => c,
+    //         SegmentStyle::RGBGradient { start_color: c, .. } => c,
+    //         SegmentStyle::HSLGradient { start_hue: h, lightness: l, .. } => {
+    //             HSL { h, s: 1.0, l }.to_color()
+    //         }
+    //         SegmentStyle::OkLabGradient { start_hue: h, lightness: l, .. } => {
+    //             OkLab::from_lch(l, 1.0, h).to_color()
+    //         }
+    //     };
+    //
+    //     builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
+    // }
 
     descs.into_iter().try_for_each(|(desc, resolution)| {
         // TODO: animate black hole in
