@@ -1,4 +1,5 @@
 use ggez::graphics::{DrawMode, MeshBuilder};
+use std::iter;
 
 use crate::basic::transformations::{flip_horizontally, rotate_clockwise, translate};
 use crate::basic::{Dir, Point};
@@ -55,30 +56,30 @@ impl SegmentDescription {
     /// there should be (longer snakes have lower subsegment
     /// resolution)
     pub fn render(
-        mut self,
+        &self,
         color_resolution: usize,
         turn_fraction: f32,
-    ) -> Vec<(Color, Vec<Point>)> {
+    ) -> Box<dyn Iterator<Item = (Color, Vec<Point>)> + '_> {
         match self.draw_style {
-            rendering::Style::Hexagon => vec![(
+            rendering::Style::Hexagon => Box::new(iter::once((
                 self.segment_style.first_color(),
                 HexagonSegments::render_segment(&self, turn_fraction, SegmentFraction::solid()),
-            )],
+            ))),
             rendering::Style::Smooth => {
                 let mut end = self.fraction.start;
-                self.get_subsegments(color_resolution)
-                    .into_iter()
-                    .map(|subsegment| {
-                        let start = end;
-                        end = subsegment.end;
-                        let points = SmoothSegments::render_segment(
-                            &self,
-                            turn_fraction,
-                            SegmentFraction { start, end },
-                        );
-                        (subsegment.color, points)
-                    })
-                    .collect()
+                Box::new(
+                    self.get_subsegments(color_resolution)
+                        .map(move |subsegment| {
+                            let start = end;
+                            end = subsegment.end;
+                            let points = SmoothSegments::render_segment(
+                                &self,
+                                turn_fraction,
+                                SegmentFraction { start, end },
+                            );
+                            (subsegment.color, points)
+                        }),
+                )
             }
         }
     }
@@ -87,13 +88,15 @@ impl SegmentDescription {
     pub fn build(self, builder: &mut MeshBuilder, color_resolution: usize) -> Result<usize> {
         let mut polygons = 0;
         let turn_fraction = self.turn.fraction;
-        for (color, points) in self.render(color_resolution, turn_fraction) {
-            builder
-                .polygon(DrawMode::fill(), &points, *color)
-                .map_err(Error::from)
-                .with_trace_step("SegmentDescription::build")?;
-            polygons += 1;
-        }
+        self.render(color_resolution, turn_fraction)
+            .try_for_each(|(color, points)| {
+                polygons += 1;
+                builder
+                    .polygon(DrawMode::fill(), &points, *color)
+                    .map(|_| ())
+            })
+            .map_err(Error::from)
+            .with_trace_step("SegmentDescription::build")?;
         Ok(polygons)
     }
 }
