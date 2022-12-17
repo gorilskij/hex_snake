@@ -239,6 +239,7 @@ pub enum SegmentStyle {
 }
 
 impl SegmentStyle {
+    // TODO: deprecate or reimplement in terms of color_at_fraction
     pub fn first_color(&self) -> Color {
         match self {
             &Self::Solid(color) => color,
@@ -274,7 +275,11 @@ impl SegmentStyle {
 }
 
 pub trait Palette: Send + Sync {
-    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle>;
+    fn segment_styles<'a>(
+        &'a mut self,
+        body: &'a Body,
+        frame_fraction: f32,
+    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a>;
     // TODO: refactor as
     //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_fraction: f32) -> Color;
     //  this avoids unnecessary work for hex palette and is called exactly as many times as needed
@@ -388,21 +393,21 @@ pub struct Solid {
 }
 
 impl Palette for Solid {
-    fn segment_styles(&mut self, body: &Body, _frame_fraction: f32) -> Vec<SegmentStyle> {
+    fn segment_styles<'a>(
+        &'a mut self,
+        body: &'a Body,
+        _frame_fraction: f32,
+    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
-        let mut styles = Vec::with_capacity(body.visible_len());
-
-        for segment in body.segments.iter() {
+        Box::new(body.segments.iter().map(|segment| {
             let color = match segment.segment_type {
                 Normal | BlackHole { .. } => self.color,
                 Eaten { .. } => self.eaten,
                 Crashed => *DEFAULT_CRASHED_COLOR,
             };
-            styles.push(SegmentStyle::Solid(color));
-        }
-
-        styles
+            SegmentStyle::Solid(color)
+        }))
     }
 }
 
@@ -414,16 +419,18 @@ pub struct RGBGradient {
 }
 
 impl Palette for RGBGradient {
-    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
+    fn segment_styles<'a>(
+        &'a mut self,
+        body: &'a Body,
+        frame_fraction: f32,
+    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
-
-        let mut styles = Vec::with_capacity(body.visible_len());
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
         let logical_len = correct_len(logical_len, body, frame_fraction as f64);
-        for (i, seg) in body.segments.iter().enumerate() {
-            if seg.segment_type == Crashed {
-                styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
+        Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
+            if segment.segment_type == Crashed {
+                SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
                 let start_color =
@@ -431,22 +438,18 @@ impl Palette for RGBGradient {
                 let end_color =
                     self.head_color + (self.tail_color - self.head_color) * (r + 1.) / logical_len;
 
-                match seg.segment_type {
+                match segment.segment_type {
                     Normal | BlackHole { .. } => {
-                        styles.push(SegmentStyle::RGBGradient { start_color, end_color });
+                        SegmentStyle::RGBGradient { start_color, end_color }
                     }
-                    Eaten { .. } => {
-                        styles.push(SegmentStyle::RGBGradient {
-                            start_color: invert_rgb(start_color),
-                            end_color: invert_rgb(end_color),
-                        });
-                    }
-                    Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
-                };
+                    Eaten { .. } => SegmentStyle::RGBGradient {
+                        start_color: invert_rgb(start_color),
+                        end_color: invert_rgb(end_color),
+                    },
+                    Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
+                }
             }
-        }
-
-        styles
+        }))
     }
 }
 
@@ -459,30 +462,30 @@ pub struct HSLGradient {
 }
 
 impl Palette for HSLGradient {
-    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
+    fn segment_styles<'a>(
+        &'a mut self,
+        body: &'a Body,
+        frame_fraction: f32,
+    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
-
-        let mut styles = Vec::with_capacity(body.visible_len());
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
         let logical_len = correct_len(logical_len, body, frame_fraction as f64);
-        for (i, seg) in body.segments.iter().enumerate() {
-            if seg.segment_type == Crashed {
-                styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR));
+        Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
+            if segment.segment_type == Crashed {
+                SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
                 let end_hue =
                     self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
 
-                match seg.segment_type {
-                    Normal | BlackHole { .. } => {
-                        styles.push(SegmentStyle::HSLGradient {
-                            start_hue,
-                            end_hue,
-                            lightness: self.lightness,
-                        });
-                    }
+                match segment.segment_type {
+                    Normal | BlackHole { .. } => SegmentStyle::HSLGradient {
+                        start_hue,
+                        end_hue,
+                        lightness: self.lightness,
+                    },
                     Eaten { .. } => {
                         // invert lightness twice
                         let start_hsl = HSL {
@@ -495,17 +498,15 @@ impl Palette for HSLGradient {
                             s: 1.,
                             l: 1. - self.eaten_lightness,
                         };
-                        styles.push(SegmentStyle::RGBGradient {
+                        SegmentStyle::RGBGradient {
                             start_color: invert_rgb(start_hsl.to_color()),
                             end_color: invert_rgb(end_hsl.to_color()),
-                        });
+                        }
                     }
-                    Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
-                };
+                    Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
+                }
             }
-        }
-
-        styles
+        }))
     }
 }
 
@@ -518,40 +519,38 @@ pub struct OkLabGradient {
 }
 
 impl Palette for OkLabGradient {
-    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
+    fn segment_styles<'a>(
+        &'a mut self,
+        body: &'a Body,
+        frame_fraction: f32,
+    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
-
-        let mut styles = Vec::with_capacity(body.visible_len());
 
         let frame_fraction = frame_fraction as f64;
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
         let logical_len = correct_len(logical_len, body, frame_fraction);
-        for (i, seg) in body.segments.iter().enumerate() {
+        Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             let r = (i + body.missing_front) as f64 + frame_fraction;
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
-            match seg.segment_type {
-                Normal | BlackHole { .. } => {
-                    styles.push(SegmentStyle::OkLabGradient {
-                        start_hue,
-                        end_hue,
-                        lightness: self.lightness,
-                    });
-                }
+            match segment.segment_type {
+                Normal | BlackHole { .. } => SegmentStyle::OkLabGradient {
+                    start_hue,
+                    end_hue,
+                    lightness: self.lightness,
+                },
                 Eaten { .. } => {
                     // invert lightness twice
                     let start_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, start_hue);
                     let end_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, end_hue);
-                    styles.push(SegmentStyle::RGBGradient {
+                    SegmentStyle::RGBGradient {
                         start_color: invert_rgb(start_okl.to_color()),
                         end_color: invert_rgb(end_okl.to_color()),
-                    });
+                    }
                 }
-                Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
-            };
-        }
-
-        styles
+                Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
+            }
+        }))
     }
 }
 
@@ -563,10 +562,12 @@ pub struct AlternatingFixed {
 }
 
 impl Palette for AlternatingFixed {
-    fn segment_styles(&mut self, body: &Body, _frame_fraction: f32) -> Vec<SegmentStyle> {
+    fn segment_styles<'a>(
+        &'a mut self,
+        body: &'a Body,
+        frame_fraction: f32,
+    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
-
-        let mut styles = Vec::with_capacity(body.visible_len());
 
         let head = Some(body.segments[0].pos);
         if head != self.last_head {
@@ -574,8 +575,8 @@ impl Palette for AlternatingFixed {
             self.iteration = !self.iteration;
         }
         let expected_mod = !self.iteration as usize;
-        for (i, seg) in body.segments.iter().enumerate() {
-            let color = match seg.segment_type {
+        Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
+            let color = match segment.segment_type {
                 Normal | BlackHole { .. } => {
                     if i % 2 == expected_mod {
                         self.color1
@@ -592,10 +593,8 @@ impl Palette for AlternatingFixed {
                 }
                 Crashed => *DEFAULT_CRASHED_COLOR,
             };
-            styles.push(SegmentStyle::Solid(color));
-        }
-
-        styles
+            SegmentStyle::Solid(color)
+        }))
     }
 }
 
@@ -605,16 +604,18 @@ pub struct Alternating {
 }
 
 impl Palette for Alternating {
-    fn segment_styles(&mut self, body: &Body, frame_fraction: f32) -> Vec<SegmentStyle> {
+    fn segment_styles<'a>(
+        &'a mut self,
+        body: &'a Body,
+        frame_fraction: f32,
+    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
-        let mut styles = Vec::with_capacity(body.visible_len());
-
-        for (i, seg) in body.segments.iter().enumerate() {
+        Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             // How far along the snake we currently are (in units of segments)
             let r = (i + body.missing_front) as f64 + frame_fraction as f64;
 
-            match seg.segment_type {
+            match segment.segment_type {
                 Normal | BlackHole { .. } => {
                     // Check whether there is a minimum or maximum within this segment
                     use std::f64::consts::PI;
@@ -632,16 +633,12 @@ impl Palette for Alternating {
                         ratio1_start * self.color1 + (1. - ratio1_start) * self.color2;
                     let end_color = ratio1_end * self.color1 + (1. - ratio1_end) * self.color2;
 
-                    styles.push(SegmentStyle::RGBGradient { start_color, end_color });
+                    SegmentStyle::RGBGradient { start_color, end_color }
                 }
-                Eaten { .. } => {
-                    styles.push(SegmentStyle::Solid(*DEFAULT_EATEN_COLOR));
-                }
-                Crashed => styles.push(SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)),
-            };
-        }
-
-        styles
+                Eaten { .. } => SegmentStyle::Solid(*DEFAULT_EATEN_COLOR),
+                Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
+            }
+        }))
     }
 }
 

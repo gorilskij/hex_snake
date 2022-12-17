@@ -2,7 +2,7 @@ use ggez::event::{EventHandler, KeyCode, KeyMods};
 use ggez::graphics::{self, DrawParam};
 use ggez::Context;
 use rand::prelude::*;
-use std::result;
+use std::{iter, result};
 
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
@@ -280,7 +280,7 @@ impl DebugScenario {
 
             apples: vec![],
 
-            seeds: vec![wall_seed].into_iter().chain(crash_seeds).collect(),
+            seeds: iter::once(wall_seed).chain(crash_seeds).collect(),
             snakes: vec![],
 
             rng: thread_rng(),
