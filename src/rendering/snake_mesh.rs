@@ -169,11 +169,6 @@ pub fn snake_mesh(
         })
         .collect();
 
-    let styles: Vec<_> = snakes
-        .iter_mut()
-        .map(|snake| snake.palette.segment_styles(&snake.body, frame_fraction))
-        .collect();
-
     let mut builder = MeshBuilder::new();
 
     // The draw order priority list is:
@@ -191,9 +186,10 @@ pub fn snake_mesh(
         // .zip(styles.into_par_iter())
         // .zip(color_resolutions.par_iter())
         .iter_mut()
-        .zip(styles.into_iter())
         .zip(color_resolutions.iter())
-        .flat_map(|((snake, style), resolution)| {
+        .flat_map(|(snake, resolution)| {
+            let style = snake.palette.segment_styles(&snake.body, frame_fraction);
+
             snake
                 .body
                 .segments
