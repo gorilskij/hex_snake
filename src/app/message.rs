@@ -58,10 +58,30 @@ impl Message {
             disappear: duration.map(|d| Instant::now() + d),
         }
     }
+}
 
-    /// Returns Ok(true) if the message should continue existing
-    /// and Ok(false) if it should be removed
-    pub fn draw(&self, ctx: &mut Context) -> Result<bool> {
+pub struct MessageDrawable {
+    text: Text,
+    dest: Point,
+    color: Color,
+}
+
+impl MessageDrawable {
+    pub fn draw(&self, ctx: &mut Context) -> Result {
+        graphics::draw(
+            ctx,
+            &self.text,
+            DrawParam::from((self.dest, self.color)),
+        )
+        .map_err(Error::from)
+        .with_trace_step("Message::draw")
+    }
+}
+
+impl Message {
+    /// A return value of None signifies that the message has reached
+    /// its end of life and should be removed
+    pub fn get_drawable(&self, ctx: &Context) -> Option<MessageDrawable> {
         let mut text = Text::new(self.text.as_str());
         text.set_font(Font::default(), PxScale::from(self.font_size));
 
@@ -79,13 +99,13 @@ impl Message {
             height - text.height(ctx) - self.v_margin
         };
 
-        let location = Point { x, y };
+        let dest = Point { x, y };
 
         // fade out
         let mut color = self.color;
         if let Some(deadline) = self.disappear {
             match deadline.checked_duration_since(Instant::now()) {
-                None => return Ok(false), // Message has reached its end of life
+                None => return None, // Message has reached its end of life
                 Some(time_left) => {
                     let millis = time_left.as_millis();
                     if millis < 200 {
@@ -96,10 +116,6 @@ impl Message {
             }
         }
 
-        graphics::draw(ctx, &text, DrawParam::from((location, color)))
-            .map_err(Error::from)
-            .with_trace_step("Message::draw")?;
-
-        Ok(true)
+        Some(MessageDrawable { text, dest, color })
     }
 }

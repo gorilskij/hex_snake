@@ -8,7 +8,7 @@ use rand::prelude::*;
 use crate::app::distance_grid::DistanceGrid;
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
-use crate::app::message::{Message, MessageID};
+use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
@@ -271,25 +271,27 @@ impl Game {
         self.apples.extend(new_apples.into_iter());
     }
 
-    fn draw_messages(&mut self, ctx: &mut Context) -> Result {
+    fn get_message_drawables(&mut self, ctx: &Context) -> Vec<MessageDrawable> {
         // draw messages and remove the ones that have
         // outlived their durations
-        let remove = self
+        let mut drawables = vec![];
+        let mut remove = vec![];
+
+        self
             .messages
             .iter()
-            .map(|(id, message)| {
-                message
-                    .draw(ctx)
-                    .map(|keep| if !keep { Some(*id) } else { None })
-            })
-            .collect::<Result<Vec<_>>>()
-            .with_trace_step("draw_messages")?;
+            .for_each(|(id, message)| {
+                match message.get_drawable(ctx) {
+                    Some(drawable) => drawables.push(drawable),
+                    None => remove.push(*id),
+                }
+            });
 
         remove
             .iter()
-            .filter_map(|o| *o)
-            .for_each(|id| drop(self.messages.remove(&id)));
-        Ok(())
+            .for_each(|id| { self.messages.remove(id); });
+
+        drawables
     }
 
     /// Display a notification message in the top-right
@@ -434,11 +436,15 @@ impl EventHandler<Error> for Game {
                 &self.gtx,
                 &mut stats,
             )
-                .invert()?;
+            .invert()?;
         }
 
-        let draw_param = DrawParam::default().dest(self.offset);
+        if self.gtx.prefs.display_stats {
+            let message = stats.get_stats_message();
+            self.messages.insert(MessageID::Stats, message);
+        }
 
+        let message_drawables = self.get_message_drawables(ctx);
 
         let meshes = [
             &self.distance_grid_mesh,
@@ -449,25 +455,22 @@ impl EventHandler<Error> for Game {
             &self.border_mesh,
         ];
 
-        // if meshes.iter().any(|mesh| mesh.is_some()) {}
-        graphics::clear(ctx, self.gtx.palette.background_color);
+        if !message_drawables.is_empty() || meshes.iter().any(|mesh| mesh.is_some()) {
+            graphics::clear(ctx, self.gtx.palette.background_color);
 
-        for mesh in meshes.into_iter().flatten() {
-            graphics::draw(ctx, mesh, draw_param)?;
+            let draw_param = DrawParam::default().dest(self.offset);
+            for mesh in meshes.into_iter().flatten() {
+                graphics::draw(ctx, mesh, draw_param)?;
+            }
+
+            for drawable in message_drawables {
+                drawable.draw(ctx)?;
+            }
+
+            graphics::present(ctx)
+                .map_err(Error::from)
+                .with_trace_step("Game::draw")?;
         }
-
-        if self.gtx.prefs.display_stats {
-            let message = stats.get_stats_message();
-            self.messages.insert(MessageID::Stats, message);
-        }
-
-        // TODO: have a way to figure out if messages need to be updated
-        //  so that drawing can be completely avoided if they don't
-        self.draw_messages(ctx)?;
-
-        graphics::present(ctx)
-            .map_err(Error::from)
-            .with_trace_step("Game::draw")?;
 
         Ok(())
     }
