@@ -409,7 +409,13 @@ impl Snake {
                     self.body.dir, dir
                 );
             }
-            Some(dir) if dir != self.body.dir => {
+            Some(dir) if dir == self.body.dir => {
+                // if the controller returns Some with the same direction,
+                // this does not lead to a turn but it does prevent the snake
+                // from calling next_dir until the next cell
+                self.body.dir_grace = true;
+            }
+            Some(dir) => {
                 self.body.dir = dir;
                 self.body.dir_grace = true;
                 self.body.turn_start = Some(gtx.frame_stamp);

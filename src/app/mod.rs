@@ -83,7 +83,7 @@ impl App {
             })
             .collect();
 
-        let cell_dim = CellDim::from(30.);
+        let cell_dim = CellDim::from(50.);
 
         // Manual selection of what to launch
         Self {
@@ -95,7 +95,7 @@ impl App {
                 1 => Screen::StartScreen(StartScreen::new(cell_dim)),
                 0 => Screen::Game(Game::new(
                     cell_dim,
-                    7.,
+                    3.,
                     seeds,
                     Palette::dark(),
                     SpawnPolicy::Random { apple_count: 5 },

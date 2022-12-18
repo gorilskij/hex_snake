@@ -96,9 +96,10 @@ impl Message {
             }
         }
 
-        ggez::graphics::draw(ctx, &text, DrawParam::from((location, color)))
+        graphics::draw(ctx, &text, DrawParam::from((location, color)))
             .map_err(Error::from)
             .with_trace_step("Message::draw")?;
+
         Ok(true)
     }
 }

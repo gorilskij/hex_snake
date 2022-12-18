@@ -284,6 +284,7 @@ impl Game {
             })
             .collect::<Result<Vec<_>>>()
             .with_trace_step("draw_messages")?;
+
         remove
             .iter()
             .filter_map(|o| *o)
@@ -433,12 +434,11 @@ impl EventHandler<Error> for Game {
                 &self.gtx,
                 &mut stats,
             )
-            .invert()?;
+                .invert()?;
         }
 
         let draw_param = DrawParam::default().dest(self.offset);
 
-        graphics::clear(ctx, self.gtx.palette.background_color);
 
         let meshes = [
             &self.distance_grid_mesh,
@@ -449,6 +449,9 @@ impl EventHandler<Error> for Game {
             &self.border_mesh,
         ];
 
+        // if meshes.iter().any(|mesh| mesh.is_some()) {}
+        graphics::clear(ctx, self.gtx.palette.background_color);
+
         for mesh in meshes.into_iter().flatten() {
             graphics::draw(ctx, mesh, draw_param)?;
         }
@@ -458,11 +461,15 @@ impl EventHandler<Error> for Game {
             self.messages.insert(MessageID::Stats, message);
         }
 
+        // TODO: have a way to figure out if messages need to be updated
+        //  so that drawing can be completely avoided if they don't
         self.draw_messages(ctx)?;
 
         graphics::present(ctx)
             .map_err(Error::from)
-            .with_trace_step("Game::draw")
+            .with_trace_step("Game::draw")?;
+
+        Ok(())
     }
 
     fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
