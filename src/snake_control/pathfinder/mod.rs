@@ -20,10 +20,11 @@ pub trait PathFinder {
     //  (essentially replace the apples argument)
     fn get_path(
         &self,
+        // TODO: TargetsView so that &[Apple] doesn't need to be re-collected
+        targets: &mut dyn Iterator<Item = HexPoint>,
         body: &Body,
         passthrough_knowledge: Option<&PassthroughKnowledge>,
         other_snakes: &dyn Snakes,
-        apples: &[Apple],
         gtx: &GameContext,
     ) -> Option<Path>;
 }

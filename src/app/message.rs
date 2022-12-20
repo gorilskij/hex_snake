@@ -68,13 +68,9 @@ pub struct MessageDrawable {
 
 impl MessageDrawable {
     pub fn draw(&self, ctx: &mut Context) -> Result {
-        graphics::draw(
-            ctx,
-            &self.text,
-            DrawParam::from((self.dest, self.color)),
-        )
-        .map_err(Error::from)
-        .with_trace_step("Message::draw")
+        graphics::draw(ctx, &self.text, DrawParam::from((self.dest, self.color)))
+            .map_err(Error::from)
+            .with_trace_step("Message::draw")
     }
 }
 

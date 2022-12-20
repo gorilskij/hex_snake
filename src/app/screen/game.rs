@@ -277,19 +277,16 @@ impl Game {
         let mut drawables = vec![];
         let mut remove = vec![];
 
-        self
-            .messages
+        self.messages
             .iter()
-            .for_each(|(id, message)| {
-                match message.get_drawable(ctx) {
-                    Some(drawable) => drawables.push(drawable),
-                    None => remove.push(*id),
-                }
+            .for_each(|(id, message)| match message.get_drawable(ctx) {
+                Some(drawable) => drawables.push(drawable),
+                None => remove.push(*id),
             });
 
-        remove
-            .iter()
-            .for_each(|id| { self.messages.remove(id); });
+        remove.iter().for_each(|id| {
+            self.messages.remove(id);
+        });
 
         drawables
     }
