@@ -56,10 +56,9 @@ impl Algorithm {
 
         // recalculate
         // println!("recalculating");
-        let mut targets = apples.iter().map(|apple| apple.pos);
         self.path =
             self.pathfinder
-                .get_path(&mut targets, body, passthrough_knowledge, other_snakes, gtx);
+                .get_path(&apples, body, passthrough_knowledge, other_snakes, gtx);
     }
 }
 

@@ -21,7 +21,7 @@ use ggez::ContextBuilder;
 use crate::app::keyboard_control::ControlSetup;
 use crate::app::App;
 use crate::basic::Side;
-use crate::keyboard::Layout;
+use crate::keyboard_layout::Layout;
 use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 
 #[macro_use]
@@ -30,7 +30,7 @@ mod support;
 mod basic;
 mod app;
 mod color;
-mod keyboard;
+mod keyboard_layout;
 mod snake;
 mod view;
 #[macro_use]

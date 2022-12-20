@@ -63,7 +63,7 @@ impl SegmentDescription {
         match self.draw_style {
             rendering::Style::Hexagon => Box::new(iter::once((
                 self.segment_style.first_color(),
-                HexagonSegments::render_segment(&self, turn_fraction, SegmentFraction::solid()),
+                HexagonSegments::render_segment(self, turn_fraction, SegmentFraction::solid()),
             ))),
             rendering::Style::Smooth => {
                 let mut end = self.fraction.start;
@@ -73,7 +73,7 @@ impl SegmentDescription {
                             let start = end;
                             end = subsegment.end;
                             let points = SmoothSegments::render_segment(
-                                &self,
+                                self,
                                 turn_fraction,
                                 SegmentFraction { start, end },
                             );
@@ -139,10 +139,9 @@ pub trait SegmentRenderer {
 
         let mut segment;
         match description.turn.turn_type() {
-            Straight => segment = Self::render_default_straight_segment(&description, fraction),
+            Straight => segment = Self::render_default_straight_segment(description, fraction),
             Blunt(turn_direction) | Sharp(turn_direction) => {
-                segment =
-                    Self::render_default_curved_segment(&description, turn_fraction, fraction);
+                segment = Self::render_default_curved_segment(description, turn_fraction, fraction);
                 if turn_direction == Clockwise {
                     flip_horizontally(&mut segment, description.cell_dim.center().x);
                 }

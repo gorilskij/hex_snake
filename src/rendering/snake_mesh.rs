@@ -265,8 +265,7 @@ pub fn snake_mesh(
                 // snake has died, animate black hole out
                 assert!(
                     frame_fraction >= 0.5,
-                    "frame fraction ({}) < 0.5",
-                    frame_fraction
+                    "frame fraction ({frame_fraction}) < 0.5",
                 );
                 let animation_fraction = frame_fraction - 0.5;
                 gtx.cell_dim * (1. - animation_fraction)

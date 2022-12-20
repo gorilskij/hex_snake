@@ -220,11 +220,11 @@ impl Environment<NoRng> for SnakeDemo {
     }
 
     fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result {
-        panic!("tried to add snake to SnakeDemo: {:?}", snake_builder)
+        panic!("tried to add snake to SnakeDemo: {snake_builder:?}")
     }
 
     fn remove_snake(&mut self, index: usize) -> Snake {
-        panic!("tried to remove snake at index {} in SnakeDemo", index)
+        panic!("tried to remove snake at index {index} in SnakeDemo")
     }
 
     fn remove_apple(&mut self, index: usize) -> Apple {

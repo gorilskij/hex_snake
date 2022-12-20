@@ -327,7 +327,7 @@ impl Game {
         self.messages.insert(
             MessageID::Fps,
             Message::default_top_left(
-                format!("u: {:.2} g: {:.2}", game_fps, graphics_fps),
+                format!("u: {game_fps:.2} g: {graphics_fps:.2}"),
                 color,
                 None,
             ),
@@ -573,7 +573,7 @@ impl EventHandler<Error> for Game {
                 new_fps = (new_fps * 10.).round() / 10.;
 
                 self.fps_control.set_game_fps(new_fps);
-                self.display_notification(format!("fps: {}", new_fps));
+                self.display_notification(format!("fps: {new_fps}"));
             }
             RBracket => {
                 let mut new_fps = match self.fps_control.fps() {
@@ -590,7 +590,7 @@ impl EventHandler<Error> for Game {
                 new_fps = (new_fps * 10.).round() / 10.;
 
                 self.fps_control.set_game_fps(new_fps);
-                self.display_notification(format!("fps: {}", new_fps));
+                self.display_notification(format!("fps: {new_fps}"));
             }
             Escape => {
                 let text;
@@ -640,7 +640,7 @@ impl EventHandler<Error> for Game {
                         *food = new_food;
                     }
                 }
-                self.display_notification(format!("Apple food: {}", new_food));
+                self.display_notification(format!("Apple food: {new_food}"));
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
@@ -648,7 +648,7 @@ impl EventHandler<Error> for Game {
                 new_side_length = new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
                 self.gtx.cell_dim = CellDim::from(new_side_length);
                 self.update_dim(ctx);
-                self.display_notification(format!("Cell side: {}", new_side_length));
+                self.display_notification(format!("Cell side: {new_side_length}"));
             }
             k => {
                 if self.fps_control.state() == fps_control::State::Playing {
@@ -664,7 +664,7 @@ impl EventHandler<Error> for Game {
     fn resize_event(&mut self, ctx: &mut Context, _width: f32, _height: f32) {
         self.update_dim(ctx);
         let HexDim { h, v } = self.gtx.board_dim;
-        self.display_notification(format!("{}x{}", h, v));
+        self.display_notification(format!("{h}x{v}"));
     }
 }
 

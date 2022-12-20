@@ -9,6 +9,7 @@ use crate::snake::{Body, PassthroughKnowledge};
 use crate::view::snakes::Snakes;
 use std::collections::VecDeque;
 
+use crate::view::targets::Targets;
 use algorithm1::Algorithm1;
 use space_filling::SpaceFilling;
 use with_backup::WithBackup;
@@ -20,8 +21,7 @@ pub trait PathFinder {
     //  (essentially replace the apples argument)
     fn get_path(
         &self,
-        // TODO: TargetsView so that &[Apple] doesn't need to be re-collected
-        targets: &mut dyn Iterator<Item = HexPoint>,
+        targets: &dyn Targets,
         body: &Body,
         passthrough_knowledge: Option<&PassthroughKnowledge>,
         other_snakes: &dyn Snakes,

@@ -9,6 +9,7 @@ use ggez::Context;
 use itertools::Itertools;
 use std::f32::consts::PI;
 
+// TODO: convert to PathFinder and use as Algorithm
 pub struct Competitor2 {
     pub dir_state: bool, // Dir12 flip-flop state
     pub target_apple: Option<HexPoint>,
@@ -77,7 +78,7 @@ impl Controller for Competitor2 {
             .map(|pos| {
                 head_pos
                     .dir_to(pos)
-                    .unwrap_or_else(|| panic!("no direction from {:?} to {:?}", head_pos, pos))
+                    .unwrap_or_else(|| panic!("no direction from {head_pos:?} to {pos:?}"))
             })
             .collect_vec();
         forbidden_directions.push(-body.dir);
