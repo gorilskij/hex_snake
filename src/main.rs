@@ -39,6 +39,8 @@ mod error;
 mod rendering;
 pub mod snake_control;
 
+// TODO: upgrading to ggez 0.8 made the colors duller, fix that
+
 // TODO
 //  - untie frame_fraction from graphics
 //  - factor out lazy redrawing code (the whole mess with Some(grid_mesh)...)
