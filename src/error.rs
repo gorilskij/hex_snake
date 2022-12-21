@@ -36,7 +36,7 @@ impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "Error:\n{:?}\nTrace:", self.0)?;
         for t in (self.1).iter().rev() {
-            writeln!(f, " in {}", t)?;
+            writeln!(f, " in {t}")?;
         }
         Ok(())
     }

@@ -10,6 +10,7 @@ use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
+use crate::app::prefs::DrawGrid;
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
 use crate::app::snake_management::{
@@ -277,19 +278,16 @@ impl Game {
         let mut drawables = vec![];
         let mut remove = vec![];
 
-        self
-            .messages
+        self.messages
             .iter()
-            .for_each(|(id, message)| {
-                match message.get_drawable(ctx) {
-                    Some(drawable) => drawables.push(drawable),
-                    None => remove.push(*id),
-                }
+            .for_each(|(id, message)| match message.get_drawable(ctx) {
+                Some(drawable) => drawables.push(drawable),
+                None => remove.push(*id),
             });
 
-        remove
-            .iter()
-            .for_each(|id| { self.messages.remove(id); });
+        remove.iter().for_each(|id| {
+            self.messages.remove(id);
+        });
 
         drawables
     }
@@ -330,7 +328,7 @@ impl Game {
         self.messages.insert(
             MessageID::Fps,
             Message::default_top_left(
-                format!("u: {:.2} g: {:.2}", game_fps, graphics_fps),
+                format!("u: {game_fps:.2} g: {graphics_fps:.2}"),
                 color,
                 None,
             ),
@@ -388,8 +386,12 @@ impl EventHandler<Error> for Game {
             }
         }
 
-        if self.gtx.prefs.draw_grid && self.grid_mesh.is_none() {
-            self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
+        if self.grid_mesh.is_none() {
+            match self.gtx.prefs.draw_grid {
+                DrawGrid::Grid => self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?),
+                DrawGrid::Dots => self.grid_mesh = Some(rendering::grid_dot_mesh(&self.gtx, ctx)?),
+                _ => {}
+            }
         }
 
         if self.gtx.prefs.draw_border && self.border_mesh.is_none() {
@@ -494,14 +496,22 @@ impl EventHandler<Error> for Game {
                 fps_control::State::Paused => self.fps_control.play(),
             },
             G => {
-                self.gtx.prefs.draw_border = self.gtx.prefs.draw_grid.flip();
-                let text = if self.gtx.prefs.draw_grid {
-                    "Grid on"
-                } else {
-                    self.grid_mesh = None;
-                    self.border_mesh = None;
-                    "Grid off"
+                let text = match self.gtx.prefs.draw_grid.rotate() {
+                    DrawGrid::Grid => {
+                        self.gtx.prefs.draw_border = true;
+                        "Grid"
+                    }
+                    DrawGrid::Dots => {
+                        self.gtx.prefs.draw_border = true;
+                        "Dots"
+                    }
+                    DrawGrid::None => {
+                        self.gtx.prefs.draw_border = false;
+                        "Grid off"
+                    }
                 };
+                self.grid_mesh = None;
+                self.border_mesh = None;
                 self.display_notification(text);
             }
             D => {
@@ -576,7 +586,7 @@ impl EventHandler<Error> for Game {
                 new_fps = (new_fps * 10.).round() / 10.;
 
                 self.fps_control.set_game_fps(new_fps);
-                self.display_notification(format!("fps: {}", new_fps));
+                self.display_notification(format!("fps: {new_fps}"));
             }
             RBracket => {
                 let mut new_fps = match self.fps_control.fps() {
@@ -593,7 +603,7 @@ impl EventHandler<Error> for Game {
                 new_fps = (new_fps * 10.).round() / 10.;
 
                 self.fps_control.set_game_fps(new_fps);
-                self.display_notification(format!("fps: {}", new_fps));
+                self.display_notification(format!("fps: {new_fps}"));
             }
             Escape => {
                 let text;
@@ -643,7 +653,7 @@ impl EventHandler<Error> for Game {
                         *food = new_food;
                     }
                 }
-                self.display_notification(format!("Apple food: {}", new_food));
+                self.display_notification(format!("Apple food: {new_food}"));
             }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
@@ -651,7 +661,7 @@ impl EventHandler<Error> for Game {
                 new_side_length = new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
                 self.gtx.cell_dim = CellDim::from(new_side_length);
                 self.update_dim(ctx);
-                self.display_notification(format!("Cell side: {}", new_side_length));
+                self.display_notification(format!("Cell side: {new_side_length}"));
             }
             k => {
                 if self.fps_control.state() == fps_control::State::Playing {
@@ -667,7 +677,7 @@ impl EventHandler<Error> for Game {
     fn resize_event(&mut self, ctx: &mut Context, _width: f32, _height: f32) {
         self.update_dim(ctx);
         let HexDim { h, v } = self.gtx.board_dim;
-        self.display_notification(format!("{}x{}", h, v));
+        self.display_notification(format!("{h}x{v}"));
     }
 }
 

@@ -49,7 +49,7 @@ impl LayoutConverter {
             .from
             .iter()
             .position(|k| *k == keycode)
-            .unwrap_or_else(|| panic!("Unknown keycode: {:?}", keycode));
+            .unwrap_or_else(|| panic!("Unknown keycode: {keycode:?}"));
         self.to[idx]
     }
 }

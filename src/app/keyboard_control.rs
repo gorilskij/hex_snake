@@ -1,5 +1,5 @@
 use crate::basic::Side;
-use crate::keyboard::{Layout, LayoutConverter};
+use crate::keyboard_layout::{Layout, LayoutConverter};
 use ggez::input::keyboard::KeyCode::{self, *};
 
 #[derive(Copy, Clone)]

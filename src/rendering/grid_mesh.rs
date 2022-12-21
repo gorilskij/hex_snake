@@ -89,6 +89,49 @@ pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
     res.with_trace_step("grid_mesh")
 }
 
+pub fn grid_dot_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
+    let CellDim { side, sin, cos } = gtx.cell_dim;
+    let HexDim { h: board_h, v: board_v } = gtx.board_dim;
+
+    let draw_mode = DrawMode::fill();
+    let radius = gtx.palette.grid_dot_radius;
+    let color = gtx.palette.grid_dot_color;
+
+    let mut builder = MeshBuilder::new();
+    let mut circle = |point| {
+        builder
+            .circle(draw_mode, point, radius, 0.1, color)
+            .map(|_| {})
+    };
+
+    let res: Result<_> = try {
+        for h in 0..(board_h + 1) / 2 {
+            let dh = h as f32 * 2. * (side + cos);
+
+            for v in 0..=board_v {
+                let dv = v as f32 * 2. * sin;
+
+                circle(Point { x: cos + dh, y: dv })?;
+                circle(Point { x: cos + side + dh, y: dv })?;
+
+                // line between b and a
+                if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
+                    circle(Point {
+                        x: 2. * cos + side + dh,
+                        y: sin + dv,
+                    })?;
+                    circle(Point {
+                        x: 2. * cos + 2. * side + dh,
+                        y: sin + dv,
+                    })?;
+                }
+            }
+        }
+        builder.build(ctx)?
+    };
+    res.with_trace_step("grid_mesh")
+}
+
 pub fn border_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;

@@ -1,15 +1,20 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
-use crate::basic::Dir;
+use crate::basic::{Dir, HexPoint};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
+use crate::support::limits::Limits;
 use crate::view::snakes::Snakes;
 use ggez::Context;
 
+// TODO: rename to something more descriptive like apple seeker
 pub struct Algorithm {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
     pub path: Option<Path>,
+
+    // Also store the expected index in the apples array, chances are it didn't change
+    pub current_target: Option<(usize, HexPoint)>,
 }
 
 impl Algorithm {
@@ -21,6 +26,18 @@ impl Algorithm {
         apples: &[Apple],
         gtx: &GameContext,
     ) {
+        match self.current_target {
+            Some((i, target)) if apples[i].pos == target => {},
+            Some((_, target)) if let Some((i, _)) =
+                apples
+                    .iter()
+                    .enumerate()
+                    .find(|(_, apple)| apple.pos == target) => {
+                self.current_target.as_mut().unwrap().0 = i;
+            }
+            _ => self.path = None,
+        }
+
         if let Some(path) = &mut self.path {
             if path.len() > 1 {
                 let head_pos = body.segments[0].pos;
@@ -39,10 +56,18 @@ impl Algorithm {
         }
 
         // recalculate
-        // println!("recalculating");
+        println!("recalculating");
         self.path =
             self.pathfinder
-                .get_path(body, passthrough_knowledge, other_snakes, apples, gtx);
+                .get_path(&apples, body, passthrough_knowledge, other_snakes, gtx);
+
+        // assign wrong index 0, the true index will be found in the next iteration
+        // (it's only cache anyway)
+        self.current_target = self
+            .path
+            .as_ref()
+            .and_then(|path| path.last().copied())
+            .map(|pos| (0, pos));
     }
 }
 

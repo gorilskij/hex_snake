@@ -4,6 +4,8 @@ use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::view::snakes::Snakes;
+use crate::view::targets::Targets;
+use itertools::Itertools;
 use map_with_state::IntoMapWithState;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
@@ -42,10 +44,6 @@ impl SearchPoint {
         self.len + self.num_turns * Self::TURN_COST + self.num_teleports * Self::TELEPORT_COST
     }
 
-    fn is_successful(&self, apples: &[Apple]) -> bool {
-        apples.iter().any(|apple| apple.pos == self.pos)
-    }
-
     fn get_path(&self) -> Path {
         let mut vd = VecDeque::with_capacity(self.len);
         for pos in Iter(Some(self)) {
@@ -61,10 +59,10 @@ pub struct Algorithm1;
 impl PathFinder for Algorithm1 {
     fn get_path(
         &self,
+        targets: &dyn Targets,
         body: &Body,
         passthrough_knowledge: Option<&PassthroughKnowledge>,
         other_snakes: &dyn Snakes,
-        apples: &[Apple],
         gtx: &GameContext,
     ) -> Option<Path> {
         let off_limits: HashSet<_> = if let Some(pk) = passthrough_knowledge {
@@ -143,7 +141,7 @@ impl PathFinder for Algorithm1 {
                                     let other_sp = occupied.get();
                                     if sp.cost() < other_sp.cost() {
                                         occupied.insert(sp.clone());
-                                        if sp.is_successful(apples) {
+                                        if targets.iter().contains(&sp.pos) {
                                             match &mut *best.borrow_mut() {
                                                 Some((_, cost)) if *cost <= sp.cost() => {}
                                                 other => *other = Some((sp.pos, sp.cost())),
@@ -156,7 +154,7 @@ impl PathFinder for Algorithm1 {
                                 }
                                 Vacant(vacant) => {
                                     vacant.insert(sp.clone());
-                                    if sp.is_successful(apples) {
+                                    if targets.iter().contains(&sp.pos) {
                                         match &mut *best.borrow_mut() {
                                             Some((_, cost)) if *cost <= sp.cost() => {}
                                             other => *other = Some((sp.pos, sp.cost())),

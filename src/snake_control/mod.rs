@@ -215,6 +215,7 @@ impl Template {
             Template::Algorithm(template) => Box::new(Algorithm {
                 pathfinder: template.into_pathfinder(start_dir),
                 path: None,
+                current_target: None,
             }),
             Template::Rain => Box::new(Rain),
         }

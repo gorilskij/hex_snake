@@ -9,7 +9,6 @@ use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::basic::transformations::translate;
 use crate::basic::{CellDim, Dir, Point};
-use crate::color::oklab::OkLab;
 use crate::color::to_color::ToColor;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::segments::descriptions::{
@@ -266,8 +265,7 @@ pub fn snake_mesh(
                 // snake has died, animate black hole out
                 assert!(
                     frame_fraction >= 0.5,
-                    "frame fraction ({}) < 0.5",
-                    frame_fraction
+                    "frame fraction ({frame_fraction}) < 0.5",
                 );
                 let animation_fraction = frame_fraction - 0.5;
                 gtx.cell_dim * (1. - animation_fraction)
