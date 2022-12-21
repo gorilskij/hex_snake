@@ -5,7 +5,8 @@ authors = ["gorilskij <43991400@users.noreply.github.com>"]
 edition = "2021"
 
 [dependencies]
-ggez = "0.7"
+#ggez = "0.8"
+ggez = { git = "https://github.com/ggez/ggez", rev = "81544de" }
 rand = "~0.7"
 itertools = "0.10"
 derive_more = "~0.99"

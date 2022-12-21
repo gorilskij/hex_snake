@@ -1,4 +1,4 @@
-use ggez::event::KeyCode::{self, *};
+use ggez::input::keyboard::KeyCode::{self, *};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Layout {

@@ -1,5 +1,6 @@
-use ggez::event::{EventHandler, KeyCode, KeyMods};
-use ggez::graphics::{self, Rect};
+use ggez::event::EventHandler;
+use ggez::graphics::{Canvas, Rect};
+use ggez::input::keyboard::KeyInput;
 use ggez::Context;
 use itertools::Itertools;
 
@@ -187,14 +188,18 @@ impl EventHandler<Error> for App {
         self.screen.draw(ctx).with_trace_step("App::draw")
     }
 
-    fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, mods: KeyMods, repeat: bool) {
-        self.screen.key_down_event(ctx, key, mods, repeat)
+    fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, repeated: bool) -> Result {
+        self.screen.key_down_event(ctx, input, repeated)
     }
 
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        graphics::set_screen_coordinates(ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
-            .unwrap();
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) -> Result {
+        Canvas::from_frame(ctx, None).set_screen_coordinates(Rect {
+            x: 0.0,
+            y: 0.0,
+            w: width,
+            h: height,
+        });
 
-        self.screen.resize_event(ctx, width, height);
+        self.screen.resize_event(ctx, width, height)
     }
 }

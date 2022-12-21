@@ -3,7 +3,7 @@ use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::basic::transformations::{rotate_clockwise, translate};
 use crate::basic::{Dir, Point};
-use crate::error::{Error, ErrorConversion, Result};
+use crate::error::{ErrorConversion, Result};
 use crate::snake::{PassthroughKnowledge, Snake};
 use crate::view::snakes::OtherSnakes;
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
@@ -80,14 +80,10 @@ pub fn player_path_mesh(
             Ok(())
         });
 
-    if res.is_err() {
-        return Some(res.map(|_| unreachable!()));
+    if let Err(e) = res {
+        return Some(Err(e).with_trace_step("player_path_mesh"));
     }
 
-    let mesh = builder
-        .build(ctx)
-        .map_err(Error::from)
-        .with_trace_step("player_path_mesh");
-
-    Some(mesh)
+    let mesh = Mesh::from_data(ctx, builder.build());
+    Some(Ok(mesh))
 }

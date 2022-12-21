@@ -565,7 +565,7 @@ impl Palette for AlternatingFixed {
     fn segment_styles<'a>(
         &'a mut self,
         body: &'a Body,
-        frame_fraction: f32,
+        _frame_fraction: f32,
     ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 

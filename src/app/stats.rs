@@ -1,5 +1,6 @@
+use crate::app::message;
 use crate::app::message::Message;
-use ggez::graphics::Color;
+use crate::color::Color;
 
 /// Collect statistics about the current game state
 #[derive(Default)]
@@ -23,8 +24,7 @@ impl Stats {
         );
         Message {
             text,
-            left: true,
-            top: true,
+            position: message::Position::TopLeft,
             h_margin: Message::DEFAULT_MARGIN,
             v_margin: Message::DEFAULT_MARGIN * 2. + Message::DEFAULT_FONT_SIZE,
             font_size: Message::DEFAULT_FONT_SIZE,

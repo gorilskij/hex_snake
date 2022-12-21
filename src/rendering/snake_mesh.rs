@@ -3,13 +3,11 @@ use ggez::Context;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 use std::cmp::Ordering;
-use std::sync::Mutex;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::basic::transformations::translate;
-use crate::basic::{CellDim, Dir, Point};
-use crate::color::to_color::ToColor;
+use crate::basic::{CellDim, Point};
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::segments::descriptions::{
     SegmentDescription, SegmentFraction, TurnDescription,
@@ -256,38 +254,38 @@ pub fn snake_mesh(
     //     builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
     // }
 
-    descs.into_iter().try_for_each(|(desc, resolution)| {
-        // TODO: animate black hole in
-        if let SegmentType::BlackHole { .. } = desc.segment_type {
-            let destination = desc.destination + gtx.cell_dim.center();
-            let SegmentFraction { start, end } = desc.fraction;
-            let real_cell_dim = if (start - end).abs() < f32::EPSILON {
-                // snake has died, animate black hole out
-                assert!(
-                    frame_fraction >= 0.5,
-                    "frame fraction ({frame_fraction}) < 0.5",
-                );
-                let animation_fraction = frame_fraction - 0.5;
-                gtx.cell_dim * (1. - animation_fraction)
-            } else {
-                gtx.cell_dim
-            };
-            stats.polygons += 1;
-            builder.circle(
-                DrawMode::fill(),
-                destination,
-                real_cell_dim.side,
-                0.1,
-                black_hole_color,
-            )?;
-        }
+    descs
+        .into_iter()
+        .try_for_each(|(desc, resolution)| {
+            // TODO: animate black hole in
+            if let SegmentType::BlackHole { .. } = desc.segment_type {
+                let destination = desc.destination + gtx.cell_dim.center();
+                let SegmentFraction { start, end } = desc.fraction;
+                let real_cell_dim = if (start - end).abs() < f32::EPSILON {
+                    // snake has died, animate black hole out
+                    assert!(
+                        frame_fraction >= 0.5,
+                        "frame fraction ({frame_fraction}) < 0.5",
+                    );
+                    let animation_fraction = frame_fraction - 0.5;
+                    gtx.cell_dim * (1. - animation_fraction)
+                } else {
+                    gtx.cell_dim
+                };
+                stats.polygons += 1;
+                builder.circle(
+                    DrawMode::fill(),
+                    destination,
+                    real_cell_dim.side,
+                    0.1,
+                    black_hole_color,
+                )?;
+            }
 
-        stats.polygons += desc.build(&mut builder, resolution)?;
-        Ok::<_, Error>(())
-    })?;
+            stats.polygons += desc.build(&mut builder, resolution)?;
+            Ok::<_, Error>(())
+        })
+        .with_trace_step("snake_mesh")?;
 
-    builder
-        .build(ctx)
-        .map_err(Error::from)
-        .with_trace_step("snake_mesh")
+    Ok(Mesh::from_data(ctx, builder.build()))
 }

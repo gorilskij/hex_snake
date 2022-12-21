@@ -48,7 +48,7 @@ pub fn apple_mesh(
             stats.polygons += 1;
         }
 
-        builder.build(ctx)?
+        Mesh::from_data(ctx, builder.build())
     };
     res.with_trace_step("apple_mesh")
 }

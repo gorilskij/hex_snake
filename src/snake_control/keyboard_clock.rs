@@ -4,7 +4,7 @@ use crate::basic::{Dir, Dir12};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
-use ggez::event::KeyCode;
+use ggez::input::keyboard::KeyCode;
 use ggez::Context;
 
 // joke snake_control with 12 directions allowing the player to rotate between them using left and right, surprising horizontal teleportation

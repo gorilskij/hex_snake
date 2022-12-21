@@ -81,12 +81,13 @@ pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
             builder.polyline(draw_mode, &vline_a[1..], color)?;
         }
 
-        builder.build(ctx)?
+        builder.build()
     };
     // TODO: write a proc macro that does this with an #[annotation]
     //  i.e. it automatically wraps the method in a try block and
     //  attaches a trace step to it
-    res.with_trace_step("grid_mesh")
+    res.map(|mesh_data| Mesh::from_data(ctx, mesh_data))
+        .with_trace_step("grid_mesh")
 }
 
 pub fn grid_dot_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
@@ -127,9 +128,10 @@ pub fn grid_dot_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
                 }
             }
         }
-        builder.build(ctx)?
+        builder.build()
     };
-    res.with_trace_step("grid_mesh")
+    res.map(|mesh_data| Mesh::from_data(ctx, mesh_data))
+        .with_trace_step("grid_mesh")
 }
 
 pub fn border_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
@@ -153,49 +155,52 @@ pub fn border_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
     let draw_mode = DrawMode::stroke(gtx.palette.border_thickness);
     let color = gtx.palette.border_color;
 
-    // left border
-    builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
+    let res: Result<_> = try {
+        // left border
+        builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
 
-    // right border
-    let single_offset = 2. * (side + cos);
-    if board_h.is_even() {
-        let offset = (board_h / 2) as f32 * single_offset;
-        vline_a.iter_mut().for_each(|a| a.x += offset);
-        builder.polyline(draw_mode, &vline_a[1..], color)?;
-    } else {
-        let offset = ((board_h - 1) / 2) as f32 * single_offset;
-        vline_b.iter_mut().for_each(|b| b.x += offset);
-        builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
-    }
+        // right border
+        let single_offset = 2. * (side + cos);
+        if board_h.is_even() {
+            let offset = (board_h / 2) as f32 * single_offset;
+            vline_a.iter_mut().for_each(|a| a.x += offset);
+            builder.polyline(draw_mode, &vline_a[1..], color)?;
+        } else {
+            let offset = ((board_h - 1) / 2) as f32 * single_offset;
+            vline_b.iter_mut().for_each(|b| b.x += offset);
+            builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
+        }
 
-    let mut hline = vec![];
-    for h in 0..board_h / 2 {
-        let dh = 2. * (side + cos) * h as f32;
-        hline.push(Point { x: dh + cos, y: 0. });
-        hline.push(Point { x: dh + side + cos, y: 0. });
-        hline.push(Point { x: dh + side + 2. * cos, y: sin });
-        hline.push(Point {
-            x: dh + 2. * side + 2. * cos,
-            y: sin,
-        });
-    }
-    if board_h.is_odd() {
-        let dh = 2. * (side + cos) * (board_h / 2) as f32;
-        hline.push(Point { x: dh + cos, y: 0. });
-        hline.push(Point { x: dh + side + cos, y: 0. });
-    }
+        let mut hline = vec![];
+        for h in 0..board_h / 2 {
+            let dh = 2. * (side + cos) * h as f32;
+            hline.push(Point { x: dh + cos, y: 0. });
+            hline.push(Point { x: dh + side + cos, y: 0. });
+            hline.push(Point { x: dh + side + 2. * cos, y: sin });
+            hline.push(Point {
+                x: dh + 2. * side + 2. * cos,
+                y: sin,
+            });
+        }
+        if board_h.is_odd() {
+            let dh = 2. * (side + cos) * (board_h / 2) as f32;
+            hline.push(Point { x: dh + cos, y: 0. });
+            hline.push(Point { x: dh + side + cos, y: 0. });
+        }
 
-    // top border
-    builder.polyline(draw_mode, &hline, color)?;
+        // top border
+        builder.polyline(draw_mode, &hline, color)?;
 
-    // bottom border
-    // shift hline
-    let offset = board_v as f32 * 2. * sin;
-    hline.iter_mut().for_each(|p| p.y += offset);
-    builder.polyline(draw_mode, &hline, color)?;
+        // bottom border
+        // shift hline
+        let offset = board_v as f32 * 2. * sin;
+        hline.iter_mut().for_each(|p| p.y += offset);
+        builder.polyline(draw_mode, &hline, color)?;
 
-    builder
-        .build(ctx)
+        builder.build()
+    };
+
+    res.map(|mesh_data| Mesh::from_data(ctx, mesh_data))
         .map_err(Error::from)
         .with_trace_step("border_mesh")
 }
