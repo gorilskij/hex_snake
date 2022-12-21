@@ -9,7 +9,7 @@ use crate::snake::{self, EatBehavior, EatMechanics, SegmentType, State};
 use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
 use ggez::Context;
-use rand::Rng;
+use rand::distributions::uniform::SampleRange;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -129,8 +129,8 @@ pub fn handle_collisions<E: Environment>(
                             spawn_snakes.push(
                                 seed.clone()
                                     .pos(HexPoint { h, v: 0 })
-                                    .len(rng.gen_range(3, 10))
-                                    .speed(rng.gen_range(0.2, 1.5)),
+                                    .len((3..10).sample_single(rng))
+                                    .speed((0.2..1.5).sample_single(rng)),
                             );
                         }
                     }
@@ -255,7 +255,7 @@ pub fn spawn_snakes<E: Environment>(env: &mut E, snake_builders: Vec<snake::Buil
             .get_or_insert_with(|| Dir::random(env.rng()));
         snake_builder
             .len
-            .get_or_insert_with(|| env.rng().gen_range(7, 15));
+            .get_or_insert_with(|| (7..15).sample_single(env.rng()));
 
         env.add_snake(&snake_builder)
             .map_err(Error::from)
