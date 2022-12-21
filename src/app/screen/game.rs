@@ -10,6 +10,7 @@ use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
+use crate::app::prefs::DrawGrid;
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
 use crate::app::snake_management::{
@@ -385,8 +386,12 @@ impl EventHandler<Error> for Game {
             }
         }
 
-        if self.gtx.prefs.draw_grid && self.grid_mesh.is_none() {
-            self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?);
+        if self.grid_mesh.is_none() {
+            match self.gtx.prefs.draw_grid {
+                DrawGrid::Grid => self.grid_mesh = Some(rendering::grid_mesh(&self.gtx, ctx)?),
+                DrawGrid::Dots => self.grid_mesh = Some(rendering::grid_dot_mesh(&self.gtx, ctx)?),
+                _ => {}
+            }
         }
 
         if self.gtx.prefs.draw_border && self.border_mesh.is_none() {
@@ -491,14 +496,22 @@ impl EventHandler<Error> for Game {
                 fps_control::State::Paused => self.fps_control.play(),
             },
             G => {
-                self.gtx.prefs.draw_border = self.gtx.prefs.draw_grid.flip();
-                let text = if self.gtx.prefs.draw_grid {
-                    "Grid on"
-                } else {
-                    self.grid_mesh = None;
-                    self.border_mesh = None;
-                    "Grid off"
+                let text = match self.gtx.prefs.draw_grid.rotate() {
+                    DrawGrid::Grid => {
+                        self.gtx.prefs.draw_border = true;
+                        "Grid"
+                    }
+                    DrawGrid::Dots => {
+                        self.gtx.prefs.draw_border = true;
+                        "Dots"
+                    }
+                    DrawGrid::None => {
+                        self.gtx.prefs.draw_border = false;
+                        "Grid off"
+                    }
                 };
+                self.grid_mesh = None;
+                self.border_mesh = None;
                 self.display_notification(text);
             }
             D => {

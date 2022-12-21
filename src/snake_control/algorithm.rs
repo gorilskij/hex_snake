@@ -4,6 +4,7 @@ use crate::basic::{Dir, HexPoint};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
+use crate::support::limits::Limits;
 use crate::view::snakes::Snakes;
 use ggez::Context;
 
@@ -55,10 +56,18 @@ impl Algorithm {
         }
 
         // recalculate
-        // println!("recalculating");
+        println!("recalculating");
         self.path =
             self.pathfinder
                 .get_path(&apples, body, passthrough_knowledge, other_snakes, gtx);
+
+        // assign wrong index 0, the true index will be found in the next iteration
+        // (it's only cache anyway)
+        self.current_target = self
+            .path
+            .as_ref()
+            .and_then(|path| path.last().copied())
+            .map(|pos| (0, pos));
     }
 }
 
