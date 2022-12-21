@@ -6,7 +6,7 @@ use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use crate::ControlSetup;
-use ggez::event::KeyCode;
+use ggez::input::keyboard::KeyCode;
 use ggez::Context;
 use std::collections::VecDeque;
 
@@ -27,8 +27,9 @@ pub struct Keyboard {
 impl Keyboard {
     // How many moves ahead a player can make (this allows quick 180° turns)
     const CTRL_QUEUE_LIMIT: usize = 3;
-    // After frame_fraction is greater than this value, the change of
-    // direction is deferred to the next cell, this gives smoother motion
+    /// If frame_fraction is greater than this value, the change of
+    /// direction is deferred to the next cell, this prevents abrupt
+    /// jumps of the snake head
     const LAST_ACTIONABLE_THRESHOLD: f32 = 0.85;
 
     pub fn new(
@@ -59,12 +60,14 @@ impl Controller for Keyboard {
     ) -> Option<Dir> {
         if self.deferred || gtx.frame_stamp.1 < Self::LAST_ACTIONABLE_THRESHOLD {
             self.deferred = false;
-            if let Some(queue_dir) = self.control_queue.pop_front() {
-                self.dir = queue_dir;
+            if let Some(dir) = self.control_queue.pop_front() {
+                self.dir = dir;
                 return Some(self.dir);
             }
         } else {
             self.deferred = true;
+            // don't ask until the next frame
+            return Some(self.dir);
         }
         None
     }

@@ -12,6 +12,8 @@ pub struct SmoothSegments;
 // TODO: make this a variable parameter based on zoom level
 const TOLERANCE: f32 = 0.5;
 
+// TODO: this documentation is confusing and probably wrong
+// (wouldn't a = r0 !?) (it isn't)
 /// Return the upper intersection point between two circles
 ///  - p0, p1 are the centers of the circles
 ///  - r0, r1 are the radii

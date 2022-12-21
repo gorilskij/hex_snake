@@ -3,7 +3,7 @@ use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::basic::transformations::{rotate_clockwise, translate};
 use crate::basic::{Dir, Point};
-use crate::error::{Error, ErrorConversion, Result};
+use crate::error::{ErrorConversion, Result};
 use crate::snake::{PassthroughKnowledge, Snake};
 use crate::view::snakes::OtherSnakes;
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
@@ -19,24 +19,23 @@ pub fn player_path_mesh(
     gtx: &GameContext,
     stats: &mut Stats,
 ) -> Option<Result<Mesh>> {
-    player_snake.autopilot.as_mut().map(|autopilot| {
-        let mut builder = MeshBuilder::new();
-        // TODO: this conversion is too expensive
-        let passthrough_knowledge = PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
-        let path = autopilot
-            .get_path(
-                &player_snake.body,
-                Some(&passthrough_knowledge),
-                &other_snakes,
-                apples,
-                gtx,
-            )
-            .expect("autopilot didn't provide path");
+    let autopilot = player_snake.autopilot.as_mut()?;
+    // TODO: this conversion is too expensive
+    let passthrough_knowledge = PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
+    let path = autopilot.get_path(
+        &player_snake.body,
+        Some(&passthrough_knowledge),
+        &other_snakes,
+        apples,
+        gtx,
+    )?;
 
-        for (pos, next_pos) in path
-            .iter()
-            .zip(path.iter().skip(1).map(Some).chain(iter::once(None)))
-        {
+    let mut builder = MeshBuilder::new();
+
+    let res = path
+        .iter()
+        .zip(path.iter().skip(1).map(Some).chain(iter::once(None)))
+        .try_for_each(|(pos, next_pos)| {
             let dest = pos.to_cartesian(gtx.cell_dim) + gtx.cell_dim.center();
 
             // for the last point before a teleport, display a subtle hint about which direction
@@ -77,11 +76,14 @@ pub fn player_path_mesh(
                 builder.polygon(DrawMode::fill(), &points, Color::WHITE)?;
                 stats.polygons += 1;
             }
-        }
 
-        builder
-            .build(ctx)
-            .map_err(Error::from)
-            .with_trace_step("player_path_mesh")
-    })
+            Ok(())
+        });
+
+    if let Err(e) = res {
+        return Some(Err(e).with_trace_step("player_path_mesh"));
+    }
+
+    let mesh = Mesh::from_data(ctx, builder.build());
+    Some(Ok(mesh))
 }

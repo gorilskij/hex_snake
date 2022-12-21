@@ -156,7 +156,7 @@ impl FpsControl {
         if (-0.01..0.).contains(&elapsed) {
             elapsed = 0.;
         } else {
-            assert!(elapsed >= 0., "elapsed ({}s) < 0", elapsed);
+            assert!(elapsed >= 0., "elapsed ({elapsed}s) < 0");
         }
 
         self.last_update = Instant::now() - Duration::from_secs_f32(elapsed);
@@ -267,7 +267,7 @@ impl FpsControl {
                     / self.game_frame_duration.as_secs_f32()
                     + self.remainder as f32;
                 if frac > 1. {
-                    eprintln!("warning: frame fraction > 1 ({})", frac);
+                    eprintln!("warning: frame fraction > 1 ({frac})");
                     1.
                 } else {
                     frac

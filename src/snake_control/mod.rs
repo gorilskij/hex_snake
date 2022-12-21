@@ -5,7 +5,7 @@ use crate::basic::{Dir, Dir12, Side};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::pathfinder::Path;
 use crate::view::snakes::Snakes;
-use ggez::event::KeyCode;
+use ggez::input::keyboard::KeyCode;
 use ggez::Context;
 use itertools::{repeat_n, Itertools};
 use programmed::Move;
@@ -215,6 +215,7 @@ impl Template {
             Template::Algorithm(template) => Box::new(Algorithm {
                 pathfinder: template.into_pathfinder(start_dir),
                 path: None,
+                current_target: None,
             }),
             Template::Rain => Box::new(Rain),
         }

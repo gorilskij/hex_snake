@@ -176,7 +176,7 @@ pub fn spawn_apples(
 
                 // insert at sorted position
                 match occupied_cells.binary_search(&apple_pos) {
-                    Ok(_) => panic!("Spawned apple on top of another apple at {:?}", apple_pos),
+                    Ok(_) => panic!("Spawned apple on top of another apple at {apple_pos:?}"),
                     Err(idx) => occupied_cells.insert(idx, apple_pos),
                 }
 

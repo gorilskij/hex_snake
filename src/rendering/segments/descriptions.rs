@@ -20,8 +20,7 @@ impl SegmentFraction {
     pub fn appearing(frame_fraction: f32) -> Self {
         assert!(
             (0. ..=1.).contains(&frame_fraction),
-            "Invalid frame-frac {}",
-            frame_fraction
+            "Invalid frame fraction: {frame_fraction}",
         );
         Self { start: 0., end: frame_fraction }
     }
@@ -29,8 +28,7 @@ impl SegmentFraction {
     pub fn disappearing(frame_fraction: f32) -> Self {
         assert!(
             (0. ..=1.).contains(&frame_fraction),
-            "Invalid frame-frac {}",
-            frame_fraction
+            "Invalid frame fraction: {frame_fraction}",
         );
         Self { start: frame_fraction, end: 1. }
     }

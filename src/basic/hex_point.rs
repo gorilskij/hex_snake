@@ -63,7 +63,7 @@ impl HexPoint {
             }
         }
 
-        println!("no dir from {:?} to {:?}", self, other);
+        println!("no dir from {self:?} to {other:?}");
         None
     }
 
@@ -268,8 +268,8 @@ impl HexPoint {
             .wrap_around(board_dim, dir.axis())
             .unwrap_or_else(|| {
                 panic!(
-                    "failed to wrap pos: {:?}, translated: {:?} (board_dim: {:?}, dir: {:?})",
-                    self, translated, board_dim, dir
+                    "failed to wrap pos: {self:?}, translated: {translated:?} \
+                    (board_dim: {board_dim:?}, dir: {dir:?})"
                 )
             })
     }
@@ -290,8 +290,8 @@ impl HexPoint {
                 .wrap_around(board_dim, dir.axis())
                 .unwrap_or_else(|| {
                     panic!(
-                        "failed to wrap pos: {:?}, translated: {:?} (board_dim: {:?}, dir: {:?})",
-                        self, translated, board_dim, dir
+                        "failed to wrap pos: {self:?}, translated: {translated:?} \
+                    (board_dim: {board_dim:?}, dir: {dir:?})"
                     )
                 });
             (wrapped, true)

@@ -21,7 +21,7 @@ use ggez::ContextBuilder;
 use crate::app::keyboard_control::ControlSetup;
 use crate::app::App;
 use crate::basic::Side;
-use crate::keyboard::Layout;
+use crate::keyboard_layout::Layout;
 use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 
 #[macro_use]
@@ -30,7 +30,7 @@ mod support;
 mod basic;
 mod app;
 mod color;
-mod keyboard;
+mod keyboard_layout;
 mod snake;
 mod view;
 #[macro_use]
@@ -64,13 +64,15 @@ fn main() {
         maximized: false,
         fullscreen_type: FullscreenType::Windowed,
         borderless: false,
-        min_width: 0.,
-        min_height: 0.,
+        transparent: false,
+        min_width: 1.,
+        min_height: 1.,
         max_width: 0.,
         max_height: 0.,
         resizable: true,
         visible: true,
         resize_on_scale_factor_change: false,
+        logical_size: None,
     };
 
     let window_setup = WindowSetup {

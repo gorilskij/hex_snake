@@ -1,4 +1,4 @@
-use ggez::event::KeyCode::{self, *};
+use ggez::input::keyboard::KeyCode::{self, *};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Layout {
@@ -49,7 +49,7 @@ impl LayoutConverter {
             .from
             .iter()
             .position(|k| *k == keycode)
-            .unwrap_or_else(|| panic!("Unknown keycode: {:?}", keycode));
+            .unwrap_or_else(|| panic!("Unknown keycode: {keycode:?}"));
         self.to[idx]
     }
 }

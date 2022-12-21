@@ -3,12 +3,12 @@ mod space_filling;
 mod with_backup;
 
 use crate::app::game_context::GameContext;
-use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::view::snakes::Snakes;
 use std::collections::VecDeque;
 
+use crate::view::targets::Targets;
 use algorithm1::Algorithm1;
 use space_filling::SpaceFilling;
 use with_backup::WithBackup;
@@ -20,10 +20,10 @@ pub trait PathFinder {
     //  (essentially replace the apples argument)
     fn get_path(
         &self,
+        targets: &dyn Targets,
         body: &Body,
         passthrough_knowledge: Option<&PassthroughKnowledge>,
         other_snakes: &dyn Snakes,
-        apples: &[Apple],
         gtx: &GameContext,
     ) -> Option<Path>;
 }

@@ -2,8 +2,28 @@ use crate::basic::Food;
 use crate::rendering;
 use std::time::Duration;
 
+#[derive(Copy, Clone)]
+pub enum DrawGrid {
+    Grid,
+    Dots,
+    None,
+}
+
+impl DrawGrid {
+    // TODO: turn into a trait and write a derive macro for it
+    // TODO: rename
+    pub fn rotate(&mut self) -> Self {
+        *self = match self {
+            DrawGrid::Grid => DrawGrid::Dots,
+            DrawGrid::Dots => DrawGrid::None,
+            DrawGrid::None => DrawGrid::Grid,
+        };
+        *self
+    }
+}
+
 pub struct Prefs {
-    pub draw_grid: bool,
+    pub draw_grid: DrawGrid,
     pub draw_border: bool,
     pub draw_distance_grid: bool,
     pub draw_player_path: bool,
@@ -25,7 +45,7 @@ pub struct Prefs {
 impl Default for Prefs {
     fn default() -> Self {
         Self {
-            draw_grid: false,
+            draw_grid: DrawGrid::None,
             draw_border: false,
             draw_distance_grid: false,
             draw_player_path: false,

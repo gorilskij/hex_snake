@@ -4,7 +4,6 @@ use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
-use ggez::input::mouse;
 use ggez::Context;
 use std::f32::consts::TAU;
 
@@ -20,7 +19,7 @@ impl Controller for Mouse {
         gtx: &GameContext,
         ctx: &Context,
     ) -> Option<Dir> {
-        let mouse_position: Point = mouse::position(ctx).into();
+        let mouse_position: Point = ctx.mouse.position().into();
         let target = HexPoint::from_cartesian(mouse_position, gtx.cell_dim);
 
         let current = body.segments[0].pos;

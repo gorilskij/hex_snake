@@ -120,8 +120,8 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
 
 fn generate_mesh(
     mut iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
-    ctx: &mut Context,
     gtx: &GameContext,
+    ctx: &Context,
 ) -> Result<Mesh> {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
@@ -163,7 +163,7 @@ fn generate_mesh(
             .polygon(DrawMode::fill(), &hexagon, *color)
             .map(|_| ())
     })?;
-    Ok(builder.build(ctx)?)
+    Ok(Mesh::from_data(ctx, builder.build()))
 }
 
 pub struct DistanceGrid {
@@ -186,7 +186,7 @@ impl DistanceGrid {
         &mut self,
         player_snake: &Snake,
         other_snakes: impl Snakes,
-        ctx: &mut Context,
+        ctx: &Context,
         gtx: &GameContext,
     ) -> Result<Mesh> {
         if self.current.is_none() || gtx.game_frame_num > self.last_update {
@@ -204,8 +204,8 @@ impl DistanceGrid {
                     // TODO: this is a terrible hack, rewrite this
                     generate_mesh(
                         current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))),
-                        ctx,
                         gtx,
+                        ctx,
                     )
                 }
                 Some(last) => {
@@ -214,7 +214,7 @@ impl DistanceGrid {
                         let dist_b = current.get(pos).copied();
                         (*pos, dist_a, dist_b)
                     });
-                    generate_mesh(iter, ctx, gtx)
+                    generate_mesh(iter, gtx, ctx)
                 }
             },
         }

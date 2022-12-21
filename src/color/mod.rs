@@ -7,6 +7,12 @@ pub mod to_color;
 #[derive(Copy, Clone, Debug)]
 pub struct Color(pub graphics::Color);
 
+impl From<Color> for graphics::Color {
+    fn from(value: Color) -> Self {
+        *value
+    }
+}
+
 impl Deref for Color {
     type Target = graphics::Color;
 
