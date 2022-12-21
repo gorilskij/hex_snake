@@ -3,7 +3,6 @@ mod space_filling;
 mod with_backup;
 
 use crate::app::game_context::GameContext;
-use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::view::snakes::Snakes;

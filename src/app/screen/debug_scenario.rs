@@ -1,5 +1,6 @@
-use ggez::event::{EventHandler, KeyCode, KeyMods};
-use ggez::graphics::{self, DrawParam};
+use ggez::event::EventHandler;
+use ggez::graphics::{Canvas, DrawParam};
+use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::Context;
 use rand::prelude::*;
 use std::{iter, result};
@@ -343,7 +344,7 @@ impl EventHandler<Error> for DebugScenario {
     fn draw(&mut self, ctx: &mut Context) -> Result {
         self.fps_control.graphics_frame(&mut self.gtx);
 
-        graphics::clear(ctx, *Color::BLACK);
+        let mut canvas = Canvas::from_frame(ctx, Some(*Color::BLACK));
 
         if self.offset.is_none() {
             self.update_dim(ctx)
@@ -353,10 +354,10 @@ impl EventHandler<Error> for DebugScenario {
         let draw_param = DrawParam::default().dest(offset);
 
         let grid_mesh = rendering::grid_mesh(&self.gtx, ctx)?;
-        graphics::draw(ctx, &grid_mesh, draw_param)?;
+        canvas.draw(&grid_mesh, draw_param);
 
         let border_mesh = rendering::border_mesh(&self.gtx, ctx)?;
-        graphics::draw(ctx, &border_mesh, draw_param)?;
+        canvas.draw(&border_mesh, draw_param);
 
         for snake_index in 0..self.snakes.len() {
             let (snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, snake_index);
@@ -364,40 +365,38 @@ impl EventHandler<Error> for DebugScenario {
         }
 
         let snake_mesh = rendering::snake_mesh(&mut self.snakes, &self.gtx, ctx, &mut self.stats)?;
-        graphics::draw(ctx, &snake_mesh, draw_param)?;
+        canvas.draw(&snake_mesh, draw_param);
 
         if !self.apples.is_empty() {
             let apple_mesh = rendering::apple_mesh(&self.apples, &self.gtx, ctx, &mut self.stats)?;
-            graphics::draw(ctx, &apple_mesh, draw_param)?;
+            canvas.draw(&apple_mesh, draw_param);
         }
 
-        graphics::present(ctx)
+        canvas
+            .finish(ctx)
             .map_err(Error::from)
             .with_trace_step("DebugScenario::draw")
     }
 
-    fn key_down_event(
-        &mut self,
-        _ctx: &mut Context,
-        keycode: KeyCode,
-        _keymods: KeyMods,
-        _repeat: bool,
-    ) {
+    fn key_down_event(&mut self, _ctx: &mut Context, input: KeyInput, _repeated: bool) -> Result {
         use fps_control::State::*;
 
-        if keycode == KeyCode::Space {
+        if input.keycode == Some(KeyCode::Space) {
             match self.fps_control.state() {
                 Playing => self.fps_control.pause(),
                 Paused => self.fps_control.play(),
                 GameOver => self.restart(),
             }
-        } else if keycode == KeyCode::R {
+        } else if input.keycode == Some(KeyCode::R) {
             self.restart()
         }
+
+        Ok(())
     }
 
-    fn resize_event(&mut self, ctx: &mut Context, _width: f32, _height: f32) {
-        self.update_dim(ctx)
+    fn resize_event(&mut self, ctx: &mut Context, _width: f32, _height: f32) -> Result {
+        self.update_dim(ctx);
+        Ok(())
     }
 }
 

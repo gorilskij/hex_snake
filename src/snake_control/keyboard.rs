@@ -6,7 +6,7 @@ use crate::snake::{Body, PassthroughKnowledge};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use crate::ControlSetup;
-use ggez::event::KeyCode;
+use ggez::input::keyboard::KeyCode;
 use ggez::Context;
 use std::collections::VecDeque;
 

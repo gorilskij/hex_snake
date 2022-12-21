@@ -14,7 +14,8 @@ use crate::error::{Error, Result};
 use crate::snake::{self, EatBehavior, EatMechanics, Snake};
 use crate::snake_control::Template;
 use crate::{app, rendering, spawn_schedule};
-use ggez::event::{EventHandler, KeyCode, KeyMods};
+use ggez::event::EventHandler;
+use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::Context;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
@@ -348,18 +349,13 @@ impl EventHandler<Error> for StartScreen {
         // graphics::present(ctx)
     }
 
-    fn key_down_event(
-        &mut self,
-        _ctx: &mut Context,
-        keycode: KeyCode,
-        _keymods: KeyMods,
-        _repeat: bool,
-    ) {
-        match keycode {
-            KeyCode::Left => self.player1_demo.next_palette(),
-            KeyCode::Right => self.player2_demo.next_palette(),
+    fn key_down_event(&mut self, _ctx: &mut Context, input: KeyInput, _repeat: bool) -> Result {
+        match input.keycode {
+            Some(KeyCode::Left) => self.player1_demo.next_palette(),
+            Some(KeyCode::Right) => self.player2_demo.next_palette(),
             _ => (),
         }
+        Ok(())
     }
 }
 

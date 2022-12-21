@@ -1,7 +1,5 @@
 use super::{Path, PathFinder};
 use crate::app::game_context::GameContext;
-use crate::apple::Apple;
-use crate::basic::HexPoint;
 use crate::snake::{Body, PassthroughKnowledge};
 use crate::view::snakes::Snakes;
 use crate::view::targets::Targets;
