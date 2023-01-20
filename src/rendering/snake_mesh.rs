@@ -263,7 +263,6 @@ pub fn snake_mesh(
     //     builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
     // }
 
-    println!("================================================================");
     descs
         .into_iter()
         .try_for_each(|(desc, resolution)| {

@@ -7,7 +7,7 @@ use crate::rendering::segments::descriptions::{
     RoundHeadDescription, SegmentDescription, SegmentFraction, TurnType,
 };
 use crate::rendering::segments::point_factory::SegmentRenderer;
-use itertools::Itertools;
+use itertools::{chain, Itertools};
 use lyon_geom::{Angle, Arc, SvgArc};
 pub struct SmoothSegments;
 
@@ -36,6 +36,13 @@ fn upper_intersection_point(p0: Point, r0: f32, p1: Point, r1: f32) -> Point {
     }
 }
 
+fn extreme_points(center: Point, radius: f32, start_angle: f32, end_angle: f32) -> (Point, Point) {
+    let starting_point = center + Point { x: radius, y: 0.0 };
+    let first_point = starting_point.rotate_clockwise(center, start_angle);
+    let last_point = starting_point.rotate_clockwise(center, end_angle);
+    (first_point, last_point)
+}
+
 impl SmoothSegments {
     fn render_arc_tip(description: &SegmentDescription, fraction: SegmentFraction) -> Vec<Point> {
         let CellDim { side, sin, cos } = description.cell_dim;
@@ -51,8 +58,6 @@ impl SmoothSegments {
         let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
         let end_angle = PI - start_angle;
 
-        dbg!(start_angle, end_angle);
-
         // TODO: custom arc implementation? seriously? or find a better arc
         let arc = Arc {
             center: center.into(),
@@ -62,15 +67,12 @@ impl SmoothSegments {
             x_rotation: Angle { radians: 0. },
         };
 
-        let first_point = (center + Point { x: head_radius, y: 0.0 }).rotate_clockwise(center, start_angle);
-        let last_point = (center + Point { x: head_radius, y: 0.0 }).rotate_clockwise(center, end_angle);
+        let (first_point, last_point) = extreme_points(center, head_radius, start_angle, end_angle);
 
-        let points: Vec<Point> = iter::once(first_point.into())
+        let points: Vec<Point> = iter::once(first_point)
             .chain(arc.flattened(TOLERANCE).map(From::from))
-            .chain(iter::once(last_point.into()))
+            .chain(iter::once(last_point))
             .collect();
-
-        dbg!(&points);
 
         points
     }
@@ -88,8 +90,7 @@ impl SmoothSegments {
             x: cos + 0.5 * side,
             // fraction.end >= head_radius
             y: head_base,
-        }
-        .into();
+        };
 
         let d1 = fraction.end * 2. * sin - head_base;
         let d2 = fraction.start * 2. * sin - head_base;
@@ -101,7 +102,7 @@ impl SmoothSegments {
         let end_angle2 = PI - start_angle1;
 
         let arc1 = Arc {
-            center,
+            center: center.into(),
             radii: Point::square(head_radius).into(),
             start_angle: Angle { radians: start_angle1 },
             sweep_angle: Angle { radians: end_angle1 - start_angle1 },
@@ -109,17 +110,25 @@ impl SmoothSegments {
         };
 
         let arc2 = Arc {
-            center,
+            center: center.into(),
             radii: Point::square(head_radius).into(),
             start_angle: Angle { radians: start_angle2 },
             sweep_angle: Angle { radians: end_angle2 - start_angle2 },
             x_rotation: Angle { radians: 0. },
         };
 
-        arc1.flattened(TOLERANCE)
-            .chain(arc2.flattened(TOLERANCE))
-            .map(From::from)
-            .collect()
+        let (first1, last1) = extreme_points(center, head_radius, start_angle1, end_angle1);
+        let (first2, last2) = extreme_points(center, head_radius, start_angle2, end_angle2);
+
+        chain!(
+            iter::once(first1),
+            arc1.flattened(TOLERANCE).map(Into::into),
+            iter::once(last1),
+            iter::once(first2),
+            arc2.flattened(TOLERANCE).map(Into::into),
+            iter::once(last2),
+        )
+        .collect()
     }
 }
 
@@ -148,41 +157,43 @@ impl SegmentRenderer for SmoothSegments {
             Tip { segment_end } => {
                 println!("TIP");
                 if fraction.end == segment_end {
+                    println!("tip A: {}-{}", fraction.start, fraction.end);
                     return Self::render_arc_tip(description, fraction);
                 } else {
+                    println!("tip B: {}-{}", fraction.start, fraction.end);
                     let head_base = segment_end * 2. * sin - head_radius;
                     assert!(head_base <= 0.);
-                    // return Self::render_split_arc(description, fraction, head_base);
+                    return Self::render_split_arc(description, fraction, head_base);
                 }
             }
             Full { segment_end } => {
-                println!("FULL");
+                // println!("FULL");
                 if fraction.end == segment_end {
-                    return Self::render_arc_tip(description, fraction)
+                    return Self::render_arc_tip(description, fraction);
                 } else {
                     let head_base = segment_end * 2. * sin - head_radius;
                     if fraction.start * 2. * sin >= head_base {
                         assert!(head_base >= 0.);
-                        // return Self::render_split_arc(description, fraction, head_base);
+                        return Self::render_split_arc(description, fraction, head_base);
                     } else {
                         // println!("NO DRAW")
                     }
                 }
             }
             Tail { prev_segment_end } => {
-                println!("TAIL");
+                // println!("TAIL");
                 let head_base = 2. * sin + prev_segment_end - head_radius;
                 assert!(dbg!(head_base) >= sin);
                 assert!(head_base <= 2. * sin);
                 if fraction.start * 2. * sin >= head_base {
-                    // return Self::render_split_arc(description, fraction, head_base);
+                    return Self::render_split_arc(description, fraction, head_base);
                 }
             }
             Gone => {
-                println!("GONE");
+                // println!("GONE");
             }
         }
-        return vec![];
+        // return vec![];
 
         // top-left, top-right, bottom-right, bottom-left
         vec![
