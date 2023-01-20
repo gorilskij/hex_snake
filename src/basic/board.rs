@@ -1,7 +1,7 @@
-use rand::distributions::uniform::SampleRange;
 use crate::apple::Apple;
 use crate::basic::{HexDim, HexPoint};
 use crate::snake::Snake;
+use rand::distributions::uniform::SampleRange;
 use rand::Rng;
 
 pub fn get_occupied_cells(snakes: &[Snake], apples: &[Apple]) -> Vec<HexPoint> {

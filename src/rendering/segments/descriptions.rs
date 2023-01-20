@@ -95,3 +95,19 @@ pub struct SegmentDescription {
     pub z_index: ZIndex,
     pub cell_dim: CellDim,
 }
+
+pub enum RoundHeadDescription {
+    /// Only the beginning of the round head is within the current segment,
+    Tip {
+        segment_end: f32,
+    },
+    /// The full round head is within the current segment
+    Full {
+        segment_end: f32,
+    },
+    /// Only the end of the round head is within the current segment
+    Tail {
+        /// This refers to the end of next segment
+        segment_end: f32,
+    },
+}

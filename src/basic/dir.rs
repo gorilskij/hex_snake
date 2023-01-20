@@ -3,10 +3,10 @@ use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 use itertools::Itertools;
 
 use crate::basic::angle_distance;
+use rand::distributions::uniform::SampleRange;
 use rand::Rng;
 use std::cmp::Ordering;
 use std::f32::consts::TAU;
-use rand::distributions::uniform::SampleRange;
 use Dir::*;
 
 // defined in clockwise order starting at U

@@ -1,10 +1,12 @@
-use std::f32::consts::TAU;
+use ggez::mint;
+use std::f32::consts::{PI, TAU};
 use std::iter;
 
 use crate::basic::{CellDim, Point};
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnType};
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use itertools::Itertools;
+use lyon_geom::euclid::default::Point2D;
 use lyon_geom::{Angle, Arc};
 
 pub struct SmoothSegments;
@@ -38,16 +40,79 @@ impl SegmentRenderer for SmoothSegments {
     fn render_default_straight_segment(
         description: &SegmentDescription,
         fraction: SegmentFraction,
+        next_fraction: Option<SegmentFraction>,
+        previous_fraction: Option<SegmentFraction>,
     ) -> Vec<Point> {
         let CellDim { side, sin, cos } = description.cell_dim;
-        let SegmentFraction { start, end } = fraction;
+
+        // TODO: assert this upstream and figure out how to handle snake growing from 0
+        // assert!(
+        //     fraction.end - fraction.start >= side,
+        //     "segment too short, must be at least as long as it is wide"
+        // );
+
+        let head_radius = side / 2.;
+
+        // the length of a full straight segment (height of a hexagon)
+        let length = 2. * sin;
+
+        dbg!(next_fraction);
+        dbg!(fraction);
+        dbg!(previous_fraction);
+
+        if let Some(next_fraction) = next_fraction {
+            // the segment has already entered the next cell
+
+            if next_fraction.end < head_radius {
+                println!("A");
+                // part of the head curvature is still visible in this cell
+                // (as two separate arcs)
+            } else {
+                println!("B");
+                // no head curvature is visible in this cell
+            }
+        } else {
+            // the segment ends in this cell
+
+            if fraction.end < head_radius {
+                println!("C");
+                // only part of the head curvature is visible in this cell
+            } else {
+                println!("D");
+                // the whole head curvature is visible in this cell
+                // println!("hit");
+
+                let center = Point {
+                    x: cos + 0.5 * side,
+                    // fraction.end >= head_radius
+                    y: fraction.end - head_radius,
+                }
+                .into();
+
+                let head = Arc {
+                    center,
+                    radii: Point::square(head_radius).into(),
+                    start_angle: Angle { radians: 0. },
+                    sweep_angle: Angle { radians: PI },
+                    x_rotation: Angle { radians: 0. },
+                };
+
+                return head.flattened(TOLERANCE).map(From::from).collect();
+            }
+        }
 
         // top-left, top-right, bottom-right, bottom-left
         vec![
-            Point { x: cos, y: end * 2. * sin },
-            Point { x: cos + side, y: end * 2. * sin },
-            Point { x: cos + side, y: start * 2. * sin },
-            Point { x: cos, y: start * 2. * sin },
+            Point { x: cos, y: fraction.end * length },
+            Point {
+                x: cos + side,
+                y: fraction.end * length,
+            },
+            Point {
+                x: cos + side,
+                y: fraction.start * length,
+            },
+            Point { x: cos, y: fraction.start * length },
         ]
     }
 
@@ -68,7 +133,8 @@ impl SegmentRenderer for SmoothSegments {
             let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
             // too straight to be drawn as curved, default to straight drawing
             if pivot_dist.is_infinite() {
-                return Self::render_default_straight_segment(description, fraction);
+                panic!("add previous and next parameters to curved segment");
+                // return Self::render_default_straight_segment(description, fraction);
             }
             Point { x: side + cos + pivot_dist, y: 0. }
         };

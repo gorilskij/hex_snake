@@ -60,26 +60,72 @@ impl SegmentDescription {
         color_resolution: usize,
         turn_fraction: f32,
     ) -> Box<dyn Iterator<Item = (Color, Vec<Point>)> + '_> {
+        // TODO: turn this into an iterator
+        /// return (previous, current, next) at each step with previous and next if available
+        /// e.g. [1,2,3] -> (None, 1, Some(2)), (Some(1), 2, Some(3)), (Some(2), 3, None)
+        fn windows3<T: Copy>(vec: Vec<T>) -> impl Iterator<Item = (Option<T>, T, Option<T>)> {
+            let prev = iter::once(None)
+                .chain(vec.clone()
+                    .into_iter()
+                    .map(Some));
+
+            let next = vec
+                .clone()
+                .into_iter()
+                .skip(1)
+                .map(Some)
+                .chain(iter::once(None));
+
+            prev.zip(vec.into_iter())
+                .zip(next)
+                .map(|((prev, item), next)| (prev, item, next))
+        }
+
         match self.draw_style {
             rendering::Style::Hexagon => Box::new(iter::once((
                 self.segment_style.first_color(),
-                HexagonSegments::render_segment(self, turn_fraction, SegmentFraction::solid()),
+                HexagonSegments::render_segment(
+                    self,
+                    turn_fraction,
+                    SegmentFraction::solid(),
+                    None,
+                    None,
+                ),
             ))),
+
             rendering::Style::Smooth => {
                 let mut end = self.fraction.start;
-                Box::new(
-                    self.get_subsegments(color_resolution)
-                        .map(move |subsegment| {
-                            let start = end;
-                            end = subsegment.end;
-                            let points = SmoothSegments::render_segment(
-                                self,
-                                turn_fraction,
-                                SegmentFraction { start, end },
-                            );
-                            (subsegment.color, points)
-                        }),
-                )
+                // TODO: remove collect and rewrite this mess
+                let info: Vec<_> = self
+                    .get_subsegments(color_resolution)
+                    .map(move |subsegment| {
+                        let start = end;
+                        end = subsegment.end;
+                        (start, end, subsegment.color)
+                    })
+                    .collect();
+
+                dbg!(&info);
+
+                // TODO: in general, this isn't pretty
+                Box::new({
+                    windows3(info).map(move |(previous, current, next)| {
+                        let previous_fraction =
+                            previous.map(|(start, end, _)| SegmentFraction { start, end });
+
+                        let fraction = SegmentFraction { start: current.0, end: current.1 };
+
+                        let next_fraction =
+                            next.map(|(start, end, _)| SegmentFraction { start, end });
+
+                        let points = SmoothSegments::render_segment(
+                            self,
+                            turn_fraction,
+                            fraction,
+                        );
+                        (current.2, points)
+                    })
+                })
             }
         }
     }
@@ -101,6 +147,7 @@ impl SegmentDescription {
     }
 }
 
+// TODO: just have render_segment, the straight/curved distinction can be made by smooth_segments internally
 // TODO: rework documentation (switched to subsegments)
 /// The `render_default_*` functions are without position or rotation,
 /// they assume a default orientation and the transformation is performed
@@ -111,6 +158,10 @@ pub trait SegmentRenderer {
     fn render_default_straight_segment(
         description: &SegmentDescription,
         fraction: SegmentFraction,
+        // fraction of the segment after this one
+        next_fraction: Option<SegmentFraction>,
+        // fraction of the segment before this one
+        previous_fraction: Option<SegmentFraction>,
     ) -> Vec<Point>;
 
     /// Render a curved segment in the default orientation,
@@ -133,13 +184,22 @@ pub trait SegmentRenderer {
         description: &SegmentDescription,
         turn_fraction: f32,
         fraction: SegmentFraction,
+        next_fraction: Option<SegmentFraction>,
+        previous_fraction: Option<SegmentFraction>,
     ) -> Vec<Point> {
         use TurnDirection::*;
         use TurnType::*;
 
         let mut segment;
         match description.turn.turn_type() {
-            Straight => segment = Self::render_default_straight_segment(description, fraction),
+            Straight => {
+                segment = Self::render_default_straight_segment(
+                    description,
+                    fraction,
+                    next_fraction,
+                    previous_fraction,
+                )
+            }
             Blunt(turn_direction) | Sharp(turn_direction) => {
                 segment = Self::render_default_curved_segment(description, turn_fraction, fraction);
                 if turn_direction == Clockwise {

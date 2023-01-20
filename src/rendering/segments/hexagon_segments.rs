@@ -11,7 +11,12 @@ pub struct HexagonSegments;
 /// shouldn't be used directly outside of `render_segment` and instead implements
 /// `render_segment` directly
 impl SegmentRenderer for HexagonSegments {
-    fn render_default_straight_segment(_: &SegmentDescription, _: SegmentFraction) -> Vec<Point> {
+    fn render_default_straight_segment(
+        _: &SegmentDescription,
+        _: SegmentFraction,
+        _: Option<SegmentFraction>,
+        _: Option<SegmentFraction>,
+    ) -> Vec<Point> {
         unreachable!()
     }
 
@@ -27,6 +32,8 @@ impl SegmentRenderer for HexagonSegments {
         description: &SegmentDescription,
         _turn_fraction: f32,
         _: SegmentFraction,
+        _: Option<SegmentFraction>,
+        _: Option<SegmentFraction>,
     ) -> Vec<Point> {
         let mut points = render_hexagon(description.cell_dim);
         translate(&mut points, description.destination);
