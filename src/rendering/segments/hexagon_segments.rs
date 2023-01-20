@@ -1,6 +1,8 @@
 use crate::basic::transformations::translate;
 use crate::basic::Point;
-use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction};
+use crate::rendering::segments::descriptions::{
+    RoundHeadDescription, SegmentDescription, SegmentFraction,
+};
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use crate::rendering::segments::render_hexagon;
 
@@ -14,8 +16,7 @@ impl SegmentRenderer for HexagonSegments {
     fn render_default_straight_segment(
         _: &SegmentDescription,
         _: SegmentFraction,
-        _: Option<SegmentFraction>,
-        _: Option<SegmentFraction>,
+        _: RoundHeadDescription,
     ) -> Vec<Point> {
         unreachable!()
     }
@@ -24,6 +25,7 @@ impl SegmentRenderer for HexagonSegments {
         _: &SegmentDescription,
         _: f32,
         _: SegmentFraction,
+        _: RoundHeadDescription,
     ) -> Vec<Point> {
         unreachable!()
     }
@@ -32,8 +34,7 @@ impl SegmentRenderer for HexagonSegments {
         description: &SegmentDescription,
         _turn_fraction: f32,
         _: SegmentFraction,
-        _: Option<SegmentFraction>,
-        _: Option<SegmentFraction>,
+        _: RoundHeadDescription,
     ) -> Vec<Point> {
         let mut points = render_hexagon(description.cell_dim);
         translate(&mut points, description.destination);

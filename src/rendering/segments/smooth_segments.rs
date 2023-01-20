@@ -1,18 +1,18 @@
-use ggez::mint;
 use std::f32::consts::{PI, TAU};
+use std::io::Read;
 use std::iter;
 
 use crate::basic::{CellDim, Point};
-use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnType};
+use crate::rendering::segments::descriptions::{
+    RoundHeadDescription, SegmentDescription, SegmentFraction, TurnType,
+};
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use itertools::Itertools;
-use lyon_geom::euclid::default::Point2D;
-use lyon_geom::{Angle, Arc};
-
+use lyon_geom::{Angle, Arc, SvgArc};
 pub struct SmoothSegments;
 
 // TODO: make this a variable parameter based on zoom level
-const TOLERANCE: f32 = 0.5;
+const TOLERANCE: f32 = 0.05;
 
 // TODO: this documentation is confusing and probably wrong
 // (wouldn't a = r0 !?) (it isn't)
@@ -36,14 +36,101 @@ fn upper_intersection_point(p0: Point, r0: f32, p1: Point, r1: f32) -> Point {
     }
 }
 
+impl SmoothSegments {
+    fn render_arc_tip(description: &SegmentDescription, fraction: SegmentFraction) -> Vec<Point> {
+        let CellDim { side, sin, cos } = description.cell_dim;
+        let head_radius = side / 2.;
+
+        let center = Point {
+            x: cos + 0.5 * side,
+            // fraction.end >= head_radius
+            y: fraction.end * 2. * sin - head_radius,
+        };
+
+        let slice_thickness = (fraction.end - fraction.start) * 2. * side;
+        let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
+        let end_angle = PI - start_angle;
+
+        dbg!(start_angle, end_angle);
+
+        // TODO: custom arc implementation? seriously? or find a better arc
+        let arc = Arc {
+            center: center.into(),
+            radii: Point::square(head_radius).into(),
+            start_angle: Angle { radians: start_angle },
+            sweep_angle: Angle { radians: end_angle - start_angle },
+            x_rotation: Angle { radians: 0. },
+        };
+
+        let first_point = (center + Point { x: head_radius, y: 0.0 }).rotate_clockwise(center, start_angle);
+        let last_point = (center + Point { x: head_radius, y: 0.0 }).rotate_clockwise(center, end_angle);
+
+        let points: Vec<Point> = iter::once(first_point.into())
+            .chain(arc.flattened(TOLERANCE).map(From::from))
+            .chain(iter::once(last_point.into()))
+            .collect();
+
+        dbg!(&points);
+
+        points
+    }
+
+    fn render_split_arc(
+        description: &SegmentDescription,
+        fraction: SegmentFraction,
+        // The base of the round head (center of the circle, y coordinate), even if negative
+        head_base: f32,
+    ) -> Vec<Point> {
+        let CellDim { side, sin, cos } = description.cell_dim;
+        let head_radius = side / 2.;
+
+        let center = Point {
+            x: cos + 0.5 * side,
+            // fraction.end >= head_radius
+            y: head_base,
+        }
+        .into();
+
+        let d1 = fraction.end * 2. * sin - head_base;
+        let d2 = fraction.start * 2. * sin - head_base;
+
+        let start_angle1 = (d1 / head_radius).atan();
+        let end_angle1 = (d2 / head_radius).atan();
+        // start 2 mirrors end 1, end 2 mirrors start 1
+        let start_angle2 = PI - end_angle1;
+        let end_angle2 = PI - start_angle1;
+
+        let arc1 = Arc {
+            center,
+            radii: Point::square(head_radius).into(),
+            start_angle: Angle { radians: start_angle1 },
+            sweep_angle: Angle { radians: end_angle1 - start_angle1 },
+            x_rotation: Angle { radians: 0. },
+        };
+
+        let arc2 = Arc {
+            center,
+            radii: Point::square(head_radius).into(),
+            start_angle: Angle { radians: start_angle2 },
+            sweep_angle: Angle { radians: end_angle2 - start_angle2 },
+            x_rotation: Angle { radians: 0. },
+        };
+
+        arc1.flattened(TOLERANCE)
+            .chain(arc2.flattened(TOLERANCE))
+            .map(From::from)
+            .collect()
+    }
+}
+
 impl SegmentRenderer for SmoothSegments {
     fn render_default_straight_segment(
         description: &SegmentDescription,
         fraction: SegmentFraction,
-        next_fraction: Option<SegmentFraction>,
-        previous_fraction: Option<SegmentFraction>,
+        round_head: RoundHeadDescription,
     ) -> Vec<Point> {
         let CellDim { side, sin, cos } = description.cell_dim;
+        let head_radius = side / 2.;
 
         // TODO: assert this upstream and figure out how to handle snake growing from 0
         // assert!(
@@ -51,55 +138,51 @@ impl SegmentRenderer for SmoothSegments {
         //     "segment too short, must be at least as long as it is wide"
         // );
 
-        let head_radius = side / 2.;
-
         // the length of a full straight segment (height of a hexagon)
         let length = 2. * sin;
 
-        dbg!(next_fraction);
-        dbg!(fraction);
-        dbg!(previous_fraction);
+        use RoundHeadDescription::*;
 
-        if let Some(next_fraction) = next_fraction {
-            // the segment has already entered the next cell
-
-            if next_fraction.end < head_radius {
-                println!("A");
-                // part of the head curvature is still visible in this cell
-                // (as two separate arcs)
-            } else {
-                println!("B");
-                // no head curvature is visible in this cell
-            }
-        } else {
-            // the segment ends in this cell
-
-            if fraction.end < head_radius {
-                println!("C");
-                // only part of the head curvature is visible in this cell
-            } else {
-                println!("D");
-                // the whole head curvature is visible in this cell
-                // println!("hit");
-
-                let center = Point {
-                    x: cos + 0.5 * side,
-                    // fraction.end >= head_radius
-                    y: fraction.end - head_radius,
+        // TODO: actually pass a boolean flag for first and last subsegments in the snake
+        match round_head {
+            Tip { segment_end } => {
+                println!("TIP");
+                if fraction.end == segment_end {
+                    return Self::render_arc_tip(description, fraction);
+                } else {
+                    let head_base = segment_end * 2. * sin - head_radius;
+                    assert!(head_base <= 0.);
+                    // return Self::render_split_arc(description, fraction, head_base);
                 }
-                .into();
-
-                let head = Arc {
-                    center,
-                    radii: Point::square(head_radius).into(),
-                    start_angle: Angle { radians: 0. },
-                    sweep_angle: Angle { radians: PI },
-                    x_rotation: Angle { radians: 0. },
-                };
-
-                return head.flattened(TOLERANCE).map(From::from).collect();
+            }
+            Full { segment_end } => {
+                println!("FULL");
+                if fraction.end == segment_end {
+                    return Self::render_arc_tip(description, fraction)
+                } else {
+                    let head_base = segment_end * 2. * sin - head_radius;
+                    if fraction.start * 2. * sin >= head_base {
+                        assert!(head_base >= 0.);
+                        // return Self::render_split_arc(description, fraction, head_base);
+                    } else {
+                        // println!("NO DRAW")
+                    }
+                }
+            }
+            Tail { prev_segment_end } => {
+                println!("TAIL");
+                let head_base = 2. * sin + prev_segment_end - head_radius;
+                assert!(dbg!(head_base) >= sin);
+                assert!(head_base <= 2. * sin);
+                if fraction.start * 2. * sin >= head_base {
+                    // return Self::render_split_arc(description, fraction, head_base);
+                }
+            }
+            Gone => {
+                println!("GONE");
             }
         }
+        return vec![];
 
         // top-left, top-right, bottom-right, bottom-left
         vec![
@@ -120,6 +203,7 @@ impl SegmentRenderer for SmoothSegments {
         description: &SegmentDescription,
         mut turn_fraction: f32,
         fraction: SegmentFraction,
+        round_head: RoundHeadDescription,
     ) -> Vec<Point> {
         // a blunt turn is equivalent to half a sharp turn
         if let TurnType::Blunt(_) = description.turn.turn_type() {

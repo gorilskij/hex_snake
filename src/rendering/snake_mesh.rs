@@ -1,8 +1,10 @@
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
+use itertools::Itertools;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 use std::cmp::Ordering;
+use std::iter;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
@@ -36,6 +38,7 @@ fn segment_description(
     segment: &Segment,
     segment_idx: usize,
     body: &Body,
+    prev_fraction: Option<SegmentFraction>,
     frame_fraction: f32,
     segment_style: SegmentStyle,
     gtx: &GameContext,
@@ -108,6 +111,7 @@ fn segment_description(
             going_to,
             fraction: turn_fraction,
         },
+        prev_fraction,
         fraction,
         draw_style: gtx.prefs.draw_style,
         segment_type: segment.segment_type,
@@ -181,6 +185,8 @@ pub fn snake_mesh(
         .iter_mut()
         .zip(color_resolutions.iter())
         .flat_map(|(snake, resolution)| {
+            let body = &snake.body;
+            let mut prev_fraction = None;
             snake
                 .body
                 .segments
@@ -189,16 +195,19 @@ pub fn snake_mesh(
                 // .zip(style.into_par_iter())
                 .iter()
                 .enumerate()
-                .zip(snake.palette.segment_styles(&snake.body, frame_fraction))
-                .map(|((segment_idx, segment), style)| {
+                .zip(snake.palette.segment_styles(body, frame_fraction))
+                .map(move |((segment_idx, segment), style)| {
                     let desc = segment_description(
                         segment,
                         segment_idx,
-                        &snake.body,
+                        body,
+                        prev_fraction,
                         frame_fraction,
                         style,
                         gtx,
                     );
+
+                    prev_fraction = Some(desc.fraction);
 
                     // if segment_idx == 0 {
                     //     heads.lock().unwrap().push(desc.clone());
@@ -254,6 +263,7 @@ pub fn snake_mesh(
     //     builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
     // }
 
+    println!("================================================================");
     descs
         .into_iter()
         .try_for_each(|(desc, resolution)| {

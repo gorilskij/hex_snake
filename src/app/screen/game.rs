@@ -264,7 +264,7 @@ impl Game {
 impl Game {
     /// Bounds for the length of one of the six sides of a cell
     const CELL_SIDE_MIN: f32 = 5.;
-    const CELL_SIDE_MAX: f32 = 50.;
+    const CELL_SIDE_MAX: f32 = 200.;
 
     fn spawn_apples(&mut self) {
         let new_apples = spawn_apples(&self.snakes, &self.apples, &mut self.gtx, &mut self.rng);
