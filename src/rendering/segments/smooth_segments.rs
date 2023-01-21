@@ -3,12 +3,14 @@ use std::io::Read;
 use std::iter;
 
 use crate::basic::{CellDim, Point};
+use crate::rendering::clean_arc::CleanArc;
 use crate::rendering::segments::descriptions::{
     RoundHeadDescription, SegmentDescription, SegmentFraction, TurnType,
 };
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use itertools::{chain, Itertools};
-use lyon_geom::{Angle, Arc, SvgArc};
+use lyon_geom::{Angle, Arc};
+
 pub struct SmoothSegments;
 
 // TODO: make this a variable parameter based on zoom level
@@ -50,31 +52,22 @@ impl SmoothSegments {
 
         let center = Point {
             x: cos + 0.5 * side,
-            // fraction.end >= head_radius
             y: fraction.end * 2. * sin - head_radius,
         };
 
         let slice_thickness = (fraction.end - fraction.start) * 2. * side;
+
         let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
         let end_angle = PI - start_angle;
 
-        // TODO: custom arc implementation? seriously? or find a better arc
-        let arc = Arc {
-            center: center.into(),
-            radii: Point::square(head_radius).into(),
-            start_angle: Angle { radians: start_angle },
-            sweep_angle: Angle { radians: end_angle - start_angle },
-            x_rotation: Angle { radians: 0. },
-        };
-
-        let (first_point, last_point) = extreme_points(center, head_radius, start_angle, end_angle);
-
-        let points: Vec<Point> = iter::once(first_point)
-            .chain(arc.flattened(TOLERANCE).map(From::from))
-            .chain(iter::once(last_point))
-            .collect();
-
-        points
+        CleanArc {
+            center,
+            radius: head_radius,
+            start_angle,
+            end_angle,
+        }
+        .flattened(TOLERANCE)
+        .collect()
     }
 
     fn render_split_arc(
@@ -95,40 +88,24 @@ impl SmoothSegments {
         let d1 = fraction.end * 2. * sin - head_base;
         let d2 = fraction.start * 2. * sin - head_base;
 
-        let start_angle1 = (d1 / head_radius).atan();
-        let end_angle1 = (d2 / head_radius).atan();
-        // start 2 mirrors end 1, end 2 mirrors start 1
-        let start_angle2 = PI - end_angle1;
-        let end_angle2 = PI - start_angle1;
-
-        let arc1 = Arc {
-            center: center.into(),
-            radii: Point::square(head_radius).into(),
-            start_angle: Angle { radians: start_angle1 },
-            sweep_angle: Angle { radians: end_angle1 - start_angle1 },
-            x_rotation: Angle { radians: 0. },
+        let arc1 = CleanArc {
+            center,
+            radius: head_radius,
+            start_angle: (d1 / head_radius).atan(),
+            end_angle: (d2 / head_radius).atan(),
         };
 
-        let arc2 = Arc {
-            center: center.into(),
-            radii: Point::square(head_radius).into(),
-            start_angle: Angle { radians: start_angle2 },
-            sweep_angle: Angle { radians: end_angle2 - start_angle2 },
-            x_rotation: Angle { radians: 0. },
+        let arc2 = CleanArc {
+            center,
+            radius: head_radius,
+            // start 2 mirrors end 1, end 2 mirrors start 1
+            start_angle: PI - arc1.end_angle,
+            end_angle: PI - arc1.start_angle,
         };
 
-        let (first1, last1) = extreme_points(center, head_radius, start_angle1, end_angle1);
-        let (first2, last2) = extreme_points(center, head_radius, start_angle2, end_angle2);
-
-        chain!(
-            iter::once(first1),
-            arc1.flattened(TOLERANCE).map(Into::into),
-            iter::once(last1),
-            iter::once(first2),
-            arc2.flattened(TOLERANCE).map(Into::into),
-            iter::once(last2),
-        )
-        .collect()
+        arc1.flattened(TOLERANCE)
+            .chain(arc2.flattened(TOLERANCE))
+            .collect()
     }
 }
 

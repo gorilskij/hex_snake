@@ -4,6 +4,7 @@ pub use player_path_mesh::player_path_mesh;
 pub use snake_mesh::snake_mesh;
 
 mod apple_mesh;
+mod clean_arc;
 mod grid_mesh;
 mod player_path_mesh;
 pub mod segments;
