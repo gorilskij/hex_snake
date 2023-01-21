@@ -86,6 +86,7 @@ impl TurnDescription {
 
 #[derive(Clone, Debug)]
 pub struct SegmentDescription {
+    pub segment_idx: usize,
     pub destination: Point,
     pub turn: TurnDescription,
     pub fraction: SegmentFraction,

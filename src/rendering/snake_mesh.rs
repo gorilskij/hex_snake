@@ -3,7 +3,6 @@ use ggez::Context;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 use std::cmp::Ordering;
-use std::iter;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
@@ -104,6 +103,7 @@ fn segment_description(
     };
 
     SegmentDescription {
+        segment_idx,
         destination: location,
         turn: TurnDescription {
             coming_from,
