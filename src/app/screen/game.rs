@@ -159,6 +159,7 @@ impl Game {
         }
     }
 
+    // TODO: R as a restart shortcut but only in debug mode
     fn restart(&mut self) {
         self.snakes.clear();
         self.apples.clear();
@@ -264,7 +265,7 @@ impl Game {
 impl Game {
     /// Bounds for the length of one of the six sides of a cell
     const CELL_SIDE_MIN: f32 = 5.;
-    const CELL_SIDE_MAX: f32 = 200.;
+    const CELL_SIDE_MAX: f32 = 1000.;
 
     fn spawn_apples(&mut self) {
         let new_apples = spawn_apples(&self.snakes, &self.apples, &mut self.gtx, &mut self.rng);
@@ -580,7 +581,8 @@ impl EventHandler<Error> for Game {
                 }
                 LBracket => {
                     let mut new_fps = match self.fps_control.fps() {
-                        f if f <= 0.2 => 0.1,
+                        f if f <= 0.1 => 0.05,
+                        // f if f <= 0.2 => 0.1,
                         f if f <= 1. => f - 0.1,
                         f if f <= 20. => f - 1.,
                         f if f <= 50. => f - 5.,
@@ -590,14 +592,15 @@ impl EventHandler<Error> for Game {
                         f if f <= 10_000. => f - 1000.,
                         f => f - 10_000.,
                     };
-                    new_fps = (new_fps * 10.).round() / 10.;
+                    new_fps = (new_fps * 100.).round() / 100.;
 
                     self.fps_control.set_game_fps(new_fps);
                     self.display_notification(format!("fps: {new_fps}"));
                 }
                 RBracket => {
                     let mut new_fps = match self.fps_control.fps() {
-                        f if f <= 0.1 => 0.2,
+                        f if f <= 0.05 => 0.1,
+                        // f if f <= 0.1 => 0.2,
                         f if f < 1. => f + 0.1,
                         f if f < 20. => (f + 1.).floor(),
                         f if f < 50. => f + 5.,
@@ -607,7 +610,7 @@ impl EventHandler<Error> for Game {
                         f if f < 10_000. => f + 1000.,
                         f => f + 10_000.,
                     };
-                    new_fps = (new_fps * 10.).round() / 10.;
+                    new_fps = (new_fps * 100.).round() / 100.;
 
                     self.fps_control.set_game_fps(new_fps);
                     self.display_notification(format!("fps: {new_fps}"));

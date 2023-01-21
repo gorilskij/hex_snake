@@ -1,6 +1,6 @@
 use ggez::graphics;
-use std::ops::{Add, Deref, DerefMut, Div, Mul, Sub};
 use rand::Rng;
+use std::ops::{Add, Deref, DerefMut, Div, Mul, Sub};
 
 pub mod oklab;
 pub mod to_color;

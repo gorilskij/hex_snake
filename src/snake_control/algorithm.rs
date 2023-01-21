@@ -55,6 +55,7 @@ impl Algorithm {
             }
         }
 
+        // TODO: don't recalculate until called upon (lazy ai)
         // recalculate
         println!("recalculating");
         self.path =

@@ -1,13 +1,13 @@
 use ggez::graphics::{DrawMode, MeshBuilder};
-use std::iter;
 use rand::thread_rng;
+use std::iter;
 
 use crate::basic::Point;
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;
 use crate::rendering::segments::descriptions::{
-    RoundHeadDescription, SegmentDescription, SegmentFraction
+    RoundHeadDescription, SegmentDescription, SegmentFraction,
 };
 use crate::rendering::segments::hexagon_segments::HexagonSegments;
 use crate::rendering::segments::smooth_segments::SmoothSegments;
@@ -48,7 +48,12 @@ impl SegmentDescription {
             .rev()
             .enumerate()
             .rev()
-            .map(move |(subsegment_idx, subsegment)| (subsegment_idx, get_color(subsegment as f64 / num_subsegments as f64)))
+            .map(move |(subsegment_idx, subsegment)| {
+                (
+                    subsegment_idx,
+                    get_color(subsegment as f64 / num_subsegments as f64),
+                )
+            })
             .enumerate()
             .map(move |(i, (subsegment_idx, color))| {
                 let end = self.fraction.start + subsegment_size * (i + 1) as f32;
@@ -95,28 +100,19 @@ impl SegmentDescription {
                     .collect();
 
                 // TODO: in general, this isn't pretty
-                Box::new(info.into_iter().map(move |(subsegment_idx, start, end, color)| {
-                    let points = SmoothSegments::render_segment(
-                        self,
-                        subsegment_idx,
-                        turn_fraction,
-                        SegmentFraction { start, end },
-                        round_head,
-                    );
-                    // (color, points)
-                    // (Color::random(0.5, &mut thread_rng()), points)
-                    let color = match subsegment_idx {
-                        0 => Color::WHITE,
-                        1 => Color::RED,
-                        2 => Color::GREEN,
-                        3 => Color::BLUE,
-                        4 => Color::CYAN,
-                        5 => Color::MAGENTA,
-                        6 => Color::YELLOW,
-                        _ => Color::gray(0.5),
-                    };
-                    (color, points)
-                }))
+                Box::new(
+                    info.into_iter()
+                        .map(move |(subsegment_idx, start, end, color)| {
+                            let points = SmoothSegments::render_segment(
+                                self,
+                                subsegment_idx,
+                                turn_fraction,
+                                SegmentFraction { start, end },
+                                round_head,
+                            );
+                            (color, points)
+                        }),
+                )
             }
         }
     }
