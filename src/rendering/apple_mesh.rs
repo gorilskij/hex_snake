@@ -36,16 +36,21 @@ pub fn apple_mesh(
                 }
             };
 
-            if gtx.prefs.draw_style == rendering::Style::Hexagon {
-                let dest = apple.pos.to_cartesian(gtx.cell_dim);
-                let mut points = render_hexagon(gtx.cell_dim);
-                translate(&mut points, dest);
-                builder.polygon(DrawMode::fill(), &points, color)?;
-            } else {
-                let dest = apple.pos.to_cartesian(gtx.cell_dim) + gtx.cell_dim.center();
-                builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 1.5, 0.1, color)?;
+            match gtx.prefs.draw_style {
+                rendering::Style::Hexagon => {
+                    let dest = apple.pos.to_cartesian(gtx.cell_dim);
+                    let mut points = render_hexagon(gtx.cell_dim);
+                    translate(&mut points, dest);
+                    builder.polygon(DrawMode::fill(), &points, color)?;
+                    stats.polygons += 1;
+                }
+                rendering::Style::Smooth => {
+                    let dest = apple.pos.to_cartesian(gtx.cell_dim) + gtx.cell_dim.center();
+                    let radius = gtx.cell_dim.side / 2.;
+                    builder.circle(DrawMode::fill(), dest, radius, 0.1, color)?;
+                    stats.polygons += 1;
+                }
             }
-            stats.polygons += 1;
         }
 
         Mesh::from_data(ctx, builder.build())
