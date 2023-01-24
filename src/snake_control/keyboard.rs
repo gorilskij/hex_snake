@@ -30,7 +30,7 @@ impl Keyboard {
     /// If frame_fraction is greater than this value, the change of
     /// direction is deferred to the next cell, this prevents abrupt
     /// jumps of the snake head
-    const LAST_ACTIONABLE_THRESHOLD: f32 = 0.85;
+    const LAST_ACTIONABLE_THRESHOLD: f32 = 0.75;
 
     pub fn new(
         control_setup: ControlSetup,

@@ -1,4 +1,4 @@
-use std::f32::consts::{PI, TAU};
+use std::f32::consts::TAU;
 use std::iter;
 
 use crate::basic::transformations::{flip_horizontally, rotate_clockwise, translate};
@@ -50,7 +50,7 @@ fn render_arc_tip(description: &SegmentDescription, fraction: SegmentFraction) -
     let slice_thickness = (fraction.end - fraction.start) * 2. * side;
 
     let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
-    let end_angle = PI - start_angle;
+    let end_angle = TAU / 2. - start_angle;
 
     CleanArc {
         center,
@@ -91,8 +91,8 @@ fn render_split_arc(
         center,
         radius: head_radius,
         // start 2 mirrors end 1, end 2 mirrors start 1
-        start_angle: PI - arc1.end_angle,
-        end_angle: PI - arc1.start_angle,
+        start_angle: TAU / 2. - arc1.end_angle,
+        end_angle: TAU / 2. - arc1.start_angle,
     };
 
     arc2.flattened(TOLERANCE)
@@ -100,7 +100,7 @@ fn render_split_arc(
         .collect()
 }
 
-fn render_box(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
+fn render_box(fraction: SegmentFraction, cell_dim: CellDim) -> Vec<Point> {
     let CellDim { side, cos, .. } = cell_dim;
     let height = cell_dim.height();
     return vec![
@@ -117,81 +117,65 @@ fn render_box(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
     ];
 }
 
+// TODO: switch to iterators
+fn render_round_head(description: &SegmentDescription, fraction: SegmentFraction) -> Vec<Point> {
+    let CellDim { side, sin, cos } = description.cell_dim;
+    let head_radius = side / 2.;
+
+    let center = Point {
+        x: cos + 0.5 * side,
+        y: fraction.end * 2. * sin,
+    };
+
+    CleanArc {
+        center,
+        radius: head_radius,
+        start_angle: 0.,
+        end_angle: TAU / 2.,
+    }
+    .flattened(TOLERANCE)
+    .collect()
+}
+
+fn render_round_head_tilted(description: &SegmentDescription, fraction: SegmentFraction, angle: f32, pivot: Point) -> Vec<Point> {
+    let CellDim { side, sin, cos } = description.cell_dim;
+    let head_radius = side / 2.;
+
+    let center = Point {
+        x: cos + 0.5 * side,
+        y: 0.,
+    }
+    .rotate_clockwise(pivot, -angle * fraction.end);
+
+    CleanArc {
+        center,
+        radius: head_radius,
+        start_angle: TAU / 2. - angle,
+        end_angle: -angle,
+    }
+    .flattened(TOLERANCE)
+    .collect()
+}
+
 fn render_default_straight_segment(
     description: &SegmentDescription,
     subsegment_idx: usize,
     fraction: SegmentFraction,
     round_head: RoundHeadDescription,
 ) -> Vec<Point> {
-    let CellDim { side,cos,.. } = description.cell_dim;
-    let head_radius = side / 2.;
-
     // TODO: assert this upstream and figure out how to handle snake growing from 0
     // assert!(
     //     fraction.end - fraction.start >= side,
     //     "segment too short, must be at least as long as it is wide"
     // );
 
-    let height = description.cell_dim.height();
-    let subsegment_start_y = fraction.start * height;
-    let subsegment_end_y = fraction.end * height;
-    // the tip of the snake (could be out of bounds for the current cell)
-    use RoundHeadDescription::*;
-    let tip_y = match round_head {
-        Tip { segment_end } => segment_end * height,
-        Full { segment_end } => segment_end * height,
-        Tail { prev_segment_end } => (1. + prev_segment_end) * height,
-        Gone => f32::MAX,
-    };
-
-    enum PartOfRoundHead {
-        Not,
-        Partly,
-        Fully,
-    }
-    use PartOfRoundHead::*;
-
-    let part_of_round_head = if tip_y - subsegment_start_y <= head_radius {
-        Fully
-    } else if tip_y - subsegment_end_y <= head_radius {
-        Partly
-    } else {
-        Not
-    };
-
     if description.segment_idx == 0 && subsegment_idx == 0 {
-        match part_of_round_head {
-            Fully => render_arc_tip(description, fraction),
-            Partly => todo!(),
-            Not => unreachable!(
-                "the first segment of the snake should always be part of the round head"
-            ),
-        }
-    } else {
-        let head_base = tip_y - head_radius;
-        match part_of_round_head {
-            Fully => render_split_arc(description, fraction, head_base),
-            Partly => {
-                // the fraction at which the segment starts being part of the round head
-                let head_base_start = head_base / height;
-                let round_fraction = SegmentFraction {
-                    start: head_base_start,
-                    ..fraction
-                };
-
-                // TODO: figure out maximum number of points and use stack vectors instead
-                let mut points = render_split_arc(description, round_fraction, head_base);
-                // complete the square part
-                points.push(Point {
-                    x: cos + side,
-                    y: fraction.start * height,
-                });
-                points.push(Point { x: cos, y: fraction.start * height });
-                points
-            }
-            Not => render_box(description.cell_dim, fraction),
-        }
+        let mut head = render_round_head(description, fraction);
+        head.reverse();
+        head.append(&mut render_box(fraction, description.cell_dim));
+        return head;
     }
+    render_box(fraction, description.cell_dim)
 }
 
 fn render_default_curved_segment(
@@ -271,12 +255,15 @@ fn render_default_curved_segment(
         x_rotation,
     };
 
-    let points = iter::once(inner_arc.sample(0.))
-        .chain(inner_arc.flattened(TOLERANCE))
-        .chain(iter::once(outer_arc.sample(0.)))
-        .chain(outer_arc.flattened(TOLERANCE))
-        .map(Point::from)
-        .collect_vec();
+    // TODO: use sample in CleanArc and use CleanArc here
+    let mut points = chain!(
+        iter::once(outer_arc.sample(0.)),
+        outer_arc.flattened(TOLERANCE),
+        iter::once(inner_arc.sample(0.)),
+        inner_arc.flattened(TOLERANCE),
+    )
+    .map(Point::from)
+    .collect_vec();
 
     // TODO: if this appears again, just forgo drawing the segment
     if points.len() < 3 {
@@ -284,7 +271,15 @@ fn render_default_curved_segment(
         panic!("segment with only 2 points");
     }
 
-    points
+    if description.segment_idx == 0 && subsegment_idx == 0 {
+        let mut head = render_round_head_tilted(description, fraction, total_angle, pivot);
+        // head.reverse();
+        points.reverse();
+        head.extend(&points);
+        head
+    } else {
+        points
+    }
 }
 
 impl SegmentRenderer for SmoothSegments {
