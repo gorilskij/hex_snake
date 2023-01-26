@@ -38,7 +38,29 @@ fn upper_intersection_point(p0: Point, r0: f32, p1: Point, r1: f32) -> Point {
     }
 }
 
-fn render_arc_tip(description: &SegmentDescription, fraction: SegmentFraction) -> Vec<Point> {
+fn render_arc_tip(
+    fraction: SegmentFraction,
+    center: Point,
+    angle: f32,
+    cell_dim: CellDim,
+) -> Vec<Point> {
+    let head_radius = cell_dim.side / 2.;
+    let slice_thickness = (fraction.end - fraction.start) * 2. * cell_dim.side;
+
+    let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
+    let end_angle = PI - start_angle;
+
+    CleanArc {
+        center,
+        radius: head_radius,
+        start_angle: start_angle + angle,
+        end_angle: end_angle + angle,
+    }
+    .flattened(TOLERANCE)
+    .collect()
+}
+
+fn render_arc_tip_straight(description: &SegmentDescription, fraction: SegmentFraction) -> Vec<Point> {
     let CellDim { side, sin, cos } = description.cell_dim;
     let head_radius = side / 2.;
 
@@ -47,19 +69,21 @@ fn render_arc_tip(description: &SegmentDescription, fraction: SegmentFraction) -
         y: fraction.end * 2. * sin - head_radius,
     };
 
-    let slice_thickness = (fraction.end - fraction.start) * 2. * side;
+    render_arc_tip(fraction, center, 0., description.cell_dim)
 
-    let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
-    let end_angle = PI - start_angle;
-
-    CleanArc {
-        center,
-        radius: head_radius,
-        start_angle,
-        end_angle,
-    }
-    .flattened(TOLERANCE)
-    .collect()
+    // let slice_thickness = (fraction.end - fraction.start) * 2. * side;
+    //
+    // let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
+    // let end_angle = PI - start_angle;
+    //
+    // CleanArc {
+    //     center,
+    //     radius: head_radius,
+    //     start_angle,
+    //     end_angle,
+    // }
+    // .flattened(TOLERANCE)
+    // .collect()
 }
 
 fn render_split_arc(
@@ -117,6 +141,12 @@ fn render_box(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
     ];
 }
 
+enum PartOfRoundHead {
+    Not,
+    Partly,
+    Fully,
+}
+
 fn render_default_straight_segment(
     description: &SegmentDescription,
     subsegment_idx: usize,
@@ -144,13 +174,7 @@ fn render_default_straight_segment(
         Gone => f32::MAX,
     };
 
-    enum PartOfRoundHead {
-        Not,
-        Partly,
-        Fully,
-    }
     use PartOfRoundHead::*;
-
     let part_of_round_head = if tip_y - subsegment_start_y <= head_radius {
         Fully
     } else if tip_y - subsegment_end_y <= head_radius {
@@ -161,7 +185,7 @@ fn render_default_straight_segment(
 
     if description.segment_idx == 0 && subsegment_idx == 0 {
         match part_of_round_head {
-            Fully => render_arc_tip(description, fraction),
+            Fully => render_arc_tip_straight(description, fraction),
             Partly => todo!(),
             Not => unreachable!(
                 "the first segment of the snake should always be part of the round head"
