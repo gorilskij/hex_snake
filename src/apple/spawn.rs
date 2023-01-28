@@ -7,6 +7,7 @@ use crate::snake::{self, EatBehavior, EatMechanics, Snake};
 use crate::snake_control;
 use crate::snake_control::pathfinder;
 use rand::Rng;
+use crate::snake::builder::Builder as SnakeBuilder;
 
 #[allow(unused_macros)]
 #[macro_export]
@@ -105,7 +106,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 //         .controller(snake_control::Template::AStar { passthrough_knowledge: PassthroughKnowledge::always(false) })
                 //         .speed(1.)
                 // ))
-                apple::Type::SpawnSnake(Box::new(snake::Builder::default()
+                apple::Type::SpawnSnake(Box::new(SnakeBuilder::default()
                     .snake_type(snake::Type::Competitor { life: Some(200) })
                     .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                     .palette(snake::PaletteTemplate::pastel_rainbow(true))
@@ -114,7 +115,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 ))
             },
             prefs.prob_spawn_killer => {
-                apple::Type::SpawnSnake(Box::new(snake::Builder::default()
+                apple::Type::SpawnSnake(Box::new(SnakeBuilder::default()
                     .snake_type(snake::Type::Killer { life: Some(200) })
                     .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                     .palette(snake::PaletteTemplate::dark_blue_to_red(false))

@@ -14,6 +14,7 @@ use crate::snake_control::pathfinder;
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
+use snake::builder::Builder as SnakeBuilder;
 
 mod distance_grid;
 mod fps_control;
@@ -64,7 +65,7 @@ impl App {
 
                 let passthrough_knowledge = PassthroughKnowledge::accurate(&eat_mechanics);
 
-                snake::Builder::default()
+                SnakeBuilder::default()
                     .snake_type(snake::Type::Player)
                     .eat_mechanics(eat_mechanics)
                     .palette(snake::PaletteTemplate::rainbow(true))

@@ -4,7 +4,6 @@ pub use start_screen::StartScreen;
 
 pub use crate::app::prefs::Prefs;
 use crate::basic::{FrameStamp, HexDim};
-use crate::snake;
 
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
@@ -15,6 +14,7 @@ use ggez::event::EventHandler;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use std::ops::{Deref, DerefMut};
+use crate::snake::builder::Builder as SnakeBuilder;
 
 mod board_dim;
 mod debug_scenario;
@@ -58,7 +58,7 @@ pub trait Environment<R: Rng = ThreadRng> {
     fn apples(&self) -> &[Apple];
     fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext);
     fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut R);
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result;
+    fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result;
     fn remove_snake(&mut self, index: usize) -> Snake;
     fn remove_apple(&mut self, index: usize) -> Apple;
     fn gtx(&self) -> &GameContext;

@@ -22,6 +22,7 @@ use rand::rngs::ThreadRng;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::result;
+use crate::snake::builder::Builder as SnakeBuilder;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -61,7 +62,7 @@ impl SnakeDemo {
             // snake::PaletteTemplate::zebra(),
         ];
 
-        let seed = snake::Builder::default()
+        let seed = SnakeBuilder::default()
             .snake_type(snake::Type::Simulated)
             .eat_mechanics(EatMechanics::always(EatBehavior::Cut))
             // placeholder, updated immediately
@@ -220,7 +221,7 @@ impl Environment<NoRng> for SnakeDemo {
         panic!("tried to get rng of SnakeDemo")
     }
 
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result {
+    fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result {
         panic!("tried to add snake to SnakeDemo: {snake_builder:?}")
     }
 

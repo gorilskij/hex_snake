@@ -1,6 +1,7 @@
 // This file contains structs describing various aspects of a segment
 
 use crate::basic::{CellDim, Dir, Point};
+use crate::color::Color;
 use crate::rendering;
 use crate::snake::palette::SegmentStyle;
 use crate::snake::{SegmentType, ZIndex};
@@ -128,4 +129,9 @@ impl SegmentFraction {
             Some(_) => Gone,
         }
     }
+}
+
+pub struct Polygon {
+    pub points: Vec<Point>,
+    pub color: Color,
 }

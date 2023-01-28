@@ -4,12 +4,12 @@ use std::iter;
 use crate::basic::transformations::{flip_horizontally, rotate_clockwise, translate};
 use crate::basic::{CellDim, Dir, Point};
 use crate::rendering::clean_arc::CleanArc;
-use crate::rendering::segments::descriptions::{
-    RoundHeadDescription, SegmentDescription, SegmentFraction, TurnDirection, TurnType,
-};
+use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription, SegmentFraction, TurnDirection, TurnType};
 use crate::rendering::segments::point_factory::SegmentRenderer;
-use itertools::{chain, Itertools, MinMaxResult};
+use itertools::Itertools;
 use lyon_geom::{Angle, Arc};
+
+mod subsegments;
 
 pub struct SmoothSegments;
 
@@ -311,43 +311,79 @@ fn render_default_curved_segment(
     points
 }
 
+fn render_subsegment(
+    description: &SegmentDescription,
+    subsegment_idx: usize,
+    turn_fraction: f32,
+    fraction: SegmentFraction,
+    round_head: RoundHeadDescription,
+) -> Vec<Point> {
+    use TurnDirection::*;
+    use TurnType::*;
+
+    let mut segment;
+    match description.turn.turn_type() {
+        Straight => {
+            segment = render_default_straight_segment(
+                description,
+                subsegment_idx,
+                fraction,
+                round_head,
+            )
+        }
+        Blunt(turn_direction) | Sharp(turn_direction) => {
+            segment =
+                render_default_curved_segment(description, turn_fraction, subsegment_idx, fraction, round_head);
+            if turn_direction == Clockwise {
+                flip_horizontally(&mut segment, description.cell_dim.center().x);
+            }
+        }
+    }
+
+    let rotation_angle = Dir::U.clockwise_angle_to(description.turn.coming_from);
+    if rotation_angle != 0. {
+        rotate_clockwise(&mut segment, description.cell_dim.center(), rotation_angle);
+    }
+
+    translate(&mut segment, description.destination);
+
+    segment
+}
+
 impl SegmentRenderer for SmoothSegments {
     fn render_segment(
         description: &SegmentDescription,
-        subsegment_idx: usize,
         turn_fraction: f32,
-        fraction: SegmentFraction,
         round_head: RoundHeadDescription,
-    ) -> Vec<Point> {
-        use TurnDirection::*;
-        use TurnType::*;
+        color_resolution: usize,
+    ) -> Box<dyn Iterator<Item = Polygon> + '_> {
+        let mut end = description.fraction.start;
+        // TODO: remove collect, why do we even need the SubSegment type?
+        // let info: Vec<_> =
+        //     .collect();
 
-        let mut segment;
-        match description.turn.turn_type() {
-            Straight => {
-                segment = render_default_straight_segment(
-                    description,
-                    subsegment_idx,
-                    fraction,
-                    round_head,
-                )
-            }
-            Blunt(turn_direction) | Sharp(turn_direction) => {
-                segment =
-                    render_default_curved_segment(description, turn_fraction, subsegment_idx, fraction, round_head);
-                if turn_direction == Clockwise {
-                    flip_horizontally(&mut segment, description.cell_dim.center().x);
-                }
-            }
-        }
-
-        let rotation_angle = Dir::U.clockwise_angle_to(description.turn.coming_from);
-        if rotation_angle != 0. {
-            rotate_clockwise(&mut segment, description.cell_dim.center(), rotation_angle);
-        }
-
-        translate(&mut segment, description.destination);
-
-        segment
+        // TODO: in general, this isn't pretty
+        Box::new(
+            description
+                .get_subsegments(color_resolution)
+                .map(move |subsegment| {
+                    let start = end;
+                    end = subsegment.end;
+                    (subsegment.subsegment_idx, start, end, subsegment.color)
+                })
+                .map(move |(subsegment_idx, start, end, color)| {
+                    let points = render_subsegment(
+                        description,
+                        subsegment_idx,
+                        turn_fraction,
+                        SegmentFraction { start, end },
+                        round_head,
+                    );
+                    Polygon {
+                        points,
+                        color
+                    }
+                }),
+        )
     }
 }

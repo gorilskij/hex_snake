@@ -1,5 +1,5 @@
 use crate::basic::{Food, HexPoint};
-use crate::snake;
+use crate::snake::builder::Builder as SnakeBuilder;
 
 #[macro_use]
 pub mod spawn;
@@ -7,7 +7,7 @@ pub mod spawn;
 #[derive(Debug)]
 pub enum Type {
     Food(Food),
-    SpawnSnake(Box<snake::Builder>),
+    SpawnSnake(Box<SnakeBuilder>),
     SpawnRain,
 }
 

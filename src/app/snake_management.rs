@@ -5,7 +5,7 @@ use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::{Dir, HexPoint};
 use crate::error::{Error, ErrorConversion, Result};
-use crate::snake::{self, EatBehavior, EatMechanics, SegmentType, State};
+use crate::snake::{self, EatBehavior, EatMechanics, SegmentType, State, builder::Builder as SnakeBuilder};
 use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
 use ggez::Context;
@@ -93,7 +93,7 @@ pub fn find_collisions<E: Environment>(env: &E) -> Vec<Collision> {
 pub fn handle_collisions<E: Environment>(
     env: &mut E,
     collisions: &[Collision],
-) -> (Vec<snake::Builder>, bool) {
+) -> (Vec<SnakeBuilder>, bool) {
     let board_width = env.board_dim().h;
     let (snakes, apples, rng) = env.snakes_apples_rng_mut();
 
@@ -116,7 +116,7 @@ pub fn handle_collisions<E: Environment>(
                     }
                     SpawnSnake(seed) => spawn_snakes.push((**seed).clone()),
                     SpawnRain => {
-                        let seed = snake::Builder::default()
+                        let seed = SnakeBuilder::default()
                             .snake_type(snake::Type::Rain)
                             .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                             // TODO: factor out palette into game palette
@@ -208,7 +208,7 @@ pub fn handle_collisions<E: Environment>(
     (spawn_snakes, game_over)
 }
 
-pub fn spawn_snakes<E: Environment>(env: &mut E, snake_builders: Vec<snake::Builder>) -> Result {
+pub fn spawn_snakes<E: Environment>(env: &mut E, snake_builders: Vec<SnakeBuilder>) -> Result {
     let board_dim = env.board_dim();
 
     for mut snake_builder in snake_builders {

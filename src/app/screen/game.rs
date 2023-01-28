@@ -30,6 +30,8 @@ use crate::support::flip::Flip;
 use crate::support::invert::Invert;
 use crate::view::snakes::OtherSnakes;
 
+use crate::snake::builder::Builder as SnakeBuilder;
+
 pub struct Game {
     fps_control: FpsControl,
 
@@ -38,7 +40,7 @@ pub struct Game {
     /// Offset to center the grid in the window
     offset: Point,
 
-    seeds: Vec<snake::Builder>,
+    seeds: Vec<SnakeBuilder>,
     snakes: Vec<Snake>,
     // TODO: keep apples in order of position to allow for binary search
     // TODO: specialized Vec for that
@@ -71,7 +73,7 @@ impl Game {
     pub fn new(
         cell_dim: CellDim,
         starting_fps: f64,
-        seeds: Vec<snake::Builder>,
+        seeds: Vec<SnakeBuilder>,
         palette: Palette,
         apple_spawn_policy: SpawnPolicy,
         ctx: &mut Context,
@@ -713,7 +715,7 @@ impl Environment for Game {
         (&mut self.snakes, &mut self.apples, &mut self.rng)
     }
 
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result {
+    fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result {
         self.snakes.push(
             snake_builder
                 .build()

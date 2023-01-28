@@ -21,6 +21,7 @@ use crate::snake::{self, EatBehavior, EatMechanics, Snake};
 use crate::snake_control::pathfinder;
 use crate::view::snakes::OtherSnakes;
 use crate::{app, rendering, snake_control};
+use crate::snake::builder::Builder as SnakeBuilder;
 
 pub struct DebugScenario {
     fps_control: FpsControl,
@@ -34,7 +35,7 @@ pub struct DebugScenario {
 
     apples: Vec<Apple>,
 
-    seeds: Vec<snake::Builder>,
+    seeds: Vec<SnakeBuilder>,
     snakes: Vec<Snake>,
 
     rng: ThreadRng,
@@ -47,7 +48,7 @@ impl DebugScenario {
     pub fn head_body_collision(cell_dim: CellDim) -> Self {
         // snake2 crashes into snake1 coming from the bottom-right
 
-        let seed1 = snake::Builder::default()
+        let seed1 = SnakeBuilder::default()
             .pos(HexPoint { h: 5, v: 7 })
             .dir(Dir::U)
             .len(5)
@@ -56,7 +57,7 @@ impl DebugScenario {
             .palette(snake::PaletteTemplate::solid_white_red())
             .controller(snake_control::Template::Programmed(vec![]));
 
-        let seed2 = snake::Builder::default()
+        let seed2 = SnakeBuilder::default()
             .pos(HexPoint { h: 8, v: 7 })
             .dir(Dir::Ul)
             .len(5)
@@ -99,7 +100,7 @@ impl DebugScenario {
 
     /// Head-head dying collision
     pub fn head_head_collision(cell_dim: CellDim) -> Self {
-        let seed1 = snake::Builder::default()
+        let seed1 = SnakeBuilder::default()
             .pos(HexPoint { h: 5, v: 7 })
             .dir(Dir::Ur)
             .len(5)
@@ -109,7 +110,7 @@ impl DebugScenario {
             .speed(1.0)
             .controller(snake_control::Template::Programmed(vec![]));
 
-        let seed2 = snake::Builder::default()
+        let seed2 = SnakeBuilder::default()
             .pos(HexPoint { h: 11, v: 7 })
             .dir(Dir::Ul)
             .len(5)
@@ -160,7 +161,7 @@ impl DebugScenario {
         let rng = &mut thread_rng();
         let seeds: Vec<_> = (0..NUM_SNAKES)
             .map(|i| {
-                snake::Builder::default()
+                SnakeBuilder::default()
                     .pos(HexPoint {
                         h: i as isize / 7 * 2 + 3,
                         v: i as isize % 10 * 2 + 3,
@@ -212,7 +213,7 @@ impl DebugScenario {
 
     /// Comparison of persistent and non-persistent skins entering a black hole
     pub fn double_head_body_collision(cell_dim: CellDim) -> Self {
-        let wall_seed = snake::Builder::default()
+        let wall_seed = SnakeBuilder::default()
             .pos(HexPoint { h: 5, v: 7 })
             .dir(Dir::U)
             .len(15)
@@ -222,7 +223,7 @@ impl DebugScenario {
             .controller(snake_control::Template::Programmed(vec![]));
 
         let crash_seeds = vec![
-            snake::Builder::default()
+            SnakeBuilder::default()
                 .pos(HexPoint { h: 14, v: 5 })
                 .dir(Dir::Ul)
                 .len(5)
@@ -231,7 +232,7 @@ impl DebugScenario {
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::dark_blue_to_red(true))
                 .controller(snake_control::Template::Programmed(vec![])),
-            snake::Builder::default()
+            SnakeBuilder::default()
                 .pos(HexPoint { h: 14, v: 7 })
                 .dir(Dir::Ul)
                 .len(5)
@@ -240,7 +241,7 @@ impl DebugScenario {
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .controller(snake_control::Template::Programmed(vec![])),
-            snake::Builder::default()
+            SnakeBuilder::default()
                 .pos(HexPoint { h: 14, v: 9 })
                 .dir(Dir::Ul)
                 .len(5)
@@ -249,7 +250,7 @@ impl DebugScenario {
                 // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
                 .palette(snake::PaletteTemplate::rainbow(true))
                 .controller(snake_control::Template::Programmed(vec![])),
-            snake::Builder::default()
+            SnakeBuilder::default()
                 .pos(HexPoint { h: 14, v: 11 })
                 .dir(Dir::Ul)
                 .len(5)
@@ -304,7 +305,7 @@ impl DebugScenario {
         self.snakes = self
             .seeds
             .iter()
-            .map(snake::Builder::build)
+            .map(SnakeBuilder::build)
             .map(result::Result::unwrap)
             .collect();
         self.apples = vec![];
@@ -417,7 +418,7 @@ impl Environment for DebugScenario {
         (&mut self.snakes, &mut self.apples, &mut self.rng)
     }
 
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> Result {
+    fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result {
         self.snakes.push(
             snake_builder
                 .build()
