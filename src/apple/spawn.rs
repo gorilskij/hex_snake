@@ -3,11 +3,12 @@ use crate::app::screen::Prefs;
 use crate::apple::{self, Apple};
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::HexPoint;
-use crate::snake::{self, EatBehavior, EatMechanics, Snake};
+use crate::snake::builder::Builder as SnakeBuilder;
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
+use crate::snake::{self, Snake};
 use crate::snake_control;
 use crate::snake_control::pathfinder;
 use rand::Rng;
-use crate::snake::builder::Builder as SnakeBuilder;
 
 #[allow(unused_macros)]
 #[macro_export]

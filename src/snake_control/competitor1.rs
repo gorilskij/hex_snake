@@ -1,7 +1,8 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::Context;
@@ -39,7 +40,7 @@ impl Controller for Competitor1 {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        _: Option<&PassthroughKnowledge>,
+        _: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,

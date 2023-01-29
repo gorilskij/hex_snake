@@ -4,10 +4,10 @@
 // #![feature(never_type)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
-// #![feature(trace_macros)]
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(associated_type_defaults)]
 #![feature(type_alias_impl_trait)]
+#![feature(trace_macros)]
 // #![feature(return_position_impl_trait_in_trait)]
 
 #[macro_use]

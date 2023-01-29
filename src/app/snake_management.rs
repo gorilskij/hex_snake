@@ -5,7 +5,9 @@ use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::{Dir, HexPoint};
 use crate::error::{Error, ErrorConversion, Result};
-use crate::snake::{self, EatBehavior, EatMechanics, SegmentType, State, builder::Builder as SnakeBuilder};
+use crate::snake::builder::Builder as SnakeBuilder;
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
+use crate::snake::{self, SegmentType, State};
 use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
 use ggez::Context;
@@ -146,8 +148,10 @@ pub fn handle_collisions<E: Environment>(
                 let snake2_type = snake2.snake_type;
                 let snake2_segment_type = snake2.body.segments[snake2_segment_index]
                     .segment_type
-                    .raw_type();
-                let behavior = snake1.eat_mechanics.eat_other[&snake2_type][&snake2_segment_type];
+                    .raw();
+                let behavior = snake1
+                    .eat_mechanics
+                    .eat_other(snake2_type, snake2_segment_type);
 
                 match behavior {
                     Cut => {
@@ -178,8 +182,8 @@ pub fn handle_collisions<E: Environment>(
                 let snake = &snakes[snake_index];
                 let segment_type = snake.body.segments[snake_segment_index]
                     .segment_type
-                    .raw_type();
-                let behavior = snake.eat_mechanics.eat_self[&segment_type];
+                    .raw();
+                let behavior = snake.eat_mechanics.eat_self(segment_type);
                 match behavior {
                     Cut => snakes[snake_index].cut_at(snake_segment_index),
                     Crash => {

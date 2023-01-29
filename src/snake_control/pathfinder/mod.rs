@@ -4,10 +4,11 @@ mod with_backup;
 
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexPoint};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::Body;
 use crate::view::snakes::Snakes;
 use std::collections::VecDeque;
 
+use crate::snake::eat_mechanics::Knowledge;
 use crate::view::targets::Targets;
 use algorithm1::Algorithm1;
 use space_filling::SpaceFilling;
@@ -22,7 +23,7 @@ pub trait PathFinder {
         &self,
         targets: &dyn Targets,
         body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        passthrough_knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         gtx: &GameContext,
     ) -> Option<Path>;

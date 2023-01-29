@@ -1,7 +1,8 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
 use crate::support::limits::Limits;
@@ -21,7 +22,7 @@ impl Algorithm {
     fn recalculate_path(
         &mut self,
         body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        passthrough_knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
@@ -76,7 +77,7 @@ impl Controller for Algorithm {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        passthrough_knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
@@ -101,7 +102,7 @@ impl Controller for Algorithm {
     fn get_path(
         &mut self,
         body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        passthrough_knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,

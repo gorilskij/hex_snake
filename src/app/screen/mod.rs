@@ -9,12 +9,12 @@ use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::CellDim;
 use crate::error::{Error, Result};
+use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
 use ggez::event::EventHandler;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use std::ops::{Deref, DerefMut};
-use crate::snake::builder::Builder as SnakeBuilder;
 
 mod board_dim;
 mod debug_scenario;

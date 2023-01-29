@@ -4,7 +4,9 @@ use std::iter;
 use crate::basic::transformations::{flip_horizontally, rotate_clockwise, translate};
 use crate::basic::{CellDim, Dir, Point};
 use crate::rendering::clean_arc::CleanArc;
-use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription, SegmentFraction, TurnDirection, TurnType};
+use crate::rendering::segments::descriptions::{
+    Polygon, RoundHeadDescription, SegmentDescription, SegmentFraction, TurnDirection, TurnType,
+};
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use itertools::Itertools;
 use lyon_geom::{Angle, Arc};
@@ -60,7 +62,10 @@ fn render_arc_tip(
     .collect()
 }
 
-fn render_arc_tip_straight(description: &SegmentDescription, fraction: SegmentFraction) -> Vec<Point> {
+fn render_arc_tip_straight(
+    description: &SegmentDescription,
+    fraction: SegmentFraction,
+) -> Vec<Point> {
     let CellDim { side, sin, cos } = description.cell_dim;
     let head_radius = side / 2.;
 
@@ -127,7 +132,7 @@ fn render_split_arc(
 fn render_box(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
     let CellDim { side, cos, .. } = cell_dim;
     let height = cell_dim.height();
-    return vec![
+    vec![
         Point { x: cos, y: fraction.end * height },
         Point {
             x: cos + side,
@@ -138,7 +143,7 @@ fn render_box(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
             y: fraction.start * height,
         },
         Point { x: cos, y: fraction.start * height },
-    ];
+    ]
 }
 
 enum PartOfRoundHead {
@@ -153,7 +158,7 @@ fn render_default_straight_segment(
     fraction: SegmentFraction,
     round_head: RoundHeadDescription,
 ) -> Vec<Point> {
-    let CellDim { side,cos,.. } = description.cell_dim;
+    let CellDim { side, cos, .. } = description.cell_dim;
     let head_radius = side / 2.;
 
     // TODO: assert this upstream and figure out how to handle snake growing from 0
@@ -198,10 +203,7 @@ fn render_default_straight_segment(
             Partly => {
                 // the fraction at which the segment starts being part of the round head
                 let head_base_start = head_base / height;
-                let round_fraction = SegmentFraction {
-                    start: head_base_start,
-                    ..fraction
-                };
+                let round_fraction = SegmentFraction { start: head_base_start, ..fraction };
 
                 // TODO: figure out maximum number of points and use stack vectors instead
                 let mut points = render_split_arc(description, round_fraction, head_base);
@@ -237,7 +239,12 @@ fn render_default_curved_segment(
         let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
         // too straight to be drawn as curved, default to straight drawing
         if pivot_dist.is_infinite() {
-            return render_default_straight_segment(description, subsegment_idx, fraction, round_head);
+            return render_default_straight_segment(
+                description,
+                subsegment_idx,
+                fraction,
+                round_head,
+            );
         }
         Point { x: side + cos + pivot_dist, y: 0. }
     };
@@ -324,16 +331,17 @@ fn render_subsegment(
     let mut segment;
     match description.turn.turn_type() {
         Straight => {
-            segment = render_default_straight_segment(
+            segment =
+                render_default_straight_segment(description, subsegment_idx, fraction, round_head)
+        }
+        Blunt(turn_direction) | Sharp(turn_direction) => {
+            segment = render_default_curved_segment(
                 description,
+                turn_fraction,
                 subsegment_idx,
                 fraction,
                 round_head,
-            )
-        }
-        Blunt(turn_direction) | Sharp(turn_direction) => {
-            segment =
-                render_default_curved_segment(description, turn_fraction, subsegment_idx, fraction, round_head);
+            );
             if turn_direction == Clockwise {
                 flip_horizontally(&mut segment, description.cell_dim.center().x);
             }
@@ -379,10 +387,7 @@ impl SegmentRenderer for SmoothSegments {
                         SegmentFraction { start, end },
                         round_head,
                     );
-                    Polygon {
-                        points,
-                        color
-                    }
+                    Polygon { points, color }
                 }),
         )
     }

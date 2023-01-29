@@ -19,24 +19,16 @@ impl SegmentDescription {
     ) -> Box<dyn Iterator<Item = Polygon> + '_> {
         // TODO: pass prefs or some fragment of it instead of random arguments
         match self.draw_style {
-            rendering::Style::Hexagon => HexagonSegments::render_segment(
-                self,
-                0.0,
-                RoundHeadDescription::Gone,
-                0,
-            ),
+            rendering::Style::Hexagon => {
+                HexagonSegments::render_segment(self, 0.0, RoundHeadDescription::Gone, 0)
+            }
 
             rendering::Style::Smooth => {
                 let round_head = self
                     .fraction
                     .round_head_description(self.prev_fraction, self.cell_dim);
 
-                SmoothSegments::render_segment(
-                    self,
-                    turn_fraction,
-                    round_head,
-                    color_resolution,
-                )
+                SmoothSegments::render_segment(self, turn_fraction, round_head, color_resolution)
             }
         }
     }

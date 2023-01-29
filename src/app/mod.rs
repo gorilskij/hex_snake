@@ -8,9 +8,10 @@ use crate::app::screen::{DebugScenario, StartScreen};
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::CellDim;
 use crate::error::{Error, ErrorConversion, Result};
-use crate::snake::{self, EatBehavior, EatMechanics, PassthroughKnowledge, SegmentRawType};
-use crate::snake_control;
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
+use crate::snake::{self, SegmentRawType};
 use crate::snake_control::pathfinder;
+use crate::{by_segment_type, by_snake_type, snake_control};
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
@@ -48,23 +49,23 @@ impl App {
         let seeds: Vec<_> = players
             .into_iter()
             .map(|control_setup| {
-                let eat_mechanics = EatMechanics {
-                    eat_self: hash_map_with_default! {
-                        default => EatBehavior::Crash,
+                let eat_mechanics = EatMechanics::new(
+                    by_segment_type! {
                         SegmentRawType::Eaten => EatBehavior::PassOver,
+                        _ => EatBehavior::Crash,
                     },
-                    eat_other: hash_map_with_default! {
-                        default => hash_map_with_default! {
-                            default => EatBehavior::Crash,
-                        },
+                    by_snake_type! {
                         // TODO: this doesn't work as expected
-                        snake::Type::Rain => hash_map_with_default! {
-                            default => EatBehavior::PassUnder,
+                        snake::Type::Rain => by_segment_type! {
+                            _ => EatBehavior::PassUnder,
+                        },
+                        _ => by_segment_type! {
+                            _ => EatBehavior::Crash,
                         },
                     },
-                };
+                );
 
-                let passthrough_knowledge = PassthroughKnowledge::accurate(&eat_mechanics);
+                let passthrough_knowledge = Knowledge::accurate(&eat_mechanics);
 
                 SnakeBuilder::default()
                     .snake_type(snake::Type::Player)

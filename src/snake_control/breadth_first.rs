@@ -1,10 +1,10 @@
 use crate::basic::{Dir, HexDim, HexPoint};
 
-use crate::snake::PassthroughKnowledge;
+use crate::snake::eat_mechanics::Knowledge;
 use std::rc::Rc;
 
 pub struct BreadthFirst {
-    pub passthrough_knowledge: PassthroughKnowledge,
+    pub passthrough_knowledge: Knowledge,
     pub target: Option<HexPoint>,
     pub path: Vec<Dir>,
     pub steps_since_update: usize,

@@ -71,11 +71,7 @@ pub trait IntoTransformationIter: Sized {
 
 impl<I: Iterator<Item = Vec<Point>>> IntoTransformationIter for I {
     fn rotate_clockwise(self, origin: Point, angle: f32) -> RotateClockwise<Self> {
-        RotateClockwise {
-            iter: self,
-            origin,
-            angle,
-        }
+        RotateClockwise { iter: self, origin, angle }
     }
 
     fn translate(self, delta: Point) -> Translate<Self> {

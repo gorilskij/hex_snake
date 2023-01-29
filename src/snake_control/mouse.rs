@@ -1,7 +1,8 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::Context;
@@ -13,7 +14,7 @@ impl Controller for Mouse {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        _: Option<&PassthroughKnowledge>,
+        _: Option<&Knowledge>,
         _: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,

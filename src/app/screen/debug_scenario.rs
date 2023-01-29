@@ -17,11 +17,12 @@ use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
-use crate::snake::{self, EatBehavior, EatMechanics, Snake};
+use crate::snake::builder::Builder as SnakeBuilder;
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
+use crate::snake::{self, Snake};
 use crate::snake_control::pathfinder;
 use crate::view::snakes::OtherSnakes;
 use crate::{app, rendering, snake_control};
-use crate::snake::builder::Builder as SnakeBuilder;
 
 pub struct DebugScenario {
     fps_control: FpsControl,

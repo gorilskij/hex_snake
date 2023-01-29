@@ -2,7 +2,8 @@ use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::Controls;
 use crate::apple::Apple;
 use crate::basic::Dir;
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use crate::ControlSetup;
@@ -21,7 +22,7 @@ pub struct Keyboard {
     deferred: bool,
 
     // assumes the player knows everything
-    passthrough_knowledge: PassthroughKnowledge,
+    passthrough_knowledge: Knowledge,
 }
 
 impl Keyboard {
@@ -35,7 +36,7 @@ impl Keyboard {
     pub fn new(
         control_setup: ControlSetup,
         start_dir: Dir,
-        passthrough_knowledge: PassthroughKnowledge,
+        passthrough_knowledge: Knowledge,
     ) -> Self {
         Self {
             controls: control_setup.into(),
@@ -52,7 +53,7 @@ impl Controller for Keyboard {
     fn next_dir(
         &mut self,
         _: &mut Body,
-        _: Option<&PassthroughKnowledge>,
+        _: Option<&Knowledge>,
         _: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,
@@ -102,7 +103,7 @@ impl Controller for Keyboard {
         }
     }
 
-    fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> {
+    fn passthrough_knowledge(&self) -> Option<&Knowledge> {
         Some(&self.passthrough_knowledge)
     }
 }

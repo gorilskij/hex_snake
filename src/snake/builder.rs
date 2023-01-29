@@ -1,5 +1,6 @@
-use std::fmt::{Display, Formatter};
 use super::*;
+use crate::snake::eat_mechanics::EatMechanics;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Error)]
 #[must_use]
@@ -148,13 +149,12 @@ impl Builder {
             snake_type: self.snake_type.ok_or_else(|| {
                 BuilderError(Box::new(self.clone()), "missing field `snake_type`")
             })?,
-            eat_mechanics: self
+            eat_mechanics: *self
                 .eat_mechanics
                 .as_ref()
                 .ok_or_else(|| {
                     BuilderError(Box::new(self.clone()), "missing field `eat_mechanics`")
-                })?
-                .clone(),
+                })?,
             speed: self
                 .speed
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,

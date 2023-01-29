@@ -1,10 +1,9 @@
 use crate::snake;
 use ggez::GameError;
-use std::fmt::{Debug, Display, Formatter};
-use std::{fmt, result};
-use static_assertions::assert_impl_all;
 use snake::builder::BuilderError as SnakeBuilderError;
-use std::error;
+use static_assertions::assert_impl_all;
+use std::fmt::{Debug, Display, Formatter};
+use std::{error, fmt, result};
 
 assert_impl_all!(GameError: error::Error);
 assert_impl_all!(SnakeBuilderError: error::Error);

@@ -2,7 +2,8 @@ use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12, Side};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::pathfinder::Path;
 use crate::view::snakes::Snakes;
 use ggez::input::keyboard::KeyCode;
@@ -27,7 +28,7 @@ mod rain;
 pub enum Template {
     Keyboard {
         control_setup: ControlSetup,
-        passthrough_knowledge: PassthroughKnowledge,
+        passthrough_knowledge: Knowledge,
     },
     KeyboardClock,
     Mouse,
@@ -49,7 +50,7 @@ pub trait Controller {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        passthrough_knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
@@ -60,7 +61,7 @@ pub trait Controller {
     fn get_path(
         &mut self,
         _body: &Body,
-        _passthrough_knowledge: Option<&PassthroughKnowledge>,
+        _passthrough_knowledge: Option<&Knowledge>,
         _other_snakes: &dyn Snakes,
         _apples: &[Apple],
         _gtx: &GameContext,
@@ -73,7 +74,7 @@ pub trait Controller {
     fn key_pressed(&mut self, _key: KeyCode) {}
 
     // TODO: deprecate
-    fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> {
+    fn passthrough_knowledge(&self) -> Option<&Knowledge> {
         None
     }
 }

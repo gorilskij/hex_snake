@@ -9,13 +9,13 @@ use ggez::Context;
 
 use crate::apple::Apple;
 use crate::basic::Frames;
+use crate::snake::eat_mechanics::{EatMechanics, Knowledge};
 use crate::snake_control::{pathfinder, Controller};
 use crate::view::snakes::Snakes;
-pub use eat_mechanics::{EatBehavior, EatMechanics, PassthroughKnowledge};
 
-mod eat_mechanics;
-pub mod palette;
 pub mod builder;
+pub mod eat_mechanics;
+pub mod palette;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum State {
@@ -33,6 +33,7 @@ pub enum Type {
     Rain,
 }
 
+// TODO: use enum discriminator of SegmentType instead
 // for usage as map keys
 #[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
 pub enum SegmentRawType {
@@ -52,7 +53,7 @@ pub enum SegmentType {
 }
 
 impl SegmentType {
-    pub fn raw_type(&self) -> SegmentRawType {
+    pub fn raw(&self) -> SegmentRawType {
         match self {
             SegmentType::Normal => SegmentRawType::Normal,
             SegmentType::Eaten { .. } => SegmentRawType::Eaten,
@@ -202,7 +203,7 @@ impl Snake {
         }
 
         // advance controller
-        let passthrough_knowledge = PassthroughKnowledge::accurate(&self.eat_mechanics);
+        let passthrough_knowledge = Knowledge::accurate(&self.eat_mechanics);
         let controller_dir = self.controller.next_dir(
             &mut self.body,
             Some(&passthrough_knowledge),

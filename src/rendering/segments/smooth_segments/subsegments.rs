@@ -13,7 +13,7 @@ impl SegmentDescription {
     /// Split a single segment description into `n` subsegments,
     /// this is used to assign a solid color to each subsegment and thus
     /// simulate a smooth gradient
-    pub fn get_subsegments(&self, num_subsegments: usize) -> impl Iterator<Item=Subsegment> + '_ {
+    pub fn get_subsegments(&self, num_subsegments: usize) -> impl Iterator<Item = Subsegment> + '_ {
         let SegmentFraction { start, end } = self.fraction;
         let segment_size = self.fraction.end - self.fraction.start;
 

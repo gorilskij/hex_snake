@@ -1,7 +1,8 @@
 use super::{Path, PathFinder};
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexPoint};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::view::snakes::Snakes;
 use crate::view::targets::Targets;
 use itertools::Itertools;
@@ -60,7 +61,7 @@ impl PathFinder for Algorithm1 {
         &self,
         targets: &dyn Targets,
         body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        passthrough_knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         gtx: &GameContext,
     ) -> Option<Path> {

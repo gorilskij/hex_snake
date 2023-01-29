@@ -1,7 +1,8 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{angle_distance, CellDim, Dir, Dir12, HexPoint};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::support::partial_min_max::PartialMinMax;
 use crate::view::snakes::Snakes;
@@ -24,7 +25,7 @@ impl Controller for Competitor2 {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        _: Option<&PassthroughKnowledge>,
+        _: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         _gtx: &GameContext,

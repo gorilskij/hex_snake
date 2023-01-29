@@ -11,7 +11,9 @@ use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint};
 use crate::color::Color;
 use crate::error::{Error, Result};
-use crate::snake::{self, EatBehavior, EatMechanics, Snake};
+use crate::snake::builder::Builder as SnakeBuilder;
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
+use crate::snake::{self, Snake};
 use crate::snake_control::Template;
 use crate::{app, rendering, spawn_schedule};
 use ggez::event::EventHandler;
@@ -22,7 +24,6 @@ use rand::rngs::ThreadRng;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::result;
-use crate::snake::builder::Builder as SnakeBuilder;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
