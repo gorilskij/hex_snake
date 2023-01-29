@@ -51,12 +51,13 @@ impl App {
                 let eat_mechanics = EatMechanics {
                     eat_self: hash_map_with_default! {
                         default => EatBehavior::Crash,
-                        SegmentRawType::Eaten => EatBehavior::PassUnder,
+                        SegmentRawType::Eaten => EatBehavior::PassOver,
                     },
                     eat_other: hash_map_with_default! {
                         default => hash_map_with_default! {
                             default => EatBehavior::Crash,
                         },
+                        // TODO: this doesn't work as expected
                         snake::Type::Rain => hash_map_with_default! {
                             default => EatBehavior::PassUnder,
                         },
