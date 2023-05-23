@@ -143,7 +143,7 @@ impl FpsControl {
         }
     }
 
-    pub fn fps(&self) -> f64 {
+    pub fn game_fps(&self) -> f64 {
         self.game_fps
     }
 

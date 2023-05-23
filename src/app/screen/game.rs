@@ -32,8 +32,15 @@ use crate::view::snakes::OtherSnakes;
 
 use crate::snake::builder::Builder as SnakeBuilder;
 
+#[derive(Copy, Clone)]
+enum Boost {
+    NoBoost,
+    Boost { previous_fps: f64 },
+}
+
 pub struct Game {
     fps_control: FpsControl,
+    boost: Boost,
 
     gtx: GameContext,
 
@@ -82,6 +89,7 @@ impl Game {
 
         let mut this = Self {
             fps_control: FpsControl::new(starting_fps),
+            boost: Boost::NoBoost,
 
             gtx: GameContext {
                 // updated immediately after creation
@@ -319,7 +327,7 @@ impl Game {
         let game_fps = self.fps_control.measured_game_fps();
         let graphics_fps = self.fps_control.measured_graphics_fps();
 
-        let game_fps_undershoot = (self.fps_control.fps() - game_fps) / game_fps;
+        let game_fps_undershoot = (self.fps_control.game_fps() - game_fps) / game_fps;
         let graphics_fps_undershoot = (60. - graphics_fps) / graphics_fps;
         let color = if game_fps_undershoot > 0.05 || graphics_fps_undershoot > 0.05 {
             // > 5% undershoot: red
@@ -486,6 +494,19 @@ impl EventHandler<Error> for Game {
         Ok(())
     }
 
+    fn key_up_event(&mut self, _ctx: &mut Context, input: KeyInput) -> Result {
+        use KeyCode::*;
+
+        if let Some(Space) = input.keycode {
+            if let Boost::Boost { previous_fps } = self.boost {
+                self.boost = Boost::NoBoost;
+                self.fps_control.set_game_fps(previous_fps);
+            }
+        }
+
+        Ok(())
+    }
+
     fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, _repeated: bool) -> Result {
         use KeyCode::*;
 
@@ -494,7 +515,14 @@ impl EventHandler<Error> for Game {
         // TODO: also tie these to a keymap (dvorak-centric for now)
         if let Some(keycode) = input.keycode {
             match keycode {
-                Space => match self.fps_control.state() {
+                Space => {
+                    if let Boost::NoBoost = self.boost {
+                        let fps = self.fps_control.game_fps();
+                        self.boost = Boost::Boost { previous_fps: fps };
+                        self.fps_control.set_game_fps(2. * fps);
+                    }
+                }
+                Escape => match self.fps_control.state() {
                     fps_control::State::GameOver => {
                         self.restart();
                         self.fps_control.play();
@@ -582,7 +610,7 @@ impl EventHandler<Error> for Game {
                     }
                 }
                 LBracket => {
-                    let mut new_fps = match self.fps_control.fps() {
+                    let mut new_fps = match self.fps_control.game_fps() {
                         f if f <= 0.1 => 0.05,
                         // f if f <= 0.2 => 0.1,
                         f if f <= 1. => f - 0.1,
@@ -600,7 +628,7 @@ impl EventHandler<Error> for Game {
                     self.display_notification(format!("fps: {new_fps}"));
                 }
                 RBracket => {
-                    let mut new_fps = match self.fps_control.fps() {
+                    let mut new_fps = match self.fps_control.game_fps() {
                         f if f <= 0.05 => 0.1,
                         // f if f <= 0.1 => 0.2,
                         f if f < 1. => f + 0.1,
@@ -617,7 +645,7 @@ impl EventHandler<Error> for Game {
                     self.fps_control.set_game_fps(new_fps);
                     self.display_notification(format!("fps: {new_fps}"));
                 }
-                Escape => {
+                Tab => {
                     let text;
                     match self.gtx.prefs.draw_style {
                         rendering::Style::Hexagon => {
@@ -652,7 +680,7 @@ impl EventHandler<Error> for Game {
                     };
                     self.display_notification(text);
                 }
-                #[rustfmt::skip] // rustfmt doesn't know about if let guards
+                #[rustfmt::skip] // rustfmt doesn't know about let guards
                 k if let Some(idx) = numeric_keys
                     .iter()
                     .position(|nk| *nk == k) =>

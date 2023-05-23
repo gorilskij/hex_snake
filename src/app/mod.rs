@@ -195,6 +195,10 @@ impl EventHandler<Error> for App {
         self.screen.key_down_event(ctx, input, repeated)
     }
 
+    fn key_up_event(&mut self, ctx: &mut Context, input: KeyInput) -> Result {
+        self.screen.key_up_event(ctx, input)
+    }
+
     fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) -> Result {
         Canvas::from_frame(ctx, None).set_screen_coordinates(Rect {
             x: 0.0,
