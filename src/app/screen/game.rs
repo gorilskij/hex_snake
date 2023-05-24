@@ -4,6 +4,7 @@ use ggez::event::EventHandler;
 use ggez::graphics::{Canvas, DrawParam, Mesh};
 use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::Context;
+use ggez::input::mouse;
 use rand::prelude::*;
 
 use crate::app::distance_grid::DistanceGrid;
@@ -494,20 +495,16 @@ impl EventHandler<Error> for Game {
         Ok(())
     }
 
-    fn key_up_event(&mut self, _ctx: &mut Context, input: KeyInput) -> Result {
-        use KeyCode::*;
-
-        if let Some(Space) = input.keycode {
-            if let Boost::Boost { previous_fps } = self.boost {
-                self.boost = Boost::NoBoost;
-                self.fps_control.set_game_fps(previous_fps);
-            }
-        }
-
+    fn mouse_motion_event(&mut self, ctx: &mut Context, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result {
+        mouse::set_cursor_hidden(ctx, false);
         Ok(())
     }
 
     fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, _repeated: bool) -> Result {
+        if self.gtx.prefs.hide_cursor {
+            mouse::set_cursor_hidden(ctx, true);
+        }
+
         use KeyCode::*;
 
         let numeric_keys = [Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9];
@@ -711,6 +708,19 @@ impl EventHandler<Error> for Game {
                         }
                     }
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn key_up_event(&mut self, _ctx: &mut Context, input: KeyInput) -> Result {
+        use KeyCode::*;
+
+        if let Some(Space) = input.keycode {
+            if let Boost::Boost { previous_fps } = self.boost {
+                self.boost = Boost::NoBoost;
+                self.fps_control.set_game_fps(previous_fps);
             }
         }
 

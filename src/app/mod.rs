@@ -191,6 +191,10 @@ impl EventHandler<Error> for App {
         self.screen.draw(ctx).with_trace_step("App::draw")
     }
 
+    fn mouse_motion_event(&mut self, ctx: &mut Context, x: f32, y: f32, dx: f32, dy: f32) -> Result {
+        self.screen.mouse_motion_event(ctx, x, y, dx, dy)
+    }
+
     fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, repeated: bool) -> Result {
         self.screen.key_down_event(ctx, input, repeated)
     }
