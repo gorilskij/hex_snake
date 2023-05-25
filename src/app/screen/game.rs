@@ -424,8 +424,10 @@ impl EventHandler<Error> for Game {
             )?);
         }
 
-        // only recompute apple mesh if there are animated apples
-        if self.apple_mesh.is_none() || self.animated_apples {
+        if self.apples.is_empty() {
+            self.apple_mesh = None;
+        } else if self.apple_mesh.is_none() || self.animated_apples {
+            // only recompute apple mesh if there are animated apples
             self.apple_mesh = Some(rendering::apple_mesh(
                 &self.apples,
                 &self.gtx,

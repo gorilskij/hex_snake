@@ -28,13 +28,15 @@ impl Algorithm {
         gtx: &GameContext,
     ) {
         match self.current_target {
-            Some((i, target)) if apples[i].pos == target => {},
-            Some((_, target)) if let Some((i, _)) =
+            Some((i, target)) if apples.get(i)
+                .map(|a| a.pos == target)
+                .unwrap_or(false) => {},
+            Some((ref mut i, target)) if let Some((new_i, _)) =
                 apples
                     .iter()
                     .enumerate()
                     .find(|(_, apple)| apple.pos == target) => {
-                self.current_target.as_mut().unwrap().0 = i;
+                *i = new_i;
             }
             _ => self.path = None,
         }

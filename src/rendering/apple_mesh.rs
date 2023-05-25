@@ -16,9 +16,7 @@ pub fn apple_mesh(
     ctx: &mut Context,
     stats: &mut Stats,
 ) -> Result<Mesh> {
-    if apples.is_empty() {
-        panic!("tried to draw a mesh with 0 apples")
-    }
+    assert!(!apples.is_empty(), "tried to draw a mesh with 0 apples");
 
     stats.redrawing_apples = true;
 
