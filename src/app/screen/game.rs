@@ -768,14 +768,19 @@ impl Environment for Game {
     }
 
     // TODO: notification system so autopilots can adapt
-    fn remove_apple(&mut self, index: usize) -> Apple {
-        let apple = self.apples.remove(index);
+    fn remove_apples(&mut self, mut indices: Vec<usize>) {
+        indices.sort_unstable();
+        indices.dedup();
+
+        indices.into_iter().rev().for_each(|i| {
+            self.apples.remove(i);
+        });
+
         self.animated_apples = self
             .apples
             .iter()
             .any(|apple| apple.apple_type.is_animated());
         self.apple_mesh = None;
-        apple
     }
 
     fn gtx(&self) -> &GameContext {

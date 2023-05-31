@@ -100,13 +100,13 @@ pub fn handle_collisions<E: Environment>(
     let (snakes, apples, rng) = env.snakes_apples_rng_mut();
 
     let mut spawn_snakes = vec![];
-    let mut remove_apples = vec![];
+    let mut to_remove = vec![];
     let mut game_over = false;
     for collision in collisions.iter().copied() {
         use EatBehavior::*;
         match collision {
             Collision::Apple { snake_index, apple_index } => {
-                remove_apples.push(apple_index);
+                to_remove.push(apple_index);
 
                 use crate::apple::Type::*;
                 match &apples[apple_index].apple_type {
@@ -204,10 +204,7 @@ pub fn handle_collisions<E: Environment>(
         }
     }
 
-    remove_apples.sort_unstable();
-    for apple_idx in remove_apples.into_iter().rev() {
-        env.remove_apple(apple_idx);
-    }
+    env.remove_apples(to_remove);
 
     (spawn_snakes, game_over)
 }

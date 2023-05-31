@@ -60,7 +60,7 @@ pub trait Environment<R: Rng = ThreadRng> {
     fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut R);
     fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result;
     fn remove_snake(&mut self, index: usize) -> Snake;
-    fn remove_apple(&mut self, index: usize) -> Apple;
+    fn remove_apples(&mut self, indices: Vec<usize>);
     fn gtx(&self) -> &GameContext;
     // TODO: remove redundant methods
     fn board_dim(&self) -> HexDim {

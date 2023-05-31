@@ -230,8 +230,13 @@ impl Environment<NoRng> for SnakeDemo {
         panic!("tried to remove snake at index {index} in SnakeDemo")
     }
 
-    fn remove_apple(&mut self, index: usize) -> Apple {
-        self.apples.remove(index)
+    fn remove_apples(&mut self, mut indices: Vec<usize>) {
+        indices.sort_unstable();
+        indices.dedup();
+
+        indices.into_iter().rev().for_each(|i| {
+            self.apples.remove(i);
+        });
     }
 
     fn gtx(&self) -> &GameContext {

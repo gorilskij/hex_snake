@@ -155,7 +155,6 @@ impl DebugScenario {
         this
     }
 
-    // This currently causes a crash
     /// Head-head dying collision where both snakes try to eat the same apple at the same time
     pub fn head_head_collision_apple(cell_dim: CellDim) -> Self {
         let seed1 = SnakeBuilder::default()
@@ -492,8 +491,13 @@ impl Environment for DebugScenario {
         self.snakes.remove(index)
     }
 
-    fn remove_apple(&mut self, index: usize) -> Apple {
-        self.apples.remove(index)
+    fn remove_apples(&mut self, mut indices: Vec<usize>) {
+        indices.sort_unstable();
+        indices.dedup();
+
+        indices.into_iter().rev().for_each(|i| {
+            self.apples.remove(i);
+        });
     }
 
     fn gtx(&self) -> &GameContext {

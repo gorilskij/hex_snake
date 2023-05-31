@@ -91,7 +91,6 @@ impl App {
 
         // Manual selection of what to launch
         Self {
-            // TODO: fix crash in case 6
             screen: match 0 {
                 6 => Screen::DebugScenario(DebugScenario::head_head_collision_apple(cell_dim)),
                 5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
