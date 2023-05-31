@@ -532,23 +532,21 @@ impl EventHandler<Error> for Game {
                     }
                     fps_control::State::Paused => self.fps_control.play(),
                 },
+                B => {
+                    let text = match self.gtx.prefs.draw_border.flip() {
+                        true => "Border on",
+                        false => "Border off",
+                    };
+                    self.border_mesh = None;
+                    self.display_notification(text);
+                }
                 G => {
                     let text = match self.gtx.prefs.draw_grid.rotate() {
-                        DrawGrid::Grid => {
-                            self.gtx.prefs.draw_border = true;
-                            "Grid"
-                        }
-                        DrawGrid::Dots => {
-                            self.gtx.prefs.draw_border = true;
-                            "Dots"
-                        }
-                        DrawGrid::None => {
-                            self.gtx.prefs.draw_border = false;
-                            "Grid off"
-                        }
+                        DrawGrid::Grid => "Grid",
+                        DrawGrid::Dots => "Dot grid",
+                        DrawGrid::None => "Grid off",
                     };
                     self.grid_mesh = None;
-                    self.border_mesh = None;
                     self.display_notification(text);
                 }
                 D => {

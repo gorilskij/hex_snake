@@ -22,7 +22,7 @@ use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, Snake};
 use crate::snake_control::pathfinder;
 use crate::view::snakes::OtherSnakes;
-use crate::{app, rendering, snake_control};
+use crate::{app, apple, rendering, snake_control};
 
 pub struct DebugScenario {
     fps_control: FpsControl,
@@ -151,6 +151,64 @@ impl DebugScenario {
             rng: thread_rng(),
         };
         this.restart();
+        this.fps_control.pause();
+        this
+    }
+
+    // This currently causes a crash
+    /// Head-head dying collision where both snakes try to eat the same apple at the same time
+    pub fn head_head_collision_apple(cell_dim: CellDim) -> Self {
+        let seed1 = SnakeBuilder::default()
+            .pos(HexPoint { h: 5, v: 7 })
+            .dir(Dir::Ur)
+            .len(5)
+            .snake_type(snake::Type::Simulated)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+            .palette(snake::PaletteTemplate::solid_white_red())
+            .speed(1.0)
+            .controller(snake_control::Template::Programmed(vec![]));
+
+        let seed2 = SnakeBuilder::default()
+            .pos(HexPoint { h: 11, v: 7 })
+            .dir(Dir::Ul)
+            .len(5)
+            .snake_type(snake::Type::Simulated)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+            .palette(snake::PaletteTemplate::Solid {
+                color: Color::RED,
+                eaten: Color::WHITE,
+            })
+            .speed(1.0)
+            .controller(snake_control::Template::Programmed(vec![]));
+
+        let mut this = Self {
+            fps_control: FpsControl::new(3.),
+
+            gtx: GameContext {
+                board_dim: HexDim { h: 20, v: 10 },
+                cell_dim,
+                palette: app::Palette::dark(),
+                prefs: Default::default(),
+                apple_spawn_policy: SpawnPolicy::None,
+                frame_stamp: (0, 0.0),
+                game_frame_num: 0,
+                elapsed_millis: 0,
+            },
+
+            offset: None,
+            fit_to_window: false,
+
+            stats: Default::default(),
+
+            apples: vec![],
+
+            seeds: vec![seed1, seed2],
+            snakes: vec![],
+
+            rng: thread_rng(),
+        };
+        this.restart();
+        this.apples = vec![Apple { pos: HexPoint { h: 8, v: 6 }, apple_type: apple::Type::Food(0) }];
         this.fps_control.pause();
         this
     }
@@ -383,7 +441,8 @@ impl EventHandler<Error> for DebugScenario {
     fn key_down_event(&mut self, _ctx: &mut Context, input: KeyInput, _repeated: bool) -> Result {
         use fps_control::State::*;
 
-        if input.keycode == Some(KeyCode::Space) {
+        // TODO: unify controls with other Screens
+        if input.keycode == Some(KeyCode::Escape) {
             match self.fps_control.state() {
                 Playing => self.fps_control.pause(),
                 Paused => self.fps_control.play(),
