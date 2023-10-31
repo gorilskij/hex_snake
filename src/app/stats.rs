@@ -11,7 +11,7 @@ pub struct Stats {
     /// Number of subsegments per segment (note
     /// that head and tail will have fewer).
     /// Maximum in the case of multiple snakes
-    pub max_color_resolution: usize, // TODO: find a better name for this
+    pub max_color_resolution: usize,
     pub redrawing_apples: bool,
     pub redrawing_snakes: bool,
 }

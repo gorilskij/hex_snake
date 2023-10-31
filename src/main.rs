@@ -44,17 +44,12 @@ pub mod snake_control;
 // TODO
 //  - untie frame_fraction from graphics
 //  - factor out lazy redrawing code (the whole mess with Some(grid_mesh)...)
-//  - if a frame is nearing its end, delay turning until the next frame to avoid choppy animation
-//  - make border toggleable
 //  - smooth animation when cutting
 //  - diagnose high cpu use when paused
 
 // TODO
 //  make rain snakes ignore food
-//  split EatBehavior::Ignore into "pass in front" and "pass behind"
-//   use "pass behind for rain"
 //  make head-to-head collision with rain also ignore
-//  allow snake to pass (tunnel) under is eaten segments
 
 fn main() {
     let width = 2000.;
