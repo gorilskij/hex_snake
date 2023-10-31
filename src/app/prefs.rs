@@ -40,7 +40,6 @@ pub struct Prefs {
 
     pub draw_style: rendering::Style,
     // pub draw_ai_debug_artifacts: bool,
-
     pub hide_cursor: bool,
 }
 
@@ -64,7 +63,6 @@ impl Default for Prefs {
 
             draw_style: rendering::Style::Smooth,
             // draw_ai_debug_artifacts: false,
-
             hide_cursor: true,
         }
     }

@@ -1,4 +1,6 @@
 use std::collections::{HashSet, VecDeque};
+use std::mem;
+use std::mem::Discriminant;
 
 pub use palette::{Palette, PaletteTemplate};
 
@@ -33,16 +35,9 @@ pub enum Type {
     Rain,
 }
 
-// TODO: use enum discriminator of SegmentType instead
-// for usage as map keys
-#[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
-pub enum SegmentRawType {
-    Normal,
-    Eaten,
-    Crashed,
-    BlackHole,
-}
-
+// NOTE: if variants are added, the code should be checked for
+//       usages of Discriminant<SegmentType>, match statements
+//       using this type should be extended accordingly
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SegmentType {
     Normal,
@@ -53,14 +48,16 @@ pub enum SegmentType {
 }
 
 impl SegmentType {
-    pub fn raw(&self) -> SegmentRawType {
-        match self {
-            SegmentType::Normal => SegmentRawType::Normal,
-            SegmentType::Eaten { .. } => SegmentRawType::Eaten,
-            SegmentType::Crashed => SegmentRawType::Crashed,
-            SegmentType::BlackHole { .. } => SegmentRawType::BlackHole,
-        }
+    pub fn discriminant(&self) -> Discriminant<Self> {
+        mem::discriminant(self)
     }
+
+    pub const DISCR_NORMAL: Discriminant<Self> = mem::discriminant(&Self::Normal);
+    pub const DISCR_EATEN: Discriminant<Self> =
+        mem::discriminant(&Self::Eaten { original_food: 0, food_left: 0 });
+    pub const DISCR_CRASHED: Discriminant<Self> = mem::discriminant(&Self::Crashed);
+    pub const DISCR_BLACK_HOLE: Discriminant<Self> =
+        mem::discriminant(&Self::BlackHole { just_created: false });
 }
 
 pub type ZIndex = i32;

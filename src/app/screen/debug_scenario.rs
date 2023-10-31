@@ -207,7 +207,10 @@ impl DebugScenario {
             rng: thread_rng(),
         };
         this.restart();
-        this.apples = vec![Apple { pos: HexPoint { h: 8, v: 6 }, apple_type: apple::Type::Food(0) }];
+        this.apples = vec![Apple {
+            pos: HexPoint { h: 8, v: 6 },
+            apple_type: apple::Type::Food(0),
+        }];
         this.fps_control.pause();
         this
     }

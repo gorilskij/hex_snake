@@ -149,12 +149,9 @@ impl Builder {
             snake_type: self.snake_type.ok_or_else(|| {
                 BuilderError(Box::new(self.clone()), "missing field `snake_type`")
             })?,
-            eat_mechanics: *self
-                .eat_mechanics
-                .as_ref()
-                .ok_or_else(|| {
-                    BuilderError(Box::new(self.clone()), "missing field `eat_mechanics`")
-                })?,
+            eat_mechanics: *self.eat_mechanics.as_ref().ok_or_else(|| {
+                BuilderError(Box::new(self.clone()), "missing field `eat_mechanics`")
+            })?,
             speed: self
                 .speed
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,

@@ -9,6 +9,7 @@
 #![feature(type_alias_impl_trait)]
 #![feature(trace_macros)]
 // #![feature(return_position_impl_trait_in_trait)]
+#![feature(const_discriminant)]
 
 #[macro_use]
 extern crate derive_more;

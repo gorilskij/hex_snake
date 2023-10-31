@@ -9,9 +9,9 @@ use crate::apple::spawn::SpawnPolicy;
 use crate::basic::CellDim;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
-use crate::snake::{self, SegmentRawType};
+use crate::snake::SegmentType;
 use crate::snake_control::pathfinder;
-use crate::{by_segment_type, by_snake_type, snake_control};
+use crate::{by_segment_type, by_snake_type, snake, snake_control};
 use keyboard_control::ControlSetup;
 pub use palette::Palette;
 use screen::{Game, Screen};
@@ -51,7 +51,7 @@ impl App {
             .map(|control_setup| {
                 let eat_mechanics = EatMechanics::new(
                     by_segment_type! {
-                        SegmentRawType::Eaten => EatBehavior::PassOver,
+                        SegmentType::DISCR_EATEN => EatBehavior::PassOver,
                         _ => EatBehavior::Crash,
                     },
                     by_snake_type! {
@@ -192,7 +192,14 @@ impl EventHandler<Error> for App {
         self.screen.draw(ctx).with_trace_step("App::draw")
     }
 
-    fn mouse_motion_event(&mut self, ctx: &mut Context, x: f32, y: f32, dx: f32, dy: f32) -> Result {
+    fn mouse_motion_event(
+        &mut self,
+        ctx: &mut Context,
+        x: f32,
+        y: f32,
+        dx: f32,
+        dy: f32,
+    ) -> Result {
         self.screen.mouse_motion_event(ctx, x, y, dx, dy)
     }
 

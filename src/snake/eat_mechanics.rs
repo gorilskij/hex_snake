@@ -1,4 +1,5 @@
-use crate::snake::{self, Segment, SegmentRawType};
+use crate::snake::{self, Segment, SegmentType};
+use std::mem::Discriminant;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum EatBehavior {
@@ -65,13 +66,13 @@ pub struct BySegmentType {
 }
 
 impl BySegmentType {
-    pub fn get(&self, segment_type: SegmentRawType) -> EatBehavior {
-        use SegmentRawType::*;
+    pub fn get(&self, segment_type: Discriminant<SegmentType>) -> EatBehavior {
         let field = match segment_type {
-            Normal => self.normal,
-            Eaten => self.eaten,
-            Crashed => self.crashed,
-            BlackHole => self.black_hole,
+            d if d == SegmentType::DISCR_NORMAL => self.normal,
+            d if d == SegmentType::DISCR_EATEN => self.eaten,
+            d if d == SegmentType::DISCR_CRASHED => self.crashed,
+            d if d == SegmentType::DISCR_BLACK_HOLE => self.black_hole,
+            _ => unreachable!(),
         };
         field
             .or(self.default)
@@ -79,14 +80,14 @@ impl BySegmentType {
     }
 
     // pass None to set the default
-    pub fn set(&mut self, segment_type: Option<SegmentRawType>, behavior: EatBehavior) {
-        use SegmentRawType::*;
+    pub fn set(&mut self, segment_type: Option<Discriminant<SegmentType>>, behavior: EatBehavior) {
         let value = match segment_type {
-            Some(Normal) => &mut self.normal,
-            Some(Eaten) => &mut self.eaten,
-            Some(Crashed) => &mut self.crashed,
-            Some(BlackHole) => &mut self.black_hole,
+            Some(d) if d == SegmentType::DISCR_NORMAL => &mut self.normal,
+            Some(d) if d == SegmentType::DISCR_EATEN => &mut self.eaten,
+            Some(d) if d == SegmentType::DISCR_CRASHED => &mut self.crashed,
+            Some(d) if d == SegmentType::DISCR_BLACK_HOLE => &mut self.black_hole,
             None => &mut self.default,
+            _ => unreachable!(),
         };
         *value = Some(behavior);
     }
@@ -142,16 +143,20 @@ pub struct EatMechanics {
 impl EatMechanics {
     pub fn new(eat_self: BySegmentType, eat_other: BySnakeType) -> Self {
         // assert that eat_self and eat_other are not empty
-        eat_self.get(SegmentRawType::Normal);
+        eat_self.get(SegmentType::DISCR_NORMAL);
         eat_other.get(snake::Type::Player);
         Self { eat_self, eat_other }
     }
 
-    pub fn eat_self(&self, segment_type: SegmentRawType) -> EatBehavior {
+    pub fn eat_self(&self, segment_type: Discriminant<SegmentType>) -> EatBehavior {
         self.eat_self.get(segment_type)
     }
 
-    pub fn eat_other(&self, snake_type: snake::Type, segment_type: SegmentRawType) -> EatBehavior {
+    pub fn eat_other(
+        &self,
+        snake_type: snake::Type,
+        segment_type: Discriminant<SegmentType>,
+    ) -> EatBehavior {
         self.eat_other.get(snake_type).get(segment_type)
     }
 }
@@ -200,6 +205,6 @@ impl Knowledge {
     /// Checks whether the snake can safely pass through a given segment
     /// belonging to itself
     pub fn can_pass_through_self(&self, seg: &Segment) -> bool {
-        self.0.eat_self(seg.segment_type.raw()).is_inert()
+        self.0.eat_self(seg.segment_type.discriminant()).is_inert()
     }
 }

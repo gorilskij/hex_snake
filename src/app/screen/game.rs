@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use ggez::event::EventHandler;
 use ggez::graphics::{Canvas, DrawParam, Mesh};
 use ggez::input::keyboard::{KeyCode, KeyInput};
-use ggez::Context;
 use ggez::input::mouse;
+use ggez::Context;
 use rand::prelude::*;
 
 use crate::app::distance_grid::DistanceGrid;
@@ -497,7 +497,14 @@ impl EventHandler<Error> for Game {
         Ok(())
     }
 
-    fn mouse_motion_event(&mut self, ctx: &mut Context, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result {
+    fn mouse_motion_event(
+        &mut self,
+        ctx: &mut Context,
+        _x: f32,
+        _y: f32,
+        _dx: f32,
+        _dy: f32,
+    ) -> Result {
         mouse::set_cursor_hidden(ctx, false);
         Ok(())
     }
