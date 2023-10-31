@@ -1,6 +1,4 @@
 use ggez::graphics::{TextAlign, TextLayout};
-
-// TODO: contribute to ggez
 pub trait TextLayoutExtension {
     // top_left
     fn top_middle() -> Self;

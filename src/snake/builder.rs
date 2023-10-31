@@ -30,7 +30,6 @@ pub struct Builder {
     pub autopilot_control: bool,
 }
 
-// TODO: write a macro to generate builders
 impl Builder {
     #[inline(always)]
     #[must_use]
