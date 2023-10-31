@@ -1,13 +1,11 @@
-use crate::app::game_context::GameContext;
-use crate::app::screen::Prefs;
+use crate::app::screen::{Environment, Prefs};
 use crate::apple::{self, Apple};
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::HexPoint;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
-use crate::snake::{self, Snake};
-use crate::snake_control;
 use crate::snake_control::pathfinder;
+use crate::{app, snake, snake_control};
 use rand::Rng;
 
 #[allow(unused_macros)]
@@ -95,7 +93,7 @@ macro_rules! choose {
 
 // TODO: add a snake spawn policy
 // TODO: factor ai snake palettes out into game palette
-fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
+fn generate_apple_type(prefs: &Prefs, palette: &app::Palette, rng: &mut impl Rng) -> apple::Type {
     if prefs.special_apples {
         choose! {
             let rand: f64 <- rng;
@@ -110,7 +108,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 apple::Type::SpawnSnake(Box::new(SnakeBuilder::default()
                     .snake_type(snake::Type::Competitor { life: Some(200) })
                     .eat_mechanics(EatMechanics::always(EatBehavior::Die))
-                    .palette(snake::PaletteTemplate::pastel_rainbow(true))
+                    .palette(palette.palette_competitor)
                     .controller(snake_control::Template::Algorithm(pathfinder::Template::Algorithm1))
                     .speed(1.)
                 ))
@@ -119,8 +117,7 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
                 apple::Type::SpawnSnake(Box::new(SnakeBuilder::default()
                     .snake_type(snake::Type::Killer { life: Some(200) })
                     .eat_mechanics(EatMechanics::always(EatBehavior::Die))
-                    .palette(snake::PaletteTemplate::dark_blue_to_red(false))
-                    // .palette(snake::PaletteTemplate::dark_rainbow(true))
+                    .palette(palette.palette_killer)
                     .controller(snake_control::Template::Killer)
                     .speed(1.)
                 ))
@@ -135,23 +132,18 @@ fn generate_apple_type(prefs: &Prefs, rng: &mut impl Rng) -> apple::Type {
     }
 }
 
-pub fn spawn_apples(
-    snakes: &[Snake],
-    apples: &[Apple],
-    gtx: &mut GameContext,
-    rng: &mut impl Rng,
-) -> Vec<Apple> {
+pub fn spawn_apples(env: &mut Environment) {
     // lazy
     let mut occupied_cells = None;
 
     let mut spawn = vec![];
 
     loop {
-        let can_spawn = match &gtx.apple_spawn_policy {
+        let can_spawn = match &env.gtx.apple_spawn_policy {
             SpawnPolicy::None => false,
-            SpawnPolicy::Random { apple_count } => apples.len() + spawn.len() < *apple_count,
+            SpawnPolicy::Random { apple_count } => env.apples.len() + spawn.len() < *apple_count,
             SpawnPolicy::ScheduledOnEat { apple_count, .. } => {
-                apples.len() + spawn.len() < *apple_count
+                env.apples.len() + spawn.len() < *apple_count
             }
         };
 
@@ -160,21 +152,22 @@ pub fn spawn_apples(
         }
 
         let occupied_cells =
-            occupied_cells.get_or_insert_with(|| get_occupied_cells(snakes, apples));
+            occupied_cells.get_or_insert_with(|| get_occupied_cells(&env.snakes, &env.apples));
 
-        let new_apple_pos = match &mut gtx.apple_spawn_policy {
+        let new_apple_pos = match &mut env.gtx.apple_spawn_policy {
             SpawnPolicy::None => panic!("shouldn't be spawning with SpawnPolicy::None"),
             SpawnPolicy::Random { apple_count } => {
-                let apple_pos = match random_free_spot(occupied_cells, gtx.board_dim, rng) {
-                    Some(pos) => pos,
-                    None => {
-                        println!(
-                            "warning: no space left for new apples ({} apples will be missing)",
-                            *apple_count - apples.len(),
-                        );
-                        break;
-                    }
-                };
+                let apple_pos =
+                    match random_free_spot(occupied_cells, env.gtx.board_dim, &mut env.rng) {
+                        Some(pos) => pos,
+                        None => {
+                            println!(
+                                "warning: no space left for new apples ({} apples will be missing)",
+                                *apple_count - env.apples.len(),
+                            );
+                            break;
+                        }
+                    };
 
                 // insert at sorted position
                 match occupied_cells.binary_search(&apple_pos) {
@@ -207,11 +200,12 @@ pub fn spawn_apples(
         match new_apple_pos {
             Some(pos) => spawn.push(Apple {
                 pos,
-                apple_type: generate_apple_type(&gtx.prefs, rng),
+                apple_type: generate_apple_type(&env.gtx.prefs, &env.gtx.palette, &mut env.rng),
             }),
             None => break,
         }
     }
 
-    spawn
+    // TODO: insert directly into env.apples
+    env.apples.extend(spawn.into_iter());
 }

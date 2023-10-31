@@ -12,6 +12,7 @@ use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
 use crate::app::snake_management::{advance_snakes, find_collisions, handle_collisions};
 use crate::app::stats::Stats;
+use crate::app::Palette;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
@@ -19,27 +20,20 @@ use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
-use crate::snake::{self, Snake};
 use crate::snake_control::pathfinder;
 use crate::view::snakes::OtherSnakes;
-use crate::{app, apple, rendering, snake_control};
+use crate::{app, apple, rendering, snake, snake_control};
 
 pub struct DebugScenario {
+    env: Environment,
     fps_control: FpsControl,
-
-    gtx: GameContext,
 
     offset: Option<Point>,
     fit_to_window: bool,
 
-    stats: Stats,
-
-    apples: Vec<Apple>,
-
     seeds: Vec<SnakeBuilder>,
-    snakes: Vec<Snake>,
 
-    rng: ThreadRng,
+    stats: Stats,
 }
 
 // Constructors
@@ -69,30 +63,29 @@ impl DebugScenario {
             .controller(snake_control::Template::Programmed(vec![]));
 
         let mut this = Self {
-            fps_control: FpsControl::new(3.),
-
-            gtx: GameContext {
-                board_dim: HexDim { h: 20, v: 10 },
-                cell_dim,
-                palette: app::Palette::dark(),
-                prefs: Default::default(),
-                apple_spawn_policy: SpawnPolicy::None,
-                frame_stamp: (0, 0.0),
-                game_frame_num: 0,
-                elapsed_millis: 0,
+            env: Environment {
+                snakes: vec![],
+                apples: vec![],
+                gtx: GameContext {
+                    board_dim: HexDim { h: 20, v: 10 },
+                    cell_dim,
+                    palette: Palette::dark(),
+                    prefs: Default::default(),
+                    apple_spawn_policy: SpawnPolicy::None,
+                    frame_stamp: (0, 0.0),
+                    game_frame_num: 0,
+                    elapsed_millis: 0,
+                },
+                rng: thread_rng(),
             },
+            fps_control: FpsControl::new(3.),
 
             offset: None,
             fit_to_window: false,
 
-            stats: Default::default(),
-
-            apples: vec![],
-
             seeds: vec![seed1, seed2],
-            snakes: vec![],
 
-            rng: thread_rng(),
+            stats: Default::default(),
         };
         this.restart();
         this.fps_control.pause();
@@ -125,30 +118,29 @@ impl DebugScenario {
             .controller(snake_control::Template::Programmed(vec![]));
 
         let mut this = Self {
-            fps_control: FpsControl::new(3.),
-
-            gtx: GameContext {
-                board_dim: HexDim { h: 20, v: 10 },
-                cell_dim,
-                palette: app::Palette::dark(),
-                prefs: Default::default(),
-                apple_spawn_policy: SpawnPolicy::None,
-                frame_stamp: (0, 0.0),
-                game_frame_num: 0,
-                elapsed_millis: 0,
+            env: Environment {
+                snakes: vec![],
+                apples: vec![],
+                gtx: GameContext {
+                    board_dim: HexDim { h: 20, v: 10 },
+                    cell_dim,
+                    palette: Palette::dark(),
+                    prefs: Default::default(),
+                    apple_spawn_policy: SpawnPolicy::None,
+                    frame_stamp: (0, 0.0),
+                    game_frame_num: 0,
+                    elapsed_millis: 0,
+                },
+                rng: thread_rng(),
             },
+            fps_control: FpsControl::new(3.),
 
             offset: None,
             fit_to_window: false,
 
-            stats: Default::default(),
-
-            apples: vec![],
-
             seeds: vec![seed1, seed2],
-            snakes: vec![],
 
-            rng: thread_rng(),
+            stats: Default::default(),
         };
         this.restart();
         this.fps_control.pause();
@@ -181,33 +173,32 @@ impl DebugScenario {
             .controller(snake_control::Template::Programmed(vec![]));
 
         let mut this = Self {
-            fps_control: FpsControl::new(3.),
-
-            gtx: GameContext {
-                board_dim: HexDim { h: 20, v: 10 },
-                cell_dim,
-                palette: app::Palette::dark(),
-                prefs: Default::default(),
-                apple_spawn_policy: SpawnPolicy::None,
-                frame_stamp: (0, 0.0),
-                game_frame_num: 0,
-                elapsed_millis: 0,
+            env: Environment {
+                snakes: vec![],
+                apples: vec![],
+                gtx: GameContext {
+                    board_dim: HexDim { h: 20, v: 10 },
+                    cell_dim,
+                    palette: Palette::dark(),
+                    prefs: Default::default(),
+                    apple_spawn_policy: SpawnPolicy::None,
+                    frame_stamp: (0, 0.0),
+                    game_frame_num: 0,
+                    elapsed_millis: 0,
+                },
+                rng: thread_rng(),
             },
+            fps_control: FpsControl::new(3.),
 
             offset: None,
             fit_to_window: false,
 
-            stats: Default::default(),
-
-            apples: vec![],
-
             seeds: vec![seed1, seed2],
-            snakes: vec![],
 
-            rng: thread_rng(),
+            stats: Default::default(),
         };
         this.restart();
-        this.apples = vec![Apple {
+        this.env.apples = vec![Apple {
             pos: HexPoint { h: 8, v: 6 },
             apple_type: apple::Type::Food(0),
         }];
@@ -242,30 +233,29 @@ impl DebugScenario {
             .collect();
 
         let mut this = Self {
-            fps_control: FpsControl::new(3.),
-
-            gtx: GameContext {
-                board_dim: HexDim { h: 0, v: 0 },
-                cell_dim: Default::default(),
-                palette: app::Palette::dark(),
-                prefs: Prefs::default().special_apples(false),
-                apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
-                frame_stamp: (0, 0.0),
-                game_frame_num: 0,
-                elapsed_millis: 0,
+            env: Environment {
+                snakes: vec![],
+                apples: vec![],
+                gtx: GameContext {
+                    board_dim: HexDim { h: 0, v: 0 },
+                    cell_dim: Default::default(),
+                    palette: app::Palette::dark(),
+                    prefs: Prefs::default().special_apples(false),
+                    apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
+                    frame_stamp: (0, 0.0),
+                    game_frame_num: 0,
+                    elapsed_millis: 0,
+                },
+                rng: thread_rng(),
             },
+            fps_control: FpsControl::new(3.),
 
             offset: None,
             fit_to_window: true,
 
-            stats: Stats::default(),
-
-            apples: vec![],
-
             seeds,
-            snakes: vec![],
 
-            rng: thread_rng(),
+            stats: Stats::default(),
         };
         this.restart();
         this.fps_control.pause();
@@ -323,30 +313,29 @@ impl DebugScenario {
         ];
 
         let mut this = Self {
-            fps_control: FpsControl::new(3.),
-
-            gtx: GameContext {
-                board_dim: HexDim { h: 20, v: 15 },
-                cell_dim,
-                palette: app::Palette::dark(),
-                prefs: Default::default(),
-                apple_spawn_policy: SpawnPolicy::None,
-                frame_stamp: (0, 0.0),
-                game_frame_num: 0,
-                elapsed_millis: 0,
+            env: Environment {
+                snakes: vec![],
+                apples: vec![],
+                gtx: GameContext {
+                    board_dim: HexDim { h: 20, v: 15 },
+                    cell_dim,
+                    palette: app::Palette::dark(),
+                    prefs: Default::default(),
+                    apple_spawn_policy: SpawnPolicy::None,
+                    frame_stamp: (0, 0.0),
+                    game_frame_num: 0,
+                    elapsed_millis: 0,
+                },
+                rng: thread_rng(),
             },
+            fps_control: FpsControl::new(3.),
 
             offset: None,
             fit_to_window: false,
 
-            stats: Default::default(),
-
-            apples: vec![],
-
             seeds: iter::once(wall_seed).chain(crash_seeds).collect(),
-            snakes: vec![],
 
-            rng: thread_rng(),
+            stats: Default::default(),
         };
         this.restart();
         this.fps_control.pause();
@@ -356,34 +345,34 @@ impl DebugScenario {
 
 impl DebugScenario {
     fn update_dim(&mut self, ctx: &Context) {
+        let gtx = &mut self.env.gtx;
         if self.fit_to_window {
-            self.gtx.board_dim = calculate_board_dim(ctx, self.gtx.cell_dim);
+            gtx.board_dim = calculate_board_dim(ctx, gtx.cell_dim);
         }
-        self.offset = Some(calculate_offset(ctx, self.gtx.board_dim, self.gtx.cell_dim));
+        self.offset = Some(calculate_offset(ctx, gtx.board_dim, gtx.cell_dim));
     }
 
     fn restart(&mut self) {
-        self.snakes = self
+        self.env.snakes = self
             .seeds
             .iter()
             .map(SnakeBuilder::build)
             .map(result::Result::unwrap)
             .collect();
-        self.apples = vec![];
-        self.gtx.apple_spawn_policy.reset();
+        self.env.apples = vec![];
+        self.env.gtx.apple_spawn_policy.reset();
         self.fps_control.pause();
     }
 
     fn spawn_apples(&mut self) {
-        let new_apples = spawn_apples(&self.snakes, &self.apples, &mut self.gtx, &mut self.rng);
-        self.apples.extend(new_apples.into_iter())
+        spawn_apples(&mut self.env);
     }
 
     fn advance_snakes(&mut self, ctx: &Context) {
-        advance_snakes(self, ctx);
+        advance_snakes(&mut self.env, ctx);
 
-        let collisions = find_collisions(self);
-        let (spawn_snakes, game_over) = handle_collisions(self, &collisions);
+        let collisions = find_collisions(&mut self.env);
+        let (spawn_snakes, game_over) = handle_collisions(&mut self.env, &collisions);
 
         if game_over {
             self.fps_control.game_over();
@@ -397,14 +386,14 @@ impl DebugScenario {
 
 impl EventHandler<Error> for DebugScenario {
     fn update(&mut self, ctx: &mut Context) -> Result {
-        while self.fps_control.can_update(&mut self.gtx) {
+        while self.fps_control.can_update(&mut self.env.gtx) {
             self.advance_snakes(ctx);
         }
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> Result {
-        self.fps_control.graphics_frame(&mut self.gtx);
+        self.fps_control.graphics_frame(&mut self.env.gtx);
 
         let mut canvas = Canvas::from_frame(ctx, Some(*Color::BLACK));
 
@@ -415,22 +404,24 @@ impl EventHandler<Error> for DebugScenario {
         let offset = self.offset.unwrap();
         let draw_param = DrawParam::default().dest(offset);
 
-        let grid_mesh = rendering::grid_mesh(&self.gtx, ctx)?;
+        let env = &mut self.env;
+
+        let grid_mesh = rendering::grid_mesh(&env.gtx, ctx)?;
         canvas.draw(&grid_mesh, draw_param);
 
-        let border_mesh = rendering::border_mesh(&self.gtx, ctx)?;
+        let border_mesh = rendering::border_mesh(&env.gtx, ctx)?;
         canvas.draw(&border_mesh, draw_param);
 
-        for snake_index in 0..self.snakes.len() {
-            let (snake, other_snakes) = OtherSnakes::split_snakes(&mut self.snakes, snake_index);
-            snake.update_dir(other_snakes, &self.apples, &self.gtx, ctx);
+        for snake_index in 0..env.snakes.len() {
+            let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, snake_index);
+            snake.update_dir(other_snakes, &env.apples, &env.gtx, ctx);
         }
 
-        let snake_mesh = rendering::snake_mesh(&mut self.snakes, &self.gtx, ctx, &mut self.stats)?;
+        let snake_mesh = rendering::snake_mesh(&mut env.snakes, &env.gtx, ctx, &mut self.stats)?;
         canvas.draw(&snake_mesh, draw_param);
 
-        if !self.apples.is_empty() {
-            let apple_mesh = rendering::apple_mesh(&self.apples, &self.gtx, ctx, &mut self.stats)?;
+        if !env.apples.is_empty() {
+            let apple_mesh = rendering::apple_mesh(&env.apples, &env.gtx, ctx, &mut self.stats)?;
             canvas.draw(&apple_mesh, draw_param);
         }
 
@@ -460,54 +451,5 @@ impl EventHandler<Error> for DebugScenario {
     fn resize_event(&mut self, ctx: &mut Context, _width: f32, _height: f32) -> Result {
         self.update_dim(ctx);
         Ok(())
-    }
-}
-
-impl Environment for DebugScenario {
-    fn snakes(&self) -> &[Snake] {
-        &self.snakes
-    }
-
-    fn apples(&self) -> &[Apple] {
-        &self.apples
-    }
-
-    fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {
-        (&mut self.snakes, &mut self.apples, &mut self.gtx)
-    }
-
-    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut ThreadRng) {
-        (&mut self.snakes, &mut self.apples, &mut self.rng)
-    }
-
-    fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result {
-        self.snakes.push(
-            snake_builder
-                .build()
-                .map_err(Error::from)
-                .with_trace_step("Game::add_snake")?,
-        );
-        Ok(())
-    }
-
-    fn remove_snake(&mut self, index: usize) -> Snake {
-        self.snakes.remove(index)
-    }
-
-    fn remove_apples(&mut self, mut indices: Vec<usize>) {
-        indices.sort_unstable();
-        indices.dedup();
-
-        indices.into_iter().rev().for_each(|i| {
-            self.apples.remove(i);
-        });
-    }
-
-    fn gtx(&self) -> &GameContext {
-        &self.gtx
-    }
-
-    fn rng(&mut self) -> &mut ThreadRng {
-        &mut self.rng
     }
 }

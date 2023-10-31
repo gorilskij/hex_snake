@@ -1,11 +1,9 @@
-use std::slice;
-
 use crate::app::fps_control::FpsControl;
 use crate::app::game_context::GameContext;
 use crate::app::prefs::Prefs;
 use crate::app::screen::Environment;
 use crate::app::stats::Stats;
-use crate::app::Screen;
+use crate::app::{Palette, Screen};
 use crate::apple::spawn::SpawnPolicy;
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint};
@@ -20,7 +18,6 @@ use ggez::event::EventHandler;
 use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::Context;
 use rand::prelude::*;
-use rand::rngs::ThreadRng;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use std::result;
@@ -95,17 +92,6 @@ impl SnakeDemo {
     fn next_palette(&mut self) {
         self.current_palette = (self.current_palette + 1) % self.palettes.len();
         self.snake.palette = self.palettes[self.current_palette].into();
-    }
-
-    fn spawn_apples(&mut self, _prefs: &Prefs, _rng: &mut impl Rng) {
-        unimplemented!("how do you use GameContext here??")
-        // let new_apples = spawn_apples(
-        //     slice::from_ref(&self.snake),
-        //     &self.apples,
-        //     &self.gtx,
-        //     rng,
-        // );
-        // self.apples.extend(new_apples.into_iter());
     }
 
     fn advance_snakes(
@@ -184,7 +170,7 @@ impl SnakeDemo {
     }
 }
 
-enum NoRng {}
+struct NoRng;
 
 impl RngCore for NoRng {
     fn next_u32(&mut self) -> u32 {
@@ -204,80 +190,18 @@ impl RngCore for NoRng {
     }
 }
 
-impl Environment<NoRng> for SnakeDemo {
-    fn snakes(&self) -> &[Snake] {
-        slice::from_ref(&self.snake)
-    }
-
-    fn apples(&self) -> &[Apple] {
-        &self.apples
-    }
-
-    fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {
-        unimplemented!()
-        // (slice::from_mut(&mut self.snake), &mut self.apples)
-    }
-
-    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut NoRng) {
-        panic!("tried to get rng of SnakeDemo")
-    }
-
-    fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result {
-        panic!("tried to add snake to SnakeDemo: {snake_builder:?}")
-    }
-
-    fn remove_snake(&mut self, index: usize) -> Snake {
-        panic!("tried to remove snake at index {index} in SnakeDemo")
-    }
-
-    fn remove_apples(&mut self, mut indices: Vec<usize>) {
-        indices.sort_unstable();
-        indices.dedup();
-
-        indices.into_iter().rev().for_each(|i| {
-            self.apples.remove(i);
-        });
-    }
-
-    fn gtx(&self) -> &GameContext {
-        panic!("SnakeDemo has no GameContext")
-    }
-
-    fn board_dim(&self) -> HexDim {
-        self.board_dim
-    }
-
-    fn cell_dim(&self) -> CellDim {
-        panic!("tried to get cell_dim from StartScreen")
-    }
-
-    fn frame_stamp(&self) -> FrameStamp {
-        self.fps_control
-            .upgrade()
-            .expect("Weak pointer dropped")
-            .borrow()
-            .frame_stamp()
-    }
-
-    fn rng(&mut self) -> &mut NoRng {
-        panic!("tried to get rng of SnakeDemo")
-    }
-}
-
 pub struct StartScreen {
+    // TODO: can this do without an Environment?
+    env: Environment<NoRng>,
     fps_control: Rc<RefCell<FpsControl>>,
-    cell_dim: CellDim,
 
     palettes: Vec<app::Palette>,
     current_palette: usize,
 
-    prefs: Prefs,
-    stats: Stats,
-
     player1_demo: SnakeDemo,
     player2_demo: SnakeDemo,
 
-    rng: ThreadRng,
+    stats: Stats,
 }
 
 impl StartScreen {
@@ -287,20 +211,33 @@ impl StartScreen {
         let weak1 = Rc::downgrade(&fps_control);
         let weak2 = Rc::downgrade(&fps_control);
 
+        let palettes = vec![Palette::dark()];
+
         Self {
+            env: Environment {
+                snakes: vec![],
+                apples: vec![],
+                gtx: GameContext {
+                    board_dim: HexDim { h: 0, v: 0 },
+                    cell_dim,
+                    palette: palettes[0].clone(),
+                    prefs: Prefs::default().apple_food(2),
+                    apple_spawn_policy: SpawnPolicy::None,
+                    frame_stamp: (0, 0.0),
+                    game_frame_num: 0,
+                    elapsed_millis: 0,
+                },
+                rng: NoRng,
+            },
             fps_control,
-            cell_dim,
 
-            palettes: vec![app::Palette::dark()],
+            palettes,
             current_palette: 0,
-
-            prefs: Prefs::default().apple_food(2),
-            stats: Default::default(),
 
             player1_demo: SnakeDemo::new(HexPoint { h: 1, v: 5 }, weak1),
             player2_demo: SnakeDemo::new(HexPoint { h: 15, v: 5 }, weak2),
 
-            rng: thread_rng(),
+            stats: Default::default(),
         }
     }
 }

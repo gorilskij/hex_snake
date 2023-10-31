@@ -91,6 +91,7 @@ pub enum State {
 }
 
 // combines fps with game state management
+// TODO: include in `Environment`
 pub struct FpsControl {
     game_fps: f64,
     game_frame_duration: Duration,

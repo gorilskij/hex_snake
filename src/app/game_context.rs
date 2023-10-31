@@ -3,6 +3,7 @@ use crate::app::prefs::Prefs;
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, FrameStamp, HexDim};
 
+// TODO: add Stats to game context
 pub struct GameContext {
     /// Dimension of the game board in hexagons
     pub board_dim: HexDim,
