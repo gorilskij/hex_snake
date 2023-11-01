@@ -16,7 +16,7 @@ pub fn player_path_mesh(
     player_snake: &mut Snake,
     other_snakes: OtherSnakes,
     apples: &[Apple],
-    ctx: &mut Context,
+    ctx: &Context,
     gtx: &GameContext,
     stats: &mut Stats,
 ) -> Option<Result<Mesh>> {

@@ -17,21 +17,6 @@ use crate::snake::palette::SegmentStyle;
 use crate::snake::{Body, Segment, SegmentType, Snake};
 use crate::support::partial_min_max::partial_min;
 
-fn build_hexagon_at(
-    location: Point,
-    cell_dim: CellDim,
-    color: Color,
-    builder: &mut MeshBuilder,
-) -> Result {
-    let mut hexagon_points = render_hexagon(cell_dim);
-    translate(&mut hexagon_points, location);
-    builder
-        .polygon(DrawMode::fill(), &hexagon_points, color)
-        .map_err(Error::from)
-        .with_trace_step("build_hexagon_at")?;
-    Ok(())
-}
-
 fn segment_description(
     segment: &Segment,
     segment_idx: usize,
@@ -128,7 +113,7 @@ fn segment_description(
 pub fn snake_mesh(
     snakes: &mut [Snake],
     gtx: &GameContext,
-    ctx: &mut Context,
+    ctx: &Context,
     stats: &mut Stats,
 ) -> Result<Mesh> {
     stats.redrawing_snakes = true;

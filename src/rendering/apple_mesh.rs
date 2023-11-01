@@ -13,7 +13,7 @@ use crate::rendering::segments::render_hexagon;
 pub fn apple_mesh(
     apples: &[Apple],
     gtx: &GameContext,
-    ctx: &mut Context,
+    ctx: &Context,
     stats: &mut Stats,
 ) -> Result<Mesh> {
     assert!(!apples.is_empty(), "tried to draw a mesh with 0 apples");

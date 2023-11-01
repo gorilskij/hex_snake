@@ -1,5 +1,5 @@
+use enum_rotate::EnumRotate;
 use std::collections::HashMap;
-use enum_rotate::RotateEnum;
 
 use ggez::event::EventHandler;
 use ggez::graphics::{Canvas, DrawParam, Mesh};
@@ -78,7 +78,7 @@ impl Game {
         seeds: Vec<SnakeBuilder>,
         palette: Palette,
         apple_spawn_policy: SpawnPolicy,
-        ctx: &mut Context,
+        ctx: &Context,
     ) -> Self {
         assert!(!seeds.is_empty(), "No players specified");
 

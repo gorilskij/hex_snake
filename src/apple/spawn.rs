@@ -207,5 +207,5 @@ pub fn spawn_apples(env: &mut Environment) {
     }
 
     // TODO: insert directly into env.apples
-    env.apples.extend(spawn.into_iter());
+    env.apples.extend(spawn);
 }

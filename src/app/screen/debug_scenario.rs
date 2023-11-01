@@ -371,7 +371,7 @@ impl DebugScenario {
     fn advance_snakes(&mut self, ctx: &Context) {
         advance_snakes(&mut self.env, ctx);
 
-        let collisions = find_collisions(&mut self.env);
+        let collisions = find_collisions(&self.env);
         let (spawn_snakes, game_over) = handle_collisions(&mut self.env, &collisions);
 
         if game_over {
