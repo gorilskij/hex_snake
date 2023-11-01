@@ -21,7 +21,10 @@ rayon = "1.5.2"
 static_assertions = "1.1.0"
 thiserror = "1.0.38"
 # local dependencies
+tap = "1.0.1"
+# TODO: publish all local dependencies before merging into master
 map_with_state = { path = "../map_with_state" }
+enum_rotate = { path = "../enum_rotate" }
 
 [profile.release]
 debug = true

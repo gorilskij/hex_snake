@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use enum_rotate::RotateEnum;
 
 use ggez::event::EventHandler;
 use ggez::graphics::{Canvas, DrawParam, Mesh};
@@ -562,7 +563,7 @@ impl EventHandler<Error> for Game {
                     self.display_notification(text);
                 }
                 G => {
-                    let text = match prefs.draw_grid.rotate() {
+                    let text = match prefs.draw_grid.rotate_next() {
                         DrawGrid::Grid => "Grid",
                         DrawGrid::Dots => "Dot grid",
                         DrawGrid::None => "Grid off",

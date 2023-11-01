@@ -1,25 +1,13 @@
 use crate::basic::Food;
 use crate::rendering;
 use std::time::Duration;
+use enum_rotate::RotateEnum;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, RotateEnum)]
 pub enum DrawGrid {
     Grid,
     Dots,
     None,
-}
-
-impl DrawGrid {
-    // TODO: turn into a trait and write a derive macro for it
-    // TODO: rename
-    pub fn rotate(&mut self) -> Self {
-        *self = match self {
-            DrawGrid::Grid => DrawGrid::Dots,
-            DrawGrid::Dots => DrawGrid::None,
-            DrawGrid::None => DrawGrid::Grid,
-        };
-        *self
-    }
 }
 
 pub struct Prefs {
