@@ -75,7 +75,7 @@ impl App {
                     // .palette(PaletteTemplate::zebra())
                     .controller(snake_control::Template::Keyboard {
                         control_setup,
-                        passthrough_knowledge,
+                        knowledge: passthrough_knowledge,
                     })
                     .speed(1.)
                     .autopilot(pathfinder::Template::WithBackup {

@@ -12,9 +12,6 @@ use itertools::{repeat_n, Itertools};
 use programmed::Move;
 
 mod algorithm;
-mod breadth_first;
-mod competitor1;
-mod competitor2;
 mod keyboard;
 mod keyboard_clock;
 mod killer;
@@ -28,17 +25,12 @@ mod rain;
 pub enum Template {
     Keyboard {
         control_setup: ControlSetup,
-        passthrough_knowledge: Knowledge,
+        knowledge: Knowledge,
     },
     KeyboardClock,
     Mouse,
     Programmed(Vec<Move>),
-    Competitor1,
-    Competitor2,
     Killer,
-    // AStar {
-    //     passthrough_knowledge: PassthroughKnowledge,
-    // },
     Algorithm(pathfinder::Template),
     Rain,
 }
@@ -169,20 +161,18 @@ impl Template {
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         // use crate::snake_control::a_star::AStar;
-        use crate::snake_control::algorithm::Algorithm;
-        use crate::snake_control::competitor1::Competitor1;
-        use crate::snake_control::competitor2::Competitor2;
-        use crate::snake_control::keyboard::Keyboard;
-        use crate::snake_control::keyboard_clock::KeyboardClock;
-        use crate::snake_control::killer::Killer;
-        use crate::snake_control::mouse::Mouse;
-        use crate::snake_control::programmed::Programmed;
-        use crate::snake_control::rain::Rain;
+        use keyboard::Keyboard;
+        use keyboard_clock::KeyboardClock;
+        use killer::Killer;
+        use mouse::Mouse;
+        use programmed::Programmed;
+        use rain::Rain;
+        use algorithm::Algorithm;
 
         match self {
             Template::Keyboard {
                 control_setup,
-                passthrough_knowledge,
+                knowledge: passthrough_knowledge,
             } => Box::new(Keyboard::new(
                 control_setup,
                 start_dir,
@@ -199,12 +189,6 @@ impl Template {
                 dir: start_dir,
                 next_move_idx: 0,
                 wait: 0,
-            }),
-            Template::Competitor1 => Box::new(Competitor1),
-            Template::Competitor2 => Box::new(Competitor2 {
-                dir_state: false,
-                target_apple: None,
-                frames_since_update: 0,
             }),
             Template::Killer => Box::new(Killer),
             // Template::AStar { passthrough_knowledge } => Box::new(AStar {

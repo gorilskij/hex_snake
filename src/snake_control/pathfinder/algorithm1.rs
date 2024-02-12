@@ -11,7 +11,7 @@ use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 
-// TODO: instead of cloning, use more Rcs
+// TODO: instead of keeping track of so many metrics, just track cost
 #[derive(Clone)]
 struct SearchPoint {
     parent: Option<Rc<Self>>,
@@ -52,7 +52,6 @@ impl SearchPoint {
     }
 }
 
-// TODO: rename
 pub struct Algorithm1;
 
 impl PathFinder for Algorithm1 {
@@ -100,17 +99,16 @@ impl PathFinder for Algorithm1 {
                 .flat_map(|sp| {
                     let pos = sp.pos;
                     let rc = Rc::new(sp);
-                    let rc_clone = rc.clone();
 
                     Dir::iter()
                         .map(move |dir| {
                             let (new_pos, teleported) =
                                 pos.explicit_wrapping_translate(dir, 1, gtx.board_dim);
-                            let turned = dir != rc.dir;
-                            (dir, new_pos, turned, teleported)
+                            (dir, new_pos, teleported)
                         })
-                        .filter(|(_, new_pos, _, _)| !off_limits.contains(new_pos))
-                        .scan(rc_clone, |rc, (dir, new_pos, turned, teleported)| {
+                        .filter(|(_, new_pos, _)| !off_limits.contains(new_pos))
+                        .scan(rc, |rc, (dir, new_pos, teleported)| {
+                            let turned = dir != rc.dir;
                             let new_sp = SearchPoint {
                                 parent: Some(rc.clone()),
                                 pos: new_pos,

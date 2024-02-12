@@ -17,8 +17,6 @@ use with_backup::WithBackup;
 pub type Path = VecDeque<HexPoint>;
 
 pub trait PathFinder {
-    // TODO: pass target or list of targets as arguments
-    //  (essentially replace the apples argument)
     fn get_path(
         &self,
         targets: &dyn Targets,
