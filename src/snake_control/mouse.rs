@@ -7,6 +7,7 @@ use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::Context;
 use std::f32::consts::TAU;
+use crate::app::fps_control::FpsContext;
 
 pub struct Mouse;
 
@@ -18,6 +19,7 @@ impl Controller for Mouse {
         _: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,
+        _ftx: &FpsContext,
         ctx: &Context,
     ) -> Option<Dir> {
         let mouse_position: Point = ctx.mouse.position().into();

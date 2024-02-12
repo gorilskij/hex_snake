@@ -93,7 +93,7 @@ impl BySegmentType {
     }
 }
 
-// INVARIANT: at least one field is Some
+// TODO: why can default be None? this is weird
 #[derive(Default, Debug, Copy, Clone)]
 pub struct BySnakeType {
     player: Option<BySegmentType>,

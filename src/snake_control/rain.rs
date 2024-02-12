@@ -6,6 +6,7 @@ use crate::snake::{self, Body};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::Context;
+use crate::app::fps_control::FpsContext;
 
 pub struct Rain;
 
@@ -17,6 +18,7 @@ impl Controller for Rain {
         other_snakes: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,
+        _ftx: &FpsContext,
         _ctx: &Context,
     ) -> Option<Dir> {
         if body.segments[0].pos.v == gtx.board_dim.v - 1 {

@@ -6,6 +6,7 @@ use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::Context;
+use crate::app::fps_control::FpsContext;
 #[allow(unused_macros)]
 macro_rules! move_sequence {
     (@ turn($dir:expr) ) => {
@@ -42,6 +43,7 @@ impl Controller for Programmed {
         _: &dyn Snakes,
         _: &[Apple],
         _: &GameContext,
+        _: &FpsContext,
         _: &Context,
     ) -> Option<Dir> {
         if self.wait > 0 {

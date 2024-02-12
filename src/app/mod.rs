@@ -18,7 +18,7 @@ use screen::{Game, Screen};
 use snake::builder::Builder as SnakeBuilder;
 
 mod distance_grid;
-mod fps_control;
+pub(crate) mod fps_control;
 pub mod game_context;
 pub mod keyboard_control;
 mod message;
@@ -65,7 +65,7 @@ impl App {
                     },
                 );
 
-                let passthrough_knowledge = Knowledge::accurate(&eat_mechanics);
+                let knowledge = Knowledge::accurate(&eat_mechanics);
 
                 SnakeBuilder::default()
                     .snake_type(snake::Type::Player)
@@ -75,7 +75,7 @@ impl App {
                     // .palette(PaletteTemplate::zebra())
                     .controller(snake_control::Template::Keyboard {
                         control_setup,
-                        knowledge: passthrough_knowledge,
+                        knowledge,
                     })
                     .speed(1.)
                     .autopilot(pathfinder::Template::WithBackup {
@@ -91,13 +91,13 @@ impl App {
 
         // Manual selection of what to launch
         Self {
-            screen: match 0 {
+            screen: match 1 {
                 6 => Screen::DebugScenario(DebugScenario::head_head_collision_apple(cell_dim)),
                 5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
                 // 4 => Screen::DebugScenario(DebugScenario::many_snakes()),
                 3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
                 2 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
-                1 => Screen::StartScreen(StartScreen::new(cell_dim)),
+                1 => Screen::StartScreen(StartScreen::new(cell_dim, Palette::dark())),
                 0 => Screen::Game(Game::new(
                     cell_dim,
                     3.,

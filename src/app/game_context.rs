@@ -1,7 +1,7 @@
 use crate::app;
 use crate::app::prefs::Prefs;
 use crate::apple::spawn::SpawnPolicy;
-use crate::basic::{CellDim, FrameStamp, HexDim};
+use crate::basic::{CellDim, HexDim};
 
 // TODO: add Stats to game context
 pub struct GameContext {
@@ -15,12 +15,22 @@ pub struct GameContext {
     pub prefs: Prefs,
     /// How many apples are spawned and when
     pub apple_spawn_policy: SpawnPolicy,
-    /// Current graphics frame number and frame fraction,
-    /// note that the speed of graphics frames is decided
-    /// by the ggez runtime
-    pub frame_stamp: FrameStamp,
-    pub game_frame_num: usize,
-    /// Total number of milliseconds that have elapsed
-    /// since the game was started
-    pub elapsed_millis: u128,
+}
+
+impl GameContext {
+    pub fn new(
+        board_dim: HexDim,
+        cell_dim: CellDim,
+        palette: app::Palette,
+        prefs: Prefs,
+        apple_spawn_policy: SpawnPolicy
+    ) -> Self {
+        Self {
+            board_dim,
+            cell_dim,
+            palette,
+            prefs,
+            apple_spawn_policy,
+        }
+    }
 }

@@ -14,7 +14,7 @@ use crate::app::game_context::GameContext;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
-use crate::app::prefs::DrawGrid;
+use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
 use crate::app::snake_management::{
@@ -86,17 +86,14 @@ impl Game {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
-                gtx: GameContext {
+                gtx: GameContext::new(
                     // updated immediately after creation
-                    board_dim: HexPoint { h: 0, v: 0 },
+                    HexPoint { h: 0, v: 0 },
                     cell_dim,
                     palette,
-                    prefs: Default::default(),
+                    Prefs::default(),
                     apple_spawn_policy,
-                    frame_stamp: (0, 0.0),
-                    game_frame_num: 0,
-                    elapsed_millis: 0,
-                },
+                ),
                 rng: thread_rng(),
             },
             fps_control: FpsControl::new(starting_fps),
@@ -238,7 +235,7 @@ impl Game {
     fn advance_snakes(&mut self, ctx: &Context) -> Result {
         let env = &mut self.env;
 
-        advance_snakes(env, ctx);
+        advance_snakes(env, self.fps_control.context(), ctx);
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
@@ -370,7 +367,7 @@ impl Game {
 
 impl EventHandler<Error> for Game {
     fn update(&mut self, ctx: &mut Context) -> Result {
-        while self.fps_control.can_update(&mut self.env.gtx) {
+        while self.fps_control.can_update() {
             self.advance_snakes(ctx).with_trace_step("Game::update")?;
             self.spawn_apples();
         }
@@ -379,7 +376,7 @@ impl EventHandler<Error> for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> Result {
-        self.fps_control.graphics_frame(&mut self.env.gtx);
+        self.fps_control.graphics_frame();
 
         if self.env.gtx.prefs.display_fps {
             self.update_fps_message();
@@ -410,7 +407,7 @@ impl EventHandler<Error> for Game {
             // same game frame are blocked
             for idx in 0..env.snakes.len() {
                 let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
-                snake.update_dir(other_snakes, &env.apples, &env.gtx, ctx);
+                snake.update_dir(other_snakes, &env.apples, &env.gtx, &self.fps_control.context(), ctx);
             }
         }
 
@@ -426,10 +423,13 @@ impl EventHandler<Error> for Game {
             self.border_mesh = Some(rendering::border_mesh(&env.gtx, ctx)?);
         }
 
+        let ftx = self.fps_control.context();
+
         if self.snake_mesh.is_none() || playing {
             self.snake_mesh = Some(rendering::snake_mesh(
                 &mut env.snakes,
                 &env.gtx,
+                ftx,
                 ctx,
                 &mut stats,
             )?);
@@ -442,6 +442,7 @@ impl EventHandler<Error> for Game {
             self.apple_mesh = Some(rendering::apple_mesh(
                 &env.apples,
                 &env.gtx,
+                ftx,
                 ctx,
                 &mut stats,
             )?);
@@ -456,7 +457,7 @@ impl EventHandler<Error> for Game {
             self.distance_grid_mesh =
                 Some(
                     self.distance_grid
-                        .mesh(player_snake, other_snakes, ctx, &env.gtx)?,
+                        .mesh(player_snake, other_snakes, ctx, &env.gtx, &self.fps_control.context())?,
                 );
         }
 

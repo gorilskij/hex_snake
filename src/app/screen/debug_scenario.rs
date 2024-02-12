@@ -72,9 +72,6 @@ impl DebugScenario {
                     palette: Palette::dark(),
                     prefs: Default::default(),
                     apple_spawn_policy: SpawnPolicy::None,
-                    frame_stamp: (0, 0.0),
-                    game_frame_num: 0,
-                    elapsed_millis: 0,
                 },
                 rng: thread_rng(),
             },
@@ -127,9 +124,6 @@ impl DebugScenario {
                     palette: Palette::dark(),
                     prefs: Default::default(),
                     apple_spawn_policy: SpawnPolicy::None,
-                    frame_stamp: (0, 0.0),
-                    game_frame_num: 0,
-                    elapsed_millis: 0,
                 },
                 rng: thread_rng(),
             },
@@ -182,9 +176,6 @@ impl DebugScenario {
                     palette: Palette::dark(),
                     prefs: Default::default(),
                     apple_spawn_policy: SpawnPolicy::None,
-                    frame_stamp: (0, 0.0),
-                    game_frame_num: 0,
-                    elapsed_millis: 0,
                 },
                 rng: thread_rng(),
             },
@@ -242,9 +233,6 @@ impl DebugScenario {
                     palette: app::Palette::dark(),
                     prefs: Prefs::default().special_apples(false),
                     apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
-                    frame_stamp: (0, 0.0),
-                    game_frame_num: 0,
-                    elapsed_millis: 0,
                 },
                 rng: thread_rng(),
             },
@@ -322,9 +310,6 @@ impl DebugScenario {
                     palette: app::Palette::dark(),
                     prefs: Default::default(),
                     apple_spawn_policy: SpawnPolicy::None,
-                    frame_stamp: (0, 0.0),
-                    game_frame_num: 0,
-                    elapsed_millis: 0,
                 },
                 rng: thread_rng(),
             },
@@ -369,7 +354,7 @@ impl DebugScenario {
     }
 
     fn advance_snakes(&mut self, ctx: &Context) {
-        advance_snakes(&mut self.env, ctx);
+        advance_snakes(&mut self.env, self.fps_control.context(), ctx);
 
         let collisions = find_collisions(&self.env);
         let (spawn_snakes, game_over) = handle_collisions(&mut self.env, &collisions);
@@ -386,14 +371,14 @@ impl DebugScenario {
 
 impl EventHandler<Error> for DebugScenario {
     fn update(&mut self, ctx: &mut Context) -> Result {
-        while self.fps_control.can_update(&mut self.env.gtx) {
+        while self.fps_control.can_update() {
             self.advance_snakes(ctx);
         }
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut Context) -> Result {
-        self.fps_control.graphics_frame(&mut self.env.gtx);
+        self.fps_control.graphics_frame();
 
         let mut canvas = Canvas::from_frame(ctx, Some(*Color::BLACK));
 
@@ -412,16 +397,18 @@ impl EventHandler<Error> for DebugScenario {
         let border_mesh = rendering::border_mesh(&env.gtx, ctx)?;
         canvas.draw(&border_mesh, draw_param);
 
+        let ftx = self.fps_control.context();
+
         for snake_index in 0..env.snakes.len() {
             let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, snake_index);
-            snake.update_dir(other_snakes, &env.apples, &env.gtx, ctx);
+            snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx, ctx);
         }
 
-        let snake_mesh = rendering::snake_mesh(&mut env.snakes, &env.gtx, ctx, &mut self.stats)?;
+        let snake_mesh = rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut self.stats)?;
         canvas.draw(&snake_mesh, draw_param);
 
         if !env.apples.is_empty() {
-            let apple_mesh = rendering::apple_mesh(&env.apples, &env.gtx, ctx, &mut self.stats)?;
+            let apple_mesh = rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut self.stats)?;
             canvas.draw(&apple_mesh, draw_param);
         }
 

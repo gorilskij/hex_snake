@@ -1,51 +1,77 @@
 use crate::app::screen::{Environment, Prefs};
 use crate::apple::{self, Apple};
 use crate::basic::board::{get_occupied_cells, random_free_spot};
-use crate::basic::HexPoint;
+use crate::basic::{Frames, HexPoint};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake_control::pathfinder;
 use crate::{app, snake, snake_control};
 use rand::Rng;
 
-#[allow(unused_macros)]
-#[macro_export]
-macro_rules! spawn_schedule {
-    (@ spawn($h:expr, $v:expr) ) => {
-        $crate::apple::spawn::ScheduledSpawn::Spawn(
-            $crate::basic::HexPoint { h: $h, v: $v }
-        )
-    };
-    (@ wait($t:expr) ) => {
-        $crate::apple::spawn::ScheduledSpawn::Wait {
-            total: $t,
-            current: 0,
-        }
-    };
-    [ $( $action:tt ( $( $inner:tt )* ) ),* $(,)? ] => {
-        vec![
-            $(
-                spawn_schedule!(@ $action( $( $inner )* ))
-            ),*
-        ]
-    };
+// #[allow(unused_macros)]
+// #[macro_export]
+// macro_rules! spawn_schedule {
+//     (@ spawn($h:expr, $v:expr) ) => {
+//         $crate::apple::spawn::ScheduledSpawn::Spawn(
+//             $crate::basic::HexPoint { h: $h, v: $v }
+//         )
+//     };
+//     (@ wait($t:expr) ) => {
+//         $crate::apple::spawn::ScheduledSpawn::Wait {
+//             total: $t,
+//             current: 0,
+//         }
+//     };
+//     [ $( $action:tt ( $( $inner:tt )* ) ),* $(,)? ] => {
+//         vec![
+//             $(
+//                 spawn_schedule!(@ $action( $( $inner )* ))
+//             ),*
+//         ]
+//     };
+// }
+
+pub enum SpawnEvent {
+    Spawn(Apple),
+    Wait(Frames),
 }
 
-pub enum ScheduledSpawn {
-    Spawn(HexPoint),
-    Wait { total: usize, current: usize },
+pub type SpawnSchedule = Vec<SpawnEvent>;
+
+pub struct SpawnScheduleBuilder(SpawnSchedule);
+
+impl SpawnScheduleBuilder {
+    pub fn new() -> Self {
+        Self(vec![])
+    }
+
+    pub fn spawn(mut self, pos: HexPoint, apple_type: apple::Type) -> Self {
+        self.0.push(SpawnEvent::Spawn(Apple { pos, apple_type }));
+        self
+    }
+
+    pub fn wait(mut self, frames: Frames) -> Self {
+        self.0.push(SpawnEvent::Wait(frames));
+        self
+    }
+
+    pub fn build(self) -> SpawnSchedule {
+        self.0
+    }
 }
 
+// TODO: specify which types of apples spawn when
 pub enum SpawnPolicy {
     None, // no apples
     Random {
         apple_count: usize,
     },
-    // a new apple is spawed each time there are not enough apples on the board
+    // a new apple is spawned each time there are not enough apples on the board
     ScheduledOnEat {
         apple_count: usize,
-        spawns: Vec<ScheduledSpawn>,
+        schedule: Vec<SpawnEvent>,
         next_index: usize,
+        current_wait: Frames,
     },
     // apples are spawned at a given time
     // ScheduledOtTime { .. }
@@ -56,7 +82,10 @@ impl SpawnPolicy {
         match self {
             SpawnPolicy::None => {}
             SpawnPolicy::Random { .. } => {}
-            SpawnPolicy::ScheduledOnEat { next_index, .. } => *next_index = 0,
+            SpawnPolicy::ScheduledOnEat { next_index, current_wait, .. } => {
+                *next_index = 0;
+                *current_wait = 0;
+            },
         }
     }
 }
@@ -132,7 +161,7 @@ fn generate_apple_type(prefs: &Prefs, palette: &app::Palette, rng: &mut impl Rng
     }
 }
 
-pub fn spawn_apples(env: &mut Environment) {
+pub fn spawn_apples<Rng: rand::Rng>(env: &mut Environment<Rng>) {
     // lazy
     let mut occupied_cells = None;
 
@@ -154,7 +183,7 @@ pub fn spawn_apples(env: &mut Environment) {
         let occupied_cells =
             occupied_cells.get_or_insert_with(|| get_occupied_cells(&env.snakes, &env.apples));
 
-        let new_apple_pos = match &mut env.gtx.apple_spawn_policy {
+        let new_apple = match &mut env.gtx.apple_spawn_policy {
             SpawnPolicy::None => panic!("shouldn't be spawning with SpawnPolicy::None"),
             SpawnPolicy::Random { apple_count } => {
                 let apple_pos =
@@ -175,37 +204,34 @@ pub fn spawn_apples(env: &mut Environment) {
                     Err(idx) => occupied_cells.insert(idx, apple_pos),
                 }
 
-                Some(apple_pos)
+                let apple_type = generate_apple_type(&env.gtx.prefs, &env.gtx.palette, &mut env.rng);
+                Some(Apple { pos: apple_pos, apple_type })
             }
-            SpawnPolicy::ScheduledOnEat { spawns, next_index, .. } => {
+            SpawnPolicy::ScheduledOnEat { schedule: spawns, next_index, current_wait, .. } => {
                 let len = spawns.len();
                 match &mut spawns[*next_index] {
-                    ScheduledSpawn::Wait { total, current } => {
-                        if *current == *total - 1 {
-                            *current = 0;
+                    SpawnEvent::Wait(frames) => {
+                        if *current_wait == *frames - 1 {
+                            *current_wait = 0;
                             *next_index = (*next_index + 1) % len;
                         } else {
-                            *current += 1;
+                            *current_wait += 1;
                         }
                         None
                     }
-                    ScheduledSpawn::Spawn(pos) => {
+                    SpawnEvent::Spawn(pos) => {
                         *next_index = (*next_index + 1) % len;
-                        Some(*pos)
+                        Some(pos.clone())
                     }
                 }
             }
         };
 
-        match new_apple_pos {
-            Some(pos) => spawn.push(Apple {
-                pos,
-                apple_type: generate_apple_type(&env.gtx.prefs, &env.gtx.palette, &mut env.rng),
-            }),
+        match new_apple {
+            Some(apple) => spawn.push(apple),
             None => break,
         }
     }
 
-    // TODO: insert directly into env.apples
     env.apples.extend(spawn);
 }

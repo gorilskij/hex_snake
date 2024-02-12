@@ -5,6 +5,7 @@ use std::mem::Discriminant;
 pub use palette::{Palette, PaletteTemplate};
 
 use crate::app::game_context::GameContext;
+use crate::app::fps_control::FpsContext;
 use crate::basic::{Dir, FrameStamp, HexDim, HexPoint};
 use crate::snake_control;
 use ggez::Context;
@@ -193,6 +194,7 @@ impl Snake {
         other_snakes: impl Snakes,
         apples: &[Apple],
         gtx: &GameContext,
+        ftx: &FpsContext,
         ctx: &Context,
     ) {
         if self.body.dir_grace || self.state != State::Living {
@@ -200,13 +202,14 @@ impl Snake {
         }
 
         // advance controller
-        let passthrough_knowledge = Knowledge::accurate(&self.eat_mechanics);
+        let knowledge = Knowledge::accurate(&self.eat_mechanics);
         let controller_dir = self.controller.next_dir(
             &mut self.body,
-            Some(&passthrough_knowledge),
+            Some(&knowledge),
             &other_snakes,
             apples,
             gtx,
+            ftx,
             ctx,
         );
 
@@ -214,10 +217,11 @@ impl Snake {
         let autopilot_dir = self.autopilot.as_mut().map(|autopilot| {
             autopilot.next_dir(
                 &mut self.body,
-                Some(&passthrough_knowledge),
+                Some(&knowledge),
                 &other_snakes,
                 apples,
                 gtx,
+                ftx,
                 ctx,
             )
         });
@@ -244,7 +248,7 @@ impl Snake {
             Some(dir) => {
                 self.body.dir = dir;
                 self.body.dir_grace = true;
-                self.body.turn_start = Some(gtx.frame_stamp);
+                self.body.turn_start = Some(ftx.last_graphics_update);
             }
             _ => {}
         }
@@ -255,6 +259,7 @@ impl Snake {
         other_snakes: impl Snakes,
         apples: &[Apple],
         gtx: &GameContext,
+        ftx: &FpsContext,
         ctx: &Context,
     ) {
         let last_idx = self.body.visible_len() - 1;
@@ -271,7 +276,7 @@ impl Snake {
         match &mut self.state {
             State::Dying => self.body.missing_front += 1,
             State::Living => {
-                self.update_dir(other_snakes, apples, gtx, ctx);
+                self.update_dir(other_snakes, apples, gtx, ftx, ctx);
 
                 // create new head for snake
                 let dir = self.body.dir;

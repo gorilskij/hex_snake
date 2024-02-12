@@ -10,6 +10,7 @@ use ggez::input::keyboard::KeyCode;
 use ggez::Context;
 use itertools::{repeat_n, Itertools};
 use programmed::Move;
+use crate::app::fps_control::FpsContext;
 
 mod algorithm;
 mod keyboard;
@@ -42,10 +43,11 @@ pub trait Controller {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        passthrough_knowledge: Option<&Knowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
+        ftx: &FpsContext,
         ctx: &Context,
     ) -> Option<Dir>;
 
@@ -53,7 +55,7 @@ pub trait Controller {
     fn get_path(
         &mut self,
         _body: &Body,
-        _passthrough_knowledge: Option<&Knowledge>,
+        _knowledge: Option<&Knowledge>,
         _other_snakes: &dyn Snakes,
         _apples: &[Apple],
         _gtx: &GameContext,
@@ -66,7 +68,7 @@ pub trait Controller {
     fn key_pressed(&mut self, _key: KeyCode) {}
 
     // TODO: deprecate
-    fn passthrough_knowledge(&self) -> Option<&Knowledge> {
+    fn knowledge(&self) -> Option<&Knowledge> {
         None
     }
 }
@@ -172,11 +174,11 @@ impl Template {
         match self {
             Template::Keyboard {
                 control_setup,
-                knowledge: passthrough_knowledge,
+                knowledge,
             } => Box::new(Keyboard::new(
                 control_setup,
                 start_dir,
-                passthrough_knowledge,
+                knowledge,
             )),
             Template::KeyboardClock => Box::new(KeyboardClock {
                 dir: Dir12::Single(start_dir),

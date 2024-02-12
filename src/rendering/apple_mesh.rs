@@ -1,6 +1,7 @@
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
 use hsl::HSL;
+use crate::app::fps_control::FpsContext;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
@@ -13,6 +14,7 @@ use crate::rendering::segments::render_hexagon;
 pub fn apple_mesh(
     apples: &[Apple],
     gtx: &GameContext,
+    ftx: &FpsContext,
     ctx: &Context,
     stats: &mut Stats,
 ) -> Result<Mesh> {
@@ -28,7 +30,7 @@ pub fn apple_mesh(
             let color = match apple.apple_type {
                 Food(_) => gtx.palette.apple_color,
                 SpawnSnake(_) | SpawnRain => {
-                    let hue = 360. * (gtx.elapsed_millis as f64 / 1000. % 1.);
+                    let hue = 360. * (ftx.elapsed_millis as f64 / 1000. % 1.);
                     let hsl = HSL { h: hue, s: 1., l: 0.3 };
                     Color::from(hsl.to_rgb())
                 }

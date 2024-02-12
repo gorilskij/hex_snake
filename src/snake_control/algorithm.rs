@@ -8,6 +8,7 @@ use crate::snake_control::Controller;
 use crate::support::limits::Limits;
 use crate::view::snakes::Snakes;
 use ggez::Context;
+use crate::app::fps_control::FpsContext;
 
 // TODO: rename to something more descriptive like apple seeker
 pub struct Algorithm {
@@ -22,7 +23,7 @@ impl Algorithm {
     fn recalculate_path(
         &mut self,
         body: &Body,
-        passthrough_knowledge: Option<&Knowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
@@ -63,7 +64,7 @@ impl Algorithm {
         println!("recalculating");
         self.path =
             self.pathfinder
-                .get_path(&apples, body, passthrough_knowledge, other_snakes, gtx);
+                .get_path(&apples, body, knowledge, other_snakes, gtx);
 
         // assign wrong index 0, the true index will be found in the next iteration
         // (it's only cache anyway)
@@ -79,13 +80,14 @@ impl Controller for Algorithm {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        passthrough_knowledge: Option<&Knowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
+        _ftx: &FpsContext,
         _ctx: &Context,
     ) -> Option<Dir> {
-        self.recalculate_path(body, passthrough_knowledge, other_snakes, apples, gtx);
+        self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
 
         // TODO: detect and warn about excessive recalculation
         // WARNING: this can cause excessive recalculation
@@ -104,12 +106,12 @@ impl Controller for Algorithm {
     fn get_path(
         &mut self,
         body: &Body,
-        passthrough_knowledge: Option<&Knowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
     ) -> Option<&Path> {
-        self.recalculate_path(body, passthrough_knowledge, other_snakes, apples, gtx);
+        self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
         self.path.as_ref()
     }
 

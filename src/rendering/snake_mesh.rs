@@ -3,6 +3,7 @@ use ggez::Context;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 use std::cmp::Ordering;
+use crate::app::fps_control::FpsContext;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
@@ -110,12 +111,13 @@ fn segment_description(
 pub fn snake_mesh(
     snakes: &mut [Snake],
     gtx: &GameContext,
+    ftx: &FpsContext,
     ctx: &Context,
     stats: &mut Stats,
 ) -> Result<Mesh> {
     stats.redrawing_snakes = true;
 
-    let frame_fraction = gtx.frame_stamp.1;
+    let frame_fraction = ftx.last_graphics_update.1;
 
     // Desired total number of subsegments for the whole snake
     // smaller snakes have higher resolution to show more detail

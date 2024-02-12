@@ -10,6 +10,7 @@ use crate::ControlSetup;
 use ggez::input::keyboard::KeyCode;
 use ggez::Context;
 use std::collections::VecDeque;
+use crate::app::fps_control::FpsContext;
 
 pub struct Keyboard {
     controls: Controls,
@@ -22,7 +23,7 @@ pub struct Keyboard {
     deferred: bool,
 
     // assumes the player knows everything
-    passthrough_knowledge: Knowledge,
+    knowledge: Knowledge,
 }
 
 impl Keyboard {
@@ -36,7 +37,7 @@ impl Keyboard {
     pub fn new(
         control_setup: ControlSetup,
         start_dir: Dir,
-        passthrough_knowledge: Knowledge,
+        knowledge: Knowledge,
     ) -> Self {
         Self {
             controls: control_setup.into(),
@@ -44,7 +45,7 @@ impl Keyboard {
             dir: start_dir,
             deferred: false,
 
-            passthrough_knowledge,
+            knowledge,
         }
     }
 }
@@ -56,10 +57,11 @@ impl Controller for Keyboard {
         _: Option<&Knowledge>,
         _: &dyn Snakes,
         _: &[Apple],
-        gtx: &GameContext,
+        _: &GameContext,
+        ftx: &FpsContext,
         _: &Context,
     ) -> Option<Dir> {
-        if self.deferred || gtx.frame_stamp.1 < Self::LAST_ACTIONABLE_THRESHOLD {
+        if self.deferred || ftx.last_graphics_update.1 < Self::LAST_ACTIONABLE_THRESHOLD {
             self.deferred = false;
             if let Some(dir) = self.control_queue.pop_front() {
                 self.dir = dir;
@@ -103,7 +105,7 @@ impl Controller for Keyboard {
         }
     }
 
-    fn passthrough_knowledge(&self) -> Option<&Knowledge> {
-        Some(&self.passthrough_knowledge)
+    fn knowledge(&self) -> Option<&Knowledge> {
+        Some(&self.knowledge)
     }
 }

@@ -1,4 +1,3 @@
-use crate::app::game_context::GameContext;
 use crate::basic::FrameStamp;
 use std::cmp::max;
 use std::collections::VecDeque;
@@ -90,8 +89,21 @@ pub enum State {
     GameOver,
 }
 
+// TODO: rename
+// Carries information useful to game logic
+pub struct FpsContext {
+    pub game_state: State,
+    /// Graphics frame number and fraction as of the last call to draw(),
+    /// note that the speed of graphics frames is decided by the ggez runtime
+    pub last_graphics_update: FrameStamp,
+    /// Logic frame number as of the last call to update()
+    pub game_frame_num: usize, // logic frame number
+    /// Total number of milliseconds that have elapsed
+    /// since the game was started
+    pub elapsed_millis: u128,
+}
+
 // combines fps with game state management
-// TODO: include in `Environment`
 pub struct FpsControl {
     game_fps: f64,
     game_frame_duration: Duration,
@@ -116,7 +128,7 @@ pub struct FpsControl {
     measured_game_fps: FpsCounter,
     measured_graphics_fps: FpsCounter,
 
-    game_state: State,
+    context: FpsContext,
 
     // used to store the frame fraction when the game is paused
     frozen_frame_fraction: Option<f32>,
@@ -139,13 +151,23 @@ impl FpsControl {
             measured_game_fps: FpsCounter::new(fps),
             measured_graphics_fps: FpsCounter::new(60.),
 
-            game_state: State::Playing,
+            context: FpsContext {
+                game_state: State::Playing,
+                last_graphics_update: FrameStamp::default(),
+                game_frame_num: 0,
+                elapsed_millis: 0,
+            },
+
             frozen_frame_fraction: None,
         }
     }
 
     pub fn game_fps(&self) -> f64 {
         self.game_fps
+    }
+
+    pub fn context(&self) -> &FpsContext {
+        &self.context
     }
 
     // adjust self.last_update to make it match the expected
@@ -183,8 +205,8 @@ impl FpsControl {
     // WARN: this will perform as many updates as the framerate requires
     //  this can cause strong lag a high framerates
     // TODO: automatically lower game framerate to keep up graphics framerate
-    pub fn can_update(&mut self, gtx: &mut GameContext) -> bool {
-        if self.game_state != State::Playing {
+    pub fn can_update(&mut self) -> bool {
+        if self.context.game_state != State::Playing {
             return false;
         }
 
@@ -221,26 +243,26 @@ impl FpsControl {
         };
 
         if can_update {
-            gtx.game_frame_num += 1;
+            self.context.game_frame_num += 1;
         }
 
         can_update
     }
 
     // call in draw()
-    pub fn graphics_frame(&mut self, gtx: &mut GameContext) {
+    pub fn graphics_frame(&mut self) {
         self.measured_graphics_fps.register_frames(1);
         self.graphics_frame_num += 1;
-        gtx.frame_stamp = self.frame_stamp();
-        gtx.elapsed_millis = self.start.elapsed().as_millis();
+        self.context.last_graphics_update = self.frame_stamp();
+        self.context.elapsed_millis = self.start.elapsed().as_millis();
     }
 
     pub fn state(&self) -> State {
-        self.game_state
+        self.context.game_state
     }
 
     pub fn play(&mut self) {
-        self.game_state = State::Playing;
+        self.context.game_state = State::Playing;
         self.measured_game_fps.reset();
         match self.frozen_frame_fraction.take() {
             None => (),
@@ -249,13 +271,13 @@ impl FpsControl {
     }
 
     pub fn pause(&mut self) {
-        self.game_state = State::Paused;
+        self.context.game_state = State::Paused;
         self.frozen_frame_fraction = Some(self.frame_fraction());
         self.missed_updates = None;
     }
 
     pub fn game_over(&mut self) {
-        self.game_state = State::GameOver;
+        self.context.game_state = State::GameOver;
         self.frozen_frame_fraction = Some(self.frame_fraction());
     }
 
@@ -277,7 +299,6 @@ impl FpsControl {
         }
     }
 
-    // TODO: why graphics frame num? is it correct? refactor this mechanism
     pub fn frame_stamp(&self) -> FrameStamp {
         (self.graphics_frame_num, self.frame_fraction())
     }

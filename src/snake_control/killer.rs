@@ -8,6 +8,7 @@ use crate::support::partial_min_max::PartialMinMax;
 use crate::view::snakes::Snakes;
 use ggez::Context;
 use std::f32::consts::TAU;
+use crate::app::fps_control::FpsContext;
 
 // tries to kill player
 pub struct Killer;
@@ -84,6 +85,7 @@ impl Controller for Killer {
         other_snakes: &dyn Snakes,
         _apples: &[Apple],
         gtx: &GameContext,
+        _ftx: &FpsContext,
         _ctx: &Context,
     ) -> Option<Dir> {
         let player_snake = other_snakes

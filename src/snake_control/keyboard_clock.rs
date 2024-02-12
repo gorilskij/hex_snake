@@ -7,6 +7,7 @@ use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::input::keyboard::KeyCode;
 use ggez::Context;
+use crate::app::fps_control::FpsContext;
 
 // joke snake_control with 12 directions allowing the player to rotate between them using left and right, surprising horizontal teleportation
 // looks pretty cool with the sharp drawing style
@@ -24,6 +25,7 @@ impl Controller for KeyboardClock {
         _: &dyn Snakes,
         _: &[Apple],
         _: &GameContext,
+        _: &FpsContext,
         _: &Context,
     ) -> Option<Dir> {
         if let Some(new_dir) = self.next_dir.take() {

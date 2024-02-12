@@ -50,14 +50,14 @@ impl DerefMut for Screen {
     }
 }
 
-pub struct Environment<R: Rng = ThreadRng> {
+pub struct Environment<Rng=ThreadRng> {
     pub snakes: Vec<Snake>,
     // TODO: keep apples in order of position to allow for binary search
     // TODO: specialized Vec for that
     pub apples: Vec<Apple>,
     // TODO: flatten gtx into env
     pub gtx: GameContext,
-    pub rng: R,
+    pub rng: Rng,
 }
 
 impl<R: Rng> Environment<R> {

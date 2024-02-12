@@ -12,6 +12,7 @@ use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
 use ggez::Context;
 use rand::distributions::uniform::SampleRange;
+use crate::app::fps_control::FpsContext;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -33,7 +34,7 @@ pub enum Collision {
     },
 }
 
-pub fn find_collisions(env: &Environment) -> Vec<Collision> {
+pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
     let mut collisions = vec![];
 
     // check whether snake1 collided with an apple or with snake2
@@ -90,8 +91,8 @@ pub fn find_collisions(env: &Environment) -> Vec<Collision> {
 /// (competitors, killers, etc.)
 ///  - `game_over` tells whether a snake crashed and ended the game
 #[must_use]
-pub fn handle_collisions(
-    env: &mut Environment,
+pub fn handle_collisions<Rng: rand::Rng>(
+    env: &mut Environment<Rng>,
     collisions: &[Collision],
 ) -> (Vec<SnakeBuilder>, bool) {
     let board_width = env.gtx.board_dim.h;
@@ -267,7 +268,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
 
 /// Returns the indices of snakes to be deleted (in reverse order so they
 /// can be deleted straight away)
-pub fn advance_snakes(env: &mut Environment, ctx: &Context) {
+pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext, ctx: &Context) {
     let snakes = &mut env.snakes;
 
     let mut remove_snakes = vec![];
@@ -288,7 +289,7 @@ pub fn advance_snakes(env: &mut Environment, ctx: &Context) {
         let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
 
         // advance the snake
-        snake.advance(other_snakes, &env.apples, &env.gtx, ctx);
+        snake.advance(other_snakes, &env.apples, &env.gtx, ftx, ctx);
 
         // remove snake if it ran out of body
         if snake.body.visible_len() == 0 {
