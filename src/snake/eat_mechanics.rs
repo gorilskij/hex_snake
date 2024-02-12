@@ -184,7 +184,6 @@ impl EatMechanics {
 }
 
 // what an ai algorithm thinks is gonna happen
-// TODO: rewrite to just hold boolean values
 #[derive(Clone, Debug)]
 pub struct Knowledge(EatMechanics);
 

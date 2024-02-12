@@ -6,7 +6,6 @@ use crate::snake::Body;
 use crate::view::snakes::Snakes;
 use crate::view::targets::Targets;
 use itertools::Itertools;
-use map_with_state::IntoMapWithState;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -111,7 +110,7 @@ impl PathFinder for Algorithm1 {
                             (dir, new_pos, turned, teleported)
                         })
                         .filter(|(_, new_pos, _, _)| !off_limits.contains(new_pos))
-                        .map_with_state(rc_clone, |rc, (dir, new_pos, turned, teleported)| {
+                        .scan(rc_clone, |rc, (dir, new_pos, turned, teleported)| {
                             let new_sp = SearchPoint {
                                 parent: Some(rc.clone()),
                                 pos: new_pos,
@@ -120,7 +119,7 @@ impl PathFinder for Algorithm1 {
                                 num_turns: rc.num_turns + turned as usize,
                                 num_teleports: rc.num_teleports + teleported as usize,
                             };
-                            (rc, new_sp)
+                            Some(new_sp)
                         })
                         .filter(|sp| {
                             // keep track of the shortest path to each position
