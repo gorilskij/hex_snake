@@ -6,13 +6,10 @@ use std::cmp::Ordering;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
-use crate::basic::transformations::translate;
-use crate::basic::{CellDim, Point};
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::segments::descriptions::{
     SegmentDescription, SegmentFraction, TurnDescription,
 };
-use crate::rendering::segments::render_hexagon;
 use crate::snake::palette::SegmentStyle;
 use crate::snake::{Body, Segment, SegmentType, Snake};
 use crate::support::partial_min_max::partial_min;

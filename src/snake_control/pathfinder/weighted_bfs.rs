@@ -7,7 +7,6 @@ use crate::view::snakes::Snakes;
 use crate::view::targets::Targets;
 use itertools::Itertools;
 use std::cell::RefCell;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 
