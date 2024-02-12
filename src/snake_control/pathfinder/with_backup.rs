@@ -15,16 +15,16 @@ impl PathFinder for WithBackup {
         &self,
         targets: &dyn Targets,
         body: &Body,
-        passthrough_knowledge: Option<&Knowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         gtx: &GameContext,
     ) -> Option<Path> {
         // first try the main pathfinder, if that fails, fall back to the backup pathfinder
         self.main
-            .get_path(targets, body, passthrough_knowledge, other_snakes, gtx)
+            .get_path(targets, body, knowledge, other_snakes, gtx)
             .or_else(|| {
                 self.backup
-                    .get_path(targets, body, passthrough_knowledge, other_snakes, gtx)
+                    .get_path(targets, body, knowledge, other_snakes, gtx)
             })
     }
 }

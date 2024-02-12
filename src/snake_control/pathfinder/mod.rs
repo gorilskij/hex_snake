@@ -1,4 +1,4 @@
-mod algorithm1;
+mod weighted_bfs;
 mod space_filling;
 mod with_backup;
 
@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 
 use crate::snake::eat_mechanics::Knowledge;
 use crate::view::targets::Targets;
-use algorithm1::Algorithm1;
+use weighted_bfs::WeightedBFS;
 use space_filling::SpaceFilling;
 use with_backup::WithBackup;
 
@@ -21,7 +21,7 @@ pub trait PathFinder {
         &self,
         targets: &dyn Targets,
         body: &Body,
-        passthrough_knowledge: Option<&Knowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         gtx: &GameContext,
     ) -> Option<Path>;
@@ -29,7 +29,7 @@ pub trait PathFinder {
 
 #[derive(Clone, Debug)]
 pub enum Template {
-    Algorithm1,
+    WeightedBFS,
     SpaceFilling,
     WithBackup {
         main: Box<Template>,
@@ -40,7 +40,7 @@ pub enum Template {
 impl Template {
     pub fn into_pathfinder(self, _start_dir: Dir) -> Box<dyn PathFinder + Send + Sync> {
         match self {
-            Template::Algorithm1 => Box::new(Algorithm1),
+            Template::WeightedBFS => Box::new(WeightedBFS),
             Template::SpaceFilling => Box::new(SpaceFilling),
             Template::WithBackup { main, backup } => Box::new(WithBackup {
                 main: main.into_pathfinder(_start_dir),

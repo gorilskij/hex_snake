@@ -12,7 +12,7 @@ impl PathFinder for SpaceFilling {
         &self,
         _targets: &dyn Targets,
         _body: &Body,
-        _passthrough_knowledge: Option<&Knowledge>,
+        _knowledge: Option<&Knowledge>,
         _other_snakes: &dyn Snakes,
         _gtx: &GameContext,
     ) -> Option<Path> {

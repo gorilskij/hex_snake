@@ -161,13 +161,13 @@ impl Template {
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         // use crate::snake_control::a_star::AStar;
+        use algorithm::Algorithm;
         use keyboard::Keyboard;
         use keyboard_clock::KeyboardClock;
         use killer::Killer;
         use mouse::Mouse;
         use programmed::Programmed;
         use rain::Rain;
-        use algorithm::Algorithm;
 
         match self {
             Template::Keyboard {

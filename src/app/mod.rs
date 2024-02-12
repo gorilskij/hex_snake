@@ -79,7 +79,7 @@ impl App {
                     })
                     .speed(1.)
                     .autopilot(pathfinder::Template::WithBackup {
-                        main: Box::new(pathfinder::Template::Algorithm1),
+                        main: Box::new(pathfinder::Template::WeightedBFS),
                         backup: Box::new(pathfinder::Template::SpaceFilling),
                     })
                 // .snake_control(snake_control::Template::Mouse)
