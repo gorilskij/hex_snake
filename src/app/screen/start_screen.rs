@@ -2,18 +2,21 @@ use crate::app::fps_control::FpsControl;
 use crate::app::game_context::GameContext;
 use crate::app::prefs::Prefs;
 use crate::app::screen::Environment;
+use crate::app::snake_management::{find_collisions, handle_collisions};
 use crate::app::stats::Stats;
 use crate::app::{self, Screen};
 use crate::apple::spawn::{spawn_apples, SpawnPolicy, SpawnScheduleBuilder};
-use crate::basic::{CellDim, Dir, HexPoint};
+use crate::basic::{CellDim, Dir, Frames, FrameStamp, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
-use crate::{apple, by_segment_type, by_snake_type, snake};
+use crate::snake::SegmentType;
 use crate::snake_control::Template;
-use crate::rendering;
+use crate::view::snakes::OtherSnakes;
+use crate::{apple, by_segment_type, by_snake_type, rendering, snake};
 use ggez::event::EventHandler;
+use ggez::graphics::{Canvas, DrawParam};
 use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::Context;
 use rand::prelude::*;
@@ -21,10 +24,6 @@ use std::cell::RefCell;
 use std::default::Default;
 use std::rc::Rc;
 use std::result;
-use ggez::graphics::{Canvas, DrawParam};
-use crate::app::snake_management::{find_collisions, handle_collisions};
-use crate::snake::SegmentType;
-use crate::view::snakes::OtherSnakes;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -39,14 +38,19 @@ struct SnakeDemo {
 }
 
 impl SnakeDemo {
-    fn new(cell_dim: CellDim, location: HexPoint, app_palette: app::Palette, control: Rc<RefCell<FpsControl>>) -> Self {
+    fn new(
+        cell_dim: CellDim,
+        location: HexPoint,
+        app_palette: app::Palette,
+        control: Rc<RefCell<FpsControl>>,
+    ) -> Self {
         let board_dim = HexPoint { h: 11, v: 8 };
         let start_pos = HexPoint { h: 4, v: 4 };
         let start_dir = Dir::U;
         let start_len = 10;
 
         let spawn_schedule = SpawnScheduleBuilder::new()
-            .spawn(HexPoint{h: 5, v: 4}, apple::Type::Food(1))
+            .spawn(HexPoint { h: 5, v: 4 }, apple::Type::Food(1))
             .wait(40)
             .build();
         let apple_spawn_policy = SpawnPolicy::ScheduledOnEat {
@@ -57,9 +61,9 @@ impl SnakeDemo {
         };
 
         let snake_palettes = vec![
+            snake::PaletteTemplate::rainbow(true),
             snake::PaletteTemplate::solid_white_red(),
             // snake::PaletteTemplate::rainbow(false),
-            snake::PaletteTemplate::rainbow(true),
             snake::PaletteTemplate::alternating_white(),
             snake::PaletteTemplate::gray_gradient(1., false),
             snake::PaletteTemplate::green_to_red(false),
@@ -115,15 +119,17 @@ impl SnakeDemo {
 }
 
 impl SnakeDemo {
+    fn prev_palette(&mut self) {
+        self.current_palette = (self.current_palette + self.palettes.len() - 1) % self.palettes.len();
+        self.env.snakes[0].palette = self.palettes[self.current_palette].into();
+    }
+
     fn next_palette(&mut self) {
         self.current_palette = (self.current_palette + 1) % self.palettes.len();
         self.env.snakes[0].palette = self.palettes[self.current_palette].into();
     }
 
-    fn update(
-        &mut self,
-        ctx: &Context,
-    ) {
+    fn update(&mut self, ctx: &Context) {
         // unimplemented!("how do you use GameContext here??")
         self.env.snakes[0].advance(
             OtherSnakes::empty(),
@@ -142,12 +148,7 @@ impl SnakeDemo {
         spawn_apples(&mut self.env);
     }
 
-    fn draw(
-        &mut self,
-        canvas: &mut Canvas,
-        ctx: &mut Context,
-        stats: &mut Stats,
-    ) -> Result {
+    fn draw(&mut self, canvas: &mut Canvas, ctx: &mut Context, stats: &mut Stats) -> Result {
         self.env.snakes[0].update_dir(
             OtherSnakes::empty(),
             &[],
@@ -156,7 +157,8 @@ impl SnakeDemo {
             ctx,
         );
 
-        let draw_param = DrawParam::default().dest(self.location.to_cartesian(self.env.gtx.cell_dim));
+        let offset = self.location.to_cartesian(self.env.gtx.cell_dim);
+        let draw_param = DrawParam::default().dest(offset);
 
         let grid_mesh = rendering::grid_mesh(&self.env.gtx, ctx)?;
         canvas.draw(&grid_mesh, draw_param);
@@ -167,24 +169,26 @@ impl SnakeDemo {
         let fps_control = self.fps_control.borrow();
         let ftx = fps_control.context();
 
-        let snake_mesh = rendering::snake_mesh(
-            &mut self.env.snakes,
-            &self.env.gtx,
-            ftx,
-            ctx,
-            stats,
-        )?;
+        let snake_mesh =
+            rendering::snake_mesh(&mut self.env.snakes, &self.env.gtx, ftx, ctx, stats)?;
         canvas.draw(&snake_mesh, draw_param);
 
         if !self.env.apples.is_empty() {
-            let apple_mesh = rendering::apple_mesh(
-                &self.env.apples,
-                &self.env.gtx,
-                ftx,
-                ctx,
-                stats,
-            )?;
+            let apple_mesh =
+                rendering::apple_mesh(&self.env.apples, &self.env.gtx, ftx, ctx, stats)?;
             canvas.draw(&apple_mesh, draw_param);
+        }
+
+        let (button_mesh, clicked_left, clicked_right) = rendering::palette_changing_buttons_mesh(&self.env.gtx, ctx, offset)?;
+        canvas.draw(&button_mesh, draw_param);
+
+        drop(fps_control);
+
+        assert!(!(clicked_left && clicked_right));
+        if clicked_left {
+            self.prev_palette();
+        } else if clicked_right {
+            self.next_palette();
         }
 
         Ok(())
@@ -217,7 +221,6 @@ pub struct StartScreen {
     // TODO: implement palette choice
     // palettes: Vec<app::Palette>,
     // current_palette: usize,
-
     palette: app::Palette,
 
     player1_demo: SnakeDemo,
@@ -236,8 +239,18 @@ impl StartScreen {
 
             palette: app_palette.clone(),
 
-            player1_demo: SnakeDemo::new(cell_dim, HexPoint { h: 1, v: 5 }, app_palette.clone(), fps_control.clone()),
-            player2_demo: SnakeDemo::new(cell_dim, HexPoint { h: 15, v: 5 }, app_palette, fps_control),
+            player1_demo: SnakeDemo::new(
+                cell_dim,
+                HexPoint { h: 1, v: 5 },
+                app_palette.clone(),
+                fps_control.clone(),
+            ),
+            player2_demo: SnakeDemo::new(
+                cell_dim,
+                HexPoint { h: 15, v: 5 },
+                app_palette,
+                fps_control,
+            ),
 
             stats: Default::default(),
         }
@@ -258,16 +271,8 @@ impl EventHandler<Error> for StartScreen {
 
         let mut canvas = Canvas::from_frame(ctx, self.palette.background_color);
 
-        self.player1_demo.draw(
-            &mut canvas,
-            ctx,
-            &mut self.stats,
-        )?;
-        self.player2_demo.draw(
-            &mut canvas,
-            ctx,
-            &mut self.stats,
-        )?;
+        self.player1_demo.draw(&mut canvas, ctx, &mut self.stats)?;
+        self.player2_demo.draw(&mut canvas, ctx, &mut self.stats)?;
 
         canvas
             .finish(ctx)

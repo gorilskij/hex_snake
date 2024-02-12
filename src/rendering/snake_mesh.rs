@@ -1,9 +1,9 @@
+use crate::app::fps_control::FpsContext;
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 use std::cmp::Ordering;
-use crate::app::fps_control::FpsContext;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;

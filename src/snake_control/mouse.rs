@@ -1,3 +1,4 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
@@ -7,7 +8,6 @@ use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::Context;
 use std::f32::consts::TAU;
-use crate::app::fps_control::FpsContext;
 
 pub struct Mouse;
 

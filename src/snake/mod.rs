@@ -4,8 +4,8 @@ use std::mem::Discriminant;
 
 pub use palette::{Palette, PaletteTemplate};
 
-use crate::app::game_context::GameContext;
 use crate::app::fps_control::FpsContext;
+use crate::app::game_context::GameContext;
 use crate::basic::{Dir, FrameStamp, HexDim, HexPoint};
 use crate::snake_control;
 use ggez::Context;

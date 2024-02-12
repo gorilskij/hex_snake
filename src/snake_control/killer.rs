@@ -1,3 +1,4 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{angle_distance, CellDim, Dir, HexDim, HexPoint};
@@ -8,7 +9,6 @@ use crate::support::partial_min_max::PartialMinMax;
 use crate::view::snakes::Snakes;
 use ggez::Context;
 use std::f32::consts::TAU;
-use crate::app::fps_control::FpsContext;
 
 // tries to kill player
 pub struct Killer;

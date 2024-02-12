@@ -1,3 +1,4 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
@@ -5,10 +6,8 @@ use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
-use crate::support::limits::Limits;
 use crate::view::snakes::Snakes;
 use ggez::Context;
-use crate::app::fps_control::FpsContext;
 
 // TODO: rename to something more descriptive like apple seeker
 pub struct Algorithm {
@@ -29,14 +28,13 @@ impl Algorithm {
         gtx: &GameContext,
     ) {
         match self.current_target {
-            Some((i, target)) if apples.get(i)
-                .map(|a| a.pos == target)
-                .unwrap_or(false) => {},
-            Some((ref mut i, target)) if let Some((new_i, _)) =
-                apples
+            Some((i, target)) if apples.get(i).map(|a| a.pos == target).unwrap_or(false) => {}
+            Some((ref mut i, target))
+                if let Some((new_i, _)) = apples
                     .iter()
                     .enumerate()
-                    .find(|(_, apple)| apple.pos == target) => {
+                    .find(|(_, apple)| apple.pos == target) =>
+            {
                 *i = new_i;
             }
             _ => self.path = None,
@@ -62,16 +60,16 @@ impl Algorithm {
         // TODO: don't recalculate until called upon (lazy ai)
         // recalculate
         println!("recalculating");
-        self.path =
-            self.pathfinder
-                .get_path(&apples, body, knowledge, other_snakes, gtx);
+        self.path = self
+            .pathfinder
+            .get_path(&apples, body, knowledge, other_snakes, gtx);
 
         // assign wrong index 0, the true index will be found in the next iteration
         // (it's only cache anyway)
         self.current_target = self
             .path
             .as_ref()
-            .and_then(|path| path.last().copied())
+            .and_then(|path| path.back().copied())
             .map(|pos| (0, pos));
     }
 }

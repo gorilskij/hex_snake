@@ -11,7 +11,6 @@ use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
 use ggez::event::EventHandler;
 use rand::rngs::ThreadRng;
-use rand::Rng;
 use std::ops::{Deref, DerefMut};
 
 mod board_dim;
@@ -50,17 +49,16 @@ impl DerefMut for Screen {
     }
 }
 
-pub struct Environment<Rng=ThreadRng> {
+pub struct Environment<Rng = ThreadRng> {
     pub snakes: Vec<Snake>,
     // TODO: keep apples in order of position to allow for binary search
     // TODO: specialized Vec for that
     pub apples: Vec<Apple>,
-    // TODO: flatten gtx into env
     pub gtx: GameContext,
     pub rng: Rng,
 }
 
-impl<R: Rng> Environment<R> {
+impl<Rng> Environment<Rng> {
     pub fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result {
         self.snakes.push(
             snake_builder
@@ -76,7 +74,6 @@ impl<R: Rng> Environment<R> {
         self.snakes.remove(index)
     }
 
-    // TODO: notify bots
     pub fn remove_apples(&mut self, mut indices: Vec<usize>) {
         indices.sort_unstable();
         indices.dedup();

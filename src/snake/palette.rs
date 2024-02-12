@@ -6,7 +6,6 @@ use crate::color::oklab::OkLab;
 use crate::color::to_color::ToColor;
 use crate::color::Color;
 use crate::snake::{Body, SegmentType};
-use crate::support::limits::Limits;
 
 macro_rules! gray {
     ($lightness:expr) => {
@@ -360,7 +359,7 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
 fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
     let len = len as f64;
     if let SegmentType::Eaten { original_food, food_left } =
-        body.segments.last().unwrap().segment_type
+        body.segments.back().unwrap().segment_type
     {
         // Correct for eaten segment at the tail and
         //  fractional segment at the head (the eaten

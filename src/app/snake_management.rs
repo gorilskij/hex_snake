@@ -1,6 +1,7 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
+use crate::app::fps_control::FpsContext;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::{Dir, HexPoint};
@@ -12,7 +13,6 @@ use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
 use ggez::Context;
 use rand::distributions::uniform::SampleRange;
-use crate::app::fps_control::FpsContext;
 
 #[derive(Copy, Clone)]
 pub enum Collision {

@@ -1,3 +1,4 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::transformations::translate;
 use crate::basic::{Dir, HexDim, HexPoint};
@@ -12,7 +13,6 @@ use itertools::Itertools;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::mem;
-use crate::app::fps_control::FpsContext;
 
 type Distance = f32;
 type GridData = HashMap<HexPoint, Distance>;
@@ -86,25 +86,24 @@ impl Iterator for Iter {
 }
 
 fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: HexDim) -> GridData {
-    let occupied =
-        if let Some(knowledge) = player_snake.controller.knowledge() {
-            player_snake
-                .body
-                .segments
-                .iter()
-                .chain(other_snakes.iter_segments())
-                .filter(|seg| !knowledge.can_pass_through_self(seg))
-                .map(|seg| seg.pos)
-                .collect()
-        } else {
-            player_snake
-                .body
-                .segments
-                .iter()
-                .chain(other_snakes.iter_segments())
-                .map(|seg| seg.pos)
-                .collect()
-        };
+    let occupied = if let Some(knowledge) = player_snake.controller.knowledge() {
+        player_snake
+            .body
+            .segments
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .filter(|seg| !knowledge.can_pass_through_self(seg))
+            .map(|seg| seg.pos)
+            .collect()
+    } else {
+        player_snake
+            .body
+            .segments
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .map(|seg| seg.pos)
+            .collect()
+    };
 
     // setup bfs
     Iter {

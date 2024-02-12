@@ -85,7 +85,7 @@ impl SpawnPolicy {
             SpawnPolicy::ScheduledOnEat { next_index, current_wait, .. } => {
                 *next_index = 0;
                 *current_wait = 0;
-            },
+            }
         }
     }
 }
@@ -204,10 +204,16 @@ pub fn spawn_apples<Rng: rand::Rng>(env: &mut Environment<Rng>) {
                     Err(idx) => occupied_cells.insert(idx, apple_pos),
                 }
 
-                let apple_type = generate_apple_type(&env.gtx.prefs, &env.gtx.palette, &mut env.rng);
+                let apple_type =
+                    generate_apple_type(&env.gtx.prefs, &env.gtx.palette, &mut env.rng);
                 Some(Apple { pos: apple_pos, apple_type })
             }
-            SpawnPolicy::ScheduledOnEat { schedule: spawns, next_index, current_wait, .. } => {
+            SpawnPolicy::ScheduledOnEat {
+                schedule: spawns,
+                next_index,
+                current_wait,
+                ..
+            } => {
                 let len = spawns.len();
                 match &mut spawns[*next_index] {
                     SpawnEvent::Wait(frames) => {

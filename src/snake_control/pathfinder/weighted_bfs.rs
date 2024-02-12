@@ -108,7 +108,11 @@ impl PathFinder for WeightedBFS {
                                 dir,
                                 len: rc.len + 1,
                                 cost: rc.cost
-                                    + if dir != rc.dir { SearchPoint::TURN_COST } else { 0 }
+                                    + if dir != rc.dir {
+                                        SearchPoint::TURN_COST
+                                    } else {
+                                        0
+                                    }
                                     + if teleported {
                                         SearchPoint::TELEPORT_COST
                                     } else {

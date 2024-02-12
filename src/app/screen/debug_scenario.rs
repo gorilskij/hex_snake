@@ -404,11 +404,13 @@ impl EventHandler<Error> for DebugScenario {
             snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx, ctx);
         }
 
-        let snake_mesh = rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut self.stats)?;
+        let snake_mesh =
+            rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut self.stats)?;
         canvas.draw(&snake_mesh, draw_param);
 
         if !env.apples.is_empty() {
-            let apple_mesh = rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut self.stats)?;
+            let apple_mesh =
+                rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut self.stats)?;
             canvas.draw(&apple_mesh, draw_param);
         }
 

@@ -1,3 +1,4 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::Dir;
@@ -6,7 +7,6 @@ use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use ggez::Context;
-use crate::app::fps_control::FpsContext;
 #[allow(unused_macros)]
 macro_rules! move_sequence {
     (@ turn($dir:expr) ) => {

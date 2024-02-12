@@ -1,5 +1,5 @@
-mod weighted_bfs;
 mod space_filling;
+mod weighted_bfs;
 mod with_backup;
 
 use crate::app::game_context::GameContext;
@@ -10,8 +10,8 @@ use std::collections::VecDeque;
 
 use crate::snake::eat_mechanics::Knowledge;
 use crate::view::targets::Targets;
-use weighted_bfs::WeightedBFS;
 use space_filling::SpaceFilling;
+use weighted_bfs::WeightedBFS;
 use with_backup::WithBackup;
 
 pub type Path = VecDeque<HexPoint>;

@@ -1,8 +1,8 @@
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
 use hsl::HSL;
-use crate::app::fps_control::FpsContext;
 
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;

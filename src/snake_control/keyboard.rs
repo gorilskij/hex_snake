@@ -1,3 +1,4 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::Controls;
 use crate::apple::Apple;
@@ -10,7 +11,6 @@ use crate::ControlSetup;
 use ggez::input::keyboard::KeyCode;
 use ggez::Context;
 use std::collections::VecDeque;
-use crate::app::fps_control::FpsContext;
 
 pub struct Keyboard {
     controls: Controls,
@@ -34,11 +34,7 @@ impl Keyboard {
     /// jumps of the snake head
     const LAST_ACTIONABLE_THRESHOLD: f32 = 0.85;
 
-    pub fn new(
-        control_setup: ControlSetup,
-        start_dir: Dir,
-        knowledge: Knowledge,
-    ) -> Self {
+    pub fn new(control_setup: ControlSetup, start_dir: Dir, knowledge: Knowledge) -> Self {
         Self {
             controls: control_setup.into(),
             control_queue: VecDeque::with_capacity(Self::CTRL_QUEUE_LIMIT),

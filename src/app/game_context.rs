@@ -23,7 +23,7 @@ impl GameContext {
         cell_dim: CellDim,
         palette: app::Palette,
         prefs: Prefs,
-        apple_spawn_policy: SpawnPolicy
+        apple_spawn_policy: SpawnPolicy,
     ) -> Self {
         Self {
             board_dim,

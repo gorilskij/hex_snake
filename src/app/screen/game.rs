@@ -407,7 +407,13 @@ impl EventHandler<Error> for Game {
             // same game frame are blocked
             for idx in 0..env.snakes.len() {
                 let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
-                snake.update_dir(other_snakes, &env.apples, &env.gtx, &self.fps_control.context(), ctx);
+                snake.update_dir(
+                    other_snakes,
+                    &env.apples,
+                    &env.gtx,
+                    &self.fps_control.context(),
+                    ctx,
+                );
             }
         }
 
@@ -454,11 +460,13 @@ impl EventHandler<Error> for Game {
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
         if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
-            self.distance_grid_mesh =
-                Some(
-                    self.distance_grid
-                        .mesh(player_snake, other_snakes, ctx, &env.gtx, &self.fps_control.context())?,
-                );
+            self.distance_grid_mesh = Some(self.distance_grid.mesh(
+                player_snake,
+                other_snakes,
+                ctx,
+                &env.gtx,
+                &self.fps_control.context(),
+            )?);
         }
 
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
