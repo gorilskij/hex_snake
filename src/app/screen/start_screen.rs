@@ -6,9 +6,11 @@ use crate::app::snake_management::{find_collisions, handle_collisions};
 use crate::app::stats::Stats;
 use crate::app::{self, Screen};
 use crate::apple::spawn::{spawn_apples, SpawnPolicy, SpawnScheduleBuilder};
-use crate::basic::{CellDim, Dir, HexPoint};
+use crate::basic::{CellDim, Dir, HexPoint, Point};
+use crate::button::{Button, ButtonDataBuilder, ButtonType, TriColor};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
+use crate::rendering::shape::{Hexagon, Shape, TriangleArrowLeft, WideHexagon};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::SegmentType;
@@ -16,23 +18,26 @@ use crate::snake_control::Template;
 use crate::view::snakes::OtherSnakes;
 use crate::{apple, by_segment_type, by_snake_type, rendering, snake};
 use ggez::event::EventHandler;
-use ggez::graphics::{Canvas, DrawParam};
+use ggez::graphics::{Canvas, DrawParam, TextLayout};
 use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::Context;
 use rand::prelude::*;
 use std::cell::RefCell;
 use std::default::Default;
+use std::f32::consts::TAU;
 use std::rc::Rc;
 use std::result;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
 struct SnakeDemo {
-    location: HexPoint, // top-left
+    pos: Point, // top-left
     env: Environment<NoRng>,
 
     palettes: Vec<snake::PaletteTemplate>,
     current_palette: usize,
+    left_button: Button,
+    right_button: Button,
 
     fps_control: Rc<RefCell<FpsControl>>,
 }
@@ -40,7 +45,7 @@ struct SnakeDemo {
 impl SnakeDemo {
     fn new(
         cell_dim: CellDim,
-        location: HexPoint,
+        pos: Point,
         app_palette: app::Palette,
         control: Rc<RefCell<FpsControl>>,
     ) -> Self {
@@ -95,8 +100,52 @@ impl SnakeDemo {
             .speed(1.)
             .palette(snake_palettes[0]);
 
+        type ButtonOuter = Hexagon;
+        type ButtonInnerLeft = TriangleArrowLeft;
+        let bottom_right = pos + board_dim.to_cartesian(cell_dim);
+        let button_dim = cell_dim * 2.;
+        let color = TriColor {
+            normal: Color::gray(0.5),
+            hover: Color::GREEN,
+            click: Color::RED,
+        };
+        let outer_shape = ButtonOuter::new(button_dim);
+        let inner_shape = ButtonInnerLeft::new(button_dim);
+        let triangle_relative_pos = outer_shape.center() - inner_shape.center();
+        let left_button = Button {
+            pos: Point {
+                x: pos.x + 3. * cell_dim.side,
+                y: bottom_right.y + 2. * cell_dim.side,
+            },
+            button_type: ButtonType::Click(
+                ButtonDataBuilder::new()
+                    .outer_shape(outer_shape.clone(), 15., color)
+                    .inner_shape(inner_shape.clone(), 15., triangle_relative_pos, color)
+                    .build()
+                    .unwrap(),
+            ),
+        };
+        let right_button = Button {
+            pos: Point {
+                x: bottom_right.x - 3. * cell_dim.side - outer_shape.bounding_box().1.x,
+                y: bottom_right.y + 2. * cell_dim.side,
+            },
+            button_type: ButtonType::Click(
+                ButtonDataBuilder::new()
+                    .outer_shape(outer_shape, 15., color)
+                    .inner_shape(
+                        inner_shape.rotate_clockwise_about_center(TAU / 2.),
+                        15.,
+                        triangle_relative_pos,
+                        color,
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        };
+
         Self {
-            location,
+            pos,
             env: Environment {
                 snakes: vec![seed.build().unwrap()],
                 apples: vec![],
@@ -112,6 +161,9 @@ impl SnakeDemo {
 
             palettes: snake_palettes,
             current_palette: 0,
+
+            left_button,
+            right_button,
 
             fps_control: control,
         }
@@ -158,8 +210,7 @@ impl SnakeDemo {
             ctx,
         );
 
-        let offset = self.location.to_cartesian(self.env.gtx.cell_dim);
-        let draw_param = DrawParam::default().dest(offset);
+        let draw_param = DrawParam::default().dest(self.pos);
 
         let grid_mesh = rendering::grid_mesh(&self.env.gtx, ctx)?;
         canvas.draw(&grid_mesh, draw_param);
@@ -180,16 +231,14 @@ impl SnakeDemo {
             canvas.draw(&apple_mesh, draw_param);
         }
 
-        let (button_mesh, clicked_left, clicked_right) =
-            rendering::palette_changing_buttons_mesh(&self.env.gtx, ctx, offset)?;
-        canvas.draw(&button_mesh, draw_param);
-
+        let left_clicked = self.left_button.draw(canvas, ctx)?;
+        let right_clicked = self.right_button.draw(canvas, ctx)?;
         drop(fps_control);
 
-        assert!(!(clicked_left && clicked_right));
-        if clicked_left {
+        assert!(!(left_clicked && right_clicked));
+        if left_clicked {
             self.prev_palette();
-        } else if clicked_right {
+        } else if right_clicked {
             self.next_palette();
         }
 
@@ -220,6 +269,9 @@ impl RngCore for NoRng {
 pub struct StartScreen {
     fps_control: Rc<RefCell<FpsControl>>,
 
+    one_player_button: Button,
+    two_player_button: Button,
+
     // TODO: implement palette choice
     // palettes: Vec<app::Palette>,
     // current_palette: usize,
@@ -237,21 +289,67 @@ impl StartScreen {
     pub fn new(cell_dim: CellDim, app_palette: app::Palette) -> Self {
         let fps_control = Rc::new(RefCell::new(FpsControl::new(7.)));
 
+        let stroke_thickness = 15.;
+
+        type ButtonShape = WideHexagon;
+        let button_dim = cell_dim * 1.5;
+        let color = TriColor {
+            normal: Color::gray(0.5),
+            hover: Color::GREEN,
+            click: Color::RED,
+        };
+        let button_shape = ButtonShape::new(button_dim);
+        let player_button_prototype =
+            ButtonDataBuilder::new().outer_shape(button_shape.clone(), stroke_thickness, color);
+        let button_text_pos = button_shape.center();
+
         Self {
             fps_control: fps_control.clone(),
+
+            one_player_button: Button {
+                pos: Point { x: 400., y: 50. },
+                button_type: ButtonType::Click(
+                    player_button_prototype
+                        .clone()
+                        .text(
+                            "One player",
+                            50.,
+                            TextLayout::center(),
+                            button_text_pos,
+                            color,
+                        )
+                        .build()
+                        .unwrap(),
+                ),
+            },
+            two_player_button: Button {
+                pos: Point { x: 1200., y: 50. },
+                button_type: ButtonType::Click(
+                    player_button_prototype
+                        .text(
+                            "Two players",
+                            50.,
+                            TextLayout::center(),
+                            button_text_pos,
+                            color,
+                        )
+                        .build()
+                        .unwrap(),
+                ),
+            },
 
             palette: app_palette.clone(),
             cell_dim,
 
             player1_demo: SnakeDemo::new(
                 cell_dim,
-                HexPoint { h: 1, v: 5 },
+                HexPoint { h: 1, v: 5 }.to_cartesian(cell_dim),
                 app_palette.clone(),
                 fps_control.clone(),
             ),
             player2_demo: SnakeDemo::new(
                 cell_dim,
-                HexPoint { h: 15, v: 5 },
+                HexPoint { h: 15, v: 5 }.to_cartesian(cell_dim),
                 app_palette,
                 fps_control,
             ),
@@ -278,16 +376,10 @@ impl EventHandler<Error> for StartScreen {
         self.player1_demo.draw(&mut canvas, ctx, &mut self.stats)?;
         self.player2_demo.draw(&mut canvas, ctx, &mut self.stats)?;
 
-        let draw_param = DrawParam::default();
-        let (button_mesh, _clicked_single, _clicked_double, message_single, message_double) =
-            rendering::player_number_buttons_mesh(self.cell_dim, ctx)?;
-        canvas.draw(&button_mesh, draw_param);
-        if let Some(message) = message_single {
-            message.draw(&mut canvas)
-        }
-        if let Some(message) = message_double {
-            message.draw(&mut canvas)
-        }
+        // let (button_mesh, _clicked_single, _clicked_double, message_single, message_double) =
+        //     rendering::player_number_buttons_mesh(self.cell_dim, ctx)?;
+        let one_player_clicked = self.one_player_button.draw(&mut canvas, ctx)?;
+        let two_player_clicked = self.two_player_button.draw(&mut canvas, ctx)?;
 
         canvas
             .finish(ctx)

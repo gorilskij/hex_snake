@@ -1,10 +1,10 @@
 use crate::basic::{CellDim, Point};
-use crate::rendering::shape::{Shape, ShapePoints};
+use crate::rendering::shape::Shape;
 
 pub struct ArrowLeft;
 
 impl Shape for ArrowLeft {
-    fn points(CellDim { side, sin, .. }: CellDim) -> ShapePoints {
+    fn raw_points(CellDim { side, sin, .. }: CellDim) -> Vec<Point> {
         vec![
             Point { x: 0., y: sin },
             Point { x: sin, y: 2. * sin },

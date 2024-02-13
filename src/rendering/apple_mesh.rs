@@ -38,7 +38,7 @@ pub fn apple_mesh(
             match gtx.prefs.draw_style {
                 rendering::Style::Hexagon => {
                     let dest = apple.pos.to_cartesian(gtx.cell_dim);
-                    let points = Hexagon::points(gtx.cell_dim).translate(dest);
+                    let points = Hexagon::new(gtx.cell_dim).translate(dest);
                     builder.polygon(DrawMode::fill(), &points, color)?;
                     stats.polygons += 1;
                 }

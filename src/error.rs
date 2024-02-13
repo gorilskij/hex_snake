@@ -1,3 +1,4 @@
+use crate::button::ButtonDataBuilderError;
 use crate::snake;
 use ggez::GameError;
 use snake::builder::BuilderError as SnakeBuilderError;
@@ -12,6 +13,7 @@ assert_impl_all!(SnakeBuilderError: error::Error);
 pub enum ErrorType {
     GameError(GameError),
     SnakeBuilderError(SnakeBuilderError),
+    ButtonDataBuilderError(ButtonDataBuilderError),
 }
 
 /// The second member contains a trace in reverse order
@@ -27,6 +29,12 @@ impl From<GameError> for Error {
 impl From<SnakeBuilderError> for Error {
     fn from(e: SnakeBuilderError) -> Self {
         Self(ErrorType::SnakeBuilderError(e), vec![])
+    }
+}
+
+impl From<ButtonDataBuilderError> for Error {
+    fn from(e: ButtonDataBuilderError) -> Self {
+        Self(ErrorType::ButtonDataBuilderError(e), vec![])
     }
 }
 
@@ -58,6 +66,7 @@ impl error::Error for Error {
         match &self.0 {
             ErrorType::GameError(e) => Some(e),
             ErrorType::SnakeBuilderError(e) => Some(e),
+            ErrorType::ButtonDataBuilderError(e) => Some(e),
         }
     }
 }

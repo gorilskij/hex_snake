@@ -1,5 +1,5 @@
 use crate::basic::{CellDim, Point};
-use crate::rendering::shape::{Shape, ShapePoints};
+use crate::rendering::shape::Shape;
 
 pub struct WideHexagon;
 
@@ -8,7 +8,7 @@ impl WideHexagon {
 }
 
 impl Shape for WideHexagon {
-    fn points(CellDim { side, cos, sin }: CellDim) -> ShapePoints {
+    fn raw_points(CellDim { side, cos, sin }: CellDim) -> Vec<Point> {
         let h_side = Self::H_SIDE_MULTIPLIER * side;
         vec![
             Point { x: cos, y: 0. },
@@ -20,14 +20,4 @@ impl Shape for WideHexagon {
         ]
         .into()
     }
-
-    // fn bounding_box(CellDim { side, cos, sin }: CellDim) -> Point {
-    //     let h_side = Self::H_SIDE_MULTIPLIER * side;
-    //     Point { x: cos * 2. + h_side, y: sin * 2. }
-    // }
-    //
-    // fn center(CellDim { side, cos, sin }: CellDim) -> Point {
-    //     let h_side = Self::H_SIDE_MULTIPLIER * side;
-    //     Point { x: cos + h_side / 2., y: sin }
-    // }
 }

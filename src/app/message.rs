@@ -57,6 +57,7 @@ impl Message {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct MessageDrawable {
     pub text: Text,
     pub dest: Point,
@@ -66,7 +67,6 @@ pub struct MessageDrawable {
 impl MessageDrawable {
     pub fn draw(&self, canvas: &mut Canvas) {
         let dp = DrawParam::default().dest(self.dest).color(self.color);
-
         canvas.draw(&self.text, dp)
     }
 }

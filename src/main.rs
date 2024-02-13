@@ -1,7 +1,8 @@
 #![feature(stmt_expr_attributes)]
 #![feature(if_let_guard)]
 #![feature(try_blocks)]
-// #![feature(never_type)]
+#![feature(never_type)]
+#![feature(exhaustive_patterns)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
 #![feature(const_fn_floating_point_arithmetic)]
@@ -14,6 +15,7 @@
 extern crate derive_more;
 #[macro_use]
 extern crate lazy_static;
+extern crate core;
 
 use ggez::event::run;
 use ggez::ContextBuilder;
@@ -35,6 +37,7 @@ mod snake;
 mod view;
 #[macro_use]
 mod apple;
+mod button;
 mod error;
 mod rendering;
 pub mod snake_control;

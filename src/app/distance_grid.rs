@@ -157,7 +157,7 @@ fn generate_mesh(
         let frame_frac = ftx.last_graphics_update.1;
         let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
 
-        let hexagon = Hexagon::points(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
+        let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
         builder
             .polygon(DrawMode::fill(), &hexagon, *color)
             .map(|_| ())

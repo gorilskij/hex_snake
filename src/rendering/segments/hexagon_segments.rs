@@ -16,7 +16,7 @@ impl SegmentRenderer for HexagonSegments {
         _: RoundHeadDescription,
         _: usize,
     ) -> Box<dyn Iterator<Item = Polygon> + '_> {
-        let points = Hexagon::points(description.cell_dim)
+        let points = Hexagon::new(description.cell_dim)
             .translate(description.destination)
             .into();
         let poylgon = Polygon {

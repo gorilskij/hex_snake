@@ -1,3 +1,5 @@
+use itertools::MinMaxResult;
+use itertools::MinMaxResult::MinMax;
 use std::cmp::Ordering;
 
 // the partial functions return None in case of a failed comparison
@@ -7,18 +9,48 @@ pub trait PartialMinMax
 where
     Self: Iterator + Sized,
 {
-    fn partial_max(mut self) -> Option<Self::Item>
+    fn partial_minmax(mut self) -> MinMaxResult<Self::Item>
     where
         Self::Item: PartialOrd,
     {
-        let first = self.next();
-        self.fold(first, |ox, y| {
-            let x = ox?;
-            match x.partial_cmp(&y)? {
-                Ordering::Greater | Ordering::Equal => Some(x),
-                Ordering::Less => Some(y),
+        use MinMaxResult::*;
+
+        let first = match self.next() {
+            None => NoElements,
+            Some(x) => OneElement(x),
+        };
+        self.fold(first, |x, y| match x {
+            OneElement(a) => {
+                if y < a {
+                    MinMax(y, a)
+                } else if y > a {
+                    MinMax(a, y)
+                } else {
+                    OneElement(a)
+                }
             }
+            MinMax(a, b) => {
+                if y < a {
+                    MinMax(y, b)
+                } else if y > b {
+                    MinMax(a, y)
+                } else {
+                    MinMax(a, b)
+                }
+            }
+            NoElements => unreachable!(),
         })
+    }
+
+    fn partial_minmax_copy(self) -> Option<(Self::Item, Self::Item)>
+    where
+        Self::Item: PartialOrd + Copy,
+    {
+        match self.partial_minmax() {
+            MinMaxResult::NoElements => None,
+            MinMaxResult::OneElement(a) => Some((a, a)),
+            MinMax(a, b) => Some((a, b)),
+        }
     }
 
     fn partial_min_by_key<B, F>(self, mut f: F) -> Option<Self::Item>
