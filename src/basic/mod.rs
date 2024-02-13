@@ -11,7 +11,6 @@ mod dir;
 mod dir12;
 mod hex_point;
 mod point;
-pub mod transformations;
 
 pub type Frames = u64;
 pub type Food = u32;

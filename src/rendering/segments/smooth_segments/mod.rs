@@ -1,13 +1,13 @@
 use std::f32::consts::{PI, TAU};
 use std::iter;
 
-use crate::basic::transformations::{flip_horizontally, rotate_clockwise, translate};
 use crate::basic::{CellDim, Dir, Point};
 use crate::rendering::clean_arc::CleanArc;
 use crate::rendering::segments::descriptions::{
     Polygon, RoundHeadDescription, SegmentDescription, SegmentFraction, TurnDirection, TurnType,
 };
 use crate::rendering::segments::point_factory::SegmentRenderer;
+use crate::rendering::shape::ShapePoints;
 use itertools::Itertools;
 use lyon_geom::{Angle, Arc};
 
@@ -328,11 +328,13 @@ fn render_subsegment(
     use TurnDirection::*;
     use TurnType::*;
 
-    let mut segment;
+    let mut segment: ShapePoints;
     match description.turn.turn_type() {
         Straight => {
+            // TODO: convert segments to shapes
             segment =
                 render_default_straight_segment(description, subsegment_idx, fraction, round_head)
+                    .into()
         }
         Blunt(turn_direction) | Sharp(turn_direction) => {
             segment = render_default_curved_segment(
@@ -341,21 +343,22 @@ fn render_subsegment(
                 subsegment_idx,
                 fraction,
                 round_head,
-            );
+            )
+            .into();
             if turn_direction == Clockwise {
-                flip_horizontally(&mut segment, description.cell_dim.center().x);
+                segment = segment.flip_horizontally(description.cell_dim.center().x);
             }
         }
     }
 
     let rotation_angle = Dir::U.clockwise_angle_to(description.turn.coming_from);
     if rotation_angle != 0. {
-        rotate_clockwise(&mut segment, description.cell_dim.center(), rotation_angle);
+        segment = segment.rotate_clockwise(description.cell_dim.center(), rotation_angle);
     }
 
-    translate(&mut segment, description.destination);
+    segment = segment.translate(description.destination);
 
-    segment
+    segment.into()
 }
 
 impl SegmentRenderer for SmoothSegments {

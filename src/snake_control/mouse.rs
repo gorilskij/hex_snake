@@ -37,8 +37,6 @@ impl Controller for Mouse {
             .find(|dir| *dir != -body.dir)
     }
 
-    // TODO: implement get_path
-
     // fn get_mesh(&self, gtx: &GameContext, ctx: &mut Context) -> Option<AppResult<Mesh>> {
     //     let mouse_position: Point = mouse::position(ctx).into();
     //     // let position = mouse_position - self.cell_dim.center();

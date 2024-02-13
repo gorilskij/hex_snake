@@ -1,11 +1,9 @@
 use crate::app::game_context::GameContext;
-use crate::basic::transformations::{rotate_clockwise, translate};
 use crate::basic::Point;
 use crate::color::Color;
 use crate::error::{ErrorConversion, Result};
-use crate::rendering::segments::render_hexagon;
 use crate::rendering::shape::collisions::shape_point;
-use crate::rendering::shape::{Shape, TriangleArrowLeft};
+use crate::rendering::shape::{Hexagon, Shape, TriangleArrowLeft};
 use ggez::event::MouseButton;
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
@@ -48,14 +46,14 @@ pub fn palette_changing_buttons_mesh(
     let clicked = ctx.mouse.button_pressed(MouseButton::Left);
     let just_clicked = ctx.mouse.button_just_pressed(MouseButton::Left);
 
-    let mut clicked_left = false;
+    let clicked_left;
     let mut clicked_right = false;
     let res: Result<_> = try {
         // left button
-        let mut points = render_hexagon(button_dim);
+        let mut points = Hexagon::points(button_dim);
         let collided = shape_point(&points, mouse_pos - left_pos);
         clicked_left = collided && just_clicked;
-        translate(&mut points, left_pos);
+        points = points.translate(left_pos);
         let color = if collided {
             if clicked {
                 COLOR_CLICK
@@ -67,15 +65,14 @@ pub fn palette_changing_buttons_mesh(
         };
         builder.polygon(draw_mode, &points, *color)?;
 
-        let mut points = Arrow::points(arrow_dim);
-        translate(&mut points, left_arrow_pos);
+        let points = Arrow::points(arrow_dim).translate(left_arrow_pos);
         builder.polygon(draw_mode, &points, *color)?;
 
         // right button
-        let mut points = render_hexagon(button_dim);
+        let mut points = Hexagon::points(button_dim);
         let collided = shape_point(&points, mouse_pos - right_pos);
         clicked_right = collided && just_clicked;
-        translate(&mut points, right_pos);
+        points = points.translate(right_pos);
         let color = if collided {
             if clicked {
                 COLOR_CLICK
@@ -87,9 +84,9 @@ pub fn palette_changing_buttons_mesh(
         };
         builder.polygon(draw_mode, &points, *color)?;
 
-        let mut points = Arrow::points(arrow_dim);
-        rotate_clockwise(&mut points, arrow_center, TAU / 2.);
-        translate(&mut points, right_arrow_pos);
+        let points = Arrow::points(arrow_dim)
+            .rotate_clockwise(arrow_center, TAU / 2.)
+            .translate(right_arrow_pos);
         builder.polygon(draw_mode, &points, *color)?;
 
         builder.build()

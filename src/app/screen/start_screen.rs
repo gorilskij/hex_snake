@@ -6,7 +6,7 @@ use crate::app::snake_management::{find_collisions, handle_collisions};
 use crate::app::stats::Stats;
 use crate::app::{self, Screen};
 use crate::apple::spawn::{spawn_apples, SpawnPolicy, SpawnScheduleBuilder};
-use crate::basic::{CellDim, Dir, Frames, FrameStamp, HexPoint, Point};
+use crate::basic::{CellDim, Dir, HexPoint};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
@@ -120,7 +120,8 @@ impl SnakeDemo {
 
 impl SnakeDemo {
     fn prev_palette(&mut self) {
-        self.current_palette = (self.current_palette + self.palettes.len() - 1) % self.palettes.len();
+        self.current_palette =
+            (self.current_palette + self.palettes.len() - 1) % self.palettes.len();
         self.env.snakes[0].palette = self.palettes[self.current_palette].into();
     }
 
@@ -179,7 +180,8 @@ impl SnakeDemo {
             canvas.draw(&apple_mesh, draw_param);
         }
 
-        let (button_mesh, clicked_left, clicked_right) = rendering::palette_changing_buttons_mesh(&self.env.gtx, ctx, offset)?;
+        let (button_mesh, clicked_left, clicked_right) =
+            rendering::palette_changing_buttons_mesh(&self.env.gtx, ctx, offset)?;
         canvas.draw(&button_mesh, draw_param);
 
         drop(fps_control);

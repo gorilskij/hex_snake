@@ -1,9 +1,9 @@
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
-use crate::basic::transformations::{rotate_clockwise, translate};
 use crate::basic::{Dir, Point};
 use crate::error::{ErrorConversion, Result};
+use crate::rendering::shape::ShapePoints;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
 use crate::view::snakes::OtherSnakes;
@@ -63,16 +63,16 @@ pub fn player_path_mesh(
                 let sin = radius * (THETA / 2.).sin();
 
                 // pointing down
-                let mut points = vec![
+                let points = ShapePoints::from(vec![
                     Point {
                         x: 0.,
                         y: radius / (THETA / 2.).sin(),
                     },
                     Point { x: cos, y: sin },
                     Point { x: -cos, y: sin },
-                ];
-                rotate_clockwise(&mut points, Point::zero(), Dir::D.clockwise_angle_to(dir));
-                translate(&mut points, dest);
+                ])
+                .rotate_clockwise(Point::zero(), Dir::D.clockwise_angle_to(dir))
+                .translate(dest);
 
                 builder.polygon(DrawMode::fill(), &points, Color::WHITE)?;
                 stats.polygons += 1;

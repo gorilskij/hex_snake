@@ -217,13 +217,6 @@ impl HexPoint {
                 let probs = problems(x, board_dim);
                 while !board_dim.contains(x) {
                     if problems(x, board_dim) != probs {
-                        // println!(
-                        //     "problems was {:?} for {:?}, is {:?} for {:?}",
-                        //     probs,
-                        //     self,
-                        //     problems(x, board_dim),
-                        //     x
-                        // );
                         return None;
                     }
                     x = x.translate(-dir, 1);

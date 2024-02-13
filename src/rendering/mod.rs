@@ -10,7 +10,7 @@ mod clean_arc;
 mod grid_mesh;
 mod player_path_mesh;
 pub mod segments;
-mod shape;
+pub mod shape;
 mod snake_mesh;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]

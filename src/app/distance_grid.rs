@@ -1,10 +1,9 @@
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
-use crate::basic::transformations::translate;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::color::Color;
 use crate::error::Result;
-use crate::rendering::segments::render_hexagon;
+use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;
 use crate::view::snakes::Snakes;
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
@@ -158,8 +157,7 @@ fn generate_mesh(
         let frame_frac = ftx.last_graphics_update.1;
         let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
 
-        let mut hexagon = render_hexagon(gtx.cell_dim);
-        translate(&mut hexagon, pos.to_cartesian(gtx.cell_dim));
+        let hexagon = Hexagon::points(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
         builder
             .polygon(DrawMode::fill(), &hexagon, *color)
             .map(|_| ())

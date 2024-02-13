@@ -6,10 +6,9 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
-use crate::basic::transformations::translate;
 use crate::error::{ErrorConversion, Result};
 use crate::rendering;
-use crate::rendering::segments::render_hexagon;
+use crate::rendering::shape::{Hexagon, Shape};
 
 pub fn apple_mesh(
     apples: &[Apple],
@@ -39,8 +38,7 @@ pub fn apple_mesh(
             match gtx.prefs.draw_style {
                 rendering::Style::Hexagon => {
                     let dest = apple.pos.to_cartesian(gtx.cell_dim);
-                    let mut points = render_hexagon(gtx.cell_dim);
-                    translate(&mut points, dest);
+                    let points = Hexagon::points(gtx.cell_dim).translate(dest);
                     builder.polygon(DrawMode::fill(), &points, color)?;
                     stats.polygons += 1;
                 }

@@ -1,7 +1,6 @@
-use crate::basic::transformations::translate;
 use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription};
 use crate::rendering::segments::point_factory::SegmentRenderer;
-use crate::rendering::segments::render_hexagon;
+use crate::rendering::shape::{Hexagon, Shape};
 use std::iter;
 
 pub struct HexagonSegments;
@@ -17,8 +16,9 @@ impl SegmentRenderer for HexagonSegments {
         _: RoundHeadDescription,
         _: usize,
     ) -> Box<dyn Iterator<Item = Polygon> + '_> {
-        let mut points = render_hexagon(description.cell_dim);
-        translate(&mut points, description.destination);
+        let points = Hexagon::points(description.cell_dim)
+            .translate(description.destination)
+            .into();
         let poylgon = Polygon {
             points,
             color: description.segment_style.first_color(),
