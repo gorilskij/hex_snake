@@ -369,9 +369,6 @@ impl SegmentRenderer for SmoothSegments {
         color_resolution: usize,
     ) -> Box<dyn Iterator<Item = Polygon> + '_> {
         let mut end = description.fraction.start;
-        // TODO: remove collect, why do we even need the SubSegment type?
-        // let info: Vec<_> =
-        //     .collect();
 
         // TODO: in general, this isn't pretty
         Box::new(

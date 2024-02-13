@@ -1,3 +1,5 @@
+// TODO: move this to rendering
+
 use ggez::event::EventHandler;
 use ggez::graphics::{Canvas, Rect};
 use ggez::input::keyboard::KeyInput;
@@ -21,7 +23,7 @@ mod distance_grid;
 pub(crate) mod fps_control;
 pub mod game_context;
 pub mod keyboard_control;
-mod message;
+pub mod message;
 mod palette;
 mod prefs;
 pub(crate) mod screen;

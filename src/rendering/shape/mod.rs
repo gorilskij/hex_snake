@@ -1,6 +1,7 @@
 pub use arrow::ArrowLeft;
 pub use hexagon::Hexagon;
 pub use triangle_arrow::TriangleArrowLeft;
+pub use wide_hexagon::WideHexagon;
 
 use crate::basic::{CellDim, Point};
 use crate::support::partial_min_max::PartialMinMax;
@@ -9,6 +10,7 @@ mod arrow;
 pub mod collisions;
 mod hexagon;
 mod triangle_arrow;
+mod wide_hexagon;
 
 struct Line {
     start: Point,

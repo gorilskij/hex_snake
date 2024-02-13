@@ -383,6 +383,9 @@ impl EventHandler<Error> for Game {
         }
 
         let env = &mut self.env;
+        let ftx = self.fps_control.context();
+        let mut stats = Stats::default();
+        let playing = self.fps_control.state() == fps_control::State::Playing;
 
         // TODO: diagnose why the interframe interval is
         //  1ms sometimes when out of focus
@@ -394,10 +397,6 @@ impl EventHandler<Error> for Game {
         //     }
         //     L = Some(Instant::now());
         // }
-
-        let mut stats = Stats::default();
-
-        let playing = self.fps_control.state() == fps_control::State::Playing;
 
         if playing {
             // Update the direction of the snake early
@@ -411,7 +410,7 @@ impl EventHandler<Error> for Game {
                     other_snakes,
                     &env.apples,
                     &env.gtx,
-                    &self.fps_control.context(),
+                    ftx,
                     ctx,
                 );
             }
@@ -428,8 +427,6 @@ impl EventHandler<Error> for Game {
         if env.gtx.prefs.draw_border && self.border_mesh.is_none() {
             self.border_mesh = Some(rendering::border_mesh(&env.gtx, ctx)?);
         }
-
-        let ftx = self.fps_control.context();
 
         if self.snake_mesh.is_none() || playing {
             self.snake_mesh = Some(rendering::snake_mesh(
@@ -465,7 +462,7 @@ impl EventHandler<Error> for Game {
                 other_snakes,
                 ctx,
                 &env.gtx,
-                &self.fps_control.context(),
+                ftx,
             )?);
         }
 

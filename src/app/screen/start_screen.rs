@@ -224,6 +224,7 @@ pub struct StartScreen {
     // palettes: Vec<app::Palette>,
     // current_palette: usize,
     palette: app::Palette,
+    cell_dim: CellDim,
 
     player1_demo: SnakeDemo,
     player2_demo: SnakeDemo,
@@ -240,6 +241,7 @@ impl StartScreen {
             fps_control: fps_control.clone(),
 
             palette: app_palette.clone(),
+            cell_dim,
 
             player1_demo: SnakeDemo::new(
                 cell_dim,
@@ -275,6 +277,17 @@ impl EventHandler<Error> for StartScreen {
 
         self.player1_demo.draw(&mut canvas, ctx, &mut self.stats)?;
         self.player2_demo.draw(&mut canvas, ctx, &mut self.stats)?;
+
+        let draw_param = DrawParam::default();
+        let (button_mesh, _clicked_single, _clicked_double, message_single, message_double) =
+            rendering::player_number_buttons_mesh(self.cell_dim, ctx)?;
+        canvas.draw(&button_mesh, draw_param);
+        if let Some(message) = message_single {
+            message.draw(&mut canvas)
+        }
+        if let Some(message) = message_double {
+            message.draw(&mut canvas)
+        }
 
         canvas
             .finish(ctx)

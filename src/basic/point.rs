@@ -1,4 +1,4 @@
-use ggez::mint::Point2;
+use ggez::mint::{Point2, Vector2};
 use ggez::winit::dpi::PhysicalSize;
 use lyon_geom::euclid::default::{Point2D, Vector2D};
 use std::marker::PhantomData;
@@ -14,6 +14,12 @@ pub struct Point {
 impl From<Point> for Point2<f32> {
     fn from(Point { x, y }: Point) -> Self {
         Point2 { x, y }
+    }
+}
+
+impl From<Point> for Vector2<f32> {
+    fn from(Point { x, y }: Point) -> Self {
+        Vector2 { x, y }
     }
 }
 

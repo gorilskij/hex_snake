@@ -58,9 +58,9 @@ impl Message {
 }
 
 pub struct MessageDrawable {
-    text: Text,
-    dest: Point,
-    color: Color,
+    pub text: Text,
+    pub dest: Point,
+    pub color: Color,
 }
 
 impl MessageDrawable {
