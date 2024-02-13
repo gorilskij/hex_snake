@@ -1,6 +1,7 @@
 use crate::apple::Apple;
 use crate::basic::{HexDim, HexPoint};
 use crate::snake::Snake;
+use rand::distributions::uniform::SampleRange;
 use rand::Rng;
 
 pub fn get_occupied_cells(snakes: &[Snake], apples: &[Apple]) -> Vec<HexPoint> {
@@ -30,7 +31,7 @@ pub fn random_free_spot(
         return None;
     }
 
-    let mut new_idx = rng.gen_range(0, free_spaces);
+    let mut new_idx = (0..free_spaces).sample_single(rng);
     for HexPoint { h, v } in occupied_cells {
         let idx = (v * board_dim.h + h) as usize;
         if idx <= new_idx {

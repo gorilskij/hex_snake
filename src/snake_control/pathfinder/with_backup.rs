@@ -1,6 +1,7 @@
 use super::{Path, PathFinder};
 use crate::app::game_context::GameContext;
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::view::snakes::Snakes;
 use crate::view::targets::Targets;
 
@@ -14,16 +15,16 @@ impl PathFinder for WithBackup {
         &self,
         targets: &dyn Targets,
         body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         gtx: &GameContext,
     ) -> Option<Path> {
         // first try the main pathfinder, if that fails, fall back to the backup pathfinder
         self.main
-            .get_path(targets, body, passthrough_knowledge, other_snakes, gtx)
+            .get_path(targets, body, knowledge, other_snakes, gtx)
             .or_else(|| {
                 self.backup
-                    .get_path(targets, body, passthrough_knowledge, other_snakes, gtx)
+                    .get_path(targets, body, knowledge, other_snakes, gtx)
             })
     }
 }

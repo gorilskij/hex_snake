@@ -1,13 +1,13 @@
 use crate::basic::{Food, HexPoint};
-use crate::snake;
+use crate::snake::builder::Builder as SnakeBuilder;
 
 #[macro_use]
 pub mod spawn;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Type {
     Food(Food),
-    SpawnSnake(Box<snake::Builder>),
+    SpawnSnake(Box<SnakeBuilder>),
     SpawnRain,
 }
 
@@ -21,6 +21,7 @@ impl Type {
     }
 }
 
+#[derive(Clone)]
 pub struct Apple {
     pub pos: HexPoint,
     pub apple_type: Type,

@@ -7,10 +7,10 @@ pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);
 
 #[allow(dead_code)]
 impl<'a> OtherSnakes<'a> {
-    // pub fn empty() -> Self {
-    //     Self(&[], &[])
-    // }
-    //
+    pub fn empty() -> Self {
+        Self(&[], &[])
+    }
+
     // pub fn new(a: &'a [Snake], b: &'a [Snake]) -> Self {
     //     Self(a, b)
     // }

@@ -1,8 +1,10 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::Controls;
 use crate::apple::Apple;
 use crate::basic::Dir;
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use crate::ControlSetup;
@@ -21,7 +23,7 @@ pub struct Keyboard {
     deferred: bool,
 
     // assumes the player knows everything
-    passthrough_knowledge: PassthroughKnowledge,
+    knowledge: Knowledge,
 }
 
 impl Keyboard {
@@ -32,18 +34,14 @@ impl Keyboard {
     /// jumps of the snake head
     const LAST_ACTIONABLE_THRESHOLD: f32 = 0.85;
 
-    pub fn new(
-        control_setup: ControlSetup,
-        start_dir: Dir,
-        passthrough_knowledge: PassthroughKnowledge,
-    ) -> Self {
+    pub fn new(control_setup: ControlSetup, start_dir: Dir, knowledge: Knowledge) -> Self {
         Self {
             controls: control_setup.into(),
             control_queue: VecDeque::with_capacity(Self::CTRL_QUEUE_LIMIT),
             dir: start_dir,
             deferred: false,
 
-            passthrough_knowledge,
+            knowledge,
         }
     }
 }
@@ -52,13 +50,14 @@ impl Controller for Keyboard {
     fn next_dir(
         &mut self,
         _: &mut Body,
-        _: Option<&PassthroughKnowledge>,
+        _: Option<&Knowledge>,
         _: &dyn Snakes,
         _: &[Apple],
-        gtx: &GameContext,
+        _: &GameContext,
+        ftx: &FpsContext,
         _: &Context,
     ) -> Option<Dir> {
-        if self.deferred || gtx.frame_stamp.1 < Self::LAST_ACTIONABLE_THRESHOLD {
+        if self.deferred || ftx.last_graphics_update.1 < Self::LAST_ACTIONABLE_THRESHOLD {
             self.deferred = false;
             if let Some(dir) = self.control_queue.pop_front() {
                 self.dir = dir;
@@ -102,7 +101,7 @@ impl Controller for Keyboard {
         }
     }
 
-    fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> {
-        Some(&self.passthrough_knowledge)
+    fn knowledge(&self) -> Option<&Knowledge> {
+        Some(&self.knowledge)
     }
 }

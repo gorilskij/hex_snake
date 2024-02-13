@@ -1,12 +1,17 @@
 use crate::snake;
 use ggez::GameError;
+use snake::builder::BuilderError as SnakeBuilderError;
+use static_assertions::assert_impl_all;
 use std::fmt::{Debug, Display, Formatter};
-use std::{fmt, result};
+use std::{error, fmt, result};
+
+assert_impl_all!(GameError: error::Error);
+assert_impl_all!(SnakeBuilderError: error::Error);
 
 #[derive(Debug)]
 pub enum ErrorType {
     GameError(GameError),
-    SnakeBuilderError(snake::BuilderError),
+    SnakeBuilderError(SnakeBuilderError),
 }
 
 /// The second member contains a trace in reverse order
@@ -19,8 +24,8 @@ impl From<GameError> for Error {
     }
 }
 
-impl From<snake::BuilderError> for Error {
-    fn from(e: snake::BuilderError) -> Self {
+impl From<SnakeBuilderError> for Error {
+    fn from(e: SnakeBuilderError) -> Self {
         Self(ErrorType::SnakeBuilderError(e), vec![])
     }
 }
@@ -48,7 +53,14 @@ impl Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match &self.0 {
+            ErrorType::GameError(e) => Some(e),
+            ErrorType::SnakeBuilderError(e) => Some(e),
+        }
+    }
+}
 
 pub type Result<T = ()> = result::Result<T, Error>;
 

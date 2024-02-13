@@ -1,3 +1,4 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::transformations::translate;
 use crate::basic::{Dir, HexDim, HexPoint};
@@ -85,25 +86,24 @@ impl Iterator for Iter {
 }
 
 fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: HexDim) -> GridData {
-    let occupied =
-        if let Some(passthrough_knowledge) = player_snake.controller.passthrough_knowledge() {
-            player_snake
-                .body
-                .segments
-                .iter()
-                .chain(other_snakes.iter_segments())
-                .filter(|seg| !passthrough_knowledge.can_pass_through_self(seg))
-                .map(|seg| seg.pos)
-                .collect()
-        } else {
-            player_snake
-                .body
-                .segments
-                .iter()
-                .chain(other_snakes.iter_segments())
-                .map(|seg| seg.pos)
-                .collect()
-        };
+    let occupied = if let Some(knowledge) = player_snake.controller.knowledge() {
+        player_snake
+            .body
+            .segments
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .filter(|seg| !knowledge.can_pass_through_self(seg))
+            .map(|seg| seg.pos)
+            .collect()
+    } else {
+        player_snake
+            .body
+            .segments
+            .iter()
+            .chain(other_snakes.iter_segments())
+            .map(|seg| seg.pos)
+            .collect()
+    };
 
     // setup bfs
     Iter {
@@ -121,6 +121,7 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
 fn generate_mesh(
     mut iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
     gtx: &GameContext,
+    ftx: &FpsContext,
     ctx: &Context,
 ) -> Result<Mesh> {
     // not actually max distance but a good estimate, anything
@@ -154,7 +155,7 @@ fn generate_mesh(
             Some(d) => calculate_color(d),
         };
 
-        let frame_frac = gtx.frame_stamp.1;
+        let frame_frac = ftx.last_graphics_update.1;
         let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
 
         let mut hexagon = render_hexagon(gtx.cell_dim);
@@ -188,9 +189,10 @@ impl DistanceGrid {
         other_snakes: impl Snakes,
         ctx: &Context,
         gtx: &GameContext,
+        ftx: &FpsContext,
     ) -> Result<Mesh> {
-        if self.current.is_none() || gtx.game_frame_num > self.last_update {
-            self.last_update = gtx.game_frame_num;
+        if self.current.is_none() || ftx.game_frame_num > self.last_update {
+            self.last_update = ftx.game_frame_num;
             self.last = mem::replace(
                 &mut self.current,
                 Some(find_distances(player_snake, other_snakes, gtx.board_dim)),
@@ -205,6 +207,7 @@ impl DistanceGrid {
                     generate_mesh(
                         current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))),
                         gtx,
+                        ftx,
                         ctx,
                     )
                 }
@@ -214,7 +217,7 @@ impl DistanceGrid {
                         let dist_b = current.get(pos).copied();
                         (*pos, dist_a, dist_b)
                     });
-                    generate_mesh(iter, gtx, ctx)
+                    generate_mesh(iter, gtx, ftx, ctx)
                 }
             },
         }

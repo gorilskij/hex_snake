@@ -1,3 +1,4 @@
+use crate::app::fps_control::FpsContext;
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
 use rayon::prelude::*;
@@ -6,36 +7,19 @@ use std::cmp::Ordering;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
-use crate::basic::transformations::translate;
-use crate::basic::{CellDim, Point};
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::segments::descriptions::{
     SegmentDescription, SegmentFraction, TurnDescription,
 };
-use crate::rendering::segments::render_hexagon;
 use crate::snake::palette::SegmentStyle;
 use crate::snake::{Body, Segment, SegmentType, Snake};
 use crate::support::partial_min_max::partial_min;
-
-fn build_hexagon_at(
-    location: Point,
-    cell_dim: CellDim,
-    color: Color,
-    builder: &mut MeshBuilder,
-) -> Result {
-    let mut hexagon_points = render_hexagon(cell_dim);
-    translate(&mut hexagon_points, location);
-    builder
-        .polygon(DrawMode::fill(), &hexagon_points, color)
-        .map_err(Error::from)
-        .with_trace_step("build_hexagon_at")?;
-    Ok(())
-}
 
 fn segment_description(
     segment: &Segment,
     segment_idx: usize,
     body: &Body,
+    prev_fraction: Option<SegmentFraction>,
     frame_fraction: f32,
     segment_style: SegmentStyle,
     gtx: &GameContext,
@@ -102,12 +86,14 @@ fn segment_description(
     };
 
     SegmentDescription {
+        segment_idx,
         destination: location,
         turn: TurnDescription {
             coming_from,
             going_to,
             fraction: turn_fraction,
         },
+        prev_fraction,
         fraction,
         draw_style: gtx.prefs.draw_style,
         segment_type: segment.segment_type,
@@ -125,12 +111,13 @@ fn segment_description(
 pub fn snake_mesh(
     snakes: &mut [Snake],
     gtx: &GameContext,
-    ctx: &mut Context,
+    ftx: &FpsContext,
+    ctx: &Context,
     stats: &mut Stats,
 ) -> Result<Mesh> {
     stats.redrawing_snakes = true;
 
-    let frame_fraction = gtx.frame_stamp.1;
+    let frame_fraction = ftx.last_graphics_update.1;
 
     // Desired total number of subsegments for the whole snake
     // smaller snakes have higher resolution to show more detail
@@ -181,6 +168,8 @@ pub fn snake_mesh(
         .iter_mut()
         .zip(color_resolutions.iter())
         .flat_map(|(snake, resolution)| {
+            let body = &snake.body;
+            let mut prev_fraction = None;
             snake
                 .body
                 .segments
@@ -189,16 +178,19 @@ pub fn snake_mesh(
                 // .zip(style.into_par_iter())
                 .iter()
                 .enumerate()
-                .zip(snake.palette.segment_styles(&snake.body, frame_fraction))
-                .map(|((segment_idx, segment), style)| {
+                .zip(snake.palette.segment_styles(body, frame_fraction))
+                .map(move |((segment_idx, segment), style)| {
                     let desc = segment_description(
                         segment,
                         segment_idx,
-                        &snake.body,
+                        body,
+                        prev_fraction,
                         frame_fraction,
                         style,
                         gtx,
                     );
+
+                    prev_fraction = Some(desc.fraction);
 
                     // if segment_idx == 0 {
                     //     heads.lock().unwrap().push(desc.clone());

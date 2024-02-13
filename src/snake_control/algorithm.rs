@@ -1,10 +1,11 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
-use crate::support::limits::Limits;
 use crate::view::snakes::Snakes;
 use ggez::Context;
 
@@ -21,19 +22,20 @@ impl Algorithm {
     fn recalculate_path(
         &mut self,
         body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
     ) {
         match self.current_target {
-            Some((i, target)) if apples[i].pos == target => {},
-            Some((_, target)) if let Some((i, _)) =
-                apples
+            Some((i, target)) if apples.get(i).map(|a| a.pos == target).unwrap_or(false) => {}
+            Some((ref mut i, target))
+                if let Some((new_i, _)) = apples
                     .iter()
                     .enumerate()
-                    .find(|(_, apple)| apple.pos == target) => {
-                self.current_target.as_mut().unwrap().0 = i;
+                    .find(|(_, apple)| apple.pos == target) =>
+            {
+                *i = new_i;
             }
             _ => self.path = None,
         }
@@ -55,18 +57,19 @@ impl Algorithm {
             }
         }
 
+        // TODO: don't recalculate until called upon (lazy ai)
         // recalculate
         println!("recalculating");
-        self.path =
-            self.pathfinder
-                .get_path(&apples, body, passthrough_knowledge, other_snakes, gtx);
+        self.path = self
+            .pathfinder
+            .get_path(&apples, body, knowledge, other_snakes, gtx);
 
         // assign wrong index 0, the true index will be found in the next iteration
         // (it's only cache anyway)
         self.current_target = self
             .path
             .as_ref()
-            .and_then(|path| path.last().copied())
+            .and_then(|path| path.back().copied())
             .map(|pos| (0, pos));
     }
 }
@@ -75,13 +78,14 @@ impl Controller for Algorithm {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
+        _ftx: &FpsContext,
         _ctx: &Context,
     ) -> Option<Dir> {
-        self.recalculate_path(body, passthrough_knowledge, other_snakes, apples, gtx);
+        self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
 
         // TODO: detect and warn about excessive recalculation
         // WARNING: this can cause excessive recalculation
@@ -100,12 +104,12 @@ impl Controller for Algorithm {
     fn get_path(
         &mut self,
         body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
     ) -> Option<&Path> {
-        self.recalculate_path(body, passthrough_knowledge, other_snakes, apples, gtx);
+        self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
         self.path.as_ref()
     }
 

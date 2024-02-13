@@ -1,25 +1,23 @@
 use super::{Path, PathFinder};
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexPoint};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::view::snakes::Snakes;
 use crate::view::targets::Targets;
 use itertools::Itertools;
-use map_with_state::IntoMapWithState;
 use std::cell::RefCell;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 
-// TODO: instead of cloning, use more Rcs
 #[derive(Clone)]
 struct SearchPoint {
     parent: Option<Rc<Self>>,
     pos: HexPoint,
     dir: Dir,
     len: usize,
-    num_turns: usize,
-    num_teleports: usize,
+    /// cost = len + TURN_COST * num_turns + TELEPORT_COST * num_teleports
+    cost: usize,
 }
 
 // reverse order iterator of positions
@@ -39,10 +37,6 @@ impl SearchPoint {
     const TURN_COST: usize = 5;
     const TELEPORT_COST: usize = 15;
 
-    fn cost(&self) -> usize {
-        self.len + self.num_turns * Self::TURN_COST + self.num_teleports * Self::TELEPORT_COST
-    }
-
     fn get_path(&self) -> Path {
         let mut vd = VecDeque::with_capacity(self.len);
         for pos in Iter(Some(self)) {
@@ -52,19 +46,18 @@ impl SearchPoint {
     }
 }
 
-// TODO: rename
-pub struct Algorithm1;
+pub struct WeightedBFS;
 
-impl PathFinder for Algorithm1 {
+impl PathFinder for WeightedBFS {
     fn get_path(
         &self,
         targets: &dyn Targets,
         body: &Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         gtx: &GameContext,
     ) -> Option<Path> {
-        let off_limits: HashSet<_> = if let Some(pk) = passthrough_knowledge {
+        let off_limits: &HashSet<_> = &if let Some(pk) = knowledge {
             body.segments
                 .iter()
                 .chain(other_snakes.iter_segments())
@@ -86,8 +79,7 @@ impl PathFinder for Algorithm1 {
             pos: body.segments[0].pos,
             dir: body.dir,
             len: 1,
-            num_turns: 0,
-            num_teleports: 0,
+            cost: 1,
         }];
 
         let best: RefCell<Option<(HexPoint, usize)>> = Default::default();
@@ -100,26 +92,34 @@ impl PathFinder for Algorithm1 {
                 .flat_map(|sp| {
                     let pos = sp.pos;
                     let rc = Rc::new(sp);
-                    let rc_clone = rc.clone();
 
                     Dir::iter()
-                        .map(move |dir| {
+                        .scan(rc, move |rc, dir| {
                             let (new_pos, teleported) =
                                 pos.explicit_wrapping_translate(dir, 1, gtx.board_dim);
-                            let turned = dir != rc.dir;
-                            (dir, new_pos, turned, teleported)
-                        })
-                        .filter(|(_, new_pos, _, _)| !off_limits.contains(new_pos))
-                        .map_with_state(rc_clone, |rc, (dir, new_pos, turned, teleported)| {
+
+                            if off_limits.contains(&new_pos) {
+                                return None;
+                            }
+
                             let new_sp = SearchPoint {
                                 parent: Some(rc.clone()),
                                 pos: new_pos,
                                 dir,
                                 len: rc.len + 1,
-                                num_turns: rc.num_turns + turned as usize,
-                                num_teleports: rc.num_teleports + teleported as usize,
+                                cost: rc.cost
+                                    + if dir != rc.dir {
+                                        SearchPoint::TURN_COST
+                                    } else {
+                                        0
+                                    }
+                                    + if teleported {
+                                        SearchPoint::TELEPORT_COST
+                                    } else {
+                                        0
+                                    },
                             };
-                            (rc, new_sp)
+                            Some(new_sp)
                         })
                         .filter(|sp| {
                             // keep track of the shortest path to each position
@@ -135,40 +135,33 @@ impl PathFinder for Algorithm1 {
                             //         true
                             //     }
                             // }
-                            match shortest_paths.borrow_mut().entry(sp.pos) {
-                                Occupied(mut occupied) => {
-                                    let other_sp = occupied.get();
-                                    if sp.cost() < other_sp.cost() {
-                                        occupied.insert(sp.clone());
-                                        if targets.iter().contains(&sp.pos) {
-                                            match &mut *best.borrow_mut() {
-                                                Some((_, cost)) if *cost <= sp.cost() => {}
-                                                other => *other = Some((sp.pos, sp.cost())),
-                                            }
-                                        }
-                                        true
+                            let mut shortest_paths = shortest_paths.borrow_mut();
+                            match shortest_paths.get_mut(&sp.pos) {
+                                Some(other_sp) => {
+                                    if sp.cost < other_sp.cost {
+                                        *other_sp = sp.clone();
                                     } else {
-                                        false
+                                        return false;
                                     }
                                 }
-                                Vacant(vacant) => {
-                                    vacant.insert(sp.clone());
-                                    if targets.iter().contains(&sp.pos) {
-                                        match &mut *best.borrow_mut() {
-                                            Some((_, cost)) if *cost <= sp.cost() => {}
-                                            other => *other = Some((sp.pos, sp.cost())),
-                                        }
-                                    }
-                                    true
+                                None => {
+                                    shortest_paths.insert(sp.pos, sp.clone());
+                                }
+                            };
+                            if targets.iter().contains(&sp.pos) {
+                                match &mut *best.borrow_mut() {
+                                    Some((_, cost)) if *cost <= sp.cost => {}
+                                    other => *other = Some((sp.pos, sp.cost)),
                                 }
                             }
+                            true
                         })
                 })
                 .collect();
 
             // check exit condition (when the live path with the lowest cost is successful)
             if let Some((best_pos, best_cost)) = *best.borrow() {
-                let gen_min_cost = generation.iter().map(|sp| sp.cost()).min();
+                let gen_min_cost = generation.iter().map(|sp| sp.cost).min();
                 match gen_min_cost {
                     Some(cost) if cost < best_cost - 1 => {}
                     _ => return Some(shortest_paths.borrow()[&best_pos].get_path()),

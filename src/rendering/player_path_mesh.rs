@@ -4,7 +4,8 @@ use crate::apple::Apple;
 use crate::basic::transformations::{rotate_clockwise, translate};
 use crate::basic::{Dir, Point};
 use crate::error::{ErrorConversion, Result};
-use crate::snake::{PassthroughKnowledge, Snake};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Snake;
 use crate::view::snakes::OtherSnakes;
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
@@ -15,16 +16,16 @@ pub fn player_path_mesh(
     player_snake: &mut Snake,
     other_snakes: OtherSnakes,
     apples: &[Apple],
-    ctx: &mut Context,
+    ctx: &Context,
     gtx: &GameContext,
     stats: &mut Stats,
 ) -> Option<Result<Mesh>> {
     let autopilot = player_snake.autopilot.as_mut()?;
     // TODO: this conversion is too expensive
-    let passthrough_knowledge = PassthroughKnowledge::accurate(&player_snake.eat_mechanics);
+    let knowledge = Knowledge::accurate(&player_snake.eat_mechanics);
     let path = autopilot.get_path(
         &player_snake.body,
-        Some(&passthrough_knowledge),
+        Some(&knowledge),
         &other_snakes,
         apples,
         gtx,

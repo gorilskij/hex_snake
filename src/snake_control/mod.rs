@@ -1,8 +1,10 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12, Side};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::pathfinder::Path;
 use crate::view::snakes::Snakes;
 use ggez::input::keyboard::KeyCode;
@@ -11,9 +13,6 @@ use itertools::{repeat_n, Itertools};
 use programmed::Move;
 
 mod algorithm;
-mod breadth_first;
-mod competitor1;
-mod competitor2;
 mod keyboard;
 mod keyboard_clock;
 mod killer;
@@ -27,17 +26,12 @@ mod rain;
 pub enum Template {
     Keyboard {
         control_setup: ControlSetup,
-        passthrough_knowledge: PassthroughKnowledge,
+        knowledge: Knowledge,
     },
     KeyboardClock,
     Mouse,
     Programmed(Vec<Move>),
-    Competitor1,
-    Competitor2,
     Killer,
-    // AStar {
-    //     passthrough_knowledge: PassthroughKnowledge,
-    // },
     Algorithm(pathfinder::Template),
     Rain,
 }
@@ -49,10 +43,11 @@ pub trait Controller {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        passthrough_knowledge: Option<&PassthroughKnowledge>,
+        knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
+        ftx: &FpsContext,
         ctx: &Context,
     ) -> Option<Dir>;
 
@@ -60,7 +55,7 @@ pub trait Controller {
     fn get_path(
         &mut self,
         _body: &Body,
-        _passthrough_knowledge: Option<&PassthroughKnowledge>,
+        _knowledge: Option<&Knowledge>,
         _other_snakes: &dyn Snakes,
         _apples: &[Apple],
         _gtx: &GameContext,
@@ -73,7 +68,7 @@ pub trait Controller {
     fn key_pressed(&mut self, _key: KeyCode) {}
 
     // TODO: deprecate
-    fn passthrough_knowledge(&self) -> Option<&PassthroughKnowledge> {
+    fn knowledge(&self) -> Option<&Knowledge> {
         None
     }
 }
@@ -168,25 +163,18 @@ impl Template {
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         // use crate::snake_control::a_star::AStar;
-        use crate::snake_control::algorithm::Algorithm;
-        use crate::snake_control::competitor1::Competitor1;
-        use crate::snake_control::competitor2::Competitor2;
-        use crate::snake_control::keyboard::Keyboard;
-        use crate::snake_control::keyboard_clock::KeyboardClock;
-        use crate::snake_control::killer::Killer;
-        use crate::snake_control::mouse::Mouse;
-        use crate::snake_control::programmed::Programmed;
-        use crate::snake_control::rain::Rain;
+        use algorithm::Algorithm;
+        use keyboard::Keyboard;
+        use keyboard_clock::KeyboardClock;
+        use killer::Killer;
+        use mouse::Mouse;
+        use programmed::Programmed;
+        use rain::Rain;
 
         match self {
-            Template::Keyboard {
-                control_setup,
-                passthrough_knowledge,
-            } => Box::new(Keyboard::new(
-                control_setup,
-                start_dir,
-                passthrough_knowledge,
-            )),
+            Template::Keyboard { control_setup, knowledge } => {
+                Box::new(Keyboard::new(control_setup, start_dir, knowledge))
+            }
             Template::KeyboardClock => Box::new(KeyboardClock {
                 dir: Dir12::Single(start_dir),
                 alternation: false,
@@ -198,12 +186,6 @@ impl Template {
                 dir: start_dir,
                 next_move_idx: 0,
                 wait: 0,
-            }),
-            Template::Competitor1 => Box::new(Competitor1),
-            Template::Competitor2 => Box::new(Competitor2 {
-                dir_state: false,
-                target_apple: None,
-                frames_since_update: 0,
             }),
             Template::Killer => Box::new(Killer),
             // Template::AStar { passthrough_knowledge } => Box::new(AStar {

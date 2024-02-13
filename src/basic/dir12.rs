@@ -36,24 +36,24 @@ impl Dir12 {
     ];
 
     // clockwise from U
-    // pub fn iter() -> impl Iterator<Item = Self> {
-    //     [
-    //         Single(U),
-    //         Combined(U, Ur),
-    //         Single(Ur),
-    //         Combined(Ur, Dr),
-    //         Single(Dr),
-    //         Combined(Dr, D),
-    //         Single(D),
-    //         Combined(D, Dl),
-    //         Single(Dl),
-    //         Combined(Dl, Ul),
-    //         Single(Ul),
-    //         Combined(Ul, U),
-    //     ]
-    //     .iter()
-    //     .copied()
-    // }
+    #[allow(dead_code)]
+    pub fn iter() -> impl Iterator<Item = Self> {
+        [
+            Single(U),
+            Combined(U, Ur),
+            Single(Ur),
+            Combined(Ur, Dr),
+            Single(Dr),
+            Combined(Dr, D),
+            Single(D),
+            Combined(D, Dl),
+            Single(Dl),
+            Combined(Dl, Ul),
+            Single(Ul),
+            Combined(Ul, U),
+        ]
+        .into_iter()
+    }
 
     // flip_flop_state is meant to change on every frame
     pub fn to_dir(self, flip_flop_state: bool) -> Dir {

@@ -1,11 +1,26 @@
 use std::cmp::Ordering;
 
 // the partial functions return None in case of a failed comparison
+
+// TODO: return on first None
 pub trait PartialMinMax
 where
     Self: Iterator + Sized,
 {
-    // this could be more efficient if it stopped on the first None value but it's meant to be used where all items are comparable
+    fn partial_max(mut self) -> Option<Self::Item>
+    where
+        Self::Item: PartialOrd,
+    {
+        let first = self.next();
+        self.fold(first, |ox, y| {
+            let x = ox?;
+            match x.partial_cmp(&y)? {
+                Ordering::Greater | Ordering::Equal => Some(x),
+                Ordering::Less => Some(y),
+            }
+        })
+    }
+
     fn partial_min_by_key<B, F>(self, mut f: F) -> Option<Self::Item>
     where
         F: FnMut(&Self::Item) -> B,

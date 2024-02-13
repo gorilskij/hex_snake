@@ -10,7 +10,7 @@ use crate::error::{Error, ErrorConversion, Result};
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh
 //  when border is drawn separately
-pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
+pub fn grid_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
@@ -90,7 +90,7 @@ pub fn grid_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
         .with_trace_step("grid_mesh")
 }
 
-pub fn grid_dot_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
+pub fn grid_dot_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
@@ -134,7 +134,7 @@ pub fn grid_dot_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
         .with_trace_step("grid_mesh")
 }
 
-pub fn border_mesh(gtx: &GameContext, ctx: &mut Context) -> Result<Mesh> {
+pub fn border_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let CellDim { side, sin, cos } = gtx.cell_dim;
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 

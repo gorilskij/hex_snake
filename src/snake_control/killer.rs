@@ -1,7 +1,9 @@
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{angle_distance, CellDim, Dir, HexDim, HexPoint};
-use crate::snake::{self, Body, PassthroughKnowledge, Segment};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::{self, Body, Segment};
 use crate::snake_control::Controller;
 use crate::support::partial_min_max::PartialMinMax;
 use crate::view::snakes::Snakes;
@@ -79,10 +81,11 @@ impl Controller for Killer {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        _: Option<&PassthroughKnowledge>,
+        _: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         _apples: &[Apple],
         gtx: &GameContext,
+        _ftx: &FpsContext,
         _ctx: &Context,
     ) -> Option<Dir> {
         let player_snake = other_snakes

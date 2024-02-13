@@ -1,4 +1,5 @@
 use ggez::graphics;
+use rand::Rng;
 use std::ops::{Add, Deref, DerefMut, Div, Mul, Sub};
 
 pub mod oklab;
@@ -34,6 +35,11 @@ impl Color {
     pub const WHITE: Self = Self(graphics::Color::WHITE);
     pub const BLACK: Self = Self(graphics::Color::BLACK);
     pub const RED: Self = Self(graphics::Color::RED);
+    pub const GREEN: Self = Self(graphics::Color::GREEN);
+    pub const BLUE: Self = Self(graphics::Color::BLUE);
+    pub const CYAN: Self = Self(graphics::Color::CYAN);
+    pub const MAGENTA: Self = Self(graphics::Color::MAGENTA);
+    pub const YELLOW: Self = Self(graphics::Color::YELLOW);
 
     #[inline(always)]
     fn assert_in_range(&self) {
@@ -48,6 +54,24 @@ impl Color {
     // pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
     //     Self(graphics::Color::new(r, g, b, a))
     // }
+
+    pub const fn gray(brightness: f32) -> Self {
+        Self(graphics::Color {
+            r: brightness,
+            g: brightness,
+            b: brightness,
+            a: 1.,
+        })
+    }
+
+    pub fn random(min_brightness: f32, rng: &mut impl Rng) -> Self {
+        Self(graphics::Color {
+            r: rng.gen_range(min_brightness..=1.),
+            g: rng.gen_range(min_brightness..=1.),
+            b: rng.gen_range(min_brightness..=1.),
+            a: 1.,
+        })
+    }
 
     #[inline(always)]
     pub const fn from_rgb(r: u8, g: u8, b: u8) -> Self {

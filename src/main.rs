@@ -4,10 +4,10 @@
 // #![feature(never_type)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
-// #![feature(trace_macros)]
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(associated_type_defaults)]
 #![feature(type_alias_impl_trait)]
+#![feature(trace_macros)]
 // #![feature(return_position_impl_trait_in_trait)]
 
 #[macro_use]
@@ -39,20 +39,17 @@ mod error;
 mod rendering;
 pub mod snake_control;
 
+// TODO: upgrading to ggez 0.8 made the colors duller, fix that
+
 // TODO
 //  - untie frame_fraction from graphics
 //  - factor out lazy redrawing code (the whole mess with Some(grid_mesh)...)
-//  - if a frame is nearing its end, delay turning until the next frame to avoid choppy animation
-//  - make border toggleable
 //  - smooth animation when cutting
 //  - diagnose high cpu use when paused
 
 // TODO
 //  make rain snakes ignore food
-//  split EatBehavior::Ignore into "pass in front" and "pass behind"
-//   use "pass behind for rain"
 //  make head-to-head collision with rain also ignore
-//  allow snake to pass (tunnel) under is eaten segments
 
 fn main() {
     let width = 2000.;
