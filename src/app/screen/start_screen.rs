@@ -269,8 +269,7 @@ impl RngCore for NoRng {
 pub struct StartScreen {
     fps_control: Rc<RefCell<FpsControl>>,
 
-    one_player_button: Button,
-    two_player_button: Button,
+    multiplayer_button: Button,
 
     // TODO: implement palette choice
     // palettes: Vec<app::Palette>,
@@ -306,36 +305,34 @@ impl StartScreen {
         Self {
             fps_control: fps_control.clone(),
 
-            one_player_button: Button {
-                pos: Point { x: 400., y: 50. },
-                button_type: ButtonType::Click(
-                    player_button_prototype
-                        .clone()
-                        .text(
-                            "One player",
-                            50.,
-                            TextLayout::center(),
-                            button_text_pos,
-                            color,
-                        )
-                        .build()
-                        .unwrap(),
-                ),
-            },
-            two_player_button: Button {
-                pos: Point { x: 1200., y: 50. },
-                button_type: ButtonType::Click(
-                    player_button_prototype
-                        .text(
-                            "Two players",
-                            50.,
-                            TextLayout::center(),
-                            button_text_pos,
-                            color,
-                        )
-                        .build()
-                        .unwrap(),
-                ),
+            multiplayer_button: Button {
+                pos: Point { x: 800., y: 50. },
+                button_type: ButtonType::Rotate {
+                    options: vec![
+                        player_button_prototype
+                            .clone()
+                            .text(
+                                "One player",
+                                50.,
+                                TextLayout::center(),
+                                button_text_pos,
+                                color,
+                            )
+                            .build()
+                            .unwrap(),
+                        player_button_prototype
+                            .text(
+                                "Two players",
+                                50.,
+                                TextLayout::center(),
+                                button_text_pos,
+                                color,
+                            )
+                            .build()
+                            .unwrap(),
+                    ],
+                    index: 0,
+                },
             },
 
             palette: app_palette.clone(),
@@ -376,10 +373,8 @@ impl EventHandler<Error> for StartScreen {
         self.player1_demo.draw(&mut canvas, ctx, &mut self.stats)?;
         self.player2_demo.draw(&mut canvas, ctx, &mut self.stats)?;
 
-        // let (button_mesh, _clicked_single, _clicked_double, message_single, message_double) =
-        //     rendering::player_number_buttons_mesh(self.cell_dim, ctx)?;
-        let one_player_clicked = self.one_player_button.draw(&mut canvas, ctx)?;
-        let two_player_clicked = self.two_player_button.draw(&mut canvas, ctx)?;
+        let _ = self.multiplayer_button.draw(&mut canvas, ctx)?;
+        // let two_player_clicked = self.two_player_button.draw(&mut canvas, ctx)?;
 
         canvas
             .finish(ctx)

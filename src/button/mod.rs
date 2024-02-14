@@ -66,7 +66,6 @@ struct ButtonShape {
 }
 
 impl ButtonShape {
-    // `absolute_pos` is only supplied if it was changed
     fn build(
         &mut self,
         builder: &mut MeshBuilder,
@@ -217,7 +216,6 @@ impl ButtonDataBuilder {
         text
             // .set_font("arial")
             .set_scale(PxScale::from(font_size))
-            // .set_bounds([width / 2. - self.h_margin, height / 2. - self.v_margin])
             .set_layout(layout);
 
         self.text = Some(ButtonText { text, relative_pos, color });
@@ -241,8 +239,10 @@ impl ButtonDataBuilder {
 #[derive(Debug, Clone)]
 pub enum ButtonType {
     Click(ButtonData),
-    Toggle(!),
-    Rotate(!),
+    Rotate {
+        options: Vec<ButtonData>,
+        index: usize,
+    },
 }
 
 pub struct Button {
@@ -253,8 +253,10 @@ pub struct Button {
 impl Button {
     // not translated
     fn outer_shape(&self) -> &ShapePointsSlice {
+        use ButtonType::*;
         match &self.button_type {
-            ButtonType::Click(data) => &data.outer_shape.base_points,
+            Click(data) => &data.outer_shape.base_points,
+            Rotate { options, index } => &options[*index].outer_shape.base_points,
         }
     }
 
@@ -281,16 +283,25 @@ impl Button {
     }
 
     pub fn draw(&mut self, canvas: &mut Canvas, ctx: &Context) -> Result<bool> {
-        let state = self.state(ctx);
+        use ButtonType::*;
 
+        let state = self.state(ctx);
         let res: Result = try {
             match &mut self.button_type {
                 // TODO: actually signal if position was changed
-                ButtonType::Click(data) => {
-                    data.draw(canvas, ctx, Delta::Changed(self.pos), state)?
+                Click(data) => data.draw(canvas, ctx, Changed(self.pos), state)?,
+                Rotate { options, index } => {
+                    options[*index].draw(canvas, ctx, Changed(self.pos), state)?
                 }
             }
         };
+
+        if state == State::JustClicked {
+            match &mut self.button_type {
+                Rotate { options, index } => *index = (*index + 1) % options.len(),
+                _ => {}
+            }
+        }
 
         res.map(|()| state == State::JustClicked)
             .with_trace_step("Button::draw")
