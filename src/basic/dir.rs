@@ -1,13 +1,13 @@
+use std::cmp::Ordering;
+use std::f32::consts::TAU;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
 use itertools::Itertools;
-
-use crate::basic::angle_distance;
 use rand::distributions::uniform::SampleRange;
 use rand::Rng;
-use std::cmp::Ordering;
-use std::f32::consts::TAU;
 use Dir::*;
+
+use crate::basic::angle_distance;
 
 // defined in clockwise order starting at U
 #[repr(u8)]
@@ -210,12 +210,6 @@ fn test_clockwise_distance_to() {
         (Ul, Dr, 3),
         (Dl, U, 2),
     ] {
-        assert_eq!(
-            from.clockwise_distance_to(to),
-            clockwise_dist,
-            "{:?} => {:?}",
-            from,
-            to
-        )
+        assert_eq!(from.clockwise_distance_to(to), clockwise_dist, "{:?} => {:?}", from, to)
     }
 }

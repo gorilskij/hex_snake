@@ -1,9 +1,10 @@
+use std::f32::consts::TAU;
+
 pub use cell_dim::CellDim;
 pub use dir::Dir;
 pub use dir12::Dir12;
 pub use hex_point::{HexDim, HexPoint};
 pub use point::Point;
-use std::f32::consts::TAU;
 
 pub mod board;
 mod cell_dim;

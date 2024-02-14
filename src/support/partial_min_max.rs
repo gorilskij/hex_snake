@@ -1,6 +1,7 @@
+use std::cmp::Ordering;
+
 use itertools::MinMaxResult;
 use itertools::MinMaxResult::MinMax;
-use std::cmp::Ordering;
 
 // the partial functions return None in case of a failed comparison
 

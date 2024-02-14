@@ -1,3 +1,7 @@
+use std::f32::consts::TAU;
+
+use ggez::Context;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
@@ -7,8 +11,6 @@ use crate::snake::{self, Body, Segment};
 use crate::snake_control::Controller;
 use crate::support::partial_min_max::PartialMinMax;
 use crate::view::snakes::Snakes;
-use ggez::Context;
-use std::f32::consts::TAU;
 
 // tries to kill player
 pub struct Killer;
@@ -40,16 +42,7 @@ fn rough_direction(
         .iter()
         .copied()
         .filter(|(d, _)| *d != -body.dir)
-        .filter(|(d, _)| {
-            distance_to_snake(
-                head_pos,
-                *d,
-                body,
-                &other_snakes as &dyn Snakes,
-                board_dim,
-                Some(2),
-            ) > 1
-        })
+        .filter(|(d, _)| distance_to_snake(head_pos, *d, body, &other_snakes as &dyn Snakes, board_dim, Some(2)) > 1)
         .partial_min_by_key(|(_, a)| angle_distance(angle, *a))
         // .take()
         .map(|(d, _)| d)
@@ -99,12 +92,6 @@ impl Controller for Killer {
         for _ in 0..1 {
             target = target.wrapping_translate(player_snake.body.dir, 1, gtx.board_dim);
         }
-        rough_direction(
-            body.segments[0].pos,
-            target,
-            body,
-            other_snakes,
-            gtx.board_dim,
-        )
+        rough_direction(body.segments[0].pos, target, body, other_snakes, gtx.board_dim)
     }
 }

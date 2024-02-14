@@ -1,3 +1,8 @@
+use std::collections::VecDeque;
+
+use ggez::input::keyboard::KeyCode;
+use ggez::Context;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::Controls;
@@ -8,9 +13,6 @@ use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 use crate::ControlSetup;
-use ggez::input::keyboard::KeyCode;
-use ggez::Context;
-use std::collections::VecDeque;
 
 pub struct Keyboard {
     controls: Controls,

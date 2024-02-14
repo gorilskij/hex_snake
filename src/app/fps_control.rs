@@ -1,7 +1,8 @@
-use crate::basic::FrameStamp;
 use std::cmp::max;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
+
+use crate::basic::FrameStamp;
 
 /// Stores an instant along with the number of frames it represents
 struct NFrameInstant(usize, Instant);
@@ -51,10 +52,8 @@ impl FpsCounter {
             if self.buffer.len() >= Self::LEN {
                 self.buffer.pop_front();
             }
-            self.buffer.push_back(NFrameInstant(
-                self.step - self.n + num_frames - 1,
-                Instant::now(),
-            ));
+            self.buffer
+                .push_back(NFrameInstant(self.step - self.n + num_frames - 1, Instant::now()));
             self.n = self.step - 1;
         } else {
             self.n -= num_frames;
@@ -222,9 +221,8 @@ impl FpsControl {
             None => {
                 // calculate how many game frames should have occurred
                 // since the last call to can_update
-                let game_frames = self.last_update.elapsed().as_secs_f64()
-                    / self.game_frame_duration.as_secs_f64()
-                    + self.remainder;
+                let game_frames =
+                    self.last_update.elapsed().as_secs_f64() / self.game_frame_duration.as_secs_f64() + self.remainder;
                 let missed_updates = game_frames as usize;
 
                 if missed_updates > 0 {
@@ -286,8 +284,7 @@ impl FpsControl {
         match self.frozen_frame_fraction {
             Some(frac) => frac,
             None => {
-                let frac = self.last_update.elapsed().as_secs_f32()
-                    / self.game_frame_duration.as_secs_f32()
+                let frac = self.last_update.elapsed().as_secs_f32() / self.game_frame_duration.as_secs_f32()
                     + self.remainder as f32;
                 if frac > 1. {
                     eprintln!("warning: frame fraction > 1 ({frac})");

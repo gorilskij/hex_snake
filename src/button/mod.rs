@@ -1,14 +1,16 @@
+use std::error;
+use std::fmt::{Debug, Display, Formatter};
+
+use ggez::event::MouseButton;
+use ggez::graphics::{Canvas, DrawMode, DrawParam, Mesh, MeshBuilder, PxScale, Text, TextLayout};
+use ggez::Context;
+
 use crate::basic::Point;
 use crate::button::Delta::{Changed, Unchanged};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::shape::collisions::shape_point;
 use crate::rendering::shape::{ShapePoints, ShapePointsSlice};
-use ggez::event::MouseButton;
-use ggez::graphics::{Canvas, DrawMode, DrawParam, Mesh, MeshBuilder, PxScale, Text, TextLayout};
-use ggez::Context;
-use std::error;
-use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum State {
@@ -66,12 +68,7 @@ struct ButtonShape {
 }
 
 impl ButtonShape {
-    fn build(
-        &mut self,
-        builder: &mut MeshBuilder,
-        absolute_pos: Delta<Point>,
-        state: State,
-    ) -> Result {
+    fn build(&mut self, builder: &mut MeshBuilder, absolute_pos: Delta<Point>, state: State) -> Result {
         use Delta::*;
 
         let points = match absolute_pos {
@@ -114,13 +111,7 @@ impl<T> Delta<T> {
 }
 
 impl ButtonData {
-    fn draw(
-        &mut self,
-        canvas: &mut Canvas,
-        ctx: &Context,
-        absolute_pos: Delta<Point>,
-        state: State,
-    ) -> Result {
+    fn draw(&mut self, canvas: &mut Canvas, ctx: &Context, absolute_pos: Delta<Point>, state: State) -> Result {
         let res: Result = try {
             if let Some(text) = &self.text {
                 ButtonText {
@@ -171,12 +162,7 @@ impl ButtonDataBuilder {
         }
     }
 
-    pub fn outer_shape(
-        mut self,
-        points: ShapePoints,
-        stroke_thickness: f32,
-        color: TriColor,
-    ) -> Self {
+    pub fn outer_shape(mut self, points: ShapePoints, stroke_thickness: f32, color: TriColor) -> Self {
         self.outer_shape = Some(ButtonShape {
             base_points: points,
             relative_pos: Point::zero(),
@@ -224,8 +210,7 @@ impl ButtonDataBuilder {
 
     pub fn build(self) -> Result<ButtonData> {
         let Some(outer_shape) = self.outer_shape else {
-            let res: Result<_> =
-                Err(ButtonDataBuilderError(Box::new(self), "Outer shape missing").into());
+            let res: Result<_> = Err(ButtonDataBuilderError(Box::new(self), "Outer shape missing").into());
             return res.with_trace_step("ButtonDataBuilder::build");
         };
         Ok(ButtonData {
@@ -239,10 +224,7 @@ impl ButtonDataBuilder {
 #[derive(Debug, Clone)]
 pub enum ButtonType {
     Click(ButtonData),
-    Rotate {
-        options: Vec<ButtonData>,
-        index: usize,
-    },
+    Rotate { options: Vec<ButtonData>, index: usize },
 }
 
 pub struct Button {
@@ -290,9 +272,7 @@ impl Button {
             match &mut self.button_type {
                 // TODO: actually signal if position was changed
                 Click(data) => data.draw(canvas, ctx, Changed(self.pos), state)?,
-                Rotate { options, index } => {
-                    options[*index].draw(canvas, ctx, Changed(self.pos), state)?
-                }
+                Rotate { options, index } => options[*index].draw(canvas, ctx, Changed(self.pos), state)?,
             }
         };
 

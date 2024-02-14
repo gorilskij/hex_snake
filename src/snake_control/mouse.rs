@@ -1,3 +1,7 @@
+use std::f32::consts::TAU;
+
+use ggez::Context;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
@@ -6,8 +10,6 @@ use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
-use ggez::Context;
-use std::f32::consts::TAU;
 
 pub struct Mouse;
 
@@ -32,9 +34,7 @@ impl Controller for Mouse {
         let dx = (target.h - current.h) as f32;
         let dy = -(target.v - current.v) as f32 / (2. * sin);
         let angle = (dy.atan2(dx) + TAU) % TAU;
-        Dir::closest_to_angle(angle)
-            .into_iter()
-            .find(|dir| *dir != -body.dir)
+        Dir::closest_to_angle(angle).into_iter().find(|dir| *dir != -body.dir)
     }
 
     // fn get_mesh(&self, gtx: &GameContext, ctx: &mut Context) -> Option<AppResult<Mesh>> {

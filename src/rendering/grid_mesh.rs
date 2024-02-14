@@ -1,10 +1,9 @@
-use crate::basic::{CellDim, Point};
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
 use num_integer::Integer;
 
 use crate::app::game_context::GameContext;
-use crate::basic::HexDim;
+use crate::basic::{CellDim, HexDim, Point};
 use crate::error::{Error, ErrorConversion, Result};
 
 // TODO: make this readable
@@ -99,11 +98,7 @@ pub fn grid_dot_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let color = gtx.palette.grid_dot_color;
 
     let mut builder = MeshBuilder::new();
-    let mut circle = |point| {
-        builder
-            .circle(draw_mode, point, radius, 0.1, color)
-            .map(|_| {})
-    };
+    let mut circle = |point| builder.circle(draw_mode, point, radius, 0.1, color).map(|_| {});
 
     let res: Result<_> = try {
         for h in 0..(board_h + 1) / 2 {

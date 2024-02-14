@@ -1,7 +1,8 @@
+use std::iter;
+
 use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription};
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use crate::rendering::shape::{Hexagon, Shape};
-use std::iter;
 
 pub struct HexagonSegments;
 

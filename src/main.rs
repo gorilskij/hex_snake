@@ -17,6 +17,7 @@ extern crate derive_more;
 extern crate lazy_static;
 extern crate core;
 
+use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 use ggez::event::run;
 use ggez::ContextBuilder;
 
@@ -24,7 +25,6 @@ use crate::app::keyboard_control::ControlSetup;
 use crate::app::App;
 use crate::basic::Side;
 use crate::keyboard_layout::Layout;
-use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 
 #[macro_use]
 mod support;

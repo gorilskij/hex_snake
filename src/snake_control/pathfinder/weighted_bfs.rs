@@ -1,3 +1,9 @@
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::rc::Rc;
+
+use itertools::Itertools;
+
 use super::{Path, PathFinder};
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexPoint};
@@ -5,10 +11,6 @@ use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::view::snakes::Snakes;
 use crate::view::targets::Targets;
-use itertools::Itertools;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::Rc;
 
 #[derive(Clone)]
 struct SearchPoint {
@@ -95,8 +97,7 @@ impl PathFinder for WeightedBFS {
 
                     Dir::iter()
                         .scan(rc, move |rc, dir| {
-                            let (new_pos, teleported) =
-                                pos.explicit_wrapping_translate(dir, 1, gtx.board_dim);
+                            let (new_pos, teleported) = pos.explicit_wrapping_translate(dir, 1, gtx.board_dim);
 
                             if off_limits.contains(&new_pos) {
                                 return None;
@@ -108,16 +109,8 @@ impl PathFinder for WeightedBFS {
                                 dir,
                                 len: rc.len + 1,
                                 cost: rc.cost
-                                    + if dir != rc.dir {
-                                        SearchPoint::TURN_COST
-                                    } else {
-                                        0
-                                    }
-                                    + if teleported {
-                                        SearchPoint::TELEPORT_COST
-                                    } else {
-                                        0
-                                    },
+                                    + if dir != rc.dir { SearchPoint::TURN_COST } else { 0 }
+                                    + if teleported { SearchPoint::TELEPORT_COST } else { 0 },
                             };
                             Some(new_sp)
                         })

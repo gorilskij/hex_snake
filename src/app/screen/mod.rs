@@ -1,17 +1,17 @@
+use std::ops::{Deref, DerefMut};
+
 pub use debug_scenario::DebugScenario;
 pub use game::Game;
+use ggez::event::EventHandler;
+use rand::rngs::ThreadRng;
 pub use start_screen::StartScreen;
 
-pub use crate::app::prefs::Prefs;
-
 use crate::app::game_context::GameContext;
+pub use crate::app::prefs::Prefs;
 use crate::apple::Apple;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
-use ggez::event::EventHandler;
-use rand::rngs::ThreadRng;
-use std::ops::{Deref, DerefMut};
 
 mod board_dim;
 mod debug_scenario;

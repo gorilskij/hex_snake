@@ -1,3 +1,9 @@
+use std::f32::consts::PI;
+use std::iter;
+
+use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use ggez::Context;
+
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
@@ -7,10 +13,6 @@ use crate::rendering::shape::ShapePoints;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
 use crate::view::snakes::OtherSnakes;
-use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
-use ggez::Context;
-use std::f32::consts::PI;
-use std::iter;
 
 pub fn player_path_mesh(
     player_snake: &mut Snake,
@@ -23,13 +25,7 @@ pub fn player_path_mesh(
     let autopilot = player_snake.autopilot.as_mut()?;
     // TODO: this conversion is too expensive
     let knowledge = Knowledge::accurate(&player_snake.eat_mechanics);
-    let path = autopilot.get_path(
-        &player_snake.body,
-        Some(&knowledge),
-        &other_snakes,
-        apples,
-        gtx,
-    )?;
+    let path = autopilot.get_path(&player_snake.body, Some(&knowledge), &other_snakes, apples, gtx)?;
 
     let mut builder = MeshBuilder::new();
 
@@ -43,11 +39,7 @@ pub fn player_path_mesh(
             // the snake should be going to teleport correctly
             let arrow = next_pos.and_then(|next_pos| {
                 pos.single_step_dir_to(*next_pos, gtx.board_dim)
-                    .and_then(|dir| {
-                        pos.explicit_wrapping_translate(dir, 1, gtx.board_dim)
-                            .1
-                            .then_some(dir)
-                    })
+                    .and_then(|dir| pos.explicit_wrapping_translate(dir, 1, gtx.board_dim).1.then_some(dir))
             });
 
             let radius = gtx.cell_dim.side / 2.5;

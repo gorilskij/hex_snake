@@ -5,6 +5,10 @@ use ggez::graphics::{Canvas, Rect};
 use ggez::input::keyboard::KeyInput;
 use ggez::Context;
 use itertools::Itertools;
+use keyboard_control::ControlSetup;
+pub use palette::Palette;
+use screen::{Game, Screen};
+use snake::builder::Builder as SnakeBuilder;
 
 use crate::app::screen::{DebugScenario, StartScreen};
 use crate::apple::spawn::SpawnPolicy;
@@ -14,10 +18,6 @@ use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
 use crate::snake::SegmentType;
 use crate::snake_control::pathfinder;
 use crate::{by_segment_type, by_snake_type, snake, snake_control};
-use keyboard_control::ControlSetup;
-pub use palette::Palette;
-use screen::{Game, Screen};
-use snake::builder::Builder as SnakeBuilder;
 
 mod distance_grid;
 pub(crate) mod fps_control;
@@ -191,14 +191,7 @@ impl EventHandler<Error> for App {
         self.screen.draw(ctx).with_trace_step("App::draw")
     }
 
-    fn mouse_motion_event(
-        &mut self,
-        ctx: &mut Context,
-        x: f32,
-        y: f32,
-        dx: f32,
-        dy: f32,
-    ) -> Result {
+    fn mouse_motion_event(&mut self, ctx: &mut Context, x: f32, y: f32, dx: f32, dy: f32) -> Result {
         self.screen.mouse_motion_event(ctx, x, y, dx, dy)
     }
 
@@ -211,12 +204,7 @@ impl EventHandler<Error> for App {
     }
 
     fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) -> Result {
-        Canvas::from_frame(ctx, None).set_screen_coordinates(Rect {
-            x: 0.0,
-            y: 0.0,
-            w: width,
-            h: height,
-        });
+        Canvas::from_frame(ctx, None).set_screen_coordinates(Rect { x: 0.0, y: 0.0, w: width, h: height });
 
         self.screen.resize_event(ctx, width, height)
     }

@@ -1,3 +1,5 @@
+use ggez::Context;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
@@ -7,7 +9,6 @@ use crate::snake::Body;
 use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
-use ggez::Context;
 
 // TODO: rename to something more descriptive like apple seeker
 pub struct Algorithm {
@@ -30,10 +31,7 @@ impl Algorithm {
         match self.current_target {
             Some((i, target)) if apples.get(i).map(|a| a.pos == target).unwrap_or(false) => {}
             Some((ref mut i, target))
-                if let Some((new_i, _)) = apples
-                    .iter()
-                    .enumerate()
-                    .find(|(_, apple)| apple.pos == target) =>
+                if let Some((new_i, _)) = apples.iter().enumerate().find(|(_, apple)| apple.pos == target) =>
             {
                 *i = new_i;
             }
@@ -60,9 +58,7 @@ impl Algorithm {
         // TODO: don't recalculate until called upon (lazy ai)
         // recalculate
         println!("recalculating");
-        self.path = self
-            .pathfinder
-            .get_path(&apples, body, knowledge, other_snakes, gtx);
+        self.path = self.pathfinder.get_path(&apples, body, knowledge, other_snakes, gtx);
 
         // assign wrong index 0, the true index will be found in the next iteration
         // (it's only cache anyway)

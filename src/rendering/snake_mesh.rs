@@ -1,16 +1,15 @@
-use crate::app::fps_control::FpsContext;
+use std::cmp::Ordering;
+
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
-use std::cmp::Ordering;
 
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::error::{Error, ErrorConversion, Result};
-use crate::rendering::segments::descriptions::{
-    SegmentDescription, SegmentFraction, TurnDescription,
-};
+use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
 use crate::snake::palette::SegmentStyle;
 use crate::snake::{Body, Segment, SegmentType, Snake};
 use crate::support::partial_min_max::partial_min;
@@ -55,8 +54,7 @@ fn segment_description(
         // tail
         i if i == body.visible_len() - 1 && body.grow == 0 => {
             if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
-                let frac = ((original_food - food_left) as f32 + frame_fraction)
-                    / (original_food + 1) as f32;
+                let frac = ((original_food - food_left) as f32 + frame_fraction) / (original_food + 1) as f32;
                 SegmentFraction::disappearing(frac)
             } else {
                 SegmentFraction::disappearing(frame_fraction)
@@ -138,8 +136,7 @@ pub fn snake_mesh(
     let color_resolutions: Vec<_> = snakes
         .iter()
         .map(|snake| {
-            let resolution = (TOTAL_SUBSEGMENTS / snake.body.visible_len())
-                .clamp(MIN_SUBSEGMENTS, MAX_SUBSEGMENTS);
+            let resolution = (TOTAL_SUBSEGMENTS / snake.body.visible_len()).clamp(MIN_SUBSEGMENTS, MAX_SUBSEGMENTS);
 
             if resolution > stats.max_color_resolution {
                 stats.max_color_resolution = resolution;
@@ -180,15 +177,8 @@ pub fn snake_mesh(
                 .enumerate()
                 .zip(snake.palette.segment_styles(body, frame_fraction))
                 .map(move |((segment_idx, segment), style)| {
-                    let desc = segment_description(
-                        segment,
-                        segment_idx,
-                        body,
-                        prev_fraction,
-                        frame_fraction,
-                        style,
-                        gtx,
-                    );
+                    let desc =
+                        segment_description(segment, segment_idx, body, prev_fraction, frame_fraction, style, gtx);
 
                     prev_fraction = Some(desc.fraction);
 
@@ -201,20 +191,18 @@ pub fn snake_mesh(
         })
         .collect();
 
-    descs.par_sort_unstable_by(
-        |(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
-            Ordering::Equal => {
-                if let SegmentType::BlackHole { .. } = desc1.segment_type {
-                    Ordering::Greater
-                } else if let SegmentType::BlackHole { .. } = desc2.segment_type {
-                    Ordering::Less
-                } else {
-                    Ordering::Equal
-                }
+    descs.par_sort_unstable_by(|(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
+        Ordering::Equal => {
+            if let SegmentType::BlackHole { .. } = desc1.segment_type {
+                Ordering::Greater
+            } else if let SegmentType::BlackHole { .. } = desc2.segment_type {
+                Ordering::Less
+            } else {
+                Ordering::Equal
             }
-            ordering => ordering,
-        },
-    );
+        }
+        ordering => ordering,
+    });
 
     // for desc in heads.into_inner().unwrap() {
     //     let mut dest = desc.destination + gtx.cell_dim.center();
@@ -255,23 +243,14 @@ pub fn snake_mesh(
                 let SegmentFraction { start, end } = desc.fraction;
                 let real_cell_dim = if (start - end).abs() < f32::EPSILON {
                     // snake has died, animate black hole out
-                    assert!(
-                        frame_fraction >= 0.5,
-                        "frame fraction ({frame_fraction}) < 0.5",
-                    );
+                    assert!(frame_fraction >= 0.5, "frame fraction ({frame_fraction}) < 0.5",);
                     let animation_fraction = frame_fraction - 0.5;
                     gtx.cell_dim * (1. - animation_fraction)
                 } else {
                     gtx.cell_dim
                 };
                 stats.polygons += 1;
-                builder.circle(
-                    DrawMode::fill(),
-                    destination,
-                    real_cell_dim.side,
-                    0.1,
-                    black_hole_color,
-                )?;
+                builder.circle(DrawMode::fill(), destination, real_cell_dim.side, 0.1, black_hole_color)?;
             }
 
             stats.polygons += desc.build(&mut builder, resolution)?;

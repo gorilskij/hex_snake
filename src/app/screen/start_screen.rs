@@ -1,3 +1,15 @@
+use std::cell::RefCell;
+use std::default::Default;
+use std::f32::consts::TAU;
+use std::rc::Rc;
+use std::result;
+
+use ggez::event::EventHandler;
+use ggez::graphics::{Canvas, DrawParam, TextLayout};
+use ggez::input::keyboard::{KeyCode, KeyInput};
+use ggez::Context;
+use rand::prelude::*;
+
 use crate::app::fps_control::FpsControl;
 use crate::app::game_context::GameContext;
 use crate::app::prefs::Prefs;
@@ -17,16 +29,6 @@ use crate::snake::SegmentType;
 use crate::snake_control::Template;
 use crate::view::snakes::OtherSnakes;
 use crate::{apple, by_segment_type, by_snake_type, rendering, snake};
-use ggez::event::EventHandler;
-use ggez::graphics::{Canvas, DrawParam, TextLayout};
-use ggez::input::keyboard::{KeyCode, KeyInput};
-use ggez::Context;
-use rand::prelude::*;
-use std::cell::RefCell;
-use std::default::Default;
-use std::f32::consts::TAU;
-use std::rc::Rc;
-use std::result;
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
@@ -43,12 +45,7 @@ struct SnakeDemo {
 }
 
 impl SnakeDemo {
-    fn new(
-        cell_dim: CellDim,
-        pos: Point,
-        app_palette: app::Palette,
-        control: Rc<RefCell<FpsControl>>,
-    ) -> Self {
+    fn new(cell_dim: CellDim, pos: Point, app_palette: app::Palette, control: Rc<RefCell<FpsControl>>) -> Self {
         let board_dim = HexPoint { h: 11, v: 8 };
         let start_pos = HexPoint { h: 4, v: 4 };
         let start_dir = Dir::U;
@@ -149,13 +146,7 @@ impl SnakeDemo {
             env: Environment {
                 snakes: vec![seed.build().unwrap()],
                 apples: vec![],
-                gtx: GameContext::new(
-                    board_dim,
-                    cell_dim,
-                    app_palette,
-                    Prefs::default(),
-                    apple_spawn_policy,
-                ),
+                gtx: GameContext::new(board_dim, cell_dim, app_palette, Prefs::default(), apple_spawn_policy),
                 rng: NoRng,
             },
 
@@ -172,8 +163,7 @@ impl SnakeDemo {
 
 impl SnakeDemo {
     fn prev_palette(&mut self) {
-        self.current_palette =
-            (self.current_palette + self.palettes.len() - 1) % self.palettes.len();
+        self.current_palette = (self.current_palette + self.palettes.len() - 1) % self.palettes.len();
         self.env.snakes[0].palette = self.palettes[self.current_palette].into();
     }
 
@@ -221,13 +211,11 @@ impl SnakeDemo {
         let fps_control = self.fps_control.borrow();
         let ftx = fps_control.context();
 
-        let snake_mesh =
-            rendering::snake_mesh(&mut self.env.snakes, &self.env.gtx, ftx, ctx, stats)?;
+        let snake_mesh = rendering::snake_mesh(&mut self.env.snakes, &self.env.gtx, ftx, ctx, stats)?;
         canvas.draw(&snake_mesh, draw_param);
 
         if !self.env.apples.is_empty() {
-            let apple_mesh =
-                rendering::apple_mesh(&self.env.apples, &self.env.gtx, ftx, ctx, stats)?;
+            let apple_mesh = rendering::apple_mesh(&self.env.apples, &self.env.gtx, ftx, ctx, stats)?;
             canvas.draw(&apple_mesh, draw_param);
         }
 
@@ -311,23 +299,11 @@ impl StartScreen {
                     options: vec![
                         player_button_prototype
                             .clone()
-                            .text(
-                                "One player",
-                                50.,
-                                TextLayout::center(),
-                                button_text_pos,
-                                color,
-                            )
+                            .text("One player", 50., TextLayout::center(), button_text_pos, color)
                             .build()
                             .unwrap(),
                         player_button_prototype
-                            .text(
-                                "Two players",
-                                50.,
-                                TextLayout::center(),
-                                button_text_pos,
-                                color,
-                            )
+                            .text("Two players", 50., TextLayout::center(), button_text_pos, color)
                             .build()
                             .unwrap(),
                     ],
@@ -376,10 +352,7 @@ impl EventHandler<Error> for StartScreen {
         let _ = self.multiplayer_button.draw(&mut canvas, ctx)?;
         // let two_player_clicked = self.two_player_button.draw(&mut canvas, ctx)?;
 
-        canvas
-            .finish(ctx)
-            .map_err(Error::from)
-            .with_trace_step("Game::draw")
+        canvas.finish(ctx).map_err(Error::from).with_trace_step("Game::draw")
     }
 
     fn key_down_event(&mut self, _ctx: &mut Context, input: KeyInput, _repeat: bool) -> Result {

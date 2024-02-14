@@ -12,21 +12,13 @@ impl SegmentDescription {
     /// `snake_len` is used to calculate how many subsegments
     /// there should be (longer snakes have lower subsegment
     /// resolution)
-    pub fn render(
-        &self,
-        color_resolution: usize,
-        turn_fraction: f32,
-    ) -> Box<dyn Iterator<Item = Polygon> + '_> {
+    pub fn render(&self, color_resolution: usize, turn_fraction: f32) -> Box<dyn Iterator<Item = Polygon> + '_> {
         // TODO: pass prefs or some fragment of it instead of random arguments
         match self.draw_style {
-            rendering::Style::Hexagon => {
-                HexagonSegments::render_segment(self, 0.0, RoundHeadDescription::Gone, 0)
-            }
+            rendering::Style::Hexagon => HexagonSegments::render_segment(self, 0.0, RoundHeadDescription::Gone, 0),
 
             rendering::Style::Smooth => {
-                let round_head = self
-                    .fraction
-                    .round_head_description(self.prev_fraction, self.cell_dim);
+                let round_head = self.fraction.round_head_description(self.prev_fraction, self.cell_dim);
 
                 SmoothSegments::render_segment(self, turn_fraction, round_head, color_resolution)
             }
@@ -41,9 +33,7 @@ impl SegmentDescription {
             .try_for_each(|Polygon { points, color }| {
                 if points.len() >= 3 {
                     polygons += 1;
-                    builder
-                        .polygon(DrawMode::fill(), &points, *color)
-                        .map(|_| ())
+                    builder.polygon(DrawMode::fill(), &points, *color).map(|_| ())
                 } else {
                     // TODO: re-enable (and switch to log levels)
                     // eprintln!("warning: SegmentDescription::render returned a Vec with < 3 points");

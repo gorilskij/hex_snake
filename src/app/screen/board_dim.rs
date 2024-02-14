@@ -1,5 +1,6 @@
-use crate::basic::{CellDim, HexDim, Point};
 use ggez::Context;
+
+use crate::basic::{CellDim, HexDim, Point};
 
 pub fn calculate_offset(ctx: &Context, board_dim: HexDim, cell_dim: CellDim) -> Point {
     let window_dim: Point = ctx.gfx.window().inner_size().into();

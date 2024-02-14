@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::app::screen::{Environment, Prefs};
 use crate::apple::{self, Apple};
 use crate::basic::board::{get_occupied_cells, random_free_spot};
@@ -6,7 +8,6 @@ use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake_control::pathfinder;
 use crate::{app, snake, snake_control};
-use rand::Rng;
 
 // #[allow(unused_macros)]
 // #[macro_export]
@@ -171,32 +172,28 @@ pub fn spawn_apples<Rng: rand::Rng>(env: &mut Environment<Rng>) {
         let can_spawn = match &env.gtx.apple_spawn_policy {
             SpawnPolicy::None => false,
             SpawnPolicy::Random { apple_count } => env.apples.len() + spawn.len() < *apple_count,
-            SpawnPolicy::ScheduledOnEat { apple_count, .. } => {
-                env.apples.len() + spawn.len() < *apple_count
-            }
+            SpawnPolicy::ScheduledOnEat { apple_count, .. } => env.apples.len() + spawn.len() < *apple_count,
         };
 
         if !can_spawn {
             break;
         }
 
-        let occupied_cells =
-            occupied_cells.get_or_insert_with(|| get_occupied_cells(&env.snakes, &env.apples));
+        let occupied_cells = occupied_cells.get_or_insert_with(|| get_occupied_cells(&env.snakes, &env.apples));
 
         let new_apple = match &mut env.gtx.apple_spawn_policy {
             SpawnPolicy::None => panic!("shouldn't be spawning with SpawnPolicy::None"),
             SpawnPolicy::Random { apple_count } => {
-                let apple_pos =
-                    match random_free_spot(occupied_cells, env.gtx.board_dim, &mut env.rng) {
-                        Some(pos) => pos,
-                        None => {
-                            println!(
-                                "warning: no space left for new apples ({} apples will be missing)",
-                                *apple_count - env.apples.len(),
-                            );
-                            break;
-                        }
-                    };
+                let apple_pos = match random_free_spot(occupied_cells, env.gtx.board_dim, &mut env.rng) {
+                    Some(pos) => pos,
+                    None => {
+                        println!(
+                            "warning: no space left for new apples ({} apples will be missing)",
+                            *apple_count - env.apples.len(),
+                        );
+                        break;
+                    }
+                };
 
                 // insert at sorted position
                 match occupied_cells.binary_search(&apple_pos) {
@@ -204,8 +201,7 @@ pub fn spawn_apples<Rng: rand::Rng>(env: &mut Environment<Rng>) {
                     Err(idx) => occupied_cells.insert(idx, apple_pos),
                 }
 
-                let apple_type =
-                    generate_apple_type(&env.gtx.prefs, &env.gtx.palette, &mut env.rng);
+                let apple_type = generate_apple_type(&env.gtx.prefs, &env.gtx.palette, &mut env.rng);
                 Some(Apple { pos: apple_pos, apple_type })
             }
             SpawnPolicy::ScheduledOnEat {

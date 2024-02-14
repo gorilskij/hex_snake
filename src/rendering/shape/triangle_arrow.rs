@@ -1,6 +1,7 @@
+use std::f32::consts::TAU;
+
 use crate::basic::{CellDim, Point};
 use crate::rendering::shape::Shape;
-use std::f32::consts::TAU;
 
 pub struct TriangleArrowLeft;
 

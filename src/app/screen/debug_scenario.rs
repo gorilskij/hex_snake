@@ -1,9 +1,10 @@
+use std::{iter, result};
+
 use ggez::event::EventHandler;
 use ggez::graphics::{Canvas, DrawParam};
 use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::Context;
 use rand::prelude::*;
-use std::{iter, result};
 
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
@@ -217,9 +218,7 @@ impl DebugScenario {
                     // .controller(snake_control::Template::AStar {
                     //     passthrough_knowledge: PassthroughKnowledge::always(false),
                     // })
-                    .controller(snake_control::Template::Algorithm(
-                        pathfinder::Template::WeightedBFS,
-                    ))
+                    .controller(snake_control::Template::Algorithm(pathfinder::Template::WeightedBFS))
             })
             .collect();
 
@@ -404,13 +403,11 @@ impl EventHandler<Error> for DebugScenario {
             snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx, ctx);
         }
 
-        let snake_mesh =
-            rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut self.stats)?;
+        let snake_mesh = rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut self.stats)?;
         canvas.draw(&snake_mesh, draw_param);
 
         if !env.apples.is_empty() {
-            let apple_mesh =
-                rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut self.stats)?;
+            let apple_mesh = rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut self.stats)?;
             canvas.draw(&apple_mesh, draw_param);
         }
 

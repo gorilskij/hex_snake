@@ -1,6 +1,9 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
+use ggez::Context;
+use rand::distributions::uniform::SampleRange;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
@@ -11,8 +14,6 @@ use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, SegmentType, State};
 use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
-use ggez::Context;
-use rand::distributions::uniform::SampleRange;
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -146,12 +147,8 @@ pub fn handle_collisions<Rng: rand::Rng>(
                 let snake1 = &snakes[snake1_index];
                 let snake2 = &snakes[snake2_index];
                 let snake2_type = snake2.snake_type;
-                let snake2_segment_type = snake2.body.segments[snake2_segment_index]
-                    .segment_type
-                    .discriminant();
-                let behavior = snake1
-                    .eat_mechanics
-                    .eat_other(snake2_type, snake2_segment_type);
+                let snake2_segment_type = snake2.body.segments[snake2_segment_index].segment_type.discriminant();
+                let behavior = snake1.eat_mechanics.eat_other(snake2_type, snake2_segment_type);
 
                 match behavior {
                     Cut => {
@@ -180,9 +177,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
             }
             Collision::Itself { snake_index, snake_segment_index } => {
                 let snake = &snakes[snake_index];
-                let segment_type = snake.body.segments[snake_segment_index]
-                    .segment_type
-                    .discriminant();
+                let segment_type = snake.body.segments[snake_segment_index].segment_type.discriminant();
                 let behavior = snake.eat_mechanics.eat_self(segment_type);
                 match behavior {
                     Cut => snakes[snake_index].cut_at(snake_segment_index),
@@ -217,11 +212,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
 
         let mut occupied_cells = get_occupied_cells(&env.snakes, &env.apples);
-        for snake in env
-            .snakes
-            .iter()
-            .filter(|s| s.snake_type == snake::Type::Player)
-        {
+        for snake in env.snakes.iter().filter(|s| s.snake_type == snake::Type::Player) {
             let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, board_dim);
             occupied_cells.extend_from_slice(&neighborhood);
         }
@@ -251,9 +242,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
             }
         }
 
-        snake_builder
-            .dir
-            .get_or_insert_with(|| Dir::random(&mut env.rng));
+        snake_builder.dir.get_or_insert_with(|| Dir::random(&mut env.rng));
         snake_builder
             .len
             .get_or_insert_with(|| (7..15).sample_single(&mut env.rng));
@@ -275,8 +264,7 @@ pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext, ctx: &Context) {
     for snake_idx in 0..snakes.len() {
         // set snake to die if it ran out of life
         match &mut snakes[snake_idx].snake_type {
-            snake::Type::Competitor { life: Some(life) }
-            | snake::Type::Killer { life: Some(life) } => {
+            snake::Type::Competitor { life: Some(life) } | snake::Type::Killer { life: Some(life) } => {
                 if *life == 0 {
                     snakes[snake_idx].die();
                 } else {

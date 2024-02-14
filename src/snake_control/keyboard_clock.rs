@@ -1,3 +1,6 @@
+use ggez::input::keyboard::KeyCode;
+use ggez::Context;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
@@ -6,8 +9,6 @@ use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
-use ggez::input::keyboard::KeyCode;
-use ggez::Context;
 
 // joke snake_control with 12 directions allowing the player to rotate between them using left and right, surprising horizontal teleportation
 // looks pretty cool with the sharp drawing style

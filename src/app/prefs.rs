@@ -1,7 +1,9 @@
+use std::time::Duration;
+
+use enum_rotate::EnumRotate;
+
 use crate::basic::Food;
 use crate::rendering;
-use enum_rotate::EnumRotate;
-use std::time::Duration;
 
 #[derive(Copy, Clone, EnumRotate)]
 pub enum DrawGrid {

@@ -1,7 +1,9 @@
-use crate::basic::Point;
+use std::iter;
+
 use itertools::chain;
 use lyon_geom::{Angle, Arc};
-use std::iter;
+
+use crate::basic::Point;
 
 #[derive(Copy, Clone, Debug)]
 pub struct CleanArc {

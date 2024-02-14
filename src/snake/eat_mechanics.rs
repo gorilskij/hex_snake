@@ -1,5 +1,6 @@
-use crate::snake::{self, Segment, SegmentType};
 use std::mem::Discriminant;
+
+use crate::snake::{self, Segment, SegmentType};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum EatBehavior {
@@ -152,11 +153,7 @@ impl EatMechanics {
         self.eat_self.get(segment_type)
     }
 
-    pub fn eat_other(
-        &self,
-        snake_type: snake::Type,
-        segment_type: Discriminant<SegmentType>,
-    ) -> EatBehavior {
+    pub fn eat_other(&self, snake_type: snake::Type, segment_type: Discriminant<SegmentType>) -> EatBehavior {
         self.eat_other.get(snake_type).get(segment_type)
     }
 }

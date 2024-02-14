@@ -34,10 +34,7 @@ impl SegmentDescription {
             .enumerate()
             .rev()
             .map(move |(subsegment_idx, subsegment)| {
-                (
-                    subsegment_idx,
-                    get_color(subsegment as f64 / num_subsegments as f64),
-                )
+                (subsegment_idx, get_color(subsegment as f64 / num_subsegments as f64))
             })
             .enumerate()
             .map(move |(i, (subsegment_idx, color))| {

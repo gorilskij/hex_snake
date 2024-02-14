@@ -1,9 +1,11 @@
-use crate::basic::Dir;
 use std::cmp::Ordering;
 use std::f32::consts::TAU;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+
 use Dir::*;
 use Dir12::*;
+
+use crate::basic::Dir;
 
 // includes directions between the usual 6
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]

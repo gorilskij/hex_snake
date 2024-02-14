@@ -1,3 +1,11 @@
+use std::cmp::max;
+use std::collections::{HashMap, HashSet};
+use std::mem;
+
+use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
+use ggez::Context;
+use itertools::Itertools;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
@@ -6,12 +14,6 @@ use crate::error::Result;
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;
 use crate::view::snakes::Snakes;
-use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
-use ggez::Context;
-use itertools::Itertools;
-use std::cmp::max;
-use std::collections::{HashMap, HashSet};
-use std::mem;
 
 type Distance = f32;
 type GridData = HashMap<HexPoint, Distance>;
@@ -57,9 +59,7 @@ impl Iterator for Iter {
 
             generation_alive
                 .into_iter()
-                .flat_map(move |pos| {
-                    Dir::iter().map(move |dir| pos.wrapping_translate(dir, 1, board_dim))
-                })
+                .flat_map(move |pos| Dir::iter().map(move |dir| pos.wrapping_translate(dir, 1, board_dim)))
                 .filter(|new_pos| !self.seen.contains(new_pos))
                 .sorted_unstable()
                 .dedup()
@@ -158,9 +158,7 @@ fn generate_mesh(
         let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
 
         let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
-        builder
-            .polygon(DrawMode::fill(), &hexagon, *color)
-            .map(|_| ())
+        builder.polygon(DrawMode::fill(), &hexagon, *color).map(|_| ())
     })?;
     Ok(Mesh::from_data(ctx, builder.build()))
 }

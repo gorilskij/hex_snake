@@ -2,17 +2,15 @@ use std::collections::{HashSet, VecDeque};
 use std::mem;
 use std::mem::Discriminant;
 
+use ggez::Context;
 pub use palette::{Palette, PaletteTemplate};
 
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
-use crate::basic::{Dir, FrameStamp, HexDim, HexPoint};
-use crate::snake_control;
-use ggez::Context;
-
 use crate::apple::Apple;
-use crate::basic::Frames;
+use crate::basic::{Dir, FrameStamp, Frames, HexDim, HexPoint};
 use crate::snake::eat_mechanics::{EatMechanics, Knowledge};
+use crate::snake_control;
 use crate::snake_control::{pathfinder, Controller};
 use crate::view::snakes::Snakes;
 
@@ -54,11 +52,9 @@ impl SegmentType {
     }
 
     pub const DISCR_NORMAL: Discriminant<Self> = mem::discriminant(&Self::Normal);
-    pub const DISCR_EATEN: Discriminant<Self> =
-        mem::discriminant(&Self::Eaten { original_food: 0, food_left: 0 });
+    pub const DISCR_EATEN: Discriminant<Self> = mem::discriminant(&Self::Eaten { original_food: 0, food_left: 0 });
     pub const DISCR_CRASHED: Discriminant<Self> = mem::discriminant(&Self::Crashed);
-    pub const DISCR_BLACK_HOLE: Discriminant<Self> =
-        mem::discriminant(&Self::BlackHole { just_created: false });
+    pub const DISCR_BLACK_HOLE: Discriminant<Self> = mem::discriminant(&Self::BlackHole { just_created: false });
 }
 
 pub type ZIndex = i32;
@@ -167,11 +163,7 @@ impl Snake {
         }
 
         fn snake_contains(snake: &Snake, point: HexPoint) -> bool {
-            snake
-                .body
-                .segments
-                .iter()
-                .any(|segment| segment.pos == point)
+            snake.body.segments.iter().any(|segment| segment.pos == point)
         }
 
         for _ in 0..radius {
@@ -203,27 +195,13 @@ impl Snake {
 
         // advance controller
         let knowledge = Knowledge::accurate(&self.eat_mechanics);
-        let controller_dir = self.controller.next_dir(
-            &mut self.body,
-            Some(&knowledge),
-            &other_snakes,
-            apples,
-            gtx,
-            ftx,
-            ctx,
-        );
+        let controller_dir =
+            self.controller
+                .next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx, ctx);
 
         // advance autopilot
         let autopilot_dir = self.autopilot.as_mut().map(|autopilot| {
-            autopilot.next_dir(
-                &mut self.body,
-                Some(&knowledge),
-                &other_snakes,
-                apples,
-                gtx,
-                ftx,
-                ctx,
-            )
+            autopilot.next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx, ctx)
         });
 
         let new_dir = if self.autopilot_control {
@@ -263,8 +241,7 @@ impl Snake {
         ctx: &Context,
     ) {
         let last_idx = self.body.visible_len() - 1;
-        if let SegmentType::Eaten { food_left, .. } = &mut self.body.segments[last_idx].segment_type
-        {
+        if let SegmentType::Eaten { food_left, .. } = &mut self.body.segments[last_idx].segment_type {
             if *food_left == 0 {
                 self.body.segments[last_idx].segment_type = SegmentType::Normal;
             } else {

@@ -113,11 +113,7 @@ pub enum RoundHeadDescription {
 }
 
 impl SegmentFraction {
-    pub fn round_head_description(
-        self,
-        prev: Option<Self>,
-        cell_dim: CellDim,
-    ) -> RoundHeadDescription {
+    pub fn round_head_description(self, prev: Option<Self>, cell_dim: CellDim) -> RoundHeadDescription {
         let CellDim { side, sin, .. } = cell_dim;
         let head_radius = side / 2.;
 

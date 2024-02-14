@@ -1,3 +1,8 @@
+use ggez::input::keyboard::KeyCode;
+use ggez::Context;
+use itertools::{repeat_n, Itertools};
+use programmed::Move;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::ControlSetup;
@@ -7,10 +12,6 @@ use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::pathfinder::Path;
 use crate::view::snakes::Snakes;
-use ggez::input::keyboard::KeyCode;
-use ggez::Context;
-use itertools::{repeat_n, Itertools};
-use programmed::Move;
 
 mod algorithm;
 mod keyboard;
@@ -128,8 +129,7 @@ impl Template {
         Self::Programmed(if side_len == 0 {
             iter.collect()
         } else {
-            iter.interleave(repeat_n(Move::Wait(side_len), 12))
-                .collect()
+            iter.interleave(repeat_n(Move::Wait(side_len), 12)).collect()
         })
     }
 

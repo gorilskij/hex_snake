@@ -1,6 +1,9 @@
 use std::f32::consts::{PI, TAU};
 use std::iter;
 
+use itertools::Itertools;
+use lyon_geom::{Angle, Arc};
+
 use crate::basic::{CellDim, Dir, Point};
 use crate::rendering::clean_arc::CleanArc;
 use crate::rendering::segments::descriptions::{
@@ -8,8 +11,6 @@ use crate::rendering::segments::descriptions::{
 };
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use crate::rendering::shape::ShapePoints;
-use itertools::Itertools;
-use lyon_geom::{Angle, Arc};
 
 mod subsegments;
 
@@ -40,12 +41,7 @@ fn upper_intersection_point(p0: Point, r0: f32, p1: Point, r1: f32) -> Point {
     }
 }
 
-fn render_arc_tip(
-    fraction: SegmentFraction,
-    center: Point,
-    angle: f32,
-    cell_dim: CellDim,
-) -> Vec<Point> {
+fn render_arc_tip(fraction: SegmentFraction, center: Point, angle: f32, cell_dim: CellDim) -> Vec<Point> {
     let head_radius = cell_dim.side / 2.;
     let slice_thickness = (fraction.end - fraction.start) * 2. * cell_dim.side;
 
@@ -62,10 +58,7 @@ fn render_arc_tip(
     .collect()
 }
 
-fn render_arc_tip_straight(
-    description: &SegmentDescription,
-    fraction: SegmentFraction,
-) -> Vec<Point> {
+fn render_arc_tip_straight(description: &SegmentDescription, fraction: SegmentFraction) -> Vec<Point> {
     let CellDim { side, sin, cos } = description.cell_dim;
     let head_radius = side / 2.;
 
@@ -124,9 +117,7 @@ fn render_split_arc(
         end_angle: PI - arc1.start_angle,
     };
 
-    arc2.flattened(TOLERANCE)
-        .chain(arc1.flattened(TOLERANCE))
-        .collect()
+    arc2.flattened(TOLERANCE).chain(arc1.flattened(TOLERANCE)).collect()
 }
 
 fn render_box(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
@@ -192,9 +183,7 @@ fn render_default_straight_segment(
         match part_of_round_head {
             Fully => render_arc_tip_straight(description, fraction),
             Partly => todo!(),
-            Not => unreachable!(
-                "the first segment of the snake should always be part of the round head"
-            ),
+            Not => unreachable!("the first segment of the snake should always be part of the round head"),
         }
     } else {
         let head_base = tip_y - head_radius;
@@ -239,12 +228,7 @@ fn render_default_curved_segment(
         let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
         // too straight to be drawn as curved, default to straight drawing
         if pivot_dist.is_infinite() {
-            return render_default_straight_segment(
-                description,
-                subsegment_idx,
-                fraction,
-                round_head,
-            );
+            return render_default_straight_segment(description, subsegment_idx, fraction, round_head);
         }
         Point { x: side + cos + pivot_dist, y: 0. }
     };
@@ -332,19 +316,11 @@ fn render_subsegment(
     match description.turn.turn_type() {
         Straight => {
             // TODO: convert segments to shapes
-            segment =
-                render_default_straight_segment(description, subsegment_idx, fraction, round_head)
-                    .into()
+            segment = render_default_straight_segment(description, subsegment_idx, fraction, round_head).into()
         }
         Blunt(turn_direction) | Sharp(turn_direction) => {
-            segment = render_default_curved_segment(
-                description,
-                turn_fraction,
-                subsegment_idx,
-                fraction,
-                round_head,
-            )
-            .into();
+            segment =
+                render_default_curved_segment(description, turn_fraction, subsegment_idx, fraction, round_head).into();
             if turn_direction == Clockwise {
                 segment = segment.flip_horizontally(description.cell_dim.center().x);
             }

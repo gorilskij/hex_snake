@@ -1,6 +1,6 @@
-use enum_rotate::EnumRotate;
 use std::collections::HashMap;
 
+use enum_rotate::EnumRotate;
 use ggez::event::EventHandler;
 use ggez::graphics::{Canvas, DrawParam, Mesh};
 use ggez::input::keyboard::{KeyCode, KeyInput};
@@ -17,9 +17,7 @@ use crate::app::palette::Palette;
 use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
-use crate::app::snake_management::{
-    advance_snakes, find_collisions, handle_collisions, spawn_snakes,
-};
+use crate::app::snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes};
 use crate::app::stats::Stats;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::{self, Apple};
@@ -27,12 +25,11 @@ use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;
+use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
 use crate::support::invert::Invert;
 use crate::view::snakes::OtherSnakes;
-
-use crate::snake::builder::Builder as SnakeBuilder;
 
 #[derive(Copy, Clone)]
 enum Boost {
@@ -144,12 +141,10 @@ impl Game {
                 self.restart();
             } else {
                 // remove snakes outside of board limits
-                env.snakes
-                    .retain(move |snake| board_dim.contains(snake.head().pos));
+                env.snakes.retain(move |snake| board_dim.contains(snake.head().pos));
 
                 // remove apples outside of board limits
-                env.apples
-                    .retain(move |apple| board_dim.contains(apple.pos));
+                env.apples.retain(move |apple| board_dim.contains(apple.pos));
                 self.spawn_apples();
             }
 
@@ -242,8 +237,7 @@ impl Game {
             matches!(snake.state, snake::State::Dying)
                 || matches!(
                     snake.snake_type,
-                    snake::Type::Competitor { life: Some(_) }
-                        | snake::Type::Killer { life: Some(_) }
+                    snake::Type::Competitor { life: Some(_) } | snake::Type::Killer { life: Some(_) }
                 )
         };
         if env.snakes.iter().all(dying_or_ephemeral) {
@@ -279,11 +273,7 @@ impl Game {
     const CELL_SIDE_MAX: f32 = 1000.;
 
     fn refresh_animated_apples(&mut self) {
-        self.animated_apples = self
-            .env
-            .apples
-            .iter()
-            .any(|apple| apple.apple_type.is_animated());
+        self.animated_apples = self.env.apples.iter().any(|apple| apple.apple_type.is_animated());
     }
 
     fn spawn_apples(&mut self) {
@@ -423,26 +413,14 @@ impl EventHandler<Error> for Game {
         }
 
         if self.snake_mesh.is_none() || playing {
-            self.snake_mesh = Some(rendering::snake_mesh(
-                &mut env.snakes,
-                &env.gtx,
-                ftx,
-                ctx,
-                &mut stats,
-            )?);
+            self.snake_mesh = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut stats)?);
         }
 
         if env.apples.is_empty() {
             self.apple_mesh = None;
         } else if self.apple_mesh.is_none() || self.animated_apples {
             // only recompute apple mesh if there are animated apples
-            self.apple_mesh = Some(rendering::apple_mesh(
-                &env.apples,
-                &env.gtx,
-                ftx,
-                ctx,
-                &mut stats,
-            )?);
+            self.apple_mesh = Some(rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut stats)?);
         }
 
         let player_idx = self.first_player_snake_idx().expect("no player snake");
@@ -451,24 +429,17 @@ impl EventHandler<Error> for Game {
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
         if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
-            self.distance_grid_mesh =
-                Some(
-                    self.distance_grid
-                        .mesh(player_snake, other_snakes, ctx, &env.gtx, ftx)?,
-                );
+            self.distance_grid_mesh = Some(
+                self.distance_grid
+                    .mesh(player_snake, other_snakes, ctx, &env.gtx, ftx)?,
+            );
         }
 
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
-            self.player_path_mesh = rendering::player_path_mesh(
-                player_snake,
-                other_snakes,
-                &env.apples,
-                ctx,
-                &env.gtx,
-                &mut stats,
-            )
-            .invert()?;
+            self.player_path_mesh =
+                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, ctx, &env.gtx, &mut stats)
+                    .invert()?;
         }
 
         if env.gtx.prefs.display_stats {
@@ -499,23 +470,13 @@ impl EventHandler<Error> for Game {
                 drawable.draw(&mut canvas);
             }
 
-            canvas
-                .finish(ctx)
-                .map_err(Error::from)
-                .with_trace_step("Game::draw")?;
+            canvas.finish(ctx).map_err(Error::from).with_trace_step("Game::draw")?;
         }
 
         Ok(())
     }
 
-    fn mouse_motion_event(
-        &mut self,
-        ctx: &mut Context,
-        _x: f32,
-        _y: f32,
-        _dx: f32,
-        _dy: f32,
-    ) -> Result {
+    fn mouse_motion_event(&mut self, ctx: &mut Context, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result {
         mouse::set_cursor_hidden(ctx, false);
         Ok(())
     }
@@ -621,10 +582,7 @@ impl EventHandler<Error> for Game {
                             self.display_notification("Autopilot not available");
                         }
                     } else {
-                        self.display_notification(format!(
-                            "Can't use autopilot with {} players",
-                            self.seeds.len()
-                        ));
+                        self.display_notification(format!("Can't use autopilot with {} players", self.seeds.len()));
                     }
                 }
                 LBracket => {
@@ -716,8 +674,7 @@ impl EventHandler<Error> for Game {
                 k @ Down | k @ Up => {
                     let factor = if k == Down { 0.9 } else { 1. / 0.9 };
                     let mut new_side_length = self.env.gtx.cell_dim.side * factor;
-                    new_side_length =
-                        new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
+                    new_side_length = new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
                     self.env.gtx.cell_dim = CellDim::from(new_side_length);
                     self.update_dim(ctx);
                     self.display_notification(format!("Cell side: {new_side_length}"));

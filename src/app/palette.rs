@@ -1,5 +1,6 @@
-use crate::snake;
 use ggez::graphics::Color;
+
+use crate::snake;
 
 macro_rules! gray {
     ($lightness:expr) => {

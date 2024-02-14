@@ -1,9 +1,11 @@
+use std::time::{Duration, Instant};
+
+use ggez::graphics::{Canvas, DrawParam, PxScale, Text, TextLayout};
+use ggez::Context;
+
 use crate::basic::Point;
 use crate::color::Color;
 use crate::support::text_layout::TextLayoutExtension;
-use ggez::graphics::{Canvas, DrawParam, PxScale, Text, TextLayout};
-use ggez::Context;
-use std::time::{Duration, Instant};
 
 /// Finite number of possible messages
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
@@ -39,12 +41,7 @@ impl Message {
     pub const DEFAULT_FONT_SIZE: f32 = 50.;
 
     // `layout` refers to where the text should be placed in the window
-    pub fn default(
-        text: String,
-        position: Position,
-        color: Color,
-        duration: Option<Duration>,
-    ) -> Self {
+    pub fn default(text: String, position: Position, color: Color, duration: Option<Duration>) -> Self {
         Self {
             text,
             position,

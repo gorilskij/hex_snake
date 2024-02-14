@@ -1,7 +1,7 @@
-use crate::snake::{Segment, Snake};
+pub use other_snakes::OtherSnakes;
 use rayon::prelude::ParallelIterator;
 
-pub use other_snakes::OtherSnakes;
+use crate::snake::{Segment, Snake};
 
 mod all_snakes;
 mod other_snakes;

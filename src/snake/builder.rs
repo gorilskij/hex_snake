@@ -1,6 +1,7 @@
+use std::fmt::{Display, Formatter};
+
 use super::*;
 use crate::snake::eat_mechanics::EatMechanics;
-use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Error)]
 #[must_use]
@@ -116,10 +117,7 @@ impl Builder {
             ));
         }
 
-        eprintln!(
-            "spawn snake at {:?} coming from {:?} going to {:?}",
-            pos, -dir, dir
-        );
+        eprintln!("spawn snake at {:?} coming from {:?} going to {:?}", pos, -dir, dir);
 
         let head = Segment {
             segment_type: SegmentType::Normal,
@@ -145,12 +143,13 @@ impl Builder {
         };
 
         Ok(Snake {
-            snake_type: self.snake_type.ok_or_else(|| {
-                BuilderError(Box::new(self.clone()), "missing field `snake_type`")
-            })?,
-            eat_mechanics: *self.eat_mechanics.as_ref().ok_or_else(|| {
-                BuilderError(Box::new(self.clone()), "missing field `eat_mechanics`")
-            })?,
+            snake_type: self
+                .snake_type
+                .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `snake_type`"))?,
+            eat_mechanics: *self
+                .eat_mechanics
+                .as_ref()
+                .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `eat_mechanics`"))?,
             speed: self
                 .speed
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,
@@ -159,9 +158,7 @@ impl Builder {
             controller: self
                 .controller
                 .as_ref()
-                .ok_or_else(|| {
-                    BuilderError(Box::new(self.clone()), "mssing field `snake_control`")
-                })?
+                .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `snake_control`"))?
                 .clone()
                 .into_controller(dir),
             palette: self

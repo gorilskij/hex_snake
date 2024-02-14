@@ -22,9 +22,6 @@ impl PathFinder for WithBackup {
         // first try the main pathfinder, if that fails, fall back to the backup pathfinder
         self.main
             .get_path(targets, body, knowledge, other_snakes, gtx)
-            .or_else(|| {
-                self.backup
-                    .get_path(targets, body, knowledge, other_snakes, gtx)
-            })
+            .or_else(|| self.backup.get_path(targets, body, knowledge, other_snakes, gtx))
     }
 }

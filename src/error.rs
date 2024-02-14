@@ -1,10 +1,12 @@
-use crate::button::ButtonDataBuilderError;
-use crate::snake;
+use std::fmt::{Debug, Display, Formatter};
+use std::{error, fmt, result};
+
 use ggez::GameError;
 use snake::builder::BuilderError as SnakeBuilderError;
 use static_assertions::assert_impl_all;
-use std::fmt::{Debug, Display, Formatter};
-use std::{error, fmt, result};
+
+use crate::button::ButtonDataBuilderError;
+use crate::snake;
 
 assert_impl_all!(GameError: error::Error);
 assert_impl_all!(SnakeBuilderError: error::Error);

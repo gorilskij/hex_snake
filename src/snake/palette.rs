@@ -121,13 +121,7 @@ impl PaletteTemplate {
         Self::rgb_gradient(gray!(0.72, opacity), gray!(0.25, opacity), None, persistent)
     }
 
-    pub fn hsl_gradient(
-        head_hue: f64,
-        tail_hue: f64,
-        lightness: f64,
-        eaten_lightness: f64,
-        persistent: bool,
-    ) -> Self {
+    pub fn hsl_gradient(head_hue: f64, tail_hue: f64, lightness: f64, eaten_lightness: f64, persistent: bool) -> Self {
         Self::HSLGradient {
             head_hue,
             tail_hue,
@@ -160,43 +154,19 @@ impl PaletteTemplate {
     const OKLAB_RAINBOW: (f64, f64) = (147.3, 428.);
 
     pub fn rainbow(persistent: bool) -> Self {
-        Self::hsl_gradient(
-            Self::HSL_RAINBOW.0,
-            Self::HSL_RAINBOW.1,
-            0.4,
-            0.7,
-            persistent,
-        )
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.4, 0.7, persistent)
     }
 
     pub fn pastel_rainbow(persistent: bool) -> Self {
-        Self::hsl_gradient(
-            Self::HSL_RAINBOW.0,
-            Self::HSL_RAINBOW.1,
-            0.75,
-            0.7,
-            persistent,
-        )
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.75, 0.7, persistent)
     }
 
     pub fn dark_rainbow(persistent: bool) -> Self {
-        Self::hsl_gradient(
-            Self::HSL_RAINBOW.0,
-            Self::HSL_RAINBOW.1,
-            0.2,
-            0.2,
-            persistent,
-        )
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.2, 0.2, persistent)
     }
 
     pub fn green_to_red(persistent: bool) -> Self {
-        Self::oklab_gradient(
-            Self::OKLAB_RAINBOW.0,
-            Self::OKLAB_RAINBOW.1,
-            0.6,
-            0.7,
-            persistent,
-        )
+        Self::oklab_gradient(Self::OKLAB_RAINBOW.0, Self::OKLAB_RAINBOW.1, 0.6, 0.7, persistent)
     }
 
     pub fn dark_blue_to_red(persistent: bool) -> Self {
@@ -243,12 +213,8 @@ impl SegmentStyle {
         match *self {
             Self::Solid(color) => color,
             Self::RGBGradient { start_color: start_rgb, .. } => start_rgb,
-            Self::HSLGradient { start_hue, lightness, .. } => {
-                HSL { h: start_hue, s: 1., l: lightness }.to_color()
-            }
-            Self::OkLabGradient { start_hue, lightness, .. } => {
-                OkLab::from_lch(lightness, 0.5, start_hue).to_color()
-            }
+            Self::HSLGradient { start_hue, lightness, .. } => HSL { h: start_hue, s: 1., l: lightness }.to_color(),
+            Self::OkLabGradient { start_hue, lightness, .. } => OkLab::from_lch(lightness, 0.5, start_hue).to_color(),
         }
     }
 
@@ -266,9 +232,9 @@ impl SegmentStyle {
                 }
                 .to_color()
             }),
-            SegmentStyle::OkLabGradient { start_hue, end_hue, lightness } => Box::new(move |f| {
-                OkLab::from_lch(lightness, 0.5, f * start_hue + (1. - f) * end_hue).to_color()
-            }),
+            SegmentStyle::OkLabGradient { start_hue, end_hue, lightness } => {
+                Box::new(move |f| OkLab::from_lch(lightness, 0.5, f * start_hue + (1. - f) * end_hue).to_color())
+            }
         }
     }
 }
@@ -288,14 +254,12 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
     fn from(template: PaletteTemplate) -> Self {
         match template {
             PaletteTemplate::Solid { color, eaten } => Box::new(Solid { color, eaten }),
-            PaletteTemplate::RGBGradient { head, tail, eaten, persistent } => {
-                Box::new(RGBGradient {
-                    head_color: head,
-                    tail_color: tail,
-                    eaten,
-                    max_len: persistent.then_some(0),
-                })
-            }
+            PaletteTemplate::RGBGradient { head, tail, eaten, persistent } => Box::new(RGBGradient {
+                head_color: head,
+                tail_color: tail,
+                eaten,
+                max_len: persistent.then_some(0),
+            }),
             PaletteTemplate::HSLGradient {
                 head_hue,
                 tail_hue,
@@ -328,9 +292,7 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
                 iteration: true,
                 last_head: None,
             }),
-            PaletteTemplate::Alternating { color1, color2 } => {
-                Box::new(Alternating { color1, color2 })
-            }
+            PaletteTemplate::Alternating { color1, color2 } => Box::new(Alternating { color1, color2 }),
         }
     }
 }
@@ -358,9 +320,7 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
 /// and growing
 fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
     let len = len as f64;
-    if let SegmentType::Eaten { original_food, food_left } =
-        body.segments.back().unwrap().segment_type
-    {
+    if let SegmentType::Eaten { original_food, food_left } = body.segments.back().unwrap().segment_type {
         // Correct for eaten segment at the tail and
         //  fractional segment at the head (the eaten
         //  segment reduces in size more slowly than
@@ -368,8 +328,7 @@ fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
 
         // The actual visual length of the eaten segment
         //  at the tail of the snake
-        let eaten_segment_frac =
-            (food_left as f64 + 1. - frame_fraction) / (original_food + 1) as f64;
+        let eaten_segment_frac = (food_left as f64 + 1. - frame_fraction) / (original_food + 1) as f64;
 
         len - 1. + eaten_segment_frac + frame_fraction
     } else if body.grow > 0 {
@@ -432,15 +391,11 @@ impl Palette for RGBGradient {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
-                let start_color =
-                    self.head_color + (self.tail_color - self.head_color) * r / logical_len;
-                let end_color =
-                    self.head_color + (self.tail_color - self.head_color) * (r + 1.) / logical_len;
+                let start_color = self.head_color + (self.tail_color - self.head_color) * r / logical_len;
+                let end_color = self.head_color + (self.tail_color - self.head_color) * (r + 1.) / logical_len;
 
                 match segment.segment_type {
-                    Normal | BlackHole { .. } => {
-                        SegmentStyle::RGBGradient { start_color, end_color }
-                    }
+                    Normal | BlackHole { .. } => SegmentStyle::RGBGradient { start_color, end_color },
                     Eaten { .. } => SegmentStyle::RGBGradient {
                         start_color: invert_rgb(start_color),
                         end_color: invert_rgb(end_color),
@@ -476,8 +431,7 @@ impl Palette for HSLGradient {
             } else {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
-                let end_hue =
-                    self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
+                let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
 
                 match segment.segment_type {
                     Normal | BlackHole { .. } => SegmentStyle::HSLGradient {
@@ -628,8 +582,7 @@ impl Palette for Alternating {
                     let ratio1_start = (r.cos() + 1.) / 2.;
                     let ratio1_end = ((r + 1.).cos() + 1.) / 2.;
 
-                    let start_color =
-                        ratio1_start * self.color1 + (1. - ratio1_start) * self.color2;
+                    let start_color = ratio1_start * self.color1 + (1. - ratio1_start) * self.color2;
                     let end_color = ratio1_end * self.color1 + (1. - ratio1_end) * self.color2;
 
                     SegmentStyle::RGBGradient { start_color, end_color }

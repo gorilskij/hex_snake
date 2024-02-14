@@ -1,8 +1,10 @@
-use super::dir::{Axis, Dir};
-use crate::basic::{CellDim, Point};
 use std::cmp::{max, Ordering};
 use std::fmt::{Debug, Error, Formatter};
+
 use Dir::*;
+
+use super::dir::{Axis, Dir};
+use crate::basic::{CellDim, Point};
 
 // INVARIANT: even columns are half a cell higher than odd columns
 #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
@@ -205,12 +207,7 @@ impl HexPoint {
             // check if the point is salvageable, otherwise return None
             {
                 fn problems(point: HexPoint, board_dim: HexDim) -> (bool, bool, bool, bool) {
-                    (
-                        point.v < 0,
-                        point.v >= board_dim.v,
-                        point.h < 0,
-                        point.h >= board_dim.h,
-                    )
+                    (point.v < 0, point.v >= board_dim.v, point.h < 0, point.h >= board_dim.h)
                 }
 
                 let mut x = self;
@@ -257,36 +254,27 @@ impl HexPoint {
     #[must_use]
     pub fn wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> Self {
         let translated = self.translate(dir, dist);
-        translated
-            .wrap_around(board_dim, dir.axis())
-            .unwrap_or_else(|| {
-                panic!(
-                    "failed to wrap pos: {self:?}, translated: {translated:?} \
+        translated.wrap_around(board_dim, dir.axis()).unwrap_or_else(|| {
+            panic!(
+                "failed to wrap pos: {self:?}, translated: {translated:?} \
                     (board_dim: {board_dim:?}, dir: {dir:?})"
-                )
-            })
+            )
+        })
     }
 
     // tells you if it teleported or not
     #[must_use]
-    pub fn explicit_wrapping_translate(
-        self,
-        dir: Dir,
-        dist: usize,
-        board_dim: HexDim,
-    ) -> (Self, bool) {
+    pub fn explicit_wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> (Self, bool) {
         let translated = self.translate(dir, dist);
         if board_dim.contains(translated) {
             (translated, false)
         } else {
-            let wrapped = translated
-                .wrap_around(board_dim, dir.axis())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "failed to wrap pos: {self:?}, translated: {translated:?} \
+            let wrapped = translated.wrap_around(board_dim, dir.axis()).unwrap_or_else(|| {
+                panic!(
+                    "failed to wrap pos: {self:?}, translated: {translated:?} \
                     (board_dim: {board_dim:?}, dir: {dir:?})"
-                    )
-                });
+                )
+            });
             (wrapped, true)
         }
     }
