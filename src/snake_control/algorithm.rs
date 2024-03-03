@@ -9,14 +9,13 @@ use crate::snake::Body;
 use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
+use crate::view::targets::Targets;
 
 // TODO: rename to something more descriptive like apple seeker
 pub struct Algorithm {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
+    // implicitly, the target is always the last cell in the path
     pub path: Option<Path>,
-
-    // Also store the expected index in the apples array, chances are it didn't change
-    pub current_target: Option<(usize, HexPoint)>,
 }
 
 impl Algorithm {
@@ -28,45 +27,42 @@ impl Algorithm {
         apples: &[Apple],
         gtx: &GameContext,
     ) {
-        match self.current_target {
-            Some((i, target)) if apples.get(i).map(|a| a.pos == target).unwrap_or(false) => {}
-            Some((ref mut i, target))
-                if let Some((new_i, _)) = apples.iter().enumerate().find(|(_, apple)| apple.pos == target) =>
-            {
-                *i = new_i;
-            }
-            _ => self.path = None,
-        }
-
-        if let Some(path) = &mut self.path {
-            if path.len() > 1 {
-                let head_pos = body.segments[0].pos;
-
-                if path[0] == head_pos {
-                    // following path
-                    return;
-                }
-
-                if path.len() > 1 && path[1] == head_pos {
-                    // following path, remove passed cell
+        // recalculate the path if there is no target of if the last target isn't there anymore
+        let recalculate_path = match &mut self.path {
+            None => {
+                println!("recalculate: no path");
+                true
+            },
+            Some(path) if path.is_empty() => {
+                println!("recalculate: path is empty");
+                true
+            },
+            Some(path) => 'arm: {
+                // recalculate if we're not following the path
+                let head = body.segments[0].pos;
+                if head == path[0] {
+                } else if head == path[1] {
                     path.pop_front();
-                    return;
+                } else {
+                    println!("recalculate: not following path");
+                    break 'arm true;
                 }
-            }
+
+                // recalculate if the target isn't there anymore
+                let target = *path.back().unwrap();
+                if apples.iter().any(|apple| apple.pos == target) {
+                    false
+                } else {
+                    println!("recalculate: target isn't there");
+                    true
+                }
+            },
+        };
+
+        if recalculate_path {
+            // find the shortest path to any apple and lock in that apple as the target
+            self.path = self.pathfinder.get_path(&apples, body, knowledge, other_snakes, gtx);
         }
-
-        // TODO: don't recalculate until called upon (lazy ai)
-        // recalculate
-        println!("recalculating");
-        self.path = self.pathfinder.get_path(&apples, body, knowledge, other_snakes, gtx);
-
-        // assign wrong index 0, the true index will be found in the next iteration
-        // (it's only cache anyway)
-        self.current_target = self
-            .path
-            .as_ref()
-            .and_then(|path| path.back().copied())
-            .map(|pos| (0, pos));
     }
 }
 

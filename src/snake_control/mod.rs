@@ -188,16 +188,9 @@ impl Template {
                 wait: 0,
             }),
             Template::Killer => Box::new(Killer),
-            // Template::AStar { passthrough_knowledge } => Box::new(AStar {
-            //     passthrough_knowledge,
-            //     target: None,
-            //     path: vec![],
-            //     steps_since_update: 0,
-            // }),
             Template::Algorithm(template) => Box::new(Algorithm {
                 pathfinder: template.into_pathfinder(start_dir),
                 path: None,
-                current_target: None,
             }),
             Template::Rain => Box::new(Rain),
         }
