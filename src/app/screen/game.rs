@@ -85,7 +85,7 @@ impl Game {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
-                portals: Portal::cells(
+                portals: Portal::cells_inverse(
                     HexPoint { h: 4, v: 8},
                     HexPoint { h: 20, v: 8},
                 ),

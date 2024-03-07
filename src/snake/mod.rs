@@ -258,7 +258,7 @@ impl Snake {
                 self.update_dir(other_snakes, apples, gtx, ftx, ctx);
 
                 // create new head for snake
-                let dir = self.body.dir;
+                let mut dir = self.body.dir;
 
                 let head_pos = self.head().pos;
                 let mut new_head_pos = head_pos.wrapping_translate(dir, 1, gtx.board_dim);
@@ -266,8 +266,10 @@ impl Snake {
                 for portal in portals {
                     match portal.check(head_pos, new_head_pos) {
                         Some(Behavior::Die) => self.die(),
-                        Some(Behavior::TeleportTo(dest)) => {
+                        Some(Behavior::TeleportTo(dest, new_dir)) => {
                             new_head_pos = dest;
+                            dir = new_dir;
+                            self.body.dir = new_dir;
                         }
                         Some(Behavior::WrapAround) => {
                             println!("TODO: implement")

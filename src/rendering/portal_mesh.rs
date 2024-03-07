@@ -54,7 +54,7 @@ fn build_half_edge(from: HexPoint, to: HexPoint, color: Color, gtx: &GameContext
 fn color_of_behavior(behavior: Behavior) -> Color {
     match behavior {
         Behavior::Die => Color::RED,
-        Behavior::TeleportTo(_) => Color::from_rgb(50, 105, 168),
+        Behavior::TeleportTo(_, _) => Color::from_rgb(50, 105, 168),
         Behavior::WrapAround => Color::WHITE,
         Behavior::PassThrough => Color::GREEN,
         Behavior::Nothing => Color::TRANSPARENT,
