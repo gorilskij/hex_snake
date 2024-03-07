@@ -1,5 +1,7 @@
+use ggez::input::keyboard::KeyCode::{self, *};
+
 use crate::basic::Side;
-use ggez::input::keyboard::KeyCode;
+use crate::keyboard_layout::{Layout, LayoutConverter};
 
 #[derive(Copy, Clone)]
 pub struct Controls {
@@ -11,90 +13,45 @@ pub struct Controls {
     pub dr: KeyCode,
 }
 
-#[allow(dead_code)]
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum KeyboardLayout {
-    Qwerty,
-    Dvorak,
+impl Controls {
+    /// All keybinding specifications are in Qwerty, this
+    /// function is used to translate them to other keyboard
+    /// layouts (find the key in the new layout which
+    /// corresponds to the given key in qwerty)
+    fn to_layout(self, layout: Layout) -> Self {
+        let c = LayoutConverter::new(Layout::Qwerty, layout);
+        Self {
+            u: c.cvt(self.u),
+            d: c.cvt(self.d),
+            ul: c.cvt(self.ul),
+            ur: c.cvt(self.ur),
+            dl: c.cvt(self.dl),
+            dr: c.cvt(self.dr),
+        }
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ControlSetup {
-    pub layout: KeyboardLayout,
+    pub layout: Layout,
     pub keyboard_side: Side,
     pub hand: Side,
 }
 
 impl From<ControlSetup> for Controls {
     fn from(setup: ControlSetup) -> Self {
-        use ggez::input::keyboard::KeyCode::*;
-        use KeyboardLayout::*;
+        #[rustfmt::skip]
+        let qwerty_controls = match (setup.keyboard_side, setup.hand) {
+            (Side::Right, Side::Right) =>
+                Self { ul: J, u: K, ur: L, dl: M, d: Comma, dr: Period },
+            (Side::Right, Side::Left) =>
+                Self { ul: J, u: K, ur: L, dl: N, d: M, dr: Comma },
+            (Side::Left, Side::Right) =>
+                Self { ul: S, u: D, ur: F, dl: X, d: C, dr: V },
+            (Side::Left, Side::Left) =>
+                Self { ul: S, u: D, ur: F, dl: Z, d: X, dr: C },
+        };
 
-        match (setup.layout, setup.keyboard_side, setup.hand) {
-            (Dvorak, Side::Right, Side::Right) => Self {
-                ul: H,
-                u: T,
-                ur: N,
-                dl: M,
-                d: W,
-                dr: V,
-            },
-            (Dvorak, Side::Right, Side::Left) => Self {
-                ul: H,
-                u: T,
-                ur: N,
-                dl: B,
-                d: M,
-                dr: W,
-            },
-            (Dvorak, Side::Left, Side::Right) => Self {
-                ul: O,
-                u: E,
-                ur: U,
-                dl: Q,
-                d: J,
-                dr: K,
-            },
-            (Dvorak, Side::Left, Side::Left) => Self {
-                ul: O,
-                u: E,
-                ur: U,
-                dl: Semicolon,
-                d: Q,
-                dr: J,
-            },
-            (Qwerty, Side::Right, Side::Right) => Self {
-                ul: J,
-                u: K,
-                ur: L,
-                dl: M,
-                d: Comma,
-                dr: Period,
-            },
-            (Qwerty, Side::Right, Side::Left) => Self {
-                ul: J,
-                u: K,
-                ur: L,
-                dl: N,
-                d: M,
-                dr: Comma,
-            },
-            (Qwerty, Side::Left, Side::Right) => Self {
-                ul: S,
-                u: D,
-                ur: F,
-                dl: X,
-                d: C,
-                dr: V,
-            },
-            (Qwerty, Side::Left, Side::Left) => Self {
-                ul: S,
-                u: D,
-                ur: F,
-                dl: Z,
-                d: X,
-                dr: C,
-            },
-        }
+        qwerty_controls.to_layout(setup.layout)
     }
 }

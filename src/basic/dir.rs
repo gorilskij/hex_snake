@@ -1,24 +1,29 @@
+use std::cmp::Ordering;
+use std::f32::consts::TAU;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
+use itertools::Itertools;
+use rand::distributions::uniform::SampleRange;
 use rand::Rng;
-use std::cmp::Ordering;
 use Dir::*;
+
+use crate::basic::angle_distance;
 
 // defined in clockwise order starting at U
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Dir {
     U = 0,
-    UR = 1,
-    DR = 2,
-    D = 3,
-    DL = 4,
-    UL = 5,
+    Ur,
+    Dr,
+    D,
+    Dl,
+    Ul,
 }
 
 impl From<u8> for Dir {
     fn from(num: u8) -> Self {
-        unsafe { std::mem::transmute(num % 6) }
+        [U, Ur, Dr, D, Dl, Ul][num as usize % 6]
     }
 }
 
@@ -35,6 +40,14 @@ impl Add<u8> for Dir {
 
     fn add(self, rhs: u8) -> Self::Output {
         Self::from(self as u8 + rhs)
+    }
+}
+
+impl Add<Self> for Dir {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self + rhs as u8
     }
 }
 
@@ -58,8 +71,8 @@ impl SubAssign<u8> for Dir {
     }
 }
 
-// U is the smallest, directions get bigger clockwise, UL is the largest
-// UL > U
+// U is the smallest, directions get bigger clockwise, Ul is the largest
+// Ul > U
 impl Ord for Dir {
     fn cmp(&self, other: &Self) -> Ordering {
         (*self as u8).cmp(&(*other as u8))
@@ -74,13 +87,13 @@ impl PartialOrd for Dir {
 
 #[test]
 fn test_dir_math() {
-    let test_plus = [(U, 1, UR), (U, 2, DR), (DR, 3, UL), (D, 6, D)];
+    let test_plus = [(U, 1, Ur), (U, 2, Dr), (Dr, 3, Ul), (D, 6, D)];
 
     for &(start, add, expect) in &test_plus {
         assert_eq!(start + add, expect);
     }
 
-    let test_minus = [(U, 1, UL), (U, 2, DL), (DR, 3, UL), (D, 6, D)];
+    let test_minus = [(U, 1, Ul), (U, 2, Dl), (Dr, 3, Ul), (D, 6, D)];
 
     for &(start, sub, expect) in &test_minus {
         assert_eq!(start - sub, expect);
@@ -89,27 +102,38 @@ fn test_dir_math() {
 
 pub enum Axis {
     UD,   // |
-    ULDR, // \
-    URDL, // /
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum TurnDirection {
-    Clockwise,
-    CounterClockwise,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum TurnType {
-    Straight,
-    Blunt(TurnDirection),
-    Sharp(TurnDirection),
+    UlDr, // \
+    UrDl, // /
 }
 
 impl Dir {
+    // angles around the unit circle
+    pub const ANGLES: [(Dir, f32); 6] = [
+        (U, 3. / 12. * TAU),
+        (Ur, 1. / 12. * TAU),
+        (Dr, 11. / 12. * TAU),
+        (D, 9. / 12. * TAU),
+        (Dl, 7. / 12. * TAU),
+        (Ul, 5. / 12. * TAU),
+    ];
+
+    /// Return all `Dir`s sorted by how close they are to the given angle
+    pub fn closest_to_angle(angle: f32) -> Vec<Self> {
+        Self::ANGLES
+            .into_iter()
+            .map(|(dir, ang)| (dir, ang, angle_distance(angle, ang)))
+            .sorted_by(|(_, _, dist1), (_, _, dist2)| dist1.partial_cmp(dist2).unwrap())
+            .map(|(dir, _, _)| dir)
+            .collect()
+    }
+
     // clockwise order starting from U
     pub fn iter() -> impl Iterator<Item = Self> {
-        [U, UR, DR, D, DL, UL].iter().copied()
+        [U, Ur, Dr, D, Dl, Ul].iter().copied()
+    }
+
+    pub fn iter_from(start: Self) -> impl Iterator<Item = Self> {
+        Self::iter().map(move |dir| dir + start)
     }
 
     pub fn axis(self) -> Axis {
@@ -117,80 +141,75 @@ impl Dir {
 
         match self {
             U | D => UD,
-            UL | DR => ULDR,
-            UR | DL => URDL,
-        }
-    }
-
-    // turn: self => other
-    pub fn turn_type(self, other: Self) -> TurnType {
-        use TurnDirection::*;
-        use TurnType::*;
-
-        let mut dir = self;
-        let mut clockwise_distance = 0;
-        while dir != other {
-            clockwise_distance += 1;
-            dir += 1;
-        }
-
-        match clockwise_distance {
-            1 => Sharp(Clockwise),
-            5 => Sharp(CounterClockwise),
-            2 => Blunt(Clockwise),
-            4 => Blunt(CounterClockwise),
-            3 => Straight,
-            _ => panic!("impossible turn {:?} => {:?}", self, other),
+            Ul | Dr => UlDr,
+            Ur | Dl => UrDl,
         }
     }
 
     pub fn random(rng: &mut impl Rng) -> Self {
-        Self::from(rng.gen_range(0, 6))
+        Self::from((0..6).sample_single(rng))
     }
 
-    pub fn clockwise_angle_from_u(self) -> f32 {
-        use std::f32::consts::*;
-        match self {
-            U => 0.,
-            UR => FRAC_PI_3,
-            DR => 2. * FRAC_PI_3,
-            D => 3. * FRAC_PI_3,
-            DL => 4. * FRAC_PI_3,
-            UL => 5. * FRAC_PI_3,
-        }
+    /// Clockwise angle from self to other in units of 60°
+    pub fn clockwise_distance_to(self, other: Self) -> u8 {
+        (other as u8 + 6 - self as u8) % 6
+    }
+
+    /// Similar to `clockwise_distance_to` but returns an angle in radians
+    pub fn clockwise_angle_to(self, other: Self) -> f32 {
+        self.clockwise_distance_to(other) as f32 * std::f32::consts::FRAC_PI_3
     }
 
     pub fn blunt_turns(self) -> &'static [Self] {
-        const C_UL: &[Dir] = &[DL, U];
-        const C_U: &[Dir] = &[UL, UR];
-        const C_UR: &[Dir] = &[U, DR];
-        const C_DR: &[Dir] = &[UR, D];
-        const C_D: &[Dir] = &[DR, DL];
-        const C_DL: &[Dir] = &[D, UL];
+        const C_UL: &[Dir] = &[Dl, U];
+        const C_U: &[Dir] = &[Ul, Ur];
+        const C_UR: &[Dir] = &[U, Dr];
+        const C_DR: &[Dir] = &[Ur, D];
+        const C_D: &[Dir] = &[Dr, Dl];
+        const C_DL: &[Dir] = &[D, Ul];
         match self {
-            UL => C_UL,
+            Ul => C_UL,
             U => C_U,
-            UR => C_UR,
-            DR => C_DR,
+            Ur => C_UR,
+            Dr => C_DR,
             D => C_D,
-            DL => C_DL,
+            Dl => C_DL,
         }
     }
 
     pub fn sharp_turns(self) -> &'static [Self] {
-        const C_UL: &[Dir] = &[D, UR];
-        const C_U: &[Dir] = &[DL, DR];
-        const C_UR: &[Dir] = &[UL, D];
-        const C_DR: &[Dir] = &[U, DL];
-        const C_D: &[Dir] = &[UR, UL];
-        const C_DL: &[Dir] = &[DR, U];
+        const C_UL: &[Dir] = &[D, Ur];
+        const C_U: &[Dir] = &[Dl, Dr];
+        const C_UR: &[Dir] = &[Ul, D];
+        const C_DR: &[Dir] = &[U, Dl];
+        const C_D: &[Dir] = &[Ur, Ul];
+        const C_DL: &[Dir] = &[Dr, U];
         match self {
-            UL => C_UL,
+            Ul => C_UL,
             U => C_U,
-            UR => C_UR,
-            DR => C_DR,
+            Ur => C_UR,
+            Dr => C_DR,
             D => C_D,
-            DL => C_DL,
+            Dl => C_DL,
         }
+    }
+}
+
+#[test]
+fn test_clockwise_distance_to() {
+    use Dir::*;
+    for (from, to, clockwise_dist) in [
+        (U, U, 0),
+        (U, Ur, 1),
+        (U, Dr, 2),
+        (U, D, 3),
+        (U, Dl, 4),
+        (U, Ul, 5),
+        (Ur, Dr, 1),
+        (Dr, Ul, 3),
+        (Ul, Dr, 3),
+        (Dl, U, 2),
+    ] {
+        assert_eq!(from.clockwise_distance_to(to), clockwise_dist, "{:?} => {:?}", from, to)
     }
 }

@@ -1,82 +1,41 @@
-use std::ops::{Deref, DerefMut};
+// TODO: move this to rendering
 
-use ggez::{
-    conf::{FullscreenType, NumSamples, WindowMode, WindowSetup},
-    event::{EventHandler, KeyCode, KeyMods},
-    graphics::Rect,
-    Context, GameResult,
-};
+use ggez::event::EventHandler;
+use ggez::graphics::{Canvas, Rect};
+use ggez::input::keyboard::KeyInput;
+use ggez::Context;
 use itertools::Itertools;
+use keyboard_control::ControlSetup;
+pub use palette::Palette;
+use screen::{Game, Screen};
+use snake::builder::Builder as SnakeBuilder;
 
-use game::Game;
-use palette::GamePalette;
-use snake::{EatMechanics, SnakeSeed};
-use start_screen::StartScreen;
+use crate::app::screen::{DebugScenario, StartScreen};
+use crate::apple::spawn::SpawnPolicy;
+use crate::basic::CellDim;
+use crate::error::{Error, ErrorConversion, Result};
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
+use crate::snake::SegmentType;
+use crate::snake_control::pathfinder;
+use crate::{by_segment_type, by_snake_type, snake, snake_control};
 
-use crate::app::{
-    apple_spawn_strategy::AppleSpawnStrategy,
-    keyboard_control::ControlSetup,
-    snake::{
-        controller::SnakeControllerTemplate, palette::SnakePaletteTemplate, EatBehavior, SnakeType,
-    },
-};
-
-macro_rules! hash_map {
-    {} => {
-        ::std::collections::HashMap::new()
-    };
-    { $($key:expr => $value:expr),+ } => {{
-        let mut map = ::std::collections::HashMap::new();
-        $( m.insert($key, $value); )+
-        map
-    }};
-}
-
-mod game;
+mod distance_grid;
+pub(crate) mod fps_control;
+pub mod game_context;
 pub mod keyboard_control;
+pub mod message;
 mod palette;
-mod snake;
-mod start_screen;
-#[macro_use]
-mod apple_spawn_strategy;
-
-pub type Frames = u64;
-
-pub enum Screen {
-    StartScreen(StartScreen),
-    Game(Game),
-}
-
-impl Deref for Screen {
-    type Target = dyn EventHandler;
-
-    fn deref(&self) -> &Self::Target {
-        use Screen::*;
-        match self {
-            StartScreen(x) => x,
-            Game(x) => x,
-        }
-    }
-}
-
-impl DerefMut for Screen {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        use Screen::*;
-        match self {
-            StartScreen(x) => x,
-            Game(x) => x,
-        }
-    }
-}
+mod prefs;
+pub(crate) mod screen;
+mod snake_management;
+pub mod stats;
 
 pub struct App {
     screen: Screen,
-    window_mode: WindowMode,
-    window_setup: WindowSetup,
 }
 
 impl App {
-    pub fn new(players: Vec<ControlSetup>) -> Self {
+    pub fn new(players: Vec<ControlSetup>, ctx: &mut Context) -> Self {
         assert_eq!(
             players.iter().map(|cs| cs.layout).dedup().count(),
             1,
@@ -89,53 +48,65 @@ impl App {
             "found multiple players on the same side of the keyboard"
         );
 
-        let window_mode = WindowMode {
-            width: 1000.,
-            height: 800.,
-            maximized: false,
-            fullscreen_type: FullscreenType::Windowed,
-            borderless: false,
-            min_width: 0.,
-            min_height: 0.,
-            max_width: 0.,
-            max_height: 0.,
-            resizable: true,
-        };
-
-        let window_setup = WindowSetup {
-            title: "Hex Snake".to_string(),
-            samples: NumSamples::Zero,
-            vsync: true,
-            icon: "".to_string(),
-            srgb: true,
-        };
-
         let seeds: Vec<_> = players
             .into_iter()
-            .map(|cs| SnakeSeed {
-                snake_type: SnakeType::PlayerSnake,
-                eat_mechanics: EatMechanics {
-                    eat_self: EatBehavior::Cut,
-                    eat_other: hash_map! {},
-                    default: EatBehavior::Crash,
-                },
-                palette: SnakePaletteTemplate::rainbow().persistent(),
-                controller: SnakeControllerTemplate::PlayerController(cs),
-                // controller: SnakeControllerTemplate::PlayerController12,
+            .map(|control_setup| {
+                let eat_mechanics = EatMechanics::new(
+                    by_segment_type! {
+                        SegmentType::DISCR_EATEN => EatBehavior::PassOver,
+                        _ => EatBehavior::Crash,
+                    },
+                    by_snake_type! {
+                        // TODO: this doesn't work as expected
+                        snake::Type::Rain => by_segment_type! {
+                            _ => EatBehavior::PassUnder,
+                        },
+                        _ => by_segment_type! {
+                            _ => EatBehavior::Crash,
+                        },
+                    },
+                );
+
+                let knowledge = Knowledge::accurate(&eat_mechanics);
+
+                SnakeBuilder::default()
+                    .snake_type(snake::Type::Player)
+                    .eat_mechanics(eat_mechanics)
+                    .palette(snake::PaletteTemplate::rainbow(true))
+                    // .palette(PaletteTemplate::dark_blue_to_red(false))
+                    // .palette(PaletteTemplate::zebra())
+                    .controller(snake_control::Template::Keyboard { control_setup, knowledge })
+                    .speed(1.)
+                    .autopilot(pathfinder::Template::WithBackup {
+                        main: Box::new(pathfinder::Template::WeightedBFS),
+                        backup: Box::new(pathfinder::Template::SpaceFilling),
+                    })
+                // .snake_control(snake_control::Template::Mouse)
+                // .snake_control(SnakeControllerTemplate::PlayerController12)
             })
             .collect();
 
+        let cell_dim = CellDim::from(50.);
+
+        // Manual selection of what to launch
         Self {
-            // screen: Screen::StartScreen(StartScreen::new()),
-            screen: Screen::Game(Game::new(
-                12.,
-                seeds,
-                GamePalette::dark(),
-                AppleSpawnStrategy::Random { apple_count: 5 },
-                window_mode,
-            )),
-            window_mode,
-            window_setup,
+            screen: match 0 {
+                6 => Screen::DebugScenario(DebugScenario::head_head_collision_apple(cell_dim)),
+                5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
+                // 4 => Screen::DebugScenario(DebugScenario::many_snakes()),
+                3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
+                2 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
+                1 => Screen::StartScreen(StartScreen::new(cell_dim, Palette::dark())),
+                0 => Screen::Game(Game::new(
+                    cell_dim,
+                    3.,
+                    seeds,
+                    Palette::dark(),
+                    SpawnPolicy::Random { apple_count: 5 },
+                    ctx,
+                )),
+                _ => unreachable!(),
+            },
         }
 
         // let seeds = vec![SnakeSeed {
@@ -146,7 +117,7 @@ impl App {
         //     },
         //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::rainbow(),
-        //     controller: SnakeControllerTemplate::demo_triangle_pattern(0, Side::Right),
+        //     snake_control: SnakeControllerTemplate::demo_triangle_pattern(0, Side::Right),
         // }];
         //
         // Self {
@@ -155,7 +126,7 @@ impl App {
         //         12.,
         //         seeds,
         //         GamePalette::dark(),
-        //         AppleSpawnStrategy::ScheduledOnEat {
+        //         AppleSpawnPolicy::ScheduledOnEat {
         //             apple_count: 1,
         //             spawns: spawn_schedule![spawn(10, 9), wait(10),],
         //             next_index: 0,
@@ -170,17 +141,17 @@ impl App {
         //     snake_type: SnakeType::PlayerSnake,
         //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::rainbow(),
-        //     controller: SnakeControllerTemplate::demo_hexagon_pattern(0),
+        //     snake_control: SnakeControllerTemplate::demo_hexagon_pattern(0),
         // }];
 
         // let seeds = vec![SnakeSeed {
         //     snake_type: SnakeType::PlayerSnake,
         //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::rainbow(),
-        //     controller: SnakeControllerTemplate::DemoController(vec![
+        //     snake_control: SnakeControllerTemplate::DemoController(vec![
         //         SimMove::Move(Dir::U),
-        //         SimMove::Move(Dir::DR),
-        //         SimMove::Move(Dir::DL),
+        //         SimMove::Move(Dir::Dr),
+        //         SimMove::Move(Dir::Dl),
         //     ]),
         // }];
 
@@ -188,7 +159,7 @@ impl App {
         //     snake_type: SnakeType::PlayerSnake,
         //     eat_mechanics: EatMechanics::always(EatBehavior::Cut),
         //     palette: SnakePaletteTemplate::gray_gradient(),
-        //     controller: SnakeControllerTemplate::CompetitorAI2,
+        //     snake_control: SnakeControllerTemplate::CompetitorAI2,
         // }];
         //
         // Self {
@@ -197,53 +168,44 @@ impl App {
         //         12.,
         //         seeds,
         //         GamePalette::dark(),
-        //         AppleSpawnStrategy::Random { apple_count: 1 },
+        //         AppleSpawnPolicy::Random { apple_count: 1 },
         //         window_mode,
         //     )),
         //     window_mode,
         //     window_setup,
         // }
     }
-
-    pub fn wm(&self) -> WindowMode {
-        self.window_mode
-    }
-
-    pub fn ws(&self) -> WindowSetup {
-        self.window_setup.clone()
-    }
 }
 
-impl EventHandler for App {
-    fn update(&mut self, ctx: &mut Context) -> GameResult {
+impl EventHandler<Error> for App {
+    fn update(&mut self, ctx: &mut Context) -> Result {
         if let Screen::StartScreen(start_screen) = &self.screen {
             if let Some(next_screen) = start_screen.next_screen() {
                 self.screen = next_screen
             }
         }
-        self.screen.update(ctx)
+        self.screen.update(ctx).with_trace_step("App::update")
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> GameResult {
-        self.screen.draw(ctx)
+    fn draw(&mut self, ctx: &mut Context) -> Result {
+        self.screen.draw(ctx).with_trace_step("App::draw")
     }
 
-    fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, mods: KeyMods, repeat: bool) {
-        self.screen.key_down_event(ctx, key, mods, repeat)
+    fn mouse_motion_event(&mut self, ctx: &mut Context, x: f32, y: f32, dx: f32, dy: f32) -> Result {
+        self.screen.mouse_motion_event(ctx, x, y, dx, dy)
     }
 
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        ggez::graphics::set_screen_coordinates(
-            ctx,
-            Rect {
-                x: 0.0,
-                y: 0.0,
-                w: width,
-                h: height,
-            },
-        )
-        .unwrap();
+    fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, repeated: bool) -> Result {
+        self.screen.key_down_event(ctx, input, repeated)
+    }
 
-        self.screen.resize_event(ctx, width, height);
+    fn key_up_event(&mut self, ctx: &mut Context, input: KeyInput) -> Result {
+        self.screen.key_up_event(ctx, input)
+    }
+
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) -> Result {
+        Canvas::from_frame(ctx, None).set_screen_coordinates(Rect { x: 0.0, y: 0.0, w: width, h: height });
+
+        self.screen.resize_event(ctx, width, height)
     }
 }

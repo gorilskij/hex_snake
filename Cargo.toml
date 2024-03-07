@@ -2,16 +2,24 @@
 name = "hex_snake"
 version = "0.1.0"
 authors = ["gorilskij <43991400@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-ggez = "0.5"
-rand = "~0.7"
-itertools = "0.10"
+#ggez = "0.8"
+ggez = { git = "https://github.com/ggez/ggez", rev = "81544de" }
+rand = "0.8"
+itertools = "0.12"
 derive_more = "~0.99"
 num-integer = "~0.1"
 hsl = "0.1.1"
 lazy_static = "1.4.0"
+ezing = "~0.2"
+lyon_geom = "~1.0"
+rayon = "~1.8"
+static_assertions = "~1.1"
+# local dependencies
+# TODO: publish all local dependencies before merging into master
+enum_rotate = { path = "../enum_rotate" }
 
 [profile.release]
 debug = true

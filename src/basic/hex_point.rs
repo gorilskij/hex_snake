@@ -1,11 +1,12 @@
-use super::dir::{Axis, Dir};
-use crate::basic::{CellDim, Point};
-use std::{
-    cmp::{max, Ordering},
-    fmt::{Debug, Error, Formatter},
-};
+use std::cmp::{max, Ordering};
+use std::fmt::{Debug, Error, Formatter};
+
 use Dir::*;
 
+use super::dir::{Axis, Dir};
+use crate::basic::{CellDim, Point};
+
+// INVARIANT: even columns are half a cell higher than odd columns
 #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
 pub struct HexPoint {
     pub h: isize,
@@ -15,12 +16,22 @@ pub struct HexPoint {
 pub type HexDim = HexPoint;
 
 impl HexPoint {
-    pub fn to_point(self, CellDim { side, sin, cos }: CellDim) -> Point {
+    pub fn to_cartesian(self, cell_dim: CellDim) -> Point {
         let Self { h, v } = self;
+        let CellDim { side, sin, cos } = cell_dim;
         Point {
             x: h as f32 * (side + cos),
-            y: v as f32 * 2. * sin + if h % 2 == 0 { 0. } else { sin },
+            y: (v as f32 * 2. + (h % 2) as f32) * sin,
         }
+    }
+
+    pub fn from_cartesian(point: Point, cell_dim: CellDim) -> Self {
+        // top-right of the desired cell
+        let Point { x, y } = point; // - cell_dim.center();
+        let CellDim { side, sin, cos } = cell_dim;
+        let h = (x - cos / 2.) / (side + cos);
+        let v = (y / sin - h % 2.) / 2.;
+        Self { h: h as isize, v: v as isize }
     }
 
     // approximate straight-line distance in units of side length
@@ -31,33 +42,48 @@ impl HexPoint {
     //     (dh / (side + cos) + dv / (2. * sin)) as usize
     // }
 
-    // untested
     // None if the two points are not on the same line
-    // pub fn dir_to(self, other: Self) -> Option<Dir> {
-    //     if self.h == other.h {
-    //         return Some(if self.v > other.v { U } else { D });
-    //     } else {
-    //         let dh = (self.h - other.h).abs();
-    //         if self.v > other.v {
-    //             // going up
-    //             let dv = dh - (dh + self.h % 2) / 2;
-    //             if other.v == self.v - dv {
-    //                 return if self.h > other.h { Some(UL) } else { Some(UR) };
-    //             }
-    //         } else if self.v < other.v {
-    //             // going down
-    //             let dv = dh - (dh + (self.h + 1) % 2) / 2;
-    //             let expected_v = self.v + dv;
-    //             if expected_v == other.v {
-    //                 return if self.h > other.h { Some(DL) } else { Some(DR) };
-    //             }
-    //         }
-    //     }
-    //
-    //     None
-    // }
+    // NOTE: doesn't consider wrapping!
+    pub fn dir_to(self, other: Self) -> Option<Dir> {
+        if self.h == other.h {
+            return Some(if self.v > other.v { U } else { D });
+        } else {
+            let dh = (self.h - other.h).abs();
+            if self.v > other.v || self.v == other.v && self.h % 2 == 1 {
+                // going up
+                let dv = dh - (dh + self.h % 2) / 2;
+                if other.v == self.v - dv {
+                    return Some(if self.h > other.h { Ul } else { Ur });
+                }
+            } else if self.v < other.v || self.v == other.v && self.h % 2 == 0 {
+                // going down
+                let dv = dh - (dh + (self.h + 1) % 2) / 2;
+                let expected_v = self.v + dv;
+                if expected_v == other.v {
+                    return Some(if self.h > other.h { Dl } else { Dr });
+                }
+            }
+        }
 
-    pub fn manhattan_distance_to(self, other: Self) -> usize {
+        println!("no dir from {self:?} to {other:?}");
+        None
+    }
+
+    // TODO: improve efficiency
+    // Considers wrapping, None if there is no 1-step path
+    pub fn single_step_dir_to(self, other: Self, board_dim: HexDim) -> Option<Dir> {
+        Dir::iter().find(|&dir| self.wrapping_translate(dir, 1, board_dim) == other)
+    }
+
+    // None if the two points are not on the same line or are farther than 1 unit apart
+    // This version allows wrapping around the board
+    pub fn wrapping_dir_to_1(self, other: Self, board_dim: HexDim) -> Option<Dir> {
+        // O(12) goon enough?
+        Dir::iter().find(|dir| self.wrapping_translate(*dir, 1, board_dim) == other)
+    }
+
+    // O(1)
+    pub fn manhattan_distance(self, other: Self) -> usize {
         let dh = (self.h - other.h).abs();
         let max_dv = if self.v > other.v {
             dh - (dh + (self.h % 2).abs()) / 2
@@ -132,25 +158,25 @@ impl HexPoint {
         match dir {
             U => new_pos.v -= dh,
             D => new_pos.v += dh,
-            UL => {
+            Ul => {
                 let adjustment = (dh + (self.h % 2).abs()) / 2;
                 let dv = dh - adjustment;
                 new_pos.h -= dh;
                 new_pos.v -= dv;
             }
-            UR => {
+            Ur => {
                 let adjustment = (dh + (self.h % 2).abs()) / 2;
                 let dv = dh - adjustment;
                 new_pos.h += dh;
                 new_pos.v -= dv;
             }
-            DL => {
+            Dl => {
                 let adjustment = (dh + 1 - (self.h % 2).abs()) / 2;
                 let dv = dh - adjustment;
                 new_pos.h -= dh;
                 new_pos.v += dv;
             }
-            DR => {
+            Dr => {
                 let adjustment = (dh + 1 - (self.h % 2).abs()) / 2;
                 let dv = dh - adjustment;
                 new_pos.h += dh;
@@ -165,7 +191,7 @@ impl HexPoint {
     // if the point is n cells out of bounds, it will be n cells from the edge
     // TODO: improve efficiency
     #[must_use]
-    pub fn wrap_around(mut self, board_dim: HexDim, axis: Axis) -> Option<Self> {
+    fn wrap_around(mut self, board_dim: HexDim, axis: Axis) -> Option<Self> {
         use Axis::*;
 
         if !board_dim.contains(self) {
@@ -174,32 +200,20 @@ impl HexPoint {
             #[rustfmt::skip]
                 let dir = match axis {
                     UD => if self.v < 0 { U } else { D },
-                    ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
-                    URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
+                    UlDr => if self.v < 0 || self.h < 0 { Ul } else { Dr },
+                    UrDl => if self.v < 0 || self.h >= board_dim.h { Ur } else { Dl },
                 };
 
             // check if the point is salvageable, otherwise return None
             {
                 fn problems(point: HexPoint, board_dim: HexDim) -> (bool, bool, bool, bool) {
-                    (
-                        point.v < 0,
-                        point.v >= board_dim.v,
-                        point.h < 0,
-                        point.h >= board_dim.h,
-                    )
+                    (point.v < 0, point.v >= board_dim.v, point.h < 0, point.h >= board_dim.h)
                 }
 
                 let mut x = self;
                 let probs = problems(x, board_dim);
                 while !board_dim.contains(x) {
                     if problems(x, board_dim) != probs {
-                        // println!(
-                        //     "problems was {:?} for {:?}, is {:?} for {:?}",
-                        //     probs,
-                        //     self,
-                        //     problems(x, board_dim),
-                        //     x
-                        // );
                         return None;
                     }
                     x = x.translate(-dir, 1);
@@ -224,8 +238,8 @@ impl HexPoint {
             while !board_dim.contains(self) {
                 // let d2 = match axis {
                 //     UD => if self.v < 0 { U } else { D },
-                //     ULDR => if self.v < 0 || self.h < 0 { UL } else { DR },
-                //     URDL => if self.v < 0 || self.h >= board_dim.h { UR } else { DL },
+                //     UlDr => if self.v < 0 || self.h < 0 { Ur } else { Dr },
+                //     UrDl => if self.v < 0 || self.h >= board_dim.h { Ur } else { Dl },
                 // };
                 // assert_eq!(dir, d2);
 
@@ -240,14 +254,29 @@ impl HexPoint {
     #[must_use]
     pub fn wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> Self {
         let translated = self.translate(dir, dist);
-        translated
-            .wrap_around(board_dim, dir.axis())
-            .unwrap_or_else(|| {
+        translated.wrap_around(board_dim, dir.axis()).unwrap_or_else(|| {
+            panic!(
+                "failed to wrap pos: {self:?}, translated: {translated:?} \
+                    (board_dim: {board_dim:?}, dir: {dir:?})"
+            )
+        })
+    }
+
+    // tells you if it teleported or not
+    #[must_use]
+    pub fn explicit_wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> (Self, bool) {
+        let translated = self.translate(dir, dist);
+        if board_dim.contains(translated) {
+            (translated, false)
+        } else {
+            let wrapped = translated.wrap_around(board_dim, dir.axis()).unwrap_or_else(|| {
                 panic!(
-                    "failed to wrap pos: {:?}, translated: {:?} (board_dim: {:?}, dir: {:?})",
-                    self, translated, board_dim, dir
+                    "failed to wrap pos: {self:?}, translated: {translated:?} \
+                    (board_dim: {board_dim:?}, dir: {dir:?})"
                 )
-            })
+            });
+            (wrapped, true)
+        }
     }
 
     pub fn contains(self, pos: Self) -> bool {
@@ -272,6 +301,6 @@ fn test_manhattan_distance() {
     .for_each(|&((h1, v1), (h2, v2), d)| {
         let p1 = HexPoint { h: h1, v: v1 };
         let p2 = HexPoint { h: h2, v: v2 };
-        assert_eq!(p1.manhattan_distance_to(p2), d);
+        assert_eq!(p1.manhattan_distance(p2), d);
     });
 }
