@@ -85,7 +85,10 @@ impl Game {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
-                portals: Portal::cells(),
+                portals: Portal::cells(
+                    HexPoint { h: 4, v: 8},
+                    HexPoint { h: 20, v: 8},
+                ),
                 gtx: GameContext::new(
                     // updated immediately after creation
                     HexPoint { h: 0, v: 0 },

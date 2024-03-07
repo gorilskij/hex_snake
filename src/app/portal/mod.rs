@@ -1,4 +1,4 @@
-use crate::basic::HexPoint;
+use crate::basic::{Dir, HexPoint};
 
 // TODO: support negative indices for portals to make them
 //       stick to the right or bottom edge
@@ -40,87 +40,29 @@ impl Portal {
         None
     }
 
-    pub fn cells() -> Vec<Self> {
+    pub fn cells(pos1: HexPoint, pos2: HexPoint) -> Vec<Self> {
+        // TODO: make sure the positions don't touch the edges of the board
+
         let cell1 = Self {
-            edges: vec![
-                Edge {
-                    a: HexPoint { h: 4, v: 6 },
-                    b: HexPoint { h: 4, v: 7 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 10, v: 21 }),
+            edges: Dir::iter()
+                .map(|dir| Edge {
+                    a: pos1 + dir,
+                    b: pos1,
+                    behavior_ab: Behavior::TeleportTo(pos2 + -dir),
                     behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 5, v: 6 },
-                    b: HexPoint { h: 4, v: 7 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 9, v: 20 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 5, v: 7 },
-                    b: HexPoint { h: 4, v: 7 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 9, v: 19 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 4, v: 8 },
-                    b: HexPoint { h: 4, v: 7 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 10, v: 19 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 3, v: 7 },
-                    b: HexPoint { h: 4, v: 7 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 11, v: 19 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 3, v: 6 },
-                    b: HexPoint { h: 4, v: 7 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 11, v: 20 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-            ],
+                })
+                .collect(),
         };
 
         let cell2 = Self {
-            edges: vec![
-                Edge {
-                    a: HexPoint { h: 10, v: 19 },
-                    b: HexPoint { h: 10, v: 20 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 4, v: 8 }),
+            edges: Dir::iter()
+                .map(|dir| Edge {
+                    a: pos2 + dir,
+                    b: pos2,
+                    behavior_ab: Behavior::TeleportTo(pos1 + -dir),
                     behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 11, v: 19 },
-                    b: HexPoint { h: 10, v: 20 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 3, v: 7 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 11, v: 20 },
-                    b: HexPoint { h: 10, v: 20 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 3, v: 6 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 10, v: 21 },
-                    b: HexPoint { h: 10, v: 20 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 4, v: 6 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 9, v: 20 },
-                    b: HexPoint { h: 10, v: 20 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 5, v: 6 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-                Edge {
-                    a: HexPoint { h: 9, v: 19 },
-                    b: HexPoint { h: 10, v: 20 },
-                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 5, v: 7 }),
-                    behavior_ba: Behavior::Nothing,
-                },
-            ],
+                })
+                .collect(),
         };
 
         vec![cell1, cell2]

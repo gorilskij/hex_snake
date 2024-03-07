@@ -1,5 +1,6 @@
 use std::cmp::{max, Ordering};
 use std::fmt::{Debug, Error, Formatter};
+use std::ops::Add;
 
 use Dir::*;
 
@@ -11,6 +12,14 @@ use crate::basic::{CellDim, Point};
 pub struct HexPoint {
     pub h: isize,
     pub v: isize,
+}
+
+impl Add<Dir> for HexPoint {
+    type Output = Self;
+
+    fn add(self, dir: Dir) -> Self::Output {
+        self.translate(dir, 1)
+    }
 }
 
 pub type HexDim = HexPoint;
