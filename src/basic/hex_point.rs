@@ -1,8 +1,10 @@
-use super::dir::{Axis, Dir};
-use crate::basic::{CellDim, Point};
 use std::cmp::{max, Ordering};
 use std::fmt::{Debug, Error, Formatter};
+
 use Dir::*;
+
+use super::dir::{Axis, Dir};
+use crate::basic::{CellDim, Point};
 
 // INVARIANT: even columns are half a cell higher than odd columns
 #[derive(Eq, PartialEq, Copy, Clone, Div, Add, Hash)]
@@ -63,8 +65,14 @@ impl HexPoint {
             }
         }
 
-        println!("no dir from {:?} to {:?}", self, other);
+        println!("no dir from {self:?} to {other:?}");
         None
+    }
+
+    // TODO: improve efficiency
+    // Considers wrapping, None if there is no 1-step path
+    pub fn single_step_dir_to(self, other: Self, board_dim: HexDim) -> Option<Dir> {
+        Dir::iter().find(|&dir| self.wrapping_translate(dir, 1, board_dim) == other)
     }
 
     // None if the two points are not on the same line or are farther than 1 unit apart
@@ -182,20 +190,20 @@ impl HexPoint {
     /// Taking a line parallel to the given axis going through this point,
     /// what is the length of the intersection of that line and the board?
     /// This also works for points outside the board.
-    fn chord_length(self, board_dim: HexDim, axis: Axis) -> usize {
-        use Axis::*;
-        match axis {
-            UD => if (0..board_dim.h).contains(&self.h) {
-                board_dim.v
-            } else {
-                0
-            }
-            UrDl =>
-            UlDr =>
-        }
-
-        todo!()
-    }
+    // fn chord_length(self, board_dim: HexDim, axis: Axis) -> usize {
+    //     use Axis::*;
+    //     match axis {
+    //         UD => if (0..board_dim.h).contains(&self.h) {
+    //             board_dim.v
+    //         } else {
+    //             0
+    //         }
+    //         UrDl =>
+    //         UlDr =>
+    //     }
+    //
+    //     todo!()
+    // }
 
     // basically mod width, mod height
     // if the point is n cells out of bounds, it will be n cells from the edge
@@ -217,25 +225,13 @@ impl HexPoint {
             // check if the point is salvageable, otherwise return None
             {
                 fn problems(point: HexPoint, board_dim: HexDim) -> (bool, bool, bool, bool) {
-                    (
-                        point.v < 0,
-                        point.v >= board_dim.v,
-                        point.h < 0,
-                        point.h >= board_dim.h,
-                    )
+                    (point.v < 0, point.v >= board_dim.v, point.h < 0, point.h >= board_dim.h)
                 }
 
                 let mut x = self;
                 let probs = problems(x, board_dim);
                 while !board_dim.contains(x) {
                     if problems(x, board_dim) != probs {
-                        // println!(
-                        //     "problems was {:?} for {:?}, is {:?} for {:?}",
-                        //     probs,
-                        //     self,
-                        //     problems(x, board_dim),
-                        //     x
-                        // );
                         return None;
                     }
                     x = x.translate(-dir, 1);
@@ -276,36 +272,27 @@ impl HexPoint {
     #[must_use]
     pub fn wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> Self {
         let translated = self.translate(dir, dist);
-        translated
-            .wrap_around(board_dim, dir.axis())
-            .unwrap_or_else(|| {
-                panic!(
-                    "failed to wrap pos: {:?}, translated: {:?} (board_dim: {:?}, dir: {:?})",
-                    self, translated, board_dim, dir
-                )
-            })
+        translated.wrap_around(board_dim, dir.axis()).unwrap_or_else(|| {
+            panic!(
+                "failed to wrap pos: {self:?}, translated: {translated:?} \
+                    (board_dim: {board_dim:?}, dir: {dir:?})"
+            )
+        })
     }
 
     // tells you if it teleported or not
     #[must_use]
-    pub fn explicit_wrapping_translate(
-        self,
-        dir: Dir,
-        dist: usize,
-        board_dim: HexDim,
-    ) -> (Self, bool) {
+    pub fn explicit_wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> (Self, bool) {
         let translated = self.translate(dir, dist);
         if board_dim.contains(translated) {
             (translated, false)
         } else {
-            let wrapped = translated
-                .wrap_around(board_dim, dir.axis())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "failed to wrap pos: {:?}, translated: {:?} (board_dim: {:?}, dir: {:?})",
-                        self, translated, board_dim, dir
-                    )
-                });
+            let wrapped = translated.wrap_around(board_dim, dir.axis()).unwrap_or_else(|| {
+                panic!(
+                    "failed to wrap pos: {self:?}, translated: {translated:?} \
+                    (board_dim: {board_dim:?}, dir: {dir:?})"
+                )
+            });
             (wrapped, true)
         }
     }

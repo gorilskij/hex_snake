@@ -1,9 +1,10 @@
+use std::f32::consts::TAU;
+
 pub use cell_dim::CellDim;
 pub use dir::Dir;
 pub use dir12::Dir12;
 pub use hex_point::{HexDim, HexPoint};
 pub use point::Point;
-use std::f32::consts::TAU;
 
 pub mod board;
 mod cell_dim;
@@ -11,20 +12,6 @@ mod dir;
 mod dir12;
 mod hex_point;
 mod point;
-pub mod transformations;
-
-macro_rules! hash_map_with_default {
-    { default => $def_value:expr $(, $($key:expr => $value:expr),* $(,)?)? } => {{
-        let map = crate::support::map_with_default::HashMapWithDefault::new($def_value);
-        $(
-            $(
-                let mut map = map;
-                map.insert($key, $value);
-            )*
-        )?
-        map
-    }};
-}
 
 pub type Frames = u64;
 pub type Food = u32;

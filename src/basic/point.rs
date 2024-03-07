@@ -1,8 +1,9 @@
-use ggez::mint::Point2;
-use ggez::winit::dpi::PhysicalSize;
-use lyon_geom::euclid::default::{Point2D, Vector2D};
 use std::marker::PhantomData;
 use std::ops::{Div, Mul};
+
+use ggez::mint::{Point2, Vector2};
+use ggez::winit::dpi::PhysicalSize;
+use lyon_geom::euclid::default::{Point2D, Vector2D};
 
 /// A more convenient version of mint::Point2<f32>
 #[derive(Copy, Clone, Debug, Add, AddAssign, Sub, SubAssign)]
@@ -14,6 +15,12 @@ pub struct Point {
 impl From<Point> for Point2<f32> {
     fn from(Point { x, y }: Point) -> Self {
         Point2 { x, y }
+    }
+}
+
+impl From<Point> for Vector2<f32> {
+    fn from(Point { x, y }: Point) -> Self {
+        Vector2 { x, y }
     }
 }
 
@@ -75,6 +82,10 @@ impl Div<f32> for Point {
 }
 
 impl Point {
+    pub fn zero() -> Self {
+        Self { x: 0., y: 0. }
+    }
+
     /// Equal x and y
     pub fn square(side: f32) -> Self {
         Self { x: side, y: side }

@@ -1,35 +1,35 @@
-use ggez::event::{EventHandler, KeyCode, KeyMods};
-use ggez::graphics::{
-    Rect, self,
-};
+// TODO: move this to rendering
+
+use ggez::event::EventHandler;
+use ggez::graphics::{Canvas, Rect};
+use ggez::input::keyboard::KeyInput;
 use ggez::Context;
 use itertools::Itertools;
+use keyboard_control::ControlSetup;
+pub use palette::Palette;
+use screen::{Game, Screen};
+use snake::builder::Builder as SnakeBuilder;
 
 use crate::app::screen::{DebugScenario, StartScreen};
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::CellDim;
-use crate::error::{AppErrorConversion, AppResult, Error};
-use crate::snake::{
-    EatBehavior, EatMechanics, PassthroughKnowledge, SegmentRawType, {self},
-};
-use crate::snake_control;
-use keyboard_control::ControlSetup;
-pub use palette::Palette;
-use screen::{Game, Screen};
-use crate::app::guidance::PathFinderTemplate;
+use crate::error::{Error, ErrorConversion, Result};
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
+use crate::snake::SegmentType;
+use crate::snake_control::pathfinder;
+use crate::{by_segment_type, by_snake_type, snake, snake_control};
 
 mod distance_grid;
-mod fps_control;
+pub(crate) mod fps_control;
 pub mod game_context;
-pub mod guidance;
 pub mod keyboard_control;
-mod message;
+pub mod message;
 mod palette;
+pub mod portal;
 mod prefs;
 pub(crate) mod screen;
 mod snake_management;
 pub mod stats;
-pub mod portal;
 
 pub struct App {
     screen: Screen,
@@ -52,53 +52,55 @@ impl App {
         let seeds: Vec<_> = players
             .into_iter()
             .map(|control_setup| {
-                let eat_mechanics = EatMechanics {
-                    eat_self: hash_map_with_default! {
-                        default => EatBehavior::Crash,
-                        SegmentRawType::Eaten => EatBehavior::PassUnder,
+                let eat_mechanics = EatMechanics::new(
+                    by_segment_type! {
+                        SegmentType::DISCR_EATEN => EatBehavior::PassOver,
+                        _ => EatBehavior::Crash,
                     },
-                    eat_other: hash_map_with_default! {
-                        default => hash_map_with_default! {
-                            default => EatBehavior::Crash,
+                    by_snake_type! {
+                        // TODO: this doesn't work as expected
+                        snake::Type::Rain => by_segment_type! {
+                            _ => EatBehavior::PassUnder,
                         },
-                        snake::Type::Rain => hash_map_with_default! {
-                            default => EatBehavior::PassUnder,
+                        _ => by_segment_type! {
+                            _ => EatBehavior::Crash,
                         },
                     },
-                };
+                );
 
-                let passthrough_knowledge = PassthroughKnowledge::accurate(&eat_mechanics);
+                let knowledge = Knowledge::accurate(&eat_mechanics);
 
-                snake::Builder::default()
+                SnakeBuilder::default()
                     .snake_type(snake::Type::Player)
                     .eat_mechanics(eat_mechanics)
                     .palette(snake::PaletteTemplate::rainbow(true))
                     // .palette(PaletteTemplate::dark_blue_to_red(false))
                     // .palette(PaletteTemplate::zebra())
-                    .controller(snake_control::Template::Keyboard {
-                        control_setup,
-                        passthrough_knowledge,
-                    })
+                    .controller(snake_control::Template::Keyboard { control_setup, knowledge })
                     .speed(1.)
-                    .autopilot(PathFinderTemplate::Algorithm1)
+                    .autopilot(pathfinder::Template::WithBackup {
+                        main: Box::new(pathfinder::Template::WeightedBFS),
+                        backup: Box::new(pathfinder::Template::SpaceFilling),
+                    })
                 // .snake_control(snake_control::Template::Mouse)
                 // .snake_control(SnakeControllerTemplate::PlayerController12)
             })
             .collect();
 
-        let cell_dim = CellDim::from(30.);
+        let cell_dim = CellDim::from(50.);
 
         // Manual selection of what to launch
         Self {
             screen: match 0 {
+                6 => Screen::DebugScenario(DebugScenario::head_head_collision_apple(cell_dim)),
                 5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
                 // 4 => Screen::DebugScenario(DebugScenario::many_snakes()),
                 3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
                 2 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
-                1 => Screen::StartScreen(StartScreen::new(cell_dim)),
+                1 => Screen::StartScreen(StartScreen::new(cell_dim, Palette::dark())),
                 0 => Screen::Game(Game::new(
                     cell_dim,
-                    7.,
+                    3.,
                     seeds,
                     Palette::dark(),
                     SpawnPolicy::Random { apple_count: 5 },
@@ -177,7 +179,7 @@ impl App {
 }
 
 impl EventHandler<Error> for App {
-    fn update(&mut self, ctx: &mut Context) -> AppResult {
+    fn update(&mut self, ctx: &mut Context) -> Result {
         if let Screen::StartScreen(start_screen) = &self.screen {
             if let Some(next_screen) = start_screen.next_screen() {
                 self.screen = next_screen
@@ -186,18 +188,25 @@ impl EventHandler<Error> for App {
         self.screen.update(ctx).with_trace_step("App::update")
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> AppResult {
+    fn draw(&mut self, ctx: &mut Context) -> Result {
         self.screen.draw(ctx).with_trace_step("App::draw")
     }
 
-    fn key_down_event(&mut self, ctx: &mut Context, key: KeyCode, mods: KeyMods, repeat: bool) {
-        self.screen.key_down_event(ctx, key, mods, repeat)
+    fn mouse_motion_event(&mut self, ctx: &mut Context, x: f32, y: f32, dx: f32, dy: f32) -> Result {
+        self.screen.mouse_motion_event(ctx, x, y, dx, dy)
     }
 
-    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) {
-        graphics::set_screen_coordinates(ctx, Rect { x: 0.0, y: 0.0, w: width, h: height })
-            .unwrap();
+    fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, repeated: bool) -> Result {
+        self.screen.key_down_event(ctx, input, repeated)
+    }
 
-        self.screen.resize_event(ctx, width, height);
+    fn key_up_event(&mut self, ctx: &mut Context, input: KeyInput) -> Result {
+        self.screen.key_up_event(ctx, input)
+    }
+
+    fn resize_event(&mut self, ctx: &mut Context, width: f32, height: f32) -> Result {
+        Canvas::from_frame(ctx, None).set_screen_coordinates(Rect { x: 0.0, y: 0.0, w: width, h: height });
+
+        self.screen.resize_event(ctx, width, height)
     }
 }

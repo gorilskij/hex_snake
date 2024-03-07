@@ -1,12 +1,21 @@
-use crate::snake;
-use ggez::GameError;
-use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use std::{error, fmt, result};
+
+use ggez::GameError;
+use snake::builder::BuilderError as SnakeBuilderError;
+use static_assertions::assert_impl_all;
+
+use crate::button::ButtonDataBuilderError;
+use crate::snake;
+
+assert_impl_all!(GameError: error::Error);
+assert_impl_all!(SnakeBuilderError: error::Error);
 
 #[derive(Debug)]
 pub enum ErrorType {
     GameError(GameError),
-    SnakeBuilderError(snake::BuilderError),
+    SnakeBuilderError(SnakeBuilderError),
+    ButtonDataBuilderError(ButtonDataBuilderError),
 }
 
 /// The second member contains a trace in reverse order
@@ -19,9 +28,15 @@ impl From<GameError> for Error {
     }
 }
 
-impl From<snake::BuilderError> for Error {
-    fn from(e: snake::BuilderError) -> Self {
+impl From<SnakeBuilderError> for Error {
+    fn from(e: SnakeBuilderError) -> Self {
         Self(ErrorType::SnakeBuilderError(e), vec![])
+    }
+}
+
+impl From<ButtonDataBuilderError> for Error {
+    fn from(e: ButtonDataBuilderError) -> Self {
+        Self(ErrorType::ButtonDataBuilderError(e), vec![])
     }
 }
 
@@ -36,7 +51,7 @@ impl Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "Error:\n{:?}\nTrace:", self.0)?;
         for t in (self.1).iter().rev() {
-            writeln!(f, " in {}", t)?;
+            writeln!(f, " in {t}")?;
         }
         Ok(())
     }
@@ -48,15 +63,23 @@ impl Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match &self.0 {
+            ErrorType::GameError(e) => Some(e),
+            ErrorType::SnakeBuilderError(e) => Some(e),
+            ErrorType::ButtonDataBuilderError(e) => Some(e),
+        }
+    }
+}
 
-pub type AppResult<T = ()> = Result<T, Error>;
+pub type Result<T = ()> = result::Result<T, Error>;
 
-pub trait AppErrorConversion {
+pub trait ErrorConversion {
     fn with_trace_step<S: ToString>(self, s: S) -> Self;
 }
 
-impl<T> AppErrorConversion for AppResult<T> {
+impl<T> ErrorConversion for Result<T> {
     fn with_trace_step<S: ToString>(self, s: S) -> Self {
         self.map_err(|e| e.with_trace_step(s.to_string()))
     }

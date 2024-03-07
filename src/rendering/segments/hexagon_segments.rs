@@ -1,8 +1,8 @@
-use crate::basic::transformations::translate;
-use crate::basic::Point;
-use crate::rendering::segments::descriptions::SegmentDescription;
+use std::iter;
+
+use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription};
 use crate::rendering::segments::point_factory::SegmentRenderer;
-use crate::rendering::segments::render_hexagon;
+use crate::rendering::shape::{Hexagon, Shape};
 
 pub struct HexagonSegments;
 
@@ -11,16 +11,19 @@ pub struct HexagonSegments;
 /// shouldn't be used directly outside of `render_segment` and instead implements
 /// `render_segment` directly
 impl SegmentRenderer for HexagonSegments {
-    fn render_default_straight_segment(_: &SegmentDescription) -> Vec<Point> {
-        unreachable!()
-    }
-    fn render_default_curved_segment(_: &SegmentDescription, _turn_fraction: f32) -> Vec<Point> {
-        unreachable!()
-    }
-
-    fn render_segment(description: SegmentDescription, _turn_fraction: f32) -> Vec<Point> {
-        let mut points = render_hexagon(description.cell_dim);
-        translate(&mut points, description.destination);
-        points
+    fn render_segment(
+        description: &SegmentDescription,
+        _: f32,
+        _: RoundHeadDescription,
+        _: usize,
+    ) -> Box<dyn Iterator<Item = Polygon> + '_> {
+        let points = Hexagon::new(description.cell_dim)
+            .translate(description.destination)
+            .into();
+        let poylgon = Polygon {
+            points,
+            color: description.segment_style.first_color(),
+        };
+        Box::new(iter::once(poylgon))
     }
 }

@@ -1,5 +1,6 @@
+use crate::app::message;
 use crate::app::message::Message;
-use ggez::graphics::Color;
+use crate::color::Color;
 
 /// Collect statistics about the current game state
 #[derive(Default)]
@@ -10,7 +11,7 @@ pub struct Stats {
     /// Number of subsegments per segment (note
     /// that head and tail will have fewer).
     /// Maximum in the case of multiple snakes
-    pub max_color_resolution: usize, // TODO: find a better name for this
+    pub max_color_resolution: usize,
     pub redrawing_apples: bool,
     pub redrawing_snakes: bool,
 }
@@ -23,8 +24,7 @@ impl Stats {
         );
         Message {
             text,
-            left: true,
-            top: true,
+            position: message::Position::TopLeft,
             h_margin: Message::DEFAULT_MARGIN,
             v_margin: Message::DEFAULT_MARGIN * 2. + Message::DEFAULT_FONT_SIZE,
             font_size: Message::DEFAULT_FONT_SIZE,

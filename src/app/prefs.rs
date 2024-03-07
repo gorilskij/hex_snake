@@ -1,11 +1,22 @@
-use crate::basic::Food;
-use crate::rendering;
 use std::time::Duration;
 
+use enum_rotate::EnumRotate;
+
+use crate::basic::Food;
+use crate::rendering;
+
+#[derive(Copy, Clone, EnumRotate)]
+pub enum DrawGrid {
+    Grid,
+    Dots,
+    None,
+}
+
 pub struct Prefs {
-    pub draw_grid: bool,
+    pub draw_grid: DrawGrid,
     pub draw_border: bool,
     pub draw_distance_grid: bool,
+    pub draw_player_path: bool,
 
     pub display_fps: bool,
     pub display_stats: bool,
@@ -18,16 +29,17 @@ pub struct Prefs {
     pub prob_spawn_rain: f64,
 
     pub draw_style: rendering::Style,
-
     // pub draw_ai_debug_artifacts: bool,
+    pub hide_cursor: bool,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
         Self {
-            draw_grid: false,
+            draw_grid: DrawGrid::None,
             draw_border: false,
             draw_distance_grid: false,
+            draw_player_path: false,
 
             display_fps: false,
             display_stats: false,
@@ -40,8 +52,8 @@ impl Default for Prefs {
             prob_spawn_rain: 0.002,
 
             draw_style: rendering::Style::Smooth,
-
             // draw_ai_debug_artifacts: false,
+            hide_cursor: true,
         }
     }
 }

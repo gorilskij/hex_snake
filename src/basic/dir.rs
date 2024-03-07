@@ -1,29 +1,29 @@
+use std::cmp::Ordering;
+use std::f32::consts::TAU;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
 use itertools::Itertools;
+use rand::distributions::uniform::SampleRange;
+use rand::Rng;
+use Dir::*;
 
 use crate::basic::angle_distance;
-use rand::Rng;
-use std::cmp::Ordering;
-use std::f32::consts::TAU;
-use Dir::*;
 
 // defined in clockwise order starting at U
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Dir {
     U = 0,
-    Ur = 1,
-    Dr = 2,
-    D = 3,
-    Dl = 4,
-    Ul = 5,
+    Ur,
+    Dr,
+    D,
+    Dl,
+    Ul,
 }
 
 impl From<u8> for Dir {
     fn from(num: u8) -> Self {
-        // SAFETY: (num % 6) is between 0 and 5
-        unsafe { std::mem::transmute(num % 6) }
+        [U, Ur, Dr, D, Dl, Ul][num as usize % 6]
     }
 }
 
@@ -147,7 +147,7 @@ impl Dir {
     }
 
     pub fn random(rng: &mut impl Rng) -> Self {
-        Self::from(rng.gen_range(0, 6))
+        Self::from((0..6).sample_single(rng))
     }
 
     /// Clockwise angle from self to other in units of 60°
@@ -210,12 +210,6 @@ fn test_clockwise_distance_to() {
         (Ul, Dr, 3),
         (Dl, U, 2),
     ] {
-        assert_eq!(
-            from.clockwise_distance_to(to),
-            clockwise_dist,
-            "{:?} => {:?}",
-            from,
-            to
-        )
+        assert_eq!(from.clockwise_distance_to(to), clockwise_dist, "{:?} => {:?}", from, to)
     }
 }

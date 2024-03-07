@@ -1,100 +1,161 @@
-use std::slice;
+use std::cell::RefCell;
+use std::default::Default;
+use std::f32::consts::TAU;
+use std::rc::Rc;
+use std::result;
+
+use ggez::event::EventHandler;
+use ggez::graphics::{Canvas, DrawParam, TextLayout};
+use ggez::input::keyboard::{KeyCode, KeyInput};
+use ggez::Context;
+use rand::prelude::*;
 
 use crate::app::fps_control::FpsControl;
-use crate::apple::spawn::SpawnPolicy;
-use crate::apple::Apple;
-use ggez::{
-    event::{EventHandler, KeyCode, KeyMods},
-    Context,
-};
-use rand::{prelude::*, rngs::ThreadRng};
-use crate::app::AppResult;
-
-use crate::{
-    app,
-    app::{
-        app_error::{AppError, AppResult},
-        apple::{spawn::SpawnPolicy, Apple},
-        control::Control,
-        game_context::GameContext,
-        prefs::Prefs,
-        rendering,
-        screen::Environment,
-        snake,
-        snake::{controller::Template, EatBehavior, EatMechanics, Snake},
-        stats::Stats,
-        Screen,
-    },
-    basic::{CellDim, Dir, FrameStamp, HexDim, HexPoint},
-};
-use crate::app::portal::Portal;
+use crate::app::game_context::GameContext;
+use crate::app::prefs::Prefs;
+use crate::app::screen::Environment;
+use crate::app::snake_management::{find_collisions, handle_collisions};
+use crate::app::stats::Stats;
+use crate::app::{self, Screen};
+use crate::apple::spawn::{spawn_apples, SpawnPolicy, SpawnScheduleBuilder};
+use crate::basic::{CellDim, Dir, HexPoint, Point};
+use crate::button::{Button, ButtonDataBuilder, ButtonType, TriColor};
 use crate::color::Color;
+use crate::error::{Error, ErrorConversion, Result};
+use crate::rendering::shape::{Hexagon, Shape, TriangleArrowLeft, WideHexagon};
+use crate::snake::builder::Builder as SnakeBuilder;
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
+use crate::snake::SegmentType;
 use crate::snake_control::Template;
-use crate::{rendering, spawn_schedule};
-use rand::prelude::*;
-use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use crate::view::snakes::OtherSnakes;
+use crate::{apple, by_segment_type, by_snake_type, rendering, snake};
 
 // position of the snake within the demo box is relative,
 // the snake thinks it's in an absolute world at (0, 0)
 struct SnakeDemo {
-    location: HexPoint, // top-left
-    board_dim: HexDim,
-    apples: Vec<Apple>,
-    apple_spawn_policy: SpawnPolicy,
-    snake: Snake,
+    pos: Point, // top-left
+    env: Environment<NoRng>,
+
     palettes: Vec<snake::PaletteTemplate>,
     current_palette: usize,
+    left_button: Button,
+    right_button: Button,
 
-    fps_control: Weak<RefCell<FpsControl>>,
+    fps_control: Rc<RefCell<FpsControl>>,
 }
 
 impl SnakeDemo {
-    fn new(location: HexPoint, control: Weak<RefCell<FpsControl>>) -> Self {
+    fn new(cell_dim: CellDim, pos: Point, app_palette: app::Palette, control: Rc<RefCell<FpsControl>>) -> Self {
         let board_dim = HexPoint { h: 11, v: 8 };
-        let start_pos = HexPoint { h: 1, v: 4 };
+        let start_pos = HexPoint { h: 4, v: 4 };
         let start_dir = Dir::U;
-        let start_len = 5;
+        let start_len = 10;
 
-        let spawn_schedule = spawn_schedule![spawn(6, 2), wait(40),];
+        let spawn_schedule = SpawnScheduleBuilder::new()
+            .spawn(HexPoint { h: 5, v: 4 }, apple::Type::Food(1))
+            .wait(40)
+            .build();
         let apple_spawn_policy = SpawnPolicy::ScheduledOnEat {
             apple_count: 1,
-            spawns: spawn_schedule,
+            schedule: spawn_schedule,
             next_index: 0,
+            current_wait: 0,
         };
 
-        let palettes = vec![
+        let snake_palettes = vec![
+            snake::PaletteTemplate::rainbow(true),
             snake::PaletteTemplate::solid_white_red(),
             // snake::PaletteTemplate::rainbow(false),
-            snake::PaletteTemplate::rainbow(true),
             snake::PaletteTemplate::alternating_white(),
             snake::PaletteTemplate::gray_gradient(1., false),
             snake::PaletteTemplate::green_to_red(false),
             // snake::PaletteTemplate::zebra(),
         ];
 
-        let seed = snake::Builder::default()
+        let seed = SnakeBuilder::default()
             .snake_type(snake::Type::Simulated)
-            .eat_mechanics(EatMechanics::always(EatBehavior::Cut))
+            .eat_mechanics(EatMechanics::new(
+                by_segment_type! {
+                    SegmentType::DISCR_EATEN => EatBehavior::PassOver,
+                    _ => EatBehavior::Cut,
+                },
+                by_snake_type! {
+                    _ => by_segment_type! {
+                        _ => EatBehavior::Crash,
+                    }
+                },
+            ))
             // placeholder, updated immediately
             .palette(snake::PaletteTemplate::Solid {
                 color: Color::RED,
                 eaten: Color::RED,
             })
-            .controller(Template::demo_infinity_pattern(1))
+            .controller(Template::demo_8_pattern(0))
             .pos(start_pos)
             .dir(start_dir)
             .len(start_len)
-            .palette(palettes[0]);
+            .speed(1.)
+            .palette(snake_palettes[0]);
+
+        type ButtonOuter = Hexagon;
+        type ButtonInnerLeft = TriangleArrowLeft;
+        let bottom_right = pos + board_dim.to_cartesian(cell_dim);
+        let button_dim = cell_dim * 2.;
+        let color = TriColor {
+            normal: Color::gray(0.5),
+            hover: Color::GREEN,
+            click: Color::RED,
+        };
+        let outer_shape = ButtonOuter::new(button_dim);
+        let inner_shape = ButtonInnerLeft::new(button_dim);
+        let triangle_relative_pos = outer_shape.center() - inner_shape.center();
+        let left_button = Button {
+            pos: Point {
+                x: pos.x + 3. * cell_dim.side,
+                y: bottom_right.y + 2. * cell_dim.side,
+            },
+            button_type: ButtonType::Click(
+                ButtonDataBuilder::new()
+                    .outer_shape(outer_shape.clone(), 15., color)
+                    .inner_shape(inner_shape.clone(), 15., triangle_relative_pos, color)
+                    .build()
+                    .unwrap(),
+            ),
+        };
+        let right_button = Button {
+            pos: Point {
+                x: bottom_right.x - 3. * cell_dim.side - outer_shape.bounding_box().1.x,
+                y: bottom_right.y + 2. * cell_dim.side,
+            },
+            button_type: ButtonType::Click(
+                ButtonDataBuilder::new()
+                    .outer_shape(outer_shape, 15., color)
+                    .inner_shape(
+                        inner_shape.rotate_clockwise_about_center(TAU / 2.),
+                        15.,
+                        triangle_relative_pos,
+                        color,
+                    )
+                    .build()
+                    .unwrap(),
+            ),
+        };
 
         Self {
-            location,
-            board_dim,
-            apples: vec![],
-            apple_spawn_policy,
-            snake: seed.build().unwrap(),
-            palettes,
+            pos,
+            env: Environment {
+                snakes: vec![seed.build().unwrap()],
+                apples: vec![],
+                portals: vec![],
+                gtx: GameContext::new(board_dim, cell_dim, app_palette, Prefs::default(), apple_spawn_policy),
+                rng: NoRng,
+            },
+
+            palettes: snake_palettes,
             current_palette: 0,
+
+            left_button,
+            right_button,
 
             fps_control: control,
         }
@@ -102,99 +163,80 @@ impl SnakeDemo {
 }
 
 impl SnakeDemo {
+    fn prev_palette(&mut self) {
+        self.current_palette = (self.current_palette + self.palettes.len() - 1) % self.palettes.len();
+        self.env.snakes[0].palette = self.palettes[self.current_palette].into();
+    }
+
     fn next_palette(&mut self) {
         self.current_palette = (self.current_palette + 1) % self.palettes.len();
-        self.snake.palette = self.palettes[self.current_palette].into();
+        self.env.snakes[0].palette = self.palettes[self.current_palette].into();
     }
 
-    fn spawn_apples(&mut self, _prefs: &Prefs, _rng: &mut impl Rng) {
-        unimplemented!("how do you use GameContext here??")
-        // let new_apples = spawn_apples(
-        //     slice::from_ref(&self.snake),
-        //     &self.apples,
-        //     &self.gtx,
-        //     rng,
-        // );
-        // self.apples.extend(new_apples.into_iter());
+    fn update(&mut self, ctx: &Context) {
+        // unimplemented!("how do you use GameContext here??")
+        self.env.snakes[0].advance(
+            OtherSnakes::empty(),
+            &self.env.apples,
+            &self.env.portals,
+            &self.env.gtx,
+            self.fps_control.borrow().context(),
+            ctx,
+        );
+
+        let collisions = find_collisions(&self.env);
+        let (spawn_snakes, game_over) = handle_collisions(&mut self.env, &collisions);
+
+        assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
+        assert!(!game_over, "unexpected game over");
+
+        spawn_apples(&mut self.env);
     }
 
-    fn advance_snakes(
-        &mut self,
-        _cell_dim: CellDim,
-        _frame_stamp: FrameStamp,
-        _prefs: &Prefs,
-        _ctx: &Context,
-        _rng: &mut impl Rng,
-    ) {
-        unimplemented!("how do you use GameContext here??")
-        // self.snake.advance(
-        //     OtherSnakes::empty(),
-        //     &self.apples,
-        //     self.board_dim,
-        //     cell_dim,
-        //     ctx,
-        //     frame_stamp,
-        // );
+    fn draw(&mut self, canvas: &mut Canvas, ctx: &mut Context, stats: &mut Stats) -> Result {
+        self.env.snakes[0].update_dir(
+            OtherSnakes::empty(),
+            &[],
+            &self.env.gtx,
+            self.fps_control.borrow().context(),
+            ctx,
+        );
 
-        // let collisions = find_collisions(self);
-        // let (spawn_snakes, game_over) = handle_collisions(self, &collisions);
-        //
-        // assert!(spawn_snakes.is_empty(), "unexpected snake spawn");
-        // assert!(!game_over, "unexpected game over");
-        //
-        // self.spawn_apples(prefs, rng);
-    }
+        let draw_param = DrawParam::default().dest(self.pos);
 
-    fn draw(
-        &mut self,
-        _ctx: &mut Context,
-        _cell_dim: CellDim,
-        _frame_stamp: FrameStamp,
-        _draw_style: rendering::Style,
-        _palette: &app::Palette,
-        _stats: &mut Stats,
-    ) -> AppResult {
-        unimplemented!("how do you use GameContext here??")
-        // self.snake
-        //     .update_dir(OtherSnakes::empty(), &[], self.board_dim, cell_dim, ctx, frame_stamp);
-        //
-        // let draw_param = DrawParam::default().dest(self.location.to_cartesian(cell_dim));
-        //
-        // let grid_mesh = rendering::grid_mesh(self.board_dim, cell_dim, palette, ctx)?;
-        // graphics::draw(ctx, &grid_mesh, draw_param)?;
-        //
-        // let border_mesh = rendering::border_mesh(self.board_dim, cell_dim, palette, ctx)?;
-        // graphics::draw(ctx, &border_mesh, draw_param)?;
-        //
-        // let snake_mesh = rendering::snake_mesh(
-        //     slice::from_mut(&mut self.snake),
-        //     frame_stamp,
-        //     self.board_dim,
-        //     cell_dim,
-        //     draw_style,
-        //     ctx,
-        //     stats,
-        // )?;
-        // graphics::draw(ctx, &snake_mesh, draw_param)?;
-        //
-        // if !self.apples.is_empty() {
-        //     let apple_mesh = rendering::apple_mesh(
-        //         &self.apples,
-        //         frame_stamp,
-        //         cell_dim,
-        //         draw_style,
-        //         palette,
-        //         ctx,
-        //         stats,
-        //     )?;
-        //     graphics::draw(ctx, &apple_mesh, draw_param)?;
-        // }
-        //
-        // Ok(())
+        let grid_mesh = rendering::grid_mesh(&self.env.gtx, ctx)?;
+        canvas.draw(&grid_mesh, draw_param);
+
+        let border_mesh = rendering::border_mesh(&self.env.gtx, ctx)?;
+        canvas.draw(&border_mesh, draw_param);
+
+        let fps_control = self.fps_control.borrow();
+        let ftx = fps_control.context();
+
+        let snake_mesh = rendering::snake_mesh(&mut self.env.snakes, &self.env.gtx, ftx, ctx, stats)?;
+        canvas.draw(&snake_mesh, draw_param);
+
+        if !self.env.apples.is_empty() {
+            let apple_mesh = rendering::apple_mesh(&self.env.apples, &self.env.gtx, ftx, ctx, stats)?;
+            canvas.draw(&apple_mesh, draw_param);
+        }
+
+        let left_clicked = self.left_button.draw(canvas, ctx)?;
+        let right_clicked = self.right_button.draw(canvas, ctx)?;
+        drop(fps_control);
+
+        assert!(!(left_clicked && right_clicked));
+        if left_clicked {
+            self.prev_palette();
+        } else if right_clicked {
+            self.next_palette();
+        }
+
+        Ok(())
     }
 }
 
-enum NoRng {}
+struct NoRng;
 
 impl RngCore for NoRng {
     fn next_u32(&mut self) -> u32 {
@@ -209,174 +251,119 @@ impl RngCore for NoRng {
         unimplemented!()
     }
 
-    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), rand::Error> {
+    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> result::Result<(), rand::Error> {
         unimplemented!()
-    }
-}
-
-impl Environment<NoRng> for SnakeDemo {
-    fn snakes(&self) -> &[Snake] {
-        slice::from_ref(&self.snake)
-    }
-
-    fn apples(&self) -> &[Apple] {
-        &self.apples
-    }
-
-    fn portals(&self) -> &[Portal] {
-        &[]
-    }
-
-    fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext) {
-        unimplemented!()
-        // (slice::from_mut(&mut self.snake), &mut self.apples)
-    }
-
-    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut NoRng) {
-        panic!("tried to get rng of SnakeDemo")
-    }
-
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult {
-        panic!("tried to add snake to SnakeDemo: {:?}", snake_builder)
-    }
-
-    fn remove_snake(&mut self, index: usize) -> Snake {
-        panic!("tried to remove snake at index {} in SnakeDemo", index)
-    }
-
-    fn remove_apple(&mut self, index: usize) -> Apple {
-        self.apples.remove(index)
-    }
-
-    fn gtx(&self) -> &GameContext {
-        panic!("SnakeDemo has no GameContext")
-    }
-
-    fn board_dim(&self) -> HexDim {
-        self.board_dim
-    }
-
-    fn cell_dim(&self) -> CellDim {
-        panic!("tried to get cell_dim from StartScreen")
-    }
-
-    fn frame_stamp(&self) -> FrameStamp {
-        self.fps_control
-            .upgrade()
-            .expect("Weak pointer dropped")
-            .borrow()
-            .frame_stamp()
-    }
-
-    fn rng(&mut self) -> &mut NoRng {
-        panic!("tried to get rng of SnakeDemo")
     }
 }
 
 pub struct StartScreen {
     fps_control: Rc<RefCell<FpsControl>>,
+
+    multiplayer_button: Button,
+
+    // TODO: implement palette choice
+    // palettes: Vec<app::Palette>,
+    // current_palette: usize,
+    palette: app::Palette,
     cell_dim: CellDim,
-
-    palettes: Vec<app::Palette>,
-    current_palette: usize,
-
-    prefs: Prefs,
-    stats: Stats,
 
     player1_demo: SnakeDemo,
     player2_demo: SnakeDemo,
 
-    rng: ThreadRng,
+    stats: Stats,
 }
 
 impl StartScreen {
     #[allow(dead_code)]
-    pub fn new(cell_dim: CellDim) -> Self {
+    pub fn new(cell_dim: CellDim, app_palette: app::Palette) -> Self {
         let fps_control = Rc::new(RefCell::new(FpsControl::new(7.)));
-        let weak1 = Rc::downgrade(&fps_control);
-        let weak2 = Rc::downgrade(&fps_control);
+
+        let stroke_thickness = 15.;
+
+        type ButtonShape = WideHexagon;
+        let button_dim = cell_dim * 1.5;
+        let color = TriColor {
+            normal: Color::gray(0.5),
+            hover: Color::GREEN,
+            click: Color::RED,
+        };
+        let button_shape = ButtonShape::new(button_dim);
+        let player_button_prototype =
+            ButtonDataBuilder::new().outer_shape(button_shape.clone(), stroke_thickness, color);
+        let button_text_pos = button_shape.center();
 
         Self {
-            fps_control,
+            fps_control: fps_control.clone(),
+
+            multiplayer_button: Button {
+                pos: Point { x: 800., y: 50. },
+                button_type: ButtonType::Rotate {
+                    options: vec![
+                        player_button_prototype
+                            .clone()
+                            .text("One player", 50., TextLayout::center(), button_text_pos, color)
+                            .build()
+                            .unwrap(),
+                        player_button_prototype
+                            .text("Two players", 50., TextLayout::center(), button_text_pos, color)
+                            .build()
+                            .unwrap(),
+                    ],
+                    index: 0,
+                },
+            },
+
+            palette: app_palette.clone(),
             cell_dim,
 
-            palettes: vec![app::Palette::dark()],
-            current_palette: 0,
+            player1_demo: SnakeDemo::new(
+                cell_dim,
+                HexPoint { h: 1, v: 5 }.to_cartesian(cell_dim),
+                app_palette.clone(),
+                fps_control.clone(),
+            ),
+            player2_demo: SnakeDemo::new(
+                cell_dim,
+                HexPoint { h: 15, v: 5 }.to_cartesian(cell_dim),
+                app_palette,
+                fps_control,
+            ),
 
-            prefs: Prefs::default().apple_food(2),
             stats: Default::default(),
-
-            player1_demo: SnakeDemo::new(HexPoint { h: 1, v: 5 }, weak1),
-            player2_demo: SnakeDemo::new(HexPoint { h: 15, v: 5 }, weak2),
-
-            rng: thread_rng(),
         }
     }
 }
 
 impl EventHandler<Error> for StartScreen {
-    fn update(&mut self, _ctx: &mut Context) -> AppResult {
-        unimplemented!("how do you use GameContext here??")
-        // while self.control.borrow_mut().can_update(&mut self.gtx) {
-        //     let frame_stamp = self.control.borrow().frame_stamp();
-        //     self.player1_demo.advance_snakes(
-        //         self.cell_dim,
-        //         frame_stamp,
-        //         &self.prefs,
-        //         ctx,
-        //         &mut self.rng,
-        //     );
-        //     self.player2_demo.advance_snakes(
-        //         self.cell_dim,
-        //         frame_stamp,
-        //         &self.prefs,
-        //         ctx,
-        //         &mut self.rng,
-        //     );
-        // }
-        // Ok(())
+    fn update(&mut self, ctx: &mut Context) -> Result {
+        while self.fps_control.borrow_mut().can_update() {
+            self.player1_demo.update(ctx);
+            self.player2_demo.update(ctx);
+        }
+        Ok(())
     }
 
-    fn draw(&mut self, _ctx: &mut Context) -> AppResult {
-        unimplemented!("how do you use GameContext here??")
-        // self.control.borrow_mut().graphics_frame(&mut self.gtx);
-        // let frame_stamp = self.control.borrow().frame_stamp();
-        //
-        // graphics::clear(ctx, Color::BLACK);
-        //
-        // let palette = &self.palettes[self.current_palette];
-        // self.player1_demo.draw(
-        //     ctx,
-        //     self.cell_dim,
-        //     frame_stamp,
-        //     self.prefs.draw_style,
-        //     palette,
-        //     &mut self.stats,
-        // )?;
-        // self.player2_demo.draw(
-        //     ctx,
-        //     self.cell_dim,
-        //     frame_stamp,
-        //     self.prefs.draw_style,
-        //     palette,
-        //     &mut self.stats,
-        // )?;
-        //
-        // graphics::present(ctx)
+    fn draw(&mut self, ctx: &mut Context) -> Result {
+        self.fps_control.borrow_mut().graphics_frame();
+
+        let mut canvas = Canvas::from_frame(ctx, self.palette.background_color);
+
+        self.player1_demo.draw(&mut canvas, ctx, &mut self.stats)?;
+        self.player2_demo.draw(&mut canvas, ctx, &mut self.stats)?;
+
+        let _ = self.multiplayer_button.draw(&mut canvas, ctx)?;
+        // let two_player_clicked = self.two_player_button.draw(&mut canvas, ctx)?;
+
+        canvas.finish(ctx).map_err(Error::from).with_trace_step("Game::draw")
     }
 
-    fn key_down_event(
-        &mut self,
-        _ctx: &mut Context,
-        keycode: KeyCode,
-        _keymods: KeyMods,
-        _repeat: bool,
-    ) {
-        match keycode {
-            KeyCode::Left => self.player1_demo.next_palette(),
-            KeyCode::Right => self.player2_demo.next_palette(),
+    fn key_down_event(&mut self, _ctx: &mut Context, input: KeyInput, _repeat: bool) -> Result {
+        match input.keycode {
+            Some(KeyCode::Left) => self.player1_demo.next_palette(),
+            Some(KeyCode::Right) => self.player2_demo.next_palette(),
             _ => (),
         }
+        Ok(())
     }
 }
 

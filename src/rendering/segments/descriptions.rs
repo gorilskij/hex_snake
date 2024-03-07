@@ -1,11 +1,10 @@
 // This file contains structs describing various aspects of a segment
 
 use crate::basic::{CellDim, Dir, Point};
+use crate::color::Color;
+use crate::rendering;
 use crate::snake::palette::SegmentStyle;
 use crate::snake::{SegmentType, ZIndex};
-use crate::{
-    rendering,
-};
 
 // A full (solid) segment starts at 0. and ends at 1.
 #[derive(Copy, Clone, Debug)]
@@ -22,8 +21,7 @@ impl SegmentFraction {
     pub fn appearing(frame_fraction: f32) -> Self {
         assert!(
             (0. ..=1.).contains(&frame_fraction),
-            "Invalid frame-frac {}",
-            frame_fraction
+            "Invalid frame fraction: {frame_fraction}",
         );
         Self { start: 0., end: frame_fraction }
     }
@@ -31,8 +29,7 @@ impl SegmentFraction {
     pub fn disappearing(frame_fraction: f32) -> Self {
         assert!(
             (0. ..=1.).contains(&frame_fraction),
-            "Invalid frame-frac {}",
-            frame_fraction
+            "Invalid frame fraction: {frame_fraction}",
         );
         Self { start: frame_fraction, end: 1. }
     }
@@ -90,12 +87,47 @@ impl TurnDescription {
 
 #[derive(Clone, Debug)]
 pub struct SegmentDescription {
+    pub segment_idx: usize,
     pub destination: Point,
     pub turn: TurnDescription,
     pub fraction: SegmentFraction,
+    /// `SegmentFraction` of the previous segment (towards the head)
+    pub prev_fraction: Option<SegmentFraction>,
     pub draw_style: rendering::Style,
     pub segment_type: SegmentType,
     pub segment_style: SegmentStyle,
     pub z_index: ZIndex,
     pub cell_dim: CellDim,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum RoundHeadDescription {
+    /// Only the beginning of the round head is within the current segment
+    Tip { segment_end: f32 },
+    /// The full round head is within the current segment
+    Full { segment_end: f32 },
+    /// Only the end of the round head is within the current segment
+    Tail { prev_segment_end: f32 },
+    /// The round head is fully behind this segment (going head to tail)
+    Gone,
+}
+
+impl SegmentFraction {
+    pub fn round_head_description(self, prev: Option<Self>, cell_dim: CellDim) -> RoundHeadDescription {
+        let CellDim { side, sin, .. } = cell_dim;
+        let head_radius = side / 2.;
+
+        use RoundHeadDescription::*;
+        match prev {
+            None if self.end * 2. * sin < head_radius => Tip { segment_end: self.end },
+            None => Full { segment_end: self.end },
+            Some(next) if next.end * 2. * sin < head_radius => Tail { prev_segment_end: next.end },
+            Some(_) => Gone,
+        }
+    }
+}
+
+pub struct Polygon {
+    pub points: Vec<Point>,
+    pub color: Color,
 }

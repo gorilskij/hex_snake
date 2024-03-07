@@ -1,21 +1,22 @@
 use std::collections::{HashSet, VecDeque};
+use std::mem;
+use std::mem::Discriminant;
 
+use ggez::Context;
 pub use palette::{Palette, PaletteTemplate};
 
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
-use crate::basic::{Dir, FrameStamp, HexDim, HexPoint};
-use crate::{ snake_control};
-use ggez::Context;
-
-use crate::apple::Apple;
-use crate::basic::Frames;
-use crate::snake_control::Controller;
-use crate::view::snakes::Snakes;
-use crate::app::guidance::{Path, PathFinderTemplate};
-pub use eat_mechanics::{EatBehavior, EatMechanics, PassthroughKnowledge};
 use crate::app::portal::{Behavior, Portal};
+use crate::apple::Apple;
+use crate::basic::{Dir, FrameStamp, Frames, HexDim, HexPoint};
+use crate::snake::eat_mechanics::{EatMechanics, Knowledge};
+use crate::snake_control;
+use crate::snake_control::{pathfinder, Controller};
+use crate::view::snakes::Snakes;
 
-mod eat_mechanics;
+pub mod builder;
+pub mod eat_mechanics;
 pub mod palette;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -34,15 +35,9 @@ pub enum Type {
     Rain,
 }
 
-// for usage as map keys
-#[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
-pub enum SegmentRawType {
-    Normal,
-    Eaten,
-    Crashed,
-    BlackHole,
-}
-
+// NOTE: if variants are added, the code should be checked for
+//       usages of Discriminant<SegmentType>, match statements
+//       using this type should be extended accordingly
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SegmentType {
     Normal,
@@ -53,14 +48,14 @@ pub enum SegmentType {
 }
 
 impl SegmentType {
-    pub fn raw_type(&self) -> SegmentRawType {
-        match self {
-            SegmentType::Normal => SegmentRawType::Normal,
-            SegmentType::Eaten { .. } => SegmentRawType::Eaten,
-            SegmentType::Crashed => SegmentRawType::Crashed,
-            SegmentType::BlackHole { .. } => SegmentRawType::BlackHole,
-        }
+    pub fn discriminant(&self) -> Discriminant<Self> {
+        mem::discriminant(self)
     }
+
+    pub const DISCR_NORMAL: Discriminant<Self> = mem::discriminant(&Self::Normal);
+    pub const DISCR_EATEN: Discriminant<Self> = mem::discriminant(&Self::Eaten { original_food: 0, food_left: 0 });
+    pub const DISCR_CRASHED: Discriminant<Self> = mem::discriminant(&Self::Crashed);
+    pub const DISCR_BLACK_HOLE: Discriminant<Self> = mem::discriminant(&Self::BlackHole { just_created: false });
 }
 
 pub type ZIndex = i32;
@@ -138,178 +133,6 @@ pub struct Snake {
     pub autopilot_control: bool, // whether autopilot is in control
 }
 
-#[derive(Debug)]
-#[must_use]
-pub struct BuilderError(pub Box<Builder>, pub &'static str);
-
-#[derive(Default, Clone, Debug)]
-pub struct Builder {
-    pub snake_type: Option<Type>,
-    pub eat_mechanics: Option<EatMechanics>,
-
-    pub pos: Option<HexPoint>,
-    pub dir: Option<Dir>,
-    pub len: Option<usize>,
-    pub speed: Option<f32>,
-
-    pub palette: Option<PaletteTemplate>,
-    pub controller: Option<snake_control::Template>,
-
-    pub autopilot: Option<PathFinderTemplate>,
-    pub autopilot_control: bool,
-}
-
-// TODO: write a macro to generate builders
-impl Builder {
-    #[inline(always)]
-    #[must_use]
-    pub fn snake_type(mut self, value: Type) -> Self {
-        self.snake_type = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn eat_mechanics(mut self, value: EatMechanics) -> Self {
-        self.eat_mechanics = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn pos(mut self, value: HexPoint) -> Self {
-        self.pos = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn dir(mut self, value: Dir) -> Self {
-        self.dir = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn len(mut self, value: usize) -> Self {
-        self.len = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn speed(mut self, value: f32) -> Self {
-        self.speed = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn palette(mut self, value: PaletteTemplate) -> Self {
-        self.palette = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn controller(mut self, value: snake_control::Template) -> Self {
-        self.controller = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn autopilot(mut self, value: PathFinderTemplate) -> Self {
-        self.autopilot = Some(value);
-        self
-    }
-
-    #[inline(always)]
-    #[must_use]
-    pub fn autopilot_control(mut self, value: bool) -> Self {
-        self.autopilot_control = value;
-        self
-    }
-
-    pub fn build(&self) -> Result<Snake, BuilderError> {
-        let pos = self
-            .pos
-            .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `pos`"))?;
-        let dir = self
-            .dir
-            .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `dir`"))?;
-
-        if self.autopilot_control && self.autopilot.is_none() {
-            return Err(BuilderError(Box::new(self.clone()), "autopilot_control set to true but autopilot missing"));
-        }
-
-        eprintln!(
-            "spawn snake at {:?} coming from {:?} going to {:?}",
-            pos, -dir, dir
-        );
-
-        let head = Segment {
-            segment_type: SegmentType::Normal,
-            pos,
-            coming_from: -dir,
-            teleported: None,
-            z_index: 0,
-        };
-
-        let mut cells = VecDeque::new();
-        cells.push_back(head);
-
-        let body = Body {
-            segments: cells,
-            missing_front: 0,
-            dir,
-            turn_start: None,
-            dir_grace: false,
-            grow: self
-                .len
-                .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `len`"))?,
-            search_trace: None,
-        };
-
-        Ok(Snake {
-            snake_type: self.snake_type.ok_or_else(|| {
-                BuilderError(Box::new(self.clone()), "missing field `snake_type`")
-            })?,
-            eat_mechanics: self
-                .eat_mechanics
-                .as_ref()
-                .ok_or_else(|| {
-                    BuilderError(Box::new(self.clone()), "missing field `eat_mechanics`")
-                })?
-                .clone(),
-            speed: self
-                .speed
-                .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,
-            body,
-            state: State::Living,
-            controller: self
-                .controller
-                .as_ref()
-                .ok_or_else(|| {
-                    BuilderError(Box::new(self.clone()), "mssing field `snake_control`")
-                })?
-                .clone()
-                .into_controller(dir),
-            palette: self
-                .palette
-                .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `palette`"))?
-                .into(),
-            autopilot: self
-                .autopilot
-                .map(|template| {
-                    let controller_template = snake_control::Template::Algorithm(template);
-                    controller_template.into_controller(dir)
-                }),
-            autopilot_control: self.autopilot_control,
-        })
-    }
-}
-
 impl Snake {
     pub fn head(&self) -> &Segment {
         &self.body.segments[0]
@@ -341,11 +164,7 @@ impl Snake {
         }
 
         fn snake_contains(snake: &Snake, point: HexPoint) -> bool {
-            snake
-                .body
-                .segments
-                .iter()
-                .any(|segment| segment.pos == point)
+            snake.body.segments.iter().any(|segment| segment.pos == point)
         }
 
         for _ in 0..radius {
@@ -368,6 +187,7 @@ impl Snake {
         other_snakes: impl Snakes,
         apples: &[Apple],
         gtx: &GameContext,
+        ftx: &FpsContext,
         ctx: &Context,
     ) {
         if self.body.dir_grace || self.state != State::Living {
@@ -375,16 +195,15 @@ impl Snake {
         }
 
         // advance controller
-        let passthrough_knowledge = PassthroughKnowledge::accurate(&self.eat_mechanics);
-        let controller_dir = self
-            .controller
-            .next_dir(&mut self.body, Some(&passthrough_knowledge), &other_snakes, apples, gtx, ctx);
+        let knowledge = Knowledge::accurate(&self.eat_mechanics);
+        let controller_dir =
+            self.controller
+                .next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx, ctx);
 
         // advance autopilot
-        let autopilot_dir = self
-            .autopilot
-            .as_mut()
-            .map(|mut autopilot| autopilot.next_dir(&mut self.body, Some(&passthrough_knowledge), &other_snakes, apples, gtx, ctx));
+        let autopilot_dir = self.autopilot.as_mut().map(|autopilot| {
+            autopilot.next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx, ctx)
+        });
 
         let new_dir = if self.autopilot_control {
             autopilot_dir.expect("autopilot_control == true with missing autopilot")
@@ -399,10 +218,16 @@ impl Snake {
                     self.body.dir, dir
                 );
             }
-            Some(dir) if dir != self.body.dir => {
+            Some(dir) if dir == self.body.dir => {
+                // if the controller returns Some with the same direction,
+                // this does not lead to a turn but it does prevent the snake
+                // from calling next_dir until the next cell
+                self.body.dir_grace = true;
+            }
+            Some(dir) => {
                 self.body.dir = dir;
                 self.body.dir_grace = true;
-                self.body.turn_start = Some(gtx.frame_stamp);
+                self.body.turn_start = Some(ftx.last_graphics_update);
             }
             _ => {}
         }
@@ -414,6 +239,7 @@ impl Snake {
         apples: &[Apple],
         portals: &[Portal],
         gtx: &GameContext,
+        ftx: &FpsContext,
         ctx: &Context,
     ) {
         let last_idx = self.body.visible_len() - 1;
@@ -429,7 +255,7 @@ impl Snake {
         match &mut self.state {
             State::Dying => self.body.missing_front += 1,
             State::Living => {
-                self.update_dir(other_snakes, apples, gtx, ctx);
+                self.update_dir(other_snakes, apples, gtx, ftx, ctx);
 
                 // create new head for snake
                 let dir = self.body.dir;
@@ -440,9 +266,7 @@ impl Snake {
                 for portal in portals {
                     match portal.check(head_pos, new_head_pos) {
                         Some(Behavior::Die) => self.die(),
-                        Some(Behavior::Teleport) => {
-
-                        }
+                        Some(Behavior::Teleport) => {}
                         Some(Behavior::PassThrough) | None => {}
                     }
                 }

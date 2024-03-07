@@ -1,11 +1,59 @@
 use std::cmp::Ordering;
 
+use itertools::MinMaxResult;
+use itertools::MinMaxResult::MinMax;
+
 // the partial functions return None in case of a failed comparison
+
+// TODO: return on first None
 pub trait PartialMinMax
 where
     Self: Iterator + Sized,
 {
-    // this could be more efficient if it stopped on the first None value but it's meant to be used where all items are comparable
+    fn partial_minmax(mut self) -> MinMaxResult<Self::Item>
+    where
+        Self::Item: PartialOrd,
+    {
+        use MinMaxResult::*;
+
+        let first = match self.next() {
+            None => NoElements,
+            Some(x) => OneElement(x),
+        };
+        self.fold(first, |x, y| match x {
+            OneElement(a) => {
+                if y < a {
+                    MinMax(y, a)
+                } else if y > a {
+                    MinMax(a, y)
+                } else {
+                    OneElement(a)
+                }
+            }
+            MinMax(a, b) => {
+                if y < a {
+                    MinMax(y, b)
+                } else if y > b {
+                    MinMax(a, y)
+                } else {
+                    MinMax(a, b)
+                }
+            }
+            NoElements => unreachable!(),
+        })
+    }
+
+    fn partial_minmax_copy(self) -> Option<(Self::Item, Self::Item)>
+    where
+        Self::Item: PartialOrd + Copy,
+    {
+        match self.partial_minmax() {
+            MinMaxResult::NoElements => None,
+            MinMaxResult::OneElement(a) => Some((a, a)),
+            MinMax(a, b) => Some((a, b)),
+        }
+    }
+
     fn partial_min_by_key<B, F>(self, mut f: F) -> Option<Self::Item>
     where
         F: FnMut(&Self::Item) -> B,

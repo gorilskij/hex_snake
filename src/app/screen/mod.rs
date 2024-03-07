@@ -1,21 +1,18 @@
+use std::ops::{Deref, DerefMut};
+
 pub use debug_scenario::DebugScenario;
 pub use game::Game;
-pub use start_screen::StartScreen;
-
-pub use crate::app::prefs::Prefs;
-use crate::basic::{FrameStamp, HexDim};
-use crate::snake;
-
-use crate::app::game_context::GameContext;
-use crate::apple::Apple;
-use crate::basic::CellDim;
-use crate::error::{AppResult, Error};
-use crate::snake::Snake;
 use ggez::event::EventHandler;
 use rand::rngs::ThreadRng;
-use rand::Rng;
-use std::ops::{Deref, DerefMut};
+pub use start_screen::StartScreen;
+
+use crate::app::game_context::GameContext;
 use crate::app::portal::Portal;
+pub use crate::app::prefs::Prefs;
+use crate::apple::Apple;
+use crate::error::{Error, ErrorConversion, Result};
+use crate::snake::builder::Builder as SnakeBuilder;
+use crate::snake::Snake;
 
 mod board_dim;
 mod debug_scenario;
@@ -53,26 +50,38 @@ impl DerefMut for Screen {
     }
 }
 
-// TODO: refactor into view
-pub trait Environment<R: Rng = ThreadRng> {
-    fn snakes(&self) -> &[Snake];
-    fn apples(&self) -> &[Apple];
-    fn portals(&self) -> &[Portal];
-    fn snakes_apples_gtx_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut GameContext);
-    fn snakes_apples_rng_mut(&mut self) -> (&mut [Snake], &mut [Apple], &mut R);
-    fn add_snake(&mut self, snake_builder: &snake::Builder) -> AppResult;
-    fn remove_snake(&mut self, index: usize) -> Snake;
-    fn remove_apple(&mut self, index: usize) -> Apple;
-    fn gtx(&self) -> &GameContext;
-    // TODO: remove redundant methods
-    fn board_dim(&self) -> HexDim {
-        self.gtx().board_dim
+pub struct Environment<Rng = ThreadRng> {
+    pub snakes: Vec<Snake>,
+    // TODO: keep apples in order of position to allow for binary search
+    // TODO: specialized Vec for that
+    pub apples: Vec<Apple>,
+    pub portals: Vec<Portal>,
+    pub gtx: GameContext,
+    pub rng: Rng,
+}
+
+impl<Rng> Environment<Rng> {
+    pub fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result {
+        self.snakes.push(
+            snake_builder
+                .build()
+                .map_err(Error::from)
+                .with_trace_step("Environment::add_snake")?,
+        );
+        // TODO: check that the snake can be added, report error if it can't
+        Ok(())
     }
-    fn cell_dim(&self) -> CellDim {
-        self.gtx().cell_dim
+
+    pub fn remove_snake(&mut self, index: usize) -> Snake {
+        self.snakes.remove(index)
     }
-    fn frame_stamp(&self) -> FrameStamp {
-        self.gtx().frame_stamp
+
+    pub fn remove_apples(&mut self, mut indices: Vec<usize>) {
+        indices.sort_unstable();
+        indices.dedup();
+
+        indices.into_iter().rev().for_each(|i| {
+            self.apples.remove(i);
+        });
     }
-    fn rng(&mut self) -> &mut R;
 }

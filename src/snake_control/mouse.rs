@@ -1,16 +1,15 @@
+use std::f32::consts::TAU;
+
+use ggez::Context;
+
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
-use crate::basic::transformations::translate;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
-use crate::error::{AppErrorConversion, AppResult, Error};
-use crate::rendering::segments::render_hexagon;
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::Controller;
-use crate::view::snakes::{ Snakes};
-use ggez::graphics::{Color, DrawMode, Mesh, StrokeOptions};
-use ggez::input::mouse;
-use ggez::Context;
-use std::f32::consts::TAU;
+use crate::view::snakes::Snakes;
 
 pub struct Mouse;
 
@@ -18,13 +17,14 @@ impl Controller for Mouse {
     fn next_dir(
         &mut self,
         body: &mut Body,
-        _: Option<&PassthroughKnowledge>,
+        _: Option<&Knowledge>,
         _: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,
+        _ftx: &FpsContext,
         ctx: &Context,
     ) -> Option<Dir> {
-        let mouse_position: Point = mouse::position(ctx).into();
+        let mouse_position: Point = ctx.mouse.position().into();
         let target = HexPoint::from_cartesian(mouse_position, gtx.cell_dim);
 
         let current = body.segments[0].pos;
@@ -34,12 +34,8 @@ impl Controller for Mouse {
         let dx = (target.h - current.h) as f32;
         let dy = -(target.v - current.v) as f32 / (2. * sin);
         let angle = (dy.atan2(dx) + TAU) % TAU;
-        Dir::closest_to_angle(angle)
-            .into_iter()
-            .find(|dir| *dir != -body.dir)
+        Dir::closest_to_angle(angle).into_iter().find(|dir| *dir != -body.dir)
     }
-
-    // TODO: implement get_path
 
     // fn get_mesh(&self, gtx: &GameContext, ctx: &mut Context) -> Option<AppResult<Mesh>> {
     //     let mouse_position: Point = mouse::position(ctx).into();

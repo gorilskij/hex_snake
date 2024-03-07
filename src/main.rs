@@ -1,28 +1,30 @@
 #![feature(stmt_expr_attributes)]
 #![feature(if_let_guard)]
 #![feature(try_blocks)]
-// #![feature(never_type)]
+#![feature(never_type)]
+#![feature(exhaustive_patterns)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
-// #![feature(trace_macros)]
 #![feature(const_fn_floating_point_arithmetic)]
 #![feature(associated_type_defaults)]
 #![feature(type_alias_impl_trait)]
+#![feature(trace_macros)]
 // #![feature(return_position_impl_trait_in_trait)]
 
 #[macro_use]
 extern crate derive_more;
 #[macro_use]
 extern crate lazy_static;
+extern crate core;
 
+use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
 use ggez::event::run;
 use ggez::ContextBuilder;
 
 use crate::app::keyboard_control::ControlSetup;
 use crate::app::App;
 use crate::basic::Side;
-use crate::keyboard::Layout;
-use ggez::conf::{FullscreenType, NumSamples, WindowMode, WindowSetup};
+use crate::keyboard_layout::Layout;
 
 #[macro_use]
 mod support;
@@ -30,30 +32,27 @@ mod support;
 mod basic;
 mod app;
 mod color;
-mod keyboard;
-mod pathfinding;
+mod keyboard_layout;
 mod snake;
 mod view;
 #[macro_use]
 mod apple;
+mod button;
 mod error;
 mod rendering;
 pub mod snake_control;
 
+// TODO: upgrading to ggez 0.8 made the colors duller, fix that
+
 // TODO
 //  - untie frame_fraction from graphics
 //  - factor out lazy redrawing code (the whole mess with Some(grid_mesh)...)
-//  - if a frame is nearing its end, delay turning until the next frame to avoid choppy animation
-//  - make border toggleable
 //  - smooth animation when cutting
 //  - diagnose high cpu use when paused
 
 // TODO
 //  make rain snakes ignore food
-//  split EatBehavior::Ignore into "pass in front" and "pass behind"
-//   use "pass behind for rain"
 //  make head-to-head collision with rain also ignore
-//  allow snake to pass (tunnel) under is eaten segments
 
 fn main() {
     let width = 2000.;
@@ -65,13 +64,15 @@ fn main() {
         maximized: false,
         fullscreen_type: FullscreenType::Windowed,
         borderless: false,
-        min_width: 0.,
-        min_height: 0.,
+        transparent: false,
+        min_width: 1.,
+        min_height: 1.,
         max_width: 0.,
         max_height: 0.,
         resizable: true,
         visible: true,
         resize_on_scale_factor_change: false,
+        logical_size: None,
     };
 
     let window_setup = WindowSetup {

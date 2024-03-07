@@ -1,16 +1,17 @@
-use crate::snake::{ Snake};
-use crate::view::snakes::{ObjectSafeParallelIterator, Snakes};
 use rayon::prelude::*;
+
+use crate::snake::Snake;
+use crate::view::snakes::{ObjectSafeParallelIterator, Snakes};
 
 #[derive(Copy, Clone)]
 pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);
 
 #[allow(dead_code)]
 impl<'a> OtherSnakes<'a> {
-    // pub fn empty() -> Self {
-    //     Self(&[], &[])
-    // }
-    //
+    pub fn empty() -> Self {
+        Self(&[], &[])
+    }
+
     // pub fn new(a: &'a [Snake], b: &'a [Snake]) -> Self {
     //     Self(a, b)
     // }

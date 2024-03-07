@@ -1,11 +1,14 @@
+use ggez::input::keyboard::KeyCode;
+use ggez::Context;
+
+use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12};
-use crate::snake::{Body, PassthroughKnowledge};
+use crate::snake::eat_mechanics::Knowledge;
+use crate::snake::Body;
 use crate::snake_control::Controller;
-use crate::view::snakes::{ Snakes};
-use ggez::event::KeyCode;
-use ggez::Context;
+use crate::view::snakes::Snakes;
 
 // joke snake_control with 12 directions allowing the player to rotate between them using left and right, surprising horizontal teleportation
 // looks pretty cool with the sharp drawing style
@@ -19,10 +22,11 @@ impl Controller for KeyboardClock {
     fn next_dir(
         &mut self,
         _: &mut Body,
-        _: Option<&PassthroughKnowledge>,
+        _: Option<&Knowledge>,
         _: &dyn Snakes,
         _: &[Apple],
         _: &GameContext,
+        _: &FpsContext,
         _: &Context,
     ) -> Option<Dir> {
         if let Some(new_dir) = self.next_dir.take() {
