@@ -57,7 +57,7 @@ pub mod snake_control;
 fn main() {
     let width = 2000.;
     let height = 1600.;
-    
+
     let window_mode = WindowMode {
         width,
         height,
@@ -91,7 +91,7 @@ fn main() {
 
     let app = App::new(
         vec![ControlSetup {
-            layout: Layout::Dvorak,
+            layout: Layout::Qwerty,
             keyboard_side: Side::Right,
             hand: Side::Right,
         }],
