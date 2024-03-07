@@ -7,6 +7,7 @@ use crate::basic::HexPoint;
 pub enum Behavior {
     Die,
     Teleport,
+    WrapAround,
     PassThrough,
 }
 
@@ -45,19 +46,19 @@ impl Portal {
                     a: HexPoint { h: 4, v: 4 },
                     b: HexPoint { h: 4, v: 5 },
                     behavior_ab: Behavior::Die,
-                    behavior_ba: Behavior::Teleport,
+                    behavior_ba: Behavior::WrapAround,
                 },
                 Edge {
                     a: HexPoint { h: 4, v: 4 },
                     b: HexPoint { h: 5, v: 4 },
                     behavior_ab: Behavior::Die,
-                    behavior_ba: Behavior::Teleport,
+                    behavior_ba: Behavior::WrapAround,
                 },
                 Edge {
                     a: HexPoint { h: 5, v: 3 },
                     b: HexPoint { h: 5, v: 4 },
                     behavior_ab: Behavior::Die,
-                    behavior_ba: Behavior::Teleport,
+                    behavior_ba: Behavior::WrapAround,
                 },
                 Edge {
                     a: HexPoint { h: 6, v: 4 },

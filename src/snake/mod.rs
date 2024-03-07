@@ -261,12 +261,17 @@ impl Snake {
                 let dir = self.body.dir;
 
                 let head_pos = self.head().pos;
-                let new_head_pos = head_pos.wrapping_translate(dir, 1, gtx.board_dim);
+                let mut new_head_pos = head_pos.wrapping_translate(dir, 1, gtx.board_dim);
 
                 for portal in portals {
                     match portal.check(head_pos, new_head_pos) {
                         Some(Behavior::Die) => self.die(),
-                        Some(Behavior::Teleport) => {}
+                        Some(Behavior::Teleport) => {
+                            println!("TODO: implement")
+                        }
+                        Some(Behavior::WrapAround) => {
+                            println!("TODO: implement")
+                        }
                         Some(Behavior::PassThrough) | None => {}
                     }
                 }
@@ -275,7 +280,7 @@ impl Snake {
                     segment_type: SegmentType::Normal,
                     // this gets very interesting if you move 2 cells each time
                     // (porous snake)
-                    pos: self.head().pos.wrapping_translate(dir, 1, gtx.board_dim),
+                    pos: new_head_pos,
                     coming_from: -dir,
                     teleported: None,
                     z_index: 0,
