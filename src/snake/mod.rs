@@ -266,13 +266,13 @@ impl Snake {
                 for portal in portals {
                     match portal.check(head_pos, new_head_pos) {
                         Some(Behavior::Die) => self.die(),
-                        Some(Behavior::Teleport) => {
-                            println!("TODO: implement")
+                        Some(Behavior::TeleportTo(dest)) => {
+                            new_head_pos = dest;
                         }
                         Some(Behavior::WrapAround) => {
                             println!("TODO: implement")
                         }
-                        Some(Behavior::PassThrough) | None => {}
+                        Some(Behavior::PassThrough) | Some(Behavior::Nothing) | None => {}
                     }
                 }
 

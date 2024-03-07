@@ -6,9 +6,10 @@ use crate::basic::HexPoint;
 #[derive(Copy, Clone, Debug)]
 pub enum Behavior {
     Die,
-    Teleport,
+    TeleportTo(HexPoint),
     WrapAround,
     PassThrough,
+    Nothing,
 }
 
 /// An edge is uniquely identified by the two
@@ -39,8 +40,94 @@ impl Portal {
         None
     }
 
-    pub fn test() -> Self {
-        Self {
+    pub fn cells() -> Vec<Self> {
+        let cell1 = Self {
+            edges: vec![
+                Edge {
+                    a: HexPoint { h: 4, v: 6 },
+                    b: HexPoint { h: 4, v: 7 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 10, v: 21 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 5, v: 6 },
+                    b: HexPoint { h: 4, v: 7 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 9, v: 20 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 5, v: 7 },
+                    b: HexPoint { h: 4, v: 7 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 9, v: 19 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 4, v: 8 },
+                    b: HexPoint { h: 4, v: 7 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 10, v: 19 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 3, v: 7 },
+                    b: HexPoint { h: 4, v: 7 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 11, v: 19 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 3, v: 6 },
+                    b: HexPoint { h: 4, v: 7 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 11, v: 20 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+            ],
+        };
+
+        let cell2 = Self {
+            edges: vec![
+                Edge {
+                    a: HexPoint { h: 10, v: 19 },
+                    b: HexPoint { h: 10, v: 20 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 4, v: 8 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 11, v: 19 },
+                    b: HexPoint { h: 10, v: 20 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 3, v: 7 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 11, v: 20 },
+                    b: HexPoint { h: 10, v: 20 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 3, v: 6 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 10, v: 21 },
+                    b: HexPoint { h: 10, v: 20 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 4, v: 6 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 9, v: 20 },
+                    b: HexPoint { h: 10, v: 20 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 5, v: 6 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+                Edge {
+                    a: HexPoint { h: 9, v: 19 },
+                    b: HexPoint { h: 10, v: 20 },
+                    behavior_ab: Behavior::TeleportTo(HexPoint { h: 5, v: 7 }),
+                    behavior_ba: Behavior::Nothing,
+                },
+            ],
+        };
+
+        vec![cell1, cell2]
+    }
+
+    pub fn test() -> Vec<Self> {
+        vec![Self {
             edges: vec![
                 Edge {
                     a: HexPoint { h: 4, v: 4 },
@@ -64,33 +151,33 @@ impl Portal {
                     a: HexPoint { h: 6, v: 4 },
                     b: HexPoint { h: 5, v: 4 },
                     behavior_ab: Behavior::Die,
-                    behavior_ba: Behavior::Teleport,
+                    behavior_ba: Behavior::TeleportTo(HexPoint { h: 10, v: 10 }),
                 },
                 Edge {
                     a: HexPoint { h: 6, v: 4 },
                     b: HexPoint { h: 6, v: 5 },
                     behavior_ab: Behavior::Die,
-                    behavior_ba: Behavior::Teleport,
+                    behavior_ba: Behavior::TeleportTo(HexPoint { h: 10, v: 10 }),
                 },
                 Edge {
                     a: HexPoint { h: 6, v: 4 },
                     b: HexPoint { h: 7, v: 4 },
                     behavior_ab: Behavior::Die,
-                    behavior_ba: Behavior::Teleport,
+                    behavior_ba: Behavior::TeleportTo(HexPoint { h: 10, v: 10 }),
                 },
                 Edge {
                     a: HexPoint { h: 6, v: 4 },
                     b: HexPoint { h: 7, v: 3 },
                     behavior_ab: Behavior::Die,
-                    behavior_ba: Behavior::Teleport,
+                    behavior_ba: Behavior::TeleportTo(HexPoint { h: 10, v: 10 }),
                 },
                 Edge {
                     a: HexPoint { h: 6, v: 4 },
                     b: HexPoint { h: 6, v: 3 },
                     behavior_ab: Behavior::Die,
-                    behavior_ba: Behavior::Teleport,
+                    behavior_ba: Behavior::TeleportTo(HexPoint { h: 10, v: 10 }),
                 },
             ],
-        }
+        }]
     }
 }

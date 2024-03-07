@@ -85,7 +85,7 @@ impl Game {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
-                portals: vec![Portal::test()],
+                portals: Portal::cells(),
                 gtx: GameContext::new(
                     // updated immediately after creation
                     HexPoint { h: 0, v: 0 },
@@ -418,7 +418,7 @@ impl EventHandler<Error> for Game {
         }
 
         if self.portal_mesh.is_none() {
-            self.portal_mesh = Some(rendering::portal_mesh(&env.portals, &env.gtx, ftx, ctx, &mut stats)?);
+            self.portal_mesh = Some(rendering::portal_mesh(&env.portals, &env.gtx, ctx, &mut stats)?);
         }
 
         if self.snake_mesh.is_none() || playing {

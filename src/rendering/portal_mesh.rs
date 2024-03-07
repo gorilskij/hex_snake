@@ -12,8 +12,6 @@ use crate::rendering::shape::ShapePoints;
 
 pub fn render_hexagon_edge(dir: Dir, CellDim { side, sin, cos }: CellDim) -> ShapePoints {
     use Dir::*;
-    // TODO: translate the edges into the "from" hexagon
-    //       so they don't overlap with the "to" hexagon
     let points = match dir {
         // counterclockwise order
         D => vec![Point { x: cos + side, y: sin * 2. }, Point { x: cos, y: sin * 2. }],
@@ -56,19 +54,20 @@ fn build_half_edge(from: HexPoint, to: HexPoint, color: Color, gtx: &GameContext
 fn color_of_behavior(behavior: Behavior) -> Color {
     match behavior {
         Behavior::Die => Color::RED,
-        Behavior::Teleport => Color::from_rgb(50, 105, 168),
+        Behavior::TeleportTo(_) => Color::from_rgb(50, 105, 168),
         Behavior::WrapAround => Color::WHITE,
         Behavior::PassThrough => Color::GREEN,
+        Behavior::Nothing => Color::TRANSPARENT,
     }
 }
 
 pub fn portal_mesh(
     portals: &[Portal],
     gtx: &GameContext,
-    ftx: &FpsContext,
     ctx: &Context,
     stats: &mut Stats,
 ) -> Result<Mesh> {
+    // TODO: update stats
     let builder = &mut MeshBuilder::new();
 
     let res: Result<_> = try {
