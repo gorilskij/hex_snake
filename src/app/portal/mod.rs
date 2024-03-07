@@ -40,12 +40,56 @@ impl Portal {
 
     pub fn test() -> Self {
         Self {
-            edges: vec![Edge {
-                a: HexPoint { h: 4, v: 4 },
-                b: HexPoint { h: 4, v: 5 },
-                behavior_ab: Behavior::Die,
-                behavior_ba: Behavior::Teleport,
-            }],
+            edges: vec![
+                Edge {
+                    a: HexPoint { h: 4, v: 4 },
+                    b: HexPoint { h: 4, v: 5 },
+                    behavior_ab: Behavior::Die,
+                    behavior_ba: Behavior::Teleport,
+                },
+                Edge {
+                    a: HexPoint { h: 4, v: 4 },
+                    b: HexPoint { h: 5, v: 4 },
+                    behavior_ab: Behavior::Die,
+                    behavior_ba: Behavior::Teleport,
+                },
+                Edge {
+                    a: HexPoint { h: 5, v: 3 },
+                    b: HexPoint { h: 5, v: 4 },
+                    behavior_ab: Behavior::Die,
+                    behavior_ba: Behavior::Teleport,
+                },
+                Edge {
+                    a: HexPoint { h: 6, v: 4 },
+                    b: HexPoint { h: 5, v: 4 },
+                    behavior_ab: Behavior::Die,
+                    behavior_ba: Behavior::Teleport,
+                },
+                Edge {
+                    a: HexPoint { h: 6, v: 4 },
+                    b: HexPoint { h: 6, v: 5 },
+                    behavior_ab: Behavior::Die,
+                    behavior_ba: Behavior::Teleport,
+                },
+                Edge {
+                    a: HexPoint { h: 6, v: 4 },
+                    b: HexPoint { h: 7, v: 4 },
+                    behavior_ab: Behavior::Die,
+                    behavior_ba: Behavior::Teleport,
+                },
+                Edge {
+                    a: HexPoint { h: 6, v: 4 },
+                    b: HexPoint { h: 7, v: 3 },
+                    behavior_ab: Behavior::Die,
+                    behavior_ba: Behavior::Teleport,
+                },
+                Edge {
+                    a: HexPoint { h: 6, v: 4 },
+                    b: HexPoint { h: 6, v: 3 },
+                    behavior_ab: Behavior::Die,
+                    behavior_ba: Behavior::Teleport,
+                },
+            ],
         }
     }
 }

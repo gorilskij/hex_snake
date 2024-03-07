@@ -16,18 +16,15 @@ pub fn render_hexagon_edge(dir: Dir, CellDim { side, sin, cos }: CellDim) -> Sha
     //       so they don't overlap with the "to" hexagon
     let points = match dir {
         // counterclockwise order
-        D => vec![Point { x: cos, y: 0. }, Point { x: cos + side, y: 0. }],
-        Dr => {
-            println!("triggered");
-            vec![Point { x: cos + side, y: 0. }, Point { x: cos * 2. + side, y: sin }]
-        }
-        Ur => vec![
+        D => vec![Point { x: cos + side, y: sin * 2. }, Point { x: cos, y: sin * 2. }],
+        Dr => vec![
             Point { x: cos * 2. + side, y: sin },
             Point { x: cos + side, y: sin * 2. },
         ],
-        U => vec![Point { x: cos + side, y: sin * 2. }, Point { x: cos, y: sin * 2. }],
-        Ul => vec![Point { x: cos, y: sin * 2. }, Point { x: 0., y: sin }],
-        Dl => vec![Point { x: 0., y: sin }, Point { x: cos, y: 0. }],
+        Ur => vec![Point { x: cos + side, y: 0. }, Point { x: cos * 2. + side, y: sin }],
+        U => vec![Point { x: cos, y: 0. }, Point { x: cos + side, y: 0. }],
+        Ul => vec![Point { x: 0., y: sin }, Point { x: cos, y: 0. }],
+        Dl => vec![Point { x: cos, y: sin * 2. }, Point { x: 0., y: sin }],
     };
     ShapePoints::from(points)
 }
@@ -40,11 +37,18 @@ fn build_half_edge(from: HexPoint, to: HexPoint, color: Color, gtx: &GameContext
     let dir = from
         .dir_to(to)
         .unwrap_or_else(|| panic!("invalid inputs: from {:?} to {:?}", from, to));
-    println!("dir {:?}", dir);
+    println!("dir: {:?}, color: {:?}", dir, color);
     let mut points = render_hexagon_edge(dir, gtx.cell_dim);
-    points = points.translate(to.to_cartesian(gtx.cell_dim));
 
-    builder.line(&points, gtx.palette.border_thickness / 2.0, *color)?;
+    let center = gtx.cell_dim.center();
+    let from_center = from.to_cartesian(gtx.cell_dim) + center;
+    let to_center = to.to_cartesian(gtx.cell_dim) + center;
+
+    let location = from.to_cartesian(gtx.cell_dim) + from_center * 0.04 - to_center * 0.04;
+
+    points = points.translate(location);
+
+    builder.line(&points, gtx.palette.border_thickness * 2.0, *color)?;
     Ok(())
 }
 
