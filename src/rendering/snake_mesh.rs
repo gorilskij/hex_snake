@@ -24,10 +24,7 @@ fn segment_description(
     gtx: &GameContext,
 ) -> SegmentDescription {
     let coming_from = segment.coming_from;
-    let going_to = segment_idx
-        .checked_sub(1)
-        .map(|prev_idx| -body.segments[prev_idx].coming_from)
-        .unwrap_or(body.dir);
+    let going_to = segment.going_to.unwrap_or(body.dir);
 
     let location = segment.pos.to_cartesian(gtx.cell_dim);
 

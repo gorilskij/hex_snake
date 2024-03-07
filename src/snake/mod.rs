@@ -66,6 +66,8 @@ pub struct Segment {
     pub pos: HexPoint,
     /// Direction from this segment to the next one (towards the tail)
     pub coming_from: Dir,
+    // going_to should be set if and only if the segment is not the head
+    pub going_to: Option<Dir>,
     pub teleported: Option<Dir>,
     pub z_index: ZIndex,
 }
@@ -263,12 +265,15 @@ impl Snake {
                 let head_pos = self.head().pos;
                 let mut new_head_pos = head_pos.wrapping_translate(dir, 1, gtx.board_dim);
 
+                let mut dir_changed_in_teleport = None;
                 for portal in portals {
                     match portal.check(head_pos, new_head_pos) {
                         Some(Behavior::Die) => self.die(),
                         Some(Behavior::TeleportTo(dest, new_dir)) => {
                             new_head_pos = dest;
-                            dir = new_dir;
+                            if dir != new_dir {
+                                dir_changed_in_teleport = Some(new_dir);
+                            }
                             self.body.dir = new_dir;
                         }
                         Some(Behavior::WrapAround) => {
@@ -278,15 +283,18 @@ impl Snake {
                     }
                 }
 
+                let new_dir = dir_changed_in_teleport.unwrap_or(dir);
                 let new_head = Segment {
                     segment_type: SegmentType::Normal,
                     // this gets very interesting if you move 2 cells each time
                     // (porous snake)
                     pos: new_head_pos,
-                    coming_from: -dir,
+                    coming_from: -new_dir,
+                    going_to: None,
                     teleported: None,
                     z_index: 0,
                 };
+                self.body.segments[0].going_to = Some(dir);
                 self.body.segments.push_front(new_head);
             }
             State::Crashed => panic!("called advance() on a crashed snake"),

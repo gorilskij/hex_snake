@@ -123,6 +123,7 @@ impl Builder {
             segment_type: SegmentType::Normal,
             pos,
             coming_from: -dir,
+            going_to: None,
             teleported: None,
             z_index: 0,
         };
