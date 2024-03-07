@@ -9,6 +9,7 @@ use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::support::filter_scan::FilterScan;
 use crate::view::snakes::Snakes;
 use crate::view::targets::Targets;
 
@@ -96,7 +97,7 @@ impl PathFinder for WeightedBFS {
                     let rc = Rc::new(sp);
 
                     Dir::iter()
-                        .scan(rc, move |rc, dir| {
+                        .filter_scan(rc, move |rc, dir| {
                             let (new_pos, teleported) = pos.explicit_wrapping_translate(dir, 1, gtx.board_dim);
 
                             if off_limits.contains(&new_pos) {
@@ -115,19 +116,6 @@ impl PathFinder for WeightedBFS {
                             Some(new_sp)
                         })
                         .filter(|sp| {
-                            // keep track of the shortest path to each position
-                            // match shortest_paths.borrow().get(&sp.pos) {
-                            //     Some(other_sp) if other_sp.cost() <= sp.cost() => false,
-                            //     other => {
-                            //         drop(other);
-                            //         shortest_paths.borrow_mut().insert(sp.pos, sp.clone());
-                            //         match *best.borrow() {
-                            //             Some((_, cost)) if cost <= sp.cost() => {}
-                            //             _ => *best.borrow_mut() = Some((sp.pos, sp.cost()))
-                            //         }
-                            //         true
-                            //     }
-                            // }
                             let mut shortest_paths = shortest_paths.borrow_mut();
                             match shortest_paths.get_mut(&sp.pos) {
                                 Some(other_sp) => {

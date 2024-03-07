@@ -32,11 +32,11 @@ impl Algorithm {
             None => {
                 println!("recalculate: no path");
                 true
-            },
+            }
             Some(path) if path.is_empty() => {
                 println!("recalculate: path is empty");
                 true
-            },
+            }
             Some(path) => 'arm: {
                 // recalculate if we're not following the path
                 let head = body.segments[0].pos;
@@ -56,12 +56,17 @@ impl Algorithm {
                     println!("recalculate: target isn't there");
                     true
                 }
-            },
+            }
         };
 
         if recalculate_path {
             // find the shortest path to any apple and lock in that apple as the target
             self.path = self.pathfinder.get_path(&apples, body, knowledge, other_snakes, gtx);
+
+            if self.path.is_none() {
+                println!("failed to find path");
+                println!("apples: {}", apples.len());
+            }
         }
     }
 }
