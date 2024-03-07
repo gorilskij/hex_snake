@@ -92,7 +92,7 @@ fn main() {
 
     let app = App::new(
         vec![ControlSetup {
-            layout: Layout::Dvorak,
+            layout: Layout::Qwerty,
             keyboard_side: Side::Right,
             hand: Side::Right,
         }],
