@@ -51,13 +51,13 @@ fn build_half_edge(from: HexPoint, to: HexPoint, color: Color, gtx: &GameContext
 }
 
 // TODO: make this part of palette
-fn color_of_behavior(behavior: Behavior) -> Color {
+fn behavior_color(behavior: Behavior) -> Color {
     match behavior {
         Behavior::Die => Color::RED,
         Behavior::TeleportTo(_, _) => Color::from_rgb(50, 105, 168),
         Behavior::WrapAround => Color::WHITE,
         Behavior::PassThrough => Color::GREEN,
-        Behavior::Nothing => Color::TRANSPARENT,
+        Behavior::Nothing | Behavior::Unreachable => Color::TRANSPARENT,
     }
 }
 
@@ -73,10 +73,10 @@ pub fn portal_mesh(
     let res: Result<_> = try {
         for portal in portals {
             for edge in &portal.edges {
-                let color_ab = color_of_behavior(edge.behavior_ab);
+                let color_ab = behavior_color(edge.behavior_ab);
                 build_half_edge(edge.a, edge.b, color_ab, gtx, builder)?;
 
-                let color_ba = color_of_behavior(edge.behavior_ba);
+                let color_ba = behavior_color(edge.behavior_ba);
                 build_half_edge(edge.b, edge.a, color_ba, gtx, builder)?;
             }
         }

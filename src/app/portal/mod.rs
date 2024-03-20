@@ -10,6 +10,7 @@ pub enum Behavior {
     WrapAround,
     PassThrough,
     Nothing,
+    Unreachable,
 }
 
 /// An edge is uniquely identified by the two
@@ -29,7 +30,7 @@ pub struct Portal {
 
 impl Portal {
     pub fn check(&self, from: HexPoint, to: HexPoint) -> Option<Behavior> {
-        assert_ne!(from, to);
+        // assert_ne!(from, to);
         for edge in &self.edges {
             if edge.a == from && edge.b == to {
                 return Some(edge.behavior_ab);
@@ -40,32 +41,17 @@ impl Portal {
         None
     }
 
-    pub fn cells(pos1: HexPoint, pos2: HexPoint) -> Vec<Self> {
-        // TODO: make sure the positions don't touch the edges of the board
-
-        let cell1 = Self {
+    pub fn cell(pos: HexPoint, dest: HexPoint) -> Self {
+        Self {
             edges: Dir::iter()
                 .map(|dir| Edge {
-                    a: pos1 + -dir,
-                    b: pos1,
-                    behavior_ab: Behavior::TeleportTo(pos2 + dir, dir),
+                    a: pos + -dir,
+                    b: pos,
+                    behavior_ab: Behavior::TeleportTo(dest + dir, dir),
                     behavior_ba: Behavior::Nothing,
                 })
                 .collect(),
-        };
-
-        let cell2 = Self {
-            edges: Dir::iter()
-                .map(|dir| Edge {
-                    a: pos2 + -dir,
-                    b: pos2,
-                    behavior_ab: Behavior::TeleportTo(pos1 + dir, dir),
-                    behavior_ba: Behavior::Nothing,
-                })
-                .collect(),
-        };
-
-        vec![cell1, cell2]
+        }
     }
 
     pub fn cells_inverse(pos1: HexPoint, pos2: HexPoint) -> Vec<Self> {

@@ -14,7 +14,7 @@ use crate::app::game_context::GameContext;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
-use crate::app::portal::Portal;
+use crate::app::portal::{Behavior, Edge, Portal};
 use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
@@ -85,10 +85,34 @@ impl Game {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
-                portals: Portal::cells_inverse(
-                    HexPoint { h: 4, v: 8},
-                    HexPoint { h: 20, v: 8},
-                ),
+                portals: vec![
+                    // Portal::cell(
+                    //     HexPoint { h: 4, v: 4},
+                    //     HexPoint { h: 20, v: 4},
+                    // ),
+                    // Portal::cell(
+                    //     HexPoint { h: 20, v: 4},
+                    //     HexPoint { h: 4, v: 4},
+                    // ),
+                    // Portal::cell(
+                    //     HexPoint { h: 20, v: 12},
+                    //     HexPoint { h: 4, v: 12},
+                    // ),
+                    // Portal::cell(
+                    //     HexPoint { h: 4, v: 12},
+                    //     HexPoint { h: 20, v: 12},
+                    // ),
+                    Portal {
+                        edges: vec![
+                            Edge {
+                                a: HexPoint { h: 13, v: 0 },
+                                b: HexPoint { h: 13, v: -1},
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 10 }, Dir::U),
+                                behavior_ba: Behavior::Unreachable,
+                            }
+                        ]
+                    }
+                ],
                 gtx: GameContext::new(
                     // updated immediately after creation
                     HexPoint { h: 0, v: 0 },
