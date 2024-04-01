@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 
 use super::*;
-use crate::snake::eat_mechanics::EatMechanics;
 
 #[derive(Debug, Error)]
 #[must_use]

@@ -104,14 +104,89 @@ impl Game {
                     // ),
                     Portal {
                         edges: vec![
+                            // top
+                            Edge {
+                                a: HexPoint { h: 13, v: 7 },
+                                b: HexPoint { h: 13, v: 8},
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 0 }, Dir::D),
+                                behavior_ba: Behavior::Nothing,
+                                // TODO: constructor that checks validity of Unreachable
+                                //       and validity of a and b points
+                            },
                             Edge {
                                 a: HexPoint { h: 13, v: 0 },
                                 b: HexPoint { h: 13, v: -1},
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 10 }, Dir::U),
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 7 }, Dir::U),
                                 behavior_ba: Behavior::Unreachable,
-                            }
+                            },
+                            // bottom
+                            Edge {
+                                a: HexPoint { h: 13, v: 9 },
+                                b: HexPoint { h: 13, v: 8},
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 16 }, Dir::U),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            Edge {
+                                a: HexPoint { h: 13, v: 16 },
+                                b: HexPoint { h: 13, v: 17},
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 9 }, Dir::D),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            // top-right
+                            Edge {
+                                a: HexPoint { h: 14, v: 8 },
+                                b: HexPoint { h: 13, v: 8 },
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 25, v: 2 }, Dir::Dl),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            Edge {
+                                a: HexPoint { h: 25, v: 2 },
+                                b: HexPoint { h: 26, v: 2 },
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 14, v: 8 }, Dir::Ur),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            // bottom-right
+                            Edge {
+                                a: HexPoint { h: 14, v: 9 },
+                                b: HexPoint { h: 13, v: 8 },
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 25, v: 14 }, Dir::Ul),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            Edge {
+                                a: HexPoint { h: 25, v: 14 },
+                                b: HexPoint { h: 26, v: 15 },
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 14, v: 9 }, Dir::Dr),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            // top-left
+                            Edge {
+                                a: HexPoint { h: 12, v: 8 },
+                                b: HexPoint { h: 13, v: 8 },
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 0, v: 2 }, Dir::Dr),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            Edge {
+                                a: HexPoint { h: 0, v: 2 },
+                                b: HexPoint { h: -1, v: 1 },
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 12, v: 8 }, Dir::Ul),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            // bottom-left
+                            Edge {
+                                a: HexPoint { h: 12, v: 9 },
+                                b: HexPoint { h: 13, v: 8 },
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 0, v: 14 }, Dir::Ur),
+                                behavior_ba: Behavior::Nothing,
+                            },
+                            Edge {
+                                a: HexPoint { h: 0, v: 14 },
+                                b: HexPoint { h: -1, v: 14 },
+                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 12, v: 9 }, Dir::Dl),
+                                behavior_ba: Behavior::Nothing,
+                            },
+
                         ]
-                    }
+                    },
                 ],
                 gtx: GameContext::new(
                     // updated immediately after creation

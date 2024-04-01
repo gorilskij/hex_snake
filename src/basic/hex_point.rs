@@ -55,22 +55,24 @@ impl HexPoint {
     // NOTE: doesn't consider wrapping!
     pub fn dir_to(self, other: Self) -> Option<Dir> {
         if self.h == other.h {
-            return Some(if self.v > other.v { U } else { D });
-        } else {
-            let dh = (self.h - other.h).abs();
-            if self.v > other.v || self.v == other.v && self.h % 2 == 1 {
-                // going up
-                let dv = dh - (dh + self.h % 2) / 2;
-                if other.v == self.v - dv {
-                    return Some(if self.h > other.h { Ul } else { Ur });
-                }
-            } else if self.v < other.v || self.v == other.v && self.h % 2 == 0 {
-                // going down
-                let dv = dh - (dh + (self.h + 1) % 2) / 2;
-                let expected_v = self.v + dv;
-                if expected_v == other.v {
-                    return Some(if self.h > other.h { Dl } else { Dr });
-                }
+            return if self.v > other.v { Some(U) } else { Some(D) };
+        }
+
+        // -1,1 -> 0,1
+
+        let dh = (self.h - other.h).abs();
+        if self.v > other.v || self.v == other.v && (self.h % 2).abs() == 1 {
+            // going up
+            let dv = dh - (dh + (self.h % 2).abs()) / 2;
+            if other.v == self.v - dv {
+                return Some(if self.h > other.h { Ul } else { Ur });
+            }
+        } else if self.v < other.v || self.v == other.v && self.h % 2 == 0 {
+            // going down
+            let dv = dh - (dh + ((self.h + 1) % 2).abs()) / 2;
+            let expected_v = self.v + dv;
+            if expected_v == other.v {
+                return Some(if self.h > other.h { Dl } else { Dr });
             }
         }
 
@@ -87,7 +89,7 @@ impl HexPoint {
     // None if the two points are not on the same line or are farther than 1 unit apart
     // This version allows wrapping around the board
     pub fn wrapping_dir_to_1(self, other: Self, board_dim: HexDim) -> Option<Dir> {
-        // O(12) goon enough?
+        // O(12) good enough?
         Dir::iter().find(|dir| self.wrapping_translate(*dir, 1, board_dim) == other)
     }
 
@@ -309,6 +311,15 @@ impl HexPoint {
     pub fn contains(self, pos: Self) -> bool {
         (0..self.h).contains(&pos.h) && (0..self.v).contains(&pos.v)
     }
+}
+
+#[test]
+fn test_dir_to() {
+    assert_eq!(HexPoint { h: 0, v: 1 }.dir_to(HexPoint { h: -1, v: 0}), Some(Ul));
+    assert_eq!(HexPoint { h: 0, v: 1 }.dir_to(HexPoint { h: -1, v: 1}), Some(Dl));
+
+    assert_eq!(HexPoint { h: -1, v: 0 }.dir_to(HexPoint { h: 0, v: 1}), Some(Dr));
+    assert_eq!(HexPoint { h: -1, v: 1 }.dir_to(HexPoint { h: 0, v: 1}), Some(Ur));
 }
 
 #[test]

@@ -1,7 +1,6 @@
-use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
+use ggez::graphics::{Mesh, MeshBuilder};
 use ggez::Context;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};
 use crate::app::stats::Stats;

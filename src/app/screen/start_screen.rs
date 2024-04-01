@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::default::Default;
 use std::f32::consts::TAU;
 use std::rc::Rc;
 use std::result;
