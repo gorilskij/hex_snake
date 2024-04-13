@@ -14,7 +14,7 @@ use crate::app::game_context::GameContext;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
-use crate::app::portal::{Behavior, Edge, Portal};
+use crate::app::portal::Portal;
 use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
@@ -102,91 +102,7 @@ impl Game {
                     //     HexPoint { h: 4, v: 12},
                     //     HexPoint { h: 20, v: 12},
                     // ),
-                    Portal {
-                        edges: vec![
-                            // top
-                            Edge {
-                                a: HexPoint { h: 13, v: 7 },
-                                b: HexPoint { h: 13, v: 8},
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 0 }, Dir::D),
-                                behavior_ba: Behavior::Nothing,
-                                // TODO: constructor that checks validity of Unreachable
-                                //       and validity of a and b points
-                            },
-                            Edge {
-                                a: HexPoint { h: 13, v: 0 },
-                                b: HexPoint { h: 13, v: -1},
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 7 }, Dir::U),
-                                behavior_ba: Behavior::Unreachable,
-                            },
-                            // bottom
-                            Edge {
-                                a: HexPoint { h: 13, v: 9 },
-                                b: HexPoint { h: 13, v: 8},
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 16 }, Dir::U),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            Edge {
-                                a: HexPoint { h: 13, v: 16 },
-                                b: HexPoint { h: 13, v: 17},
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 13, v: 9 }, Dir::D),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            // top-right
-                            Edge {
-                                a: HexPoint { h: 14, v: 8 },
-                                b: HexPoint { h: 13, v: 8 },
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 25, v: 2 }, Dir::Dl),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            Edge {
-                                a: HexPoint { h: 25, v: 2 },
-                                b: HexPoint { h: 26, v: 2 },
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 14, v: 8 }, Dir::Ur),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            // bottom-right
-                            Edge {
-                                a: HexPoint { h: 14, v: 9 },
-                                b: HexPoint { h: 13, v: 8 },
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 25, v: 14 }, Dir::Ul),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            Edge {
-                                a: HexPoint { h: 25, v: 14 },
-                                b: HexPoint { h: 26, v: 15 },
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 14, v: 9 }, Dir::Dr),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            // top-left
-                            Edge {
-                                a: HexPoint { h: 12, v: 8 },
-                                b: HexPoint { h: 13, v: 8 },
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 0, v: 2 }, Dir::Dr),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            Edge {
-                                a: HexPoint { h: 0, v: 2 },
-                                b: HexPoint { h: -1, v: 1 },
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 12, v: 8 }, Dir::Ul),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            // bottom-left
-                            Edge {
-                                a: HexPoint { h: 12, v: 9 },
-                                b: HexPoint { h: 13, v: 8 },
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 0, v: 14 }, Dir::Ur),
-                                behavior_ba: Behavior::Nothing,
-                            },
-                            Edge {
-                                a: HexPoint { h: 0, v: 14 },
-                                b: HexPoint { h: -1, v: 14 },
-                                behavior_ab: Behavior::TeleportTo(HexPoint { h: 12, v: 9 }, Dir::Dl),
-                                behavior_ba: Behavior::Nothing,
-                            },
-
-                        ]
-                    },
+                    Portal::sun_cell(),
                 ],
                 gtx: GameContext::new(
                     // updated immediately after creation
@@ -253,6 +169,12 @@ impl Game {
                 env.apples.retain(move |apple| board_dim.contains(apple.pos));
                 self.spawn_apples();
             }
+
+            // update portals
+            self.env
+                .portals
+                .iter_mut()
+                .for_each(move |portal| portal.update(board_dim));
 
             // invalidate
             self.grid_mesh = None;
@@ -520,7 +442,7 @@ impl EventHandler<Error> for Game {
         }
 
         if self.portal_mesh.is_none() {
-            self.portal_mesh = Some(rendering::portal_mesh(&env.portals, &env.gtx, ctx, &mut stats)?);
+            self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, ctx, &mut stats)?);
         }
 
         if self.snake_mesh.is_none() || playing {

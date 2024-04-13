@@ -281,7 +281,7 @@ impl Snake {
                             println!("TODO: implement")
                         }
                         Some(Behavior::PassThrough) | Some(Behavior::Nothing) | None => {}
-                        Some(Behavior::Unreachable) => panic!("Tried to execute unreachable portal behavior")
+                        Some(Behavior::Unreachable) => panic!("Tried to execute unreachable portal behavior"),
                     }
                 }
 

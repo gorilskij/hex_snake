@@ -1,7 +1,8 @@
 use std::cmp::{max, Ordering};
 use std::fmt::{Debug, Error, Formatter};
-use std::ops::Add;
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
+use num_traits::Zero;
 use Dir::*;
 
 use super::dir::{Axis, Dir};
@@ -19,6 +20,42 @@ impl Add<Dir> for HexPoint {
 
     fn add(self, dir: Dir) -> Self::Output {
         self.translate(dir, 1)
+    }
+}
+
+impl AddAssign<Dir> for HexPoint {
+    fn add_assign(&mut self, dir: Dir) {
+        *self = *self + dir
+    }
+}
+
+impl Sub<Dir> for HexPoint {
+    type Output = Self;
+
+    fn sub(self, dir: Dir) -> Self::Output {
+        self.translate(-dir, 1)
+    }
+}
+
+impl SubAssign<Dir> for HexPoint {
+    fn sub_assign(&mut self, dir: Dir) {
+        *self = *self - dir
+    }
+}
+
+impl Zero for HexPoint {
+    fn zero() -> Self {
+        Self { h: 0, v: 0 }
+    }
+
+    fn is_zero(&self) -> bool {
+        self.h == 0 && self.v == 0
+    }
+}
+
+impl Default for HexPoint {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 
@@ -86,11 +123,24 @@ impl HexPoint {
         Dir::iter().find(|&dir| self.wrapping_translate(dir, 1, board_dim) == other)
     }
 
-    // None if the two points are not on the same line or are farther than 1 unit apart
+    // None if the two points are not on the same straight line or are farther than 1 unit apart
     // This version allows wrapping around the board
     pub fn wrapping_dir_to_1(self, other: Self, board_dim: HexDim) -> Option<Dir> {
         // O(12) good enough?
         Dir::iter().find(|dir| self.wrapping_translate(*dir, 1, board_dim) == other)
+    }
+
+    pub fn find_border(&self, dir: Dir, board_dim: HexDim) -> HexPoint {
+        // TODO: efficientize and use this as part of wrapping
+
+        // if a point is outside the board, we don't have a guarantee of finding a border
+        assert!(board_dim.contains(*self));
+
+        let mut point = *self;
+        while board_dim.contains(point) {
+            point += dir;
+        }
+        point - dir
     }
 
     // O(1)
@@ -106,7 +156,7 @@ impl HexPoint {
         (dh + dv_overflow) as usize
     }
 
-    // obviously oblivious to teleportation, only works on the plane
+    // oblivious to teleportation, only works on the plane
     // all cells within a manhattan distance of radius (including self)
     // guarantees no duplicates, not sorted
     // pub fn neighborhood(self, radius: usize) -> Vec<Self> {
@@ -315,11 +365,11 @@ impl HexPoint {
 
 #[test]
 fn test_dir_to() {
-    assert_eq!(HexPoint { h: 0, v: 1 }.dir_to(HexPoint { h: -1, v: 0}), Some(Ul));
-    assert_eq!(HexPoint { h: 0, v: 1 }.dir_to(HexPoint { h: -1, v: 1}), Some(Dl));
+    assert_eq!(HexPoint { h: 0, v: 1 }.dir_to(HexPoint { h: -1, v: 0 }), Some(Ul));
+    assert_eq!(HexPoint { h: 0, v: 1 }.dir_to(HexPoint { h: -1, v: 1 }), Some(Dl));
 
-    assert_eq!(HexPoint { h: -1, v: 0 }.dir_to(HexPoint { h: 0, v: 1}), Some(Dr));
-    assert_eq!(HexPoint { h: -1, v: 1 }.dir_to(HexPoint { h: 0, v: 1}), Some(Ur));
+    assert_eq!(HexPoint { h: -1, v: 0 }.dir_to(HexPoint { h: 0, v: 1 }), Some(Dr));
+    assert_eq!(HexPoint { h: -1, v: 1 }.dir_to(HexPoint { h: 0, v: 1 }), Some(Ur));
 }
 
 #[test]

@@ -60,13 +60,8 @@ fn behavior_color(behavior: Behavior) -> Color {
     }
 }
 
-pub fn portal_mesh(
-    portals: &[Portal],
-    gtx: &GameContext,
-    ctx: &Context,
-    stats: &mut Stats,
-) -> Result<Mesh> {
-    // TODO: update stats
+// TODO: update stats
+pub fn portal_mesh(portals: &mut [Portal], gtx: &GameContext, ctx: &Context, stats: &mut Stats) -> Result<Mesh> {
     let builder = &mut MeshBuilder::new();
 
     let res: Result<_> = try {

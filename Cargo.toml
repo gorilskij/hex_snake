@@ -17,6 +17,8 @@ lyon_geom = "~1.0"
 rayon = "~1.10"
 static_assertions = "~1.1"
 enum-rotate = "0.1.0"
+num-traits = "0.2.18"
 
 [profile.release]
 debug = true
+opt-level = 2
