@@ -51,7 +51,7 @@ impl Keyboard {
 impl Controller for Keyboard {
     fn next_dir(
         &mut self,
-        _: &mut Body,
+        body: &mut Body,
         _: Option<&Knowledge>,
         _: &dyn Snakes,
         _: &[Apple],
@@ -68,7 +68,7 @@ impl Controller for Keyboard {
         } else {
             self.deferred = true;
             // don't ask until the next frame
-            return Some(self.dir);
+            return Some(body.dir);
         }
         None
     }

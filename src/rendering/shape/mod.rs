@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-pub use arrow::ArrowLeft;
 pub use hexagon::Hexagon;
 pub use triangle_arrow::TriangleArrowLeft;
 pub use wide_hexagon::WideHexagon;

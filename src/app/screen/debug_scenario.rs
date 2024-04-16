@@ -67,6 +67,7 @@ impl DebugScenario {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
+                portals: vec![],
                 gtx: GameContext {
                     board_dim: HexDim { h: 20, v: 10 },
                     cell_dim,
@@ -119,6 +120,7 @@ impl DebugScenario {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
+                portals: vec![],
                 gtx: GameContext {
                     board_dim: HexDim { h: 20, v: 10 },
                     cell_dim,
@@ -171,6 +173,7 @@ impl DebugScenario {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
+                portals: vec![],
                 gtx: GameContext {
                     board_dim: HexDim { h: 20, v: 10 },
                     cell_dim,
@@ -226,6 +229,7 @@ impl DebugScenario {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
+                portals: vec![],
                 gtx: GameContext {
                     board_dim: HexDim { h: 0, v: 0 },
                     cell_dim: Default::default(),
@@ -303,6 +307,7 @@ impl DebugScenario {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
+                portals: vec![],
                 gtx: GameContext {
                     board_dim: HexDim { h: 20, v: 15 },
                     cell_dim,

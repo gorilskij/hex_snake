@@ -7,6 +7,7 @@ use rand::rngs::ThreadRng;
 pub use start_screen::StartScreen;
 
 use crate::app::game_context::GameContext;
+use crate::app::portal::Portal;
 pub use crate::app::prefs::Prefs;
 use crate::apple::Apple;
 use crate::error::{Error, ErrorConversion, Result};
@@ -54,6 +55,7 @@ pub struct Environment<Rng = ThreadRng> {
     // TODO: keep apples in order of position to allow for binary search
     // TODO: specialized Vec for that
     pub apples: Vec<Apple>,
+    pub portals: Vec<Portal>,
     pub gtx: GameContext,
     pub rng: Rng,
 }

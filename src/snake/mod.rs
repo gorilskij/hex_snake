@@ -7,6 +7,7 @@ pub use palette::{Palette, PaletteTemplate};
 
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
+use crate::app::portal::{Behavior, Portal};
 use crate::apple::Apple;
 use crate::basic::{Dir, FrameStamp, Frames, HexDim, HexPoint};
 use crate::snake::eat_mechanics::{EatMechanics, Knowledge};
@@ -65,6 +66,8 @@ pub struct Segment {
     pub pos: HexPoint,
     /// Direction from this segment to the next one (towards the tail)
     pub coming_from: Dir,
+    // going_to should be set if and only if the segment is not the head
+    pub going_to: Option<Dir>,
     pub teleported: Option<Dir>,
     pub z_index: ZIndex,
 }
@@ -236,6 +239,7 @@ impl Snake {
         &mut self,
         other_snakes: impl Snakes,
         apples: &[Apple],
+        portals: &[Portal],
         gtx: &GameContext,
         ftx: &FpsContext,
         ctx: &Context,
@@ -256,16 +260,43 @@ impl Snake {
                 self.update_dir(other_snakes, apples, gtx, ftx, ctx);
 
                 // create new head for snake
-                let dir = self.body.dir;
+                let mut dir = self.body.dir;
+
+                let head_pos = self.head().pos;
+                let new_head_pos_raw = head_pos.translate(dir, 1);
+                let mut new_head_pos = head_pos.wrapping_translate(dir, 1, gtx.board_dim);
+
+                let mut dir_changed_in_teleport = None;
+                for portal in portals {
+                    match portal.check(head_pos, new_head_pos_raw) {
+                        Some(Behavior::Die) => self.die(),
+                        Some(Behavior::TeleportTo(dest, new_dir)) => {
+                            new_head_pos = dest;
+                            if dir != new_dir {
+                                dir_changed_in_teleport = Some(new_dir);
+                            }
+                            self.body.dir = new_dir;
+                        }
+                        Some(Behavior::WrapAround) => {
+                            println!("TODO: implement")
+                        }
+                        Some(Behavior::PassThrough) | Some(Behavior::Nothing) | None => {}
+                        Some(Behavior::Unreachable) => panic!("Tried to execute unreachable portal behavior"),
+                    }
+                }
+
+                let new_dir = dir_changed_in_teleport.unwrap_or(dir);
                 let new_head = Segment {
                     segment_type: SegmentType::Normal,
                     // this gets very interesting if you move 2 cells each time
                     // (porous snake)
-                    pos: self.head().pos.wrapping_translate(dir, 1, gtx.board_dim),
-                    coming_from: -dir,
+                    pos: new_head_pos,
+                    coming_from: -new_dir,
+                    going_to: None,
                     teleported: None,
                     z_index: 0,
                 };
+                self.body.segments[0].going_to = Some(dir);
                 self.body.segments.push_front(new_head);
             }
             State::Crashed => panic!("called advance() on a crashed snake"),

@@ -5,6 +5,7 @@ use ggez::Context;
 use rand::distributions::uniform::SampleRange;
 
 use crate::app::fps_control::FpsContext;
+use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::{Dir, HexPoint};
@@ -33,6 +34,7 @@ pub enum Collision {
         snake_index: usize,
         snake_segment_index: usize,
     },
+    Portal(portal::Behavior),
 }
 
 pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
@@ -50,7 +52,9 @@ pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
                 collisions.push(Collision::Apple {
                     snake_index: snake1_index,
                     apple_index,
-                })
+                });
+                // snakes and apples cannot overlap
+                continue 'outer;
             }
         }
 
@@ -196,6 +200,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                     }
                 }
             }
+            Collision::Portal(behavior) => todo!(),
         }
     }
 
@@ -277,7 +282,7 @@ pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext, ctx: &Context) {
         let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
 
         // advance the snake
-        snake.advance(other_snakes, &env.apples, &env.gtx, ftx, ctx);
+        snake.advance(other_snakes, &env.apples, &env.portals, &env.gtx, ftx, ctx);
 
         // remove snake if it ran out of body
         if snake.body.visible_len() == 0 {

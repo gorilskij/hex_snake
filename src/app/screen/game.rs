@@ -14,6 +14,7 @@ use crate::app::game_context::GameContext;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
+use crate::app::portal::Portal;
 use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
@@ -54,6 +55,7 @@ pub struct Game {
 
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
+    portal_mesh: Option<Mesh>,
     snake_mesh: Option<Mesh>,
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
@@ -83,6 +85,25 @@ impl Game {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
+                portals: vec![
+                    // Portal::cell(
+                    //     HexPoint { h: 4, v: 4},
+                    //     HexPoint { h: 20, v: 4},
+                    // ),
+                    // Portal::cell(
+                    //     HexPoint { h: 20, v: 4},
+                    //     HexPoint { h: 4, v: 4},
+                    // ),
+                    // Portal::cell(
+                    //     HexPoint { h: 20, v: 12},
+                    //     HexPoint { h: 4, v: 12},
+                    // ),
+                    // Portal::cell(
+                    //     HexPoint { h: 4, v: 12},
+                    //     HexPoint { h: 20, v: 12},
+                    // ),
+                    Portal::sun_cell(),
+                ],
                 gtx: GameContext::new(
                     // updated immediately after creation
                     HexPoint { h: 0, v: 0 },
@@ -108,6 +129,7 @@ impl Game {
 
             grid_mesh: None,
             border_mesh: None,
+            portal_mesh: None,
             snake_mesh: None,
             apple_mesh: None,
             distance_grid_mesh: None,
@@ -148,9 +170,16 @@ impl Game {
                 self.spawn_apples();
             }
 
+            // update portals
+            self.env
+                .portals
+                .iter_mut()
+                .for_each(move |portal| portal.update(board_dim));
+
             // invalidate
             self.grid_mesh = None;
             self.border_mesh = None;
+            self.portal_mesh = None;
             self.apple_mesh = None;
             self.snake_mesh = None;
             self.distance_grid_mesh = None;
@@ -412,6 +441,10 @@ impl EventHandler<Error> for Game {
             self.border_mesh = Some(rendering::border_mesh(&env.gtx, ctx)?);
         }
 
+        if self.portal_mesh.is_none() {
+            self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, ctx, &mut stats)?);
+        }
+
         if self.snake_mesh.is_none() || playing {
             self.snake_mesh = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut stats)?);
         }
@@ -456,6 +489,7 @@ impl EventHandler<Error> for Game {
             &self.snake_mesh,
             &self.apple_mesh,
             &self.border_mesh,
+            &self.portal_mesh,
         ];
 
         if !message_drawables.is_empty() || meshes.iter().any(|mesh| mesh.is_some()) {

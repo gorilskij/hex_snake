@@ -70,6 +70,7 @@ fn main() {
         max_width: 0.,
         max_height: 0.,
         resizable: true,
+        // resizable: false,
         visible: true,
         resize_on_scale_factor_change: false,
         logical_size: None,
