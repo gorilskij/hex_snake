@@ -213,7 +213,7 @@ impl SnakeDemo {
         let fps_control = self.fps_control.borrow();
         let ftx = fps_control.context();
 
-        let snake_mesh = rendering::snake_mesh(
+        let snake_meshes = rendering::snake_meshes(
             &mut self.env.snakes,
             &mut self.env.graphics_cache.snakes,
             &self.env.gtx,
@@ -221,7 +221,7 @@ impl SnakeDemo {
             ctx,
             stats,
         )?;
-        canvas.draw(&snake_mesh, draw_param);
+        snake_meshes.into_iter().for_each(|mesh| canvas.draw(&mesh, draw_param));
 
         if !self.env.apples.is_empty() {
             let apple_mesh = rendering::apple_mesh(&self.env.apples, &self.env.gtx, ftx, ctx, stats)?;

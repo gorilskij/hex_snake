@@ -1,15 +1,15 @@
-use std::cmp::Ordering;
 use std::result;
 
-use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use ggez::graphics::{Color, Mesh, MeshBuilder};
 use ggez::Context;
+use itertools::Itertools;
 use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
-use crate::error::{Error, ErrorConversion, Result};
+use crate::error::{ErrorConversion, Result};
 use crate::rendering::cache::SnakeGraphicsCache;
 use crate::rendering::point_factory::ColorResolution;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, SegmentLocation, TurnDescription};
@@ -105,14 +105,14 @@ fn segment_description(
 //  the black hole need to be drawn on top of it but
 //  those that are going away from the black hole need
 //  to be drawn below it (see debug scenario 3)
-pub fn snake_mesh(
+pub fn snake_meshes(
     snakes: &mut [Snake],
     cache: &mut SnakeGraphicsCache,
     gtx: &GameContext,
     ftx: &FpsContext,
     ctx: &Context,
     stats: &mut Stats,
-) -> Result<Mesh> {
+) -> Result<Vec<Mesh>> {
     stats.redrawing_snakes = true;
 
     let frame_fraction = ftx.last_graphics_update.1;
@@ -162,16 +162,16 @@ pub fn snake_mesh(
 
     // let mut heads = Mutex::new(vec![]);
 
-    let mut descs: Vec<_> = snakes
+    snakes
         // .par_iter_mut()
         // .zip(styles.into_par_iter())
         // .zip(color_resolutions.par_iter())
         .iter_mut()
-        .zip(color_resolutions.iter())
-        .flat_map(|(snake, resolution)| {
+        .zip(color_resolutions.into_iter())
+        .try_for_each(|(snake, color_resolution)| {
             let body = &snake.body;
             let mut prev_fraction = None;
-            snake
+            let desc_iter = snake
                 .body
                 .segments
                 // .par_iter()
@@ -180,6 +180,10 @@ pub fn snake_mesh(
                 .iter()
                 .enumerate()
                 .zip(snake.palette.segment_styles(body, frame_fraction))
+                // TODO: change all iterators to be tail-to-head in the first place and remove this collect
+                .collect_vec()
+                .into_iter()
+                .rev()
                 .map(move |((segment_idx, segment), style)| {
                     let desc = segment_description(
                         segment,
@@ -193,10 +197,15 @@ pub fn snake_mesh(
 
                     prev_fraction = Some(desc.fraction);
 
-                    (desc, *resolution)
-                })
+                    desc
+                });
+            cache.update(snake.body.uuid, desc_iter, color_resolution)
         })
-        .collect();
+        .with_trace_step("snake_meshes")?;
+
+    let meshes = cache.build(ctx);
+    cache.reset_head_tail_builder();
+    Ok(meshes)
 
     // descs.par_sort_unstable_by(|(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
     //     Ordering::Equal => {
@@ -241,29 +250,31 @@ pub fn snake_mesh(
     //     builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
     // }
 
-    descs
-        .into_iter()
-        .try_for_each(|(desc, resolution)| {
-            // TODO: animate black hole in
-            if let SegmentType::BlackHole { .. } = desc.segment_type {
-                let destination = desc.destination + gtx.cell_dim.center();
-                let SegmentFraction { start, end } = desc.fraction;
-                let real_cell_dim = if (start - end).abs() < f32::EPSILON {
-                    // snake has died, animate black hole out
-                    assert!(frame_fraction >= 0.5, "frame fraction ({frame_fraction}) < 0.5",);
-                    let animation_fraction = frame_fraction - 0.5;
-                    gtx.cell_dim * (1. - animation_fraction)
-                } else {
-                    gtx.cell_dim
-                };
-                stats.polygons += 1;
-                builder.circle(DrawMode::fill(), destination, real_cell_dim.side, 0.1, black_hole_color)?;
-            }
+    // TODO: handle black holes
 
-            stats.polygons += desc.build(&mut builder, resolution)?;
-            Ok::<_, Error>(())
-        })
-        .with_trace_step("snake_mesh")?;
-
-    Ok(Mesh::from_data(ctx, builder.build()))
+    // descs
+    //     .into_iter()
+    //     .try_for_each(|(desc, resolution)| {
+    //         // TODO: animate black hole in
+    //         if let SegmentType::BlackHole { .. } = desc.segment_type {
+    //             let destination = desc.destination + gtx.cell_dim.center();
+    //             let SegmentFraction { start, end } = desc.fraction;
+    //             let real_cell_dim = if (start - end).abs() < f32::EPSILON {
+    //                 // snake has died, animate black hole out
+    //                 assert!(frame_fraction >= 0.5, "frame fraction ({frame_fraction}) < 0.5",);
+    //                 let animation_fraction = frame_fraction - 0.5;
+    //                 gtx.cell_dim * (1. - animation_fraction)
+    //             } else {
+    //                 gtx.cell_dim
+    //             };
+    //             stats.polygons += 1;
+    //             builder.circle(DrawMode::fill(), destination, real_cell_dim.side, 0.1, black_hole_color)?;
+    //         }
+    //
+    //         stats.polygons += desc.build(&mut builder, resolution)?;
+    //         Ok::<_, Error>(())
+    //     })
+    //     .with_trace_step("snake_mesh")?;
+    //
+    // Ok(Mesh::from_data(ctx, builder.build()))
 }

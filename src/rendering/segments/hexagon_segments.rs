@@ -1,7 +1,7 @@
 use std::iter;
 
 use crate::rendering::point_factory::ColorResolution;
-use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription};
+use crate::rendering::segments::descriptions::{Polygon, SegmentDescription};
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use crate::rendering::shape::{Hexagon, Shape};
 
@@ -13,12 +13,12 @@ impl SegmentRenderer for HexagonSegments {
         let points = Hexagon::new(description.cell_dim)
             .translate(description.destination)
             .into();
-        let polygon = Polygon {
+        let polygon = Polygon::new(
             // TODO: find a better way to transmit this that doesn't pollute the renderers which don't need it
-            subsegment_idx: 0,
+            0,
             points,
-            color: description.segment_style.first_color(),
-        };
-        Box::new(iter::once(polygon))
+            description.segment_style.first_color(),
+        );
+        Box::new(polygon.into_iter())
     }
 }

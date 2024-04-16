@@ -1,13 +1,12 @@
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::ops::{Range, RangeInclusive};
+use std::collections::{BinaryHeap, HashMap};
+use std::ops::Range;
 
-use ggez::graphics::{Color, DrawMode, MeshBuilder};
-use ggez::{mint, GameError, GameResult};
-use itertools::{peek_nth, Itertools};
+use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
+use ggez::{Context, GameError};
+use itertools::Itertools;
 
 use crate::error::{Error, ErrorConversion, Result};
-use crate::rendering::descriptions::RoundHeadDescription;
 use crate::rendering::point_factory::SegmentRenderer;
 use crate::rendering::segments::descriptions::{Polygon, SegmentDescription};
 use crate::rendering::segments::point_factory::ColorResolution;
@@ -28,13 +27,37 @@ use crate::snake::{SegmentId, SnakeUUID, ZIndex};
 
 #[derive(Eq, PartialEq, Hash)]
 struct SubsegmentKey {
+    snake_uuid: SnakeUUID,
     segment_id: SegmentId,
     subsegment_idx: SubsegmentIdx,
 }
 
+#[derive(Clone)]
 struct Places {
     vertices: Range<usize>,
     indices: Range<usize>,
+}
+
+impl Places {
+    fn correct_for_removal_of_vertices(&mut self, removed: Range<usize>) {
+        // assert that the ranges don't overlap
+        assert!(self.vertices.end <= removed.start || removed.end <= self.vertices.start);
+
+        if removed.end <= self.vertices.start {
+            self.vertices.start -= removed.len();
+            self.vertices.end -= removed.len();
+        }
+    }
+
+    fn correct_for_removal_of_indices(&mut self, removed: Range<usize>) {
+        // assert that the ranges don't overlap
+        assert!(self.indices.end <= removed.start || removed.end <= self.indices.start);
+
+        if removed.end <= self.indices.start {
+            self.indices.start -= removed.len();
+            self.indices.end -= removed.len();
+        }
+    }
 }
 
 #[derive(Default)]
@@ -61,17 +84,27 @@ impl BuilderBucket {
         self.places.len()
     }
 
-    fn contains_id(&self, id: SegmentId) -> bool {
-        self.places.keys().any(|key| key.segment_id == id)
+    fn contains(&self, snake_uuid: SnakeUUID, segment_id: SegmentId) -> bool {
+        self.places
+            .keys()
+            .any(|key| key.snake_uuid == snake_uuid && key.segment_id == segment_id)
     }
 
-    fn add_or_update_segment(&mut self, desc: SegmentDescription, color_resolution: ColorResolution) -> Result {
+    fn add_or_update_segment(
+        &mut self,
+        snake_uuid: SnakeUUID,
+        desc: SegmentDescription,
+        color_resolution: ColorResolution,
+    ) -> Result {
         desc.render(color_resolution)
-            .try_for_each(|Polygon { subsegment_idx, points, color }| {
-                match self.places.entry(SubsegmentKey {
+            .try_for_each(|Polygon { subsegment_idx, points, color, .. }| {
+                let key = SubsegmentKey {
+                    snake_uuid,
                     segment_id: desc.segment_id,
                     subsegment_idx,
-                }) {
+                };
+
+                match self.places.entry(key) {
                     Entry::Occupied(entry) => {
                         // assert_eq!(places.vertices.len(), 1);
                         entry
@@ -111,108 +144,173 @@ impl BuilderBucket {
             .with_trace_step("BuilderBucket::add_or_update_segment")
     }
 
-    fn remove(builder: &mut MeshBuilder, places: &Places) {
-        let _ = builder.buffer.vertices.drain(places.vertices.clone());
-        let _ = builder.buffer.indices.drain(places.indices.clone());
-    }
-
-    fn remove_ids_lte(&mut self, id: SegmentId) {
-        self.places.retain(|candidate_id, places| {
-            if candidate_id.segment_id <= id {
-                Self::remove(&mut self.inner, places);
-                false
-            } else {
-                true
-            }
+    fn remove_vertices(&mut self, range: Range<usize>) {
+        let _ = self.inner.buffer.vertices.drain(range.clone());
+        // correct other vertices
+        self.places.iter_mut().for_each(|(_, places_to_correct)| {
+            places_to_correct.correct_for_removal_of_vertices(range.clone())
         })
     }
+
+    fn remove_indices(&mut self, range: Range<usize>) {
+        let _ = self.inner.buffer.indices.drain(range.clone());
+        // correct other indices
+        self.places.iter_mut().for_each(|(_, places_to_correct)| {
+            places_to_correct.correct_for_removal_of_indices(range.clone())
+        })
+    }
+
+    fn remove_segment_ids_lte(&mut self, snake_uuid: SnakeUUID, segment_id: SegmentId) {
+        println!(">>> remove_segment_ids_lte");
+        // max-heaps
+        let mut remove_vertices = BinaryHeap::new();
+        let mut remove_indices = BinaryHeap::new();
+        self.places.retain(|key, places| {
+            !(key.snake_uuid == snake_uuid && key.segment_id <= segment_id) || {
+                remove_vertices.push((places.vertices.start, places.vertices.end));
+                remove_indices.push((places.indices.start, places.indices.end));
+                false
+            }
+        });
+        remove_vertices.into_iter().for_each(|(start, end)| self.remove_vertices(start..end));
+        remove_indices.into_iter().for_each(|(start, end)| self.remove_indices(start..end));
+    }
+
+    fn remove_all(&mut self, snake_uuid: SnakeUUID) {
+        println!(">>> remove_all");
+        // max-heaps
+        let mut remove_vertices = BinaryHeap::new();
+        let mut remove_indices = BinaryHeap::new();
+        self.places.retain(|key, places| {
+            key.snake_uuid != snake_uuid || {
+                remove_vertices.push((places.vertices.start, places.vertices.end));
+                remove_indices.push((places.indices.start, places.indices.end));
+                false
+            }
+        });
+        remove_vertices.into_iter().for_each(|(start, end)| self.remove_vertices(start..end));
+        remove_indices.into_iter().for_each(|(start, end)| self.remove_indices(start..end));
+    }
 }
 
-pub struct SnakeCache {
+#[derive(Default)]
+pub struct Cache {
+    head_tail_builders: HashMap<ZIndex, MeshBuilder>,
     cached_builders: HashMap<ZIndex, Vec<BuilderBucket>>,
+    color_resolutions: HashMap<SnakeUUID, ColorResolution>,
 }
 
-impl SnakeCache {
-    const BUCKET_MAX_LEN: usize = 10;
+impl Cache {
+    // TODO: make variable
+    // this is a soft limit in terms of subsegments,
+    // segments are added one at a time so buckets can contain more
+    // subsegments than this, however, if they do, no more segments
+    // will be added
+    const BUCKET_MAX_LEN: usize = 1;
+
+    pub fn reset_head_tail_builder(&mut self) {
+        self.head_tail_builders.clear()
+    }
 
     pub fn update(
         &mut self,
+        snake_uuid: SnakeUUID,
+        // tail-to-head
         segment_descriptions: impl Iterator<Item = SegmentDescription>,
         color_resolution: ColorResolution,
     ) -> Result {
-        // TODO: iterator is __tail to head__
-
-        let mut segment_descriptions = segment_descriptions.peekable();
-
-        // build head
-        let mut head_tail_builder = MeshBuilder::new();
-        // TODO: return Err
-        let tail = segment_descriptions.next().expect("iterator empty");
-
-        // delete all segments that don't exist anymore, plus the segment that will be replaced by the tail
-        self.cached_builders.retain(|_, buckets| {
-            buckets.retain_mut(|bucket| {
-                bucket.remove_ids_lte(tail.segment_id);
-                !bucket.is_empty()
-            });
-            !buckets.is_empty()
-        });
-
-        // build tail
-        // TODO: support different renderers
-        SmoothSegments::render_segment(&tail, color_resolution).try_for_each(|polygon| {
-            head_tail_builder
-                .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
-                .map(|_| ())
-        })?;
-
-        // re-color existing segments
-        while let Some(desc) = segment_descriptions.next() {
-            if segment_descriptions.peek().is_none() {
-                let head = desc;
-                SmoothSegments::render_segment(&head, color_resolution).try_for_each(|polygon| {
-                    head_tail_builder
-                        .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
-                        .map(|_| ())
-                })?;
-            } else {
-                let buckets = self
-                    .cached_builders
-                    .entry(desc.z_index)
-                    .or_insert_with(|| Default::default());
-                let mut bucket = buckets.iter_mut().find(|bucket| bucket.contains_id(desc.segment_id));
-                if bucket.is_none() {
-                    // find the fullest bucket that isn't completely full
-                    bucket = buckets
-                        .iter_mut()
-                        .filter(|bucket| bucket.len() < Self::BUCKET_MAX_LEN)
-                        .max_by_key(|bucket| bucket.len());
-                }
-                if bucket.is_none() {
-                    buckets.push(Default::default());
-                    bucket = buckets.last_mut();
-                }
-                let bucket = bucket.unwrap();
-
-                bucket.add_or_update_segment(desc, color_resolution)?;
-
-                // TODO #######################################
+        let res: Result = try {
+            // if a snake changes color resolution, its whole cache is invalidated
+            if self
+                .color_resolutions
+                .get(&snake_uuid)
+                .map(|res| res == &color_resolution)
+                .unwrap_or(false)
+            {
+                self.cached_builders
+                    .values_mut()
+                    .for_each(|buckets| buckets.iter_mut().for_each(|bucket| bucket.remove_all(snake_uuid)));
             }
-        }
 
-        // TODO: pop the old head, add the second element and then add the new head
-        // TODO: for all existing segments, recolor
-        // TODO: pop the old tail and (maybe, depending on eaten) the second-to-last segment and add the new tail
-        // TODO: delete all segments that are *after* the last segment in the iterator
-        // TODO: build everything
+            let mut segment_descriptions = segment_descriptions.peekable();
 
-        // TODO: remember that segment HexPos locations can repeat
-        todo!()
+            // TODO: return Err
+            let tail = segment_descriptions.next().expect("iterator empty");
+
+            // delete all segments that don't exist anymore, plus the segment that will be replaced by the tail
+            self.cached_builders.retain(|_, buckets| {
+                buckets.retain_mut(|bucket| {
+                    bucket.remove_segment_ids_lte(snake_uuid, tail.segment_id);
+                    !bucket.is_empty()
+                });
+                !buckets.is_empty()
+            });
+
+            // build tail
+            // TODO: support different renderers
+            println!("build tail");
+            SmoothSegments::render_segment(&tail, color_resolution).try_for_each(|polygon| {
+                self.head_tail_builders
+                    .entry(tail.z_index)
+                    .or_insert_with(|| MeshBuilder::new())
+                    .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
+                    .map(|_| ())
+            })?;
+            println!("done");
+
+            // re-color existing segments and build head
+            while let Some(desc) = segment_descriptions.next() {
+                if segment_descriptions.peek().is_none() {
+                    let head = desc;
+                    println!("build head");
+                    SmoothSegments::render_segment(&head, color_resolution).try_for_each(|polygon| {
+                        self.head_tail_builders
+                            .entry(head.z_index)
+                            .or_insert_with(|| MeshBuilder::new())
+                            .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
+                            .map(|_| ())
+                    })?;
+                    println!("done");
+                } else {
+                    let buckets = self
+                        .cached_builders
+                        .entry(desc.z_index)
+                        .or_insert_with(|| Default::default());
+                    let mut bucket = buckets
+                        .iter_mut()
+                        .find(|bucket| bucket.contains(snake_uuid, desc.segment_id));
+                    if bucket.is_none() {
+                        // find the fullest bucket that isn't completely full
+                        bucket = buckets
+                            .iter_mut()
+                            .filter(|bucket| bucket.len() < Self::BUCKET_MAX_LEN)
+                            .max_by_key(|bucket| bucket.len());
+                    }
+                    if bucket.is_none() {
+                        buckets.push(Default::default());
+                        bucket = buckets.last_mut();
+                    }
+                    let bucket = bucket.unwrap();
+
+                    bucket.add_or_update_segment(snake_uuid, desc, color_resolution)?;
+                }
+            }
+        };
+
+        res.with_trace_step("Cache::update")
     }
-}
 
-// TODO: write z-index-aware draw method, or return multiple meshes or something
-#[derive(Default)]
-pub struct Cache {
-    snake_caches: HashMap<SnakeUUID, SnakeCache>,
+    // TODO: write z-index-aware draw method, or return multiple meshes or something
+    pub fn build(&self, ctx: &Context) -> Vec<Mesh> {
+        self.head_tail_builders
+            .iter()
+            .chain(
+                self.cached_builders
+                    .iter()
+                    .flat_map(|(z_index, buckets)| buckets.iter().map(move |bucket| (z_index, &bucket.inner))),
+            )
+            .sorted_unstable_by_key(|(key, _)| *key)
+            .map(|(_, builder)| Mesh::from_data(ctx, builder.build()))
+            .collect()
+    }
 }

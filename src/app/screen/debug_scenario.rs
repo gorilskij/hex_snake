@@ -18,7 +18,6 @@ use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
-use crate::rendering::GraphicsCache;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake_control::pathfinder;
@@ -413,7 +412,7 @@ impl EventHandler<Error> for DebugScenario {
             snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx, ctx);
         }
 
-        let snake_mesh = rendering::snake_mesh(
+        let snake_meshes = rendering::snake_meshes(
             &mut env.snakes,
             &mut env.graphics_cache.snakes,
             &env.gtx,
@@ -421,7 +420,7 @@ impl EventHandler<Error> for DebugScenario {
             ctx,
             &mut self.stats,
         )?;
-        canvas.draw(&snake_mesh, draw_param);
+        snake_meshes.into_iter().for_each(|mesh| canvas.draw(&mesh, draw_param));
 
         if !env.apples.is_empty() {
             let apple_mesh = rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut self.stats)?;

@@ -6,6 +6,7 @@ use ggez::graphics::{Canvas, DrawParam, Mesh};
 use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::input::mouse;
 use ggez::Context;
+use itertools::Itertools;
 use rand::prelude::*;
 
 use crate::app::distance_grid::DistanceGrid;
@@ -56,7 +57,7 @@ pub struct Game {
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
     portal_mesh: Option<Mesh>,
-    snake_mesh: Option<Mesh>,
+    snake_meshes: Option<Vec<Mesh>>,
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
@@ -131,7 +132,7 @@ impl Game {
             grid_mesh: None,
             border_mesh: None,
             portal_mesh: None,
-            snake_mesh: None,
+            snake_meshes: None,
             apple_mesh: None,
             distance_grid_mesh: None,
             player_path_mesh: None,
@@ -182,7 +183,7 @@ impl Game {
             self.border_mesh = None;
             self.portal_mesh = None;
             self.apple_mesh = None;
-            self.snake_mesh = None;
+            self.snake_meshes = None;
             self.distance_grid_mesh = None;
             self.distance_grid.invalidate();
             self.player_path_mesh = None;
@@ -196,7 +197,7 @@ impl Game {
         env.snakes.clear();
         env.apples.clear();
 
-        self.snake_mesh = None;
+        self.snake_meshes = None;
         self.apple_mesh = None;
         self.distance_grid_mesh = None;
         self.player_path_mesh = None;
@@ -396,126 +397,130 @@ impl EventHandler<Error> for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> Result {
-        self.fps_control.graphics_frame();
+        let res: Result = try {
+            self.fps_control.graphics_frame();
 
-        if self.env.gtx.prefs.display_fps {
-            self.update_fps_message();
-        }
-
-        let env = &mut self.env;
-        let ftx = self.fps_control.context();
-        let mut stats = Stats::default();
-        let playing = self.fps_control.state() == fps_control::State::Playing;
-
-        // TODO: diagnose why the interframe interval is
-        //  1ms sometimes when out of focus
-        // unsafe {
-        //     use std::time::Instant;
-        //     static mut L: Option<Instant> = None;
-        //     if let Some(last) = L {
-        //         println!("{}ms", last.elapsed().as_millis());
-        //     }
-        //     L = Some(Instant::now());
-        // }
-
-        if playing {
-            // Update the direction of the snake early
-            // to see it turning as soon as possible,
-            // this could happen in the middle of a
-            // game frame. Repeated update s during the
-            // same game frame are blocked
-            for idx in 0..env.snakes.len() {
-                let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
-                snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx, ctx);
-            }
-        }
-
-        if self.grid_mesh.is_none() {
-            match env.gtx.prefs.draw_grid {
-                DrawGrid::Grid => self.grid_mesh = Some(rendering::grid_mesh(&env.gtx, ctx)?),
-                DrawGrid::Dots => self.grid_mesh = Some(rendering::grid_dot_mesh(&env.gtx, ctx)?),
-                _ => {}
-            }
-        }
-
-        if env.gtx.prefs.draw_border && self.border_mesh.is_none() {
-            self.border_mesh = Some(rendering::border_mesh(&env.gtx, ctx)?);
-        }
-
-        if self.portal_mesh.is_none() {
-            self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, ctx, &mut stats)?);
-        }
-
-        if self.snake_mesh.is_none() || playing {
-            self.snake_mesh = Some(rendering::snake_mesh(
-                &mut env.snakes,
-                &mut env.graphics_cache.snakes,
-                &env.gtx,
-                ftx,
-                ctx,
-                &mut stats,
-            )?);
-        }
-
-        if env.apples.is_empty() {
-            self.apple_mesh = None;
-        } else if self.apple_mesh.is_none() || self.animated_apples {
-            // only recompute apple mesh if there are animated apples
-            self.apple_mesh = Some(rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut stats)?);
-        }
-
-        let player_idx = self.first_player_snake_idx().expect("no player snake");
-        let env = &mut self.env;
-
-        let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
-
-        if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
-            self.distance_grid_mesh = Some(
-                self.distance_grid
-                    .mesh(player_snake, other_snakes, ctx, &env.gtx, ftx)?,
-            );
-        }
-
-        if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
-            // could still be None if the player snake doesn't have an autopilot
-            self.player_path_mesh =
-                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, ctx, &env.gtx, &mut stats)
-                    .invert()?;
-        }
-
-        if env.gtx.prefs.display_stats {
-            let message = stats.get_stats_message();
-            self.messages.insert(MessageID::Stats, message);
-        }
-
-        let message_drawables = self.get_message_drawables(ctx);
-
-        let meshes = [
-            &self.distance_grid_mesh,
-            &self.grid_mesh,
-            &self.player_path_mesh,
-            &self.snake_mesh,
-            &self.apple_mesh,
-            &self.border_mesh,
-            &self.portal_mesh,
-        ];
-
-        if !message_drawables.is_empty() || meshes.iter().any(|mesh| mesh.is_some()) {
-            let mut canvas = Canvas::from_frame(ctx, self.env.gtx.palette.background_color);
-
-            let draw_param = DrawParam::default().dest(self.offset);
-            for mesh in meshes.into_iter().flatten() {
-                canvas.draw(mesh, draw_param);
+            if self.env.gtx.prefs.display_fps {
+                self.update_fps_message();
             }
 
-            for drawable in message_drawables {
-                drawable.draw(&mut canvas);
+            let env = &mut self.env;
+            let ftx = self.fps_control.context();
+            let mut stats = Stats::default();
+            let playing = self.fps_control.state() == fps_control::State::Playing;
+
+            // TODO: diagnose why the interframe interval is
+            //  1ms sometimes when out of focus
+            // unsafe {
+            //     use std::time::Instant;
+            //     static mut L: Option<Instant> = None;
+            //     if let Some(last) = L {
+            //         println!("{}ms", last.elapsed().as_millis());
+            //     }
+            //     L = Some(Instant::now());
+            // }
+
+            if playing {
+                // Update the direction of the snake early
+                // to see it turning as soon as possible,
+                // this could happen in the middle of a
+                // game frame. Repeated update s during the
+                // same game frame are blocked
+                for idx in 0..env.snakes.len() {
+                    let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
+                    snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx, ctx);
+                }
             }
 
-            canvas.finish(ctx).map_err(Error::from).with_trace_step("Game::draw")?;
-        }
+            if self.grid_mesh.is_none() {
+                match env.gtx.prefs.draw_grid {
+                    DrawGrid::Grid => self.grid_mesh = Some(rendering::grid_mesh(&env.gtx, ctx)?),
+                    DrawGrid::Dots => self.grid_mesh = Some(rendering::grid_dot_mesh(&env.gtx, ctx)?),
+                    _ => {}
+                }
+            }
 
-        Ok(())
+            if env.gtx.prefs.draw_border && self.border_mesh.is_none() {
+                self.border_mesh = Some(rendering::border_mesh(&env.gtx, ctx)?);
+            }
+
+            if self.portal_mesh.is_none() {
+                self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, ctx, &mut stats)?);
+            }
+
+            if self.snake_meshes.is_none() || playing {
+                self.snake_meshes = Some(rendering::snake_meshes(
+                    &mut env.snakes,
+                    &mut env.graphics_cache.snakes,
+                    &env.gtx,
+                    ftx,
+                    ctx,
+                    &mut stats,
+                )?);
+            }
+
+            if env.apples.is_empty() {
+                self.apple_mesh = None;
+            } else if self.apple_mesh.is_none() || self.animated_apples {
+                // only recompute apple mesh if there are animated apples
+                self.apple_mesh = Some(rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut stats)?);
+            }
+
+            let player_idx = self.first_player_snake_idx().expect("no player snake");
+            let env = &mut self.env;
+
+            let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
+
+            if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
+                self.distance_grid_mesh =
+                    Some(
+                        self.distance_grid
+                            .mesh(player_snake, other_snakes, ctx, &env.gtx, ftx)?,
+                    );
+            }
+
+            if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
+                // could still be None if the player snake doesn't have an autopilot
+                self.player_path_mesh =
+                    rendering::player_path_mesh(player_snake, other_snakes, &env.apples, ctx, &env.gtx, &mut stats)
+                        .invert()?;
+            }
+
+            if env.gtx.prefs.display_stats {
+                let message = stats.get_stats_message();
+                self.messages.insert(MessageID::Stats, message);
+            }
+
+            let message_drawables = self.get_message_drawables(ctx);
+
+            let meshes = [&self.distance_grid_mesh, &self.grid_mesh, &self.player_path_mesh]
+                .into_iter()
+                .map(|o| o.as_ref())
+                .chain(self.snake_meshes.iter().flatten().map(Some))
+                .chain(
+                    [&self.apple_mesh, &self.border_mesh, &self.portal_mesh]
+                        .into_iter()
+                        .map(|o| o.as_ref()),
+                )
+                .collect_vec();
+
+            if !message_drawables.is_empty() || meshes.iter().any(|mesh| mesh.is_some()) {
+                let mut canvas = Canvas::from_frame(ctx, self.env.gtx.palette.background_color);
+
+                let draw_param = DrawParam::default().dest(self.offset);
+                for mesh in meshes.into_iter().flatten() {
+                    canvas.draw(mesh, draw_param);
+                }
+
+                for drawable in message_drawables {
+                    drawable.draw(&mut canvas);
+                }
+
+                canvas.finish(ctx).map_err(Error::from).with_trace_step("Game::draw")?;
+            }
+        };
+
+        res.with_trace_step("Game::draw")
     }
 
     fn mouse_motion_event(&mut self, ctx: &mut Context, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result {
@@ -675,7 +680,7 @@ impl EventHandler<Error> for Game {
                             text = "draw style: hexagon";
                         }
                     }
-                    self.snake_mesh = None;
+                    self.snake_meshes = None;
                     self.apple_mesh = None;
                     self.display_notification(text);
                 }

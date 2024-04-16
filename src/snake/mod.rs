@@ -1,8 +1,7 @@
-use std::cell::RefCell;
 use std::collections::{HashSet, VecDeque};
 use std::mem;
 use std::mem::Discriminant;
-use std::sync::{Mutex, RwLock};
+use std::sync::Mutex;
 
 use ggez::Context;
 pub use palette::{Palette, PaletteTemplate};

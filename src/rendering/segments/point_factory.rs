@@ -2,7 +2,7 @@ use ggez::graphics::{DrawMode, MeshBuilder};
 
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;
-use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription};
+use crate::rendering::segments::descriptions::{Polygon, SegmentDescription};
 use crate::rendering::segments::hexagon_segments::HexagonSegments;
 use crate::rendering::segments::smooth_segments::SmoothSegments;
 

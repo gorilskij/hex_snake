@@ -150,4 +150,17 @@ pub struct Polygon {
     pub subsegment_idx: SubsegmentIdx,
     pub points: Vec<Point>,
     pub color: Color,
+    // to prevent direct construction
+    _private: (),
+}
+
+impl Polygon {
+    pub fn new(subsegment_idx: SubsegmentIdx, points: Vec<Point>, color: Color) -> Option<Self> {
+        (points.len() >= 3).then(|| Self {
+            subsegment_idx,
+            points,
+            color,
+            _private: (),
+        })
+    }
 }
