@@ -9,14 +9,14 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::error::{Error, ErrorConversion, Result};
-use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
+use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, SegmentLocation, TurnDescription};
 use crate::snake::palette::SegmentStyle;
 use crate::snake::{Body, Segment, SegmentType, Snake};
 use crate::support::partial_min_max::partial_min;
 
 fn segment_description(
     segment: &Segment,
-    segment_idx: usize,
+    segment_location: SegmentLocation,
     body: &Body,
     prev_fraction: Option<SegmentFraction>,
     frame_fraction: f32,
@@ -28,9 +28,8 @@ fn segment_description(
 
     let location = segment.pos.to_cartesian(gtx.cell_dim);
 
-    let fraction = match segment_idx {
-        // head
-        0 => {
+    let fraction = match segment_location {
+        SegmentLocation::Head => {
             if let SegmentType::BlackHole { just_created: _ } = segment.segment_type {
                 // never exceed 0.5 into a black hole, stay there once you get there
                 if body.visible_len() == 1 {
@@ -48,8 +47,8 @@ fn segment_description(
                 SegmentFraction::appearing(frame_fraction)
             }
         }
-        // tail
-        i if i == body.visible_len() - 1 && body.grow == 0 => {
+        // i if i == body.visible_len() - 1 && body.grow == 0 => {
+        SegmentLocation::Tail => {
             if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
                 let frac = ((original_food - food_left) as f32 + frame_fraction) / (original_food + 1) as f32;
                 SegmentFraction::disappearing(frac)
@@ -57,11 +56,10 @@ fn segment_description(
                 SegmentFraction::disappearing(frame_fraction)
             }
         }
-        // body
-        _ => SegmentFraction::solid(),
+        SegmentLocation::Body => SegmentFraction::solid(),
     };
 
-    let turn_fraction = if segment_idx == 0 {
+    let turn_fraction = if segment_location == SegmentLocation::Head {
         body.turn_start
             .map(|(_, start_frame_fraction)| {
                 let max = 1. - start_frame_fraction;
@@ -81,7 +79,7 @@ fn segment_description(
     };
 
     SegmentDescription {
-        segment_idx,
+        location: segment_location,
         destination: location,
         turn: TurnDescription {
             coming_from,
@@ -174,14 +172,17 @@ pub fn snake_mesh(
                 .enumerate()
                 .zip(snake.palette.segment_styles(body, frame_fraction))
                 .map(move |((segment_idx, segment), style)| {
-                    let desc =
-                        segment_description(segment, segment_idx, body, prev_fraction, frame_fraction, style, gtx);
+                    let desc = segment_description(
+                        segment,
+                        SegmentLocation::new(segment_idx, body),
+                        body,
+                        prev_fraction,
+                        frame_fraction,
+                        style,
+                        gtx,
+                    );
 
                     prev_fraction = Some(desc.fraction);
-
-                    // if segment_idx == 0 {
-                    //     heads.lock().unwrap().push(desc.clone());
-                    // }
 
                     (desc, *resolution)
                 })

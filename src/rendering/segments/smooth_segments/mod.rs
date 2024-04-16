@@ -6,9 +6,7 @@ use lyon_geom::{Angle, Arc};
 
 use crate::basic::{CellDim, Dir, Point};
 use crate::rendering::clean_arc::CleanArc;
-use crate::rendering::segments::descriptions::{
-    Polygon, RoundHeadDescription, SegmentDescription, SegmentFraction, TurnDirection, TurnType,
-};
+use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription, SegmentFraction, SegmentLocation, TurnDirection, TurnType};
 use crate::rendering::segments::point_factory::SegmentRenderer;
 use crate::rendering::shape::ShapePoints;
 
@@ -179,7 +177,7 @@ fn render_default_straight_segment(
         Not
     };
 
-    if description.segment_idx == 0 && subsegment_idx == 0 {
+    if description.location == SegmentLocation::Head && subsegment_idx == 0 {
         match part_of_round_head {
             Fully => render_arc_tip_straight(description, fraction),
             Partly => todo!(),

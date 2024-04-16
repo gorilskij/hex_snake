@@ -2,9 +2,9 @@
 
 use crate::basic::{CellDim, Dir, Point};
 use crate::color::Color;
-use crate::rendering;
 use crate::snake::palette::SegmentStyle;
 use crate::snake::{SegmentType, ZIndex};
+use crate::{rendering, snake};
 
 // A full (solid) segment starts at 0. and ends at 1.
 #[derive(Copy, Clone, Debug)]
@@ -85,9 +85,26 @@ impl TurnDescription {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum SegmentLocation {
+    Head, // first segment
+    Body, // somewhere inbetween
+    Tail, // last segment
+}
+
+impl SegmentLocation {
+    pub fn new(segment_idx: usize, body: &snake::Body) -> Self {
+        match segment_idx {
+            0 => Self::Head,
+            i if i == body.visible_len() - 1 && body.grow == 0 => Self::Tail,
+            _ => Self::Body,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SegmentDescription {
-    pub segment_idx: usize,
+    pub location: SegmentLocation,
     pub destination: Point,
     pub turn: TurnDescription,
     pub fraction: SegmentFraction,
@@ -108,7 +125,7 @@ pub enum RoundHeadDescription {
     Full { segment_end: f32 },
     /// Only the end of the round head is within the current segment
     Tail { prev_segment_end: f32 },
-    /// The round head is fully behind this segment (going head to tail)
+    /// No part of the round head is within this segment
     Gone,
 }
 
