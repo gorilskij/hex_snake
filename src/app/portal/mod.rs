@@ -1,7 +1,4 @@
-use std::cell::{Ref, RefCell};
 use std::fmt::{Debug, Formatter};
-
-use num_traits::Zero;
 
 use crate::basic::{Dir, HexDim, HexPoint};
 
