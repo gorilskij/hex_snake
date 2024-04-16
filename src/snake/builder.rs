@@ -119,6 +119,7 @@ impl Builder {
         eprintln!("spawn snake at {:?} coming from {:?} going to {:?}", pos, -dir, dir);
 
         let head = Segment {
+            id: Default::default(),
             segment_type: SegmentType::Normal,
             pos,
             coming_from: -dir,
@@ -131,6 +132,7 @@ impl Builder {
         cells.push_back(head);
 
         let body = Body {
+            uuid: SnakeUUID::new(),
             segments: cells,
             missing_front: 0,
             dir,

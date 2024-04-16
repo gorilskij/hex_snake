@@ -113,6 +113,7 @@ impl Game {
                     apple_spawn_policy,
                 ),
                 rng: thread_rng(),
+                graphics_cache: Default::default(),
             },
             fps_control: FpsControl::new(starting_fps),
             boost: Boost::NoBoost,
@@ -446,7 +447,14 @@ impl EventHandler<Error> for Game {
         }
 
         if self.snake_mesh.is_none() || playing {
-            self.snake_mesh = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut stats)?);
+            self.snake_mesh = Some(rendering::snake_mesh(
+                &mut env.snakes,
+                &mut env.graphics_cache.snakes,
+                &env.gtx,
+                ftx,
+                ctx,
+                &mut stats,
+            )?);
         }
 
         if env.apples.is_empty() {

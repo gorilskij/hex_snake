@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::result;
 
 use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use ggez::Context;
@@ -9,6 +10,8 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::error::{Error, ErrorConversion, Result};
+use crate::rendering::cache::SnakeGraphicsCache;
+use crate::rendering::point_factory::ColorResolution;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, SegmentLocation, TurnDescription};
 use crate::snake::palette::SegmentStyle;
 use crate::snake::{Body, Segment, SegmentType, Snake};
@@ -79,6 +82,7 @@ fn segment_description(
     };
 
     SegmentDescription {
+        segment_id: segment.id,
         location: segment_location,
         destination: location,
         turn: TurnDescription {
@@ -103,6 +107,7 @@ fn segment_description(
 //  to be drawn below it (see debug scenario 3)
 pub fn snake_mesh(
     snakes: &mut [Snake],
+    cache: &mut SnakeGraphicsCache,
     gtx: &GameContext,
     ftx: &FpsContext,
     ctx: &Context,
@@ -119,8 +124,8 @@ pub fn snake_mesh(
 
     // Bounds on the number of subsegments per segment to avoid
     // very high numbers of polygons or empty segments
-    const MIN_SUBSEGMENTS: usize = 1;
-    const MAX_SUBSEGMENTS: usize = 20;
+    const MIN_RESOLUTION: ColorResolution = 1;
+    const MAX_RESOLUTION: ColorResolution = 20;
 
     // TODO (easy): factor out into palette
     let black_hole_color = Color::from_rgb(1, 36, 92);
@@ -131,7 +136,11 @@ pub fn snake_mesh(
     let color_resolutions: Vec<_> = snakes
         .iter()
         .map(|snake| {
-            let resolution = (TOTAL_SUBSEGMENTS / snake.body.visible_len()).clamp(MIN_SUBSEGMENTS, MAX_SUBSEGMENTS);
+            let resolution = {
+                let resolution: result::Result<ColorResolution, _> =
+                    (TOTAL_SUBSEGMENTS / snake.body.visible_len()).try_into();
+                resolution.unwrap().clamp(MIN_RESOLUTION, MAX_RESOLUTION)
+            };
 
             if resolution > stats.max_color_resolution {
                 stats.max_color_resolution = resolution;
@@ -189,18 +198,18 @@ pub fn snake_mesh(
         })
         .collect();
 
-    descs.par_sort_unstable_by(|(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
-        Ordering::Equal => {
-            if let SegmentType::BlackHole { .. } = desc1.segment_type {
-                Ordering::Greater
-            } else if let SegmentType::BlackHole { .. } = desc2.segment_type {
-                Ordering::Less
-            } else {
-                Ordering::Equal
-            }
-        }
-        ordering => ordering,
-    });
+    // descs.par_sort_unstable_by(|(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
+    //     Ordering::Equal => {
+    //         if let SegmentType::BlackHole { .. } = desc1.segment_type {
+    //             Ordering::Greater
+    //         } else if let SegmentType::BlackHole { .. } = desc2.segment_type {
+    //             Ordering::Less
+    //         } else {
+    //             Ordering::Equal
+    //         }
+    //     }
+    //     ordering => ordering,
+    // });
 
     // for desc in heads.into_inner().unwrap() {
     //     let mut dest = desc.destination + gtx.cell_dim.center();

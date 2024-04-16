@@ -6,29 +6,27 @@ use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, Se
 use crate::rendering::segments::hexagon_segments::HexagonSegments;
 use crate::rendering::segments::smooth_segments::SmoothSegments;
 
+pub type ColorResolution = u16;
+
 impl SegmentDescription {
     /// Render the segment into a list of drawable subsegments
     /// each represented as a list of points and a color,
     /// `snake_len` is used to calculate how many subsegments
     /// there should be (longer snakes have lower subsegment
     /// resolution)
-    pub fn render(&self, color_resolution: usize, turn_fraction: f32) -> Box<dyn Iterator<Item = Polygon> + '_> {
+    pub fn render(&self, color_resolution: ColorResolution) -> Box<dyn Iterator<Item = Polygon> + '_> {
         // TODO: pass prefs or some fragment of it instead of random arguments
         match self.draw_style {
-            rendering::Style::Hexagon => HexagonSegments::render_segment(self, 0.0, RoundHeadDescription::Gone, 0),
-            rendering::Style::Smooth => {
-                let round_head = self.fraction.round_head_description(self.prev_fraction, self.cell_dim);
-                SmoothSegments::render_segment(self, turn_fraction, round_head, color_resolution)
-            }
+            rendering::Style::Hexagon => HexagonSegments::render_segment(self, 0),
+            rendering::Style::Smooth => SmoothSegments::render_segment(self, color_resolution),
         }
     }
 
     /// Returns number of polygons built
-    pub fn build(self, builder: &mut MeshBuilder, color_resolution: usize) -> Result<usize> {
+    pub fn build(self, builder: &mut MeshBuilder, color_resolution: ColorResolution) -> Result<usize> {
         let mut polygons = 0;
-        let turn_fraction = self.turn.fraction;
-        self.render(color_resolution, turn_fraction)
-            .try_for_each(|Polygon { points, color }| {
+        self.render(color_resolution)
+            .try_for_each(|Polygon { points, color, .. }| {
                 if points.len() >= 3 {
                     polygons += 1;
                     builder.polygon(DrawMode::fill(), &points, *color).map(|_| ())
@@ -77,8 +75,6 @@ pub trait SegmentRenderer {
     /// the desired position
     fn render_segment(
         description: &SegmentDescription,
-        turn_fraction: f32,
-        round_head: RoundHeadDescription,
-        color_resolution: usize,
+        color_resolution: ColorResolution,
     ) -> Box<dyn Iterator<Item = Polygon> + '_>;
 }

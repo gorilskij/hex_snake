@@ -1,6 +1,8 @@
+use std::cell::RefCell;
 use std::collections::{HashSet, VecDeque};
 use std::mem;
 use std::mem::Discriminant;
+use std::sync::{Mutex, RwLock};
 
 use ggez::Context;
 pub use palette::{Palette, PaletteTemplate};
@@ -58,10 +60,21 @@ impl SegmentType {
     pub const DISCR_BLACK_HOLE: Discriminant<Self> = mem::discriminant(&Self::BlackHole { just_created: false });
 }
 
+// all-time unique per snake, sequential for each new segment
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Debug)]
+pub struct SegmentId(u32);
+
+impl SegmentId {
+    fn next(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
 pub type ZIndex = i32;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Segment {
+    pub id: SegmentId,
     pub segment_type: SegmentType,
     pub pos: HexPoint,
     /// Direction from this segment to the next one (towards the tail)
@@ -77,7 +90,26 @@ pub struct SearchTrace {
     pub current_path: Vec<HexPoint>,
 }
 
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub struct SnakeUUID(usize);
+
+impl SnakeUUID {
+    pub fn new() -> Self {
+        lazy_static! {
+            static ref NEXT_UUID: Mutex<usize> = Default::default();
+        }
+
+        let mut next_uuid = NEXT_UUID.lock().unwrap();
+        let ret = Self(*next_uuid);
+        *next_uuid += 1;
+        ret
+    }
+}
+
 pub struct Body {
+    pub uuid: SnakeUUID,
+
     pub segments: VecDeque<Segment>,
 
     /// When a snake is being destroyed from the front
@@ -287,6 +319,7 @@ impl Snake {
 
                 let new_dir = dir_changed_in_teleport.unwrap_or(dir);
                 let new_head = Segment {
+                    id: self.head().id.next(),
                     segment_type: SegmentType::Normal,
                     // this gets very interesting if you move 2 cells each time
                     // (porous snake)

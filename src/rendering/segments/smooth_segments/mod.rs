@@ -3,11 +3,15 @@ use std::iter;
 
 use itertools::Itertools;
 use lyon_geom::{Angle, Arc};
+pub use subsegments::SubsegmentIdx;
 
 use crate::basic::{CellDim, Dir, Point};
 use crate::rendering::clean_arc::CleanArc;
-use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription, SegmentFraction, SegmentLocation, TurnDirection, TurnType};
-use crate::rendering::segments::point_factory::SegmentRenderer;
+use crate::rendering::segments::descriptions::{
+    Polygon, RoundHeadDescription, SegmentDescription, SegmentFraction, SegmentLocation, TurnDirection, TurnType,
+};
+use crate::rendering::segments::point_factory::{ColorResolution, SegmentRenderer};
+use crate::rendering::segments::smooth_segments::subsegments::Subsegment;
 use crate::rendering::shape::ShapePoints;
 
 mod subsegments;
@@ -141,14 +145,13 @@ enum PartOfRoundHead {
     Fully,
 }
 
-fn render_default_straight_segment(
-    description: &SegmentDescription,
-    subsegment_idx: usize,
-    fraction: SegmentFraction,
-    round_head: RoundHeadDescription,
-) -> Vec<Point> {
-    let CellDim { side, cos, .. } = description.cell_dim;
+fn render_straight_subsegment_default_orientation(desc: &SegmentDescription, subsegment: Subsegment) -> Vec<Point> {
+    let CellDim { side, cos, .. } = desc.cell_dim;
     let head_radius = side / 2.;
+
+    let Subsegment { idx: subsegment_idx, fraction, .. } = subsegment;
+
+    let round_head = desc.fraction.round_head_description(desc.prev_fraction, desc.cell_dim);
 
     // TODO: assert this upstream and figure out how to handle snake growing from 0
     // assert!(
@@ -156,7 +159,7 @@ fn render_default_straight_segment(
     //     "segment too short, must be at least as long as it is wide"
     // );
 
-    let height = description.cell_dim.height();
+    let height = desc.cell_dim.height();
     let subsegment_start_y = fraction.start * height;
     let subsegment_end_y = fraction.end * height;
     // the tip of the snake (could be out of bounds for the current cell)
@@ -177,23 +180,23 @@ fn render_default_straight_segment(
         Not
     };
 
-    if description.location == SegmentLocation::Head && subsegment_idx == 0 {
+    if desc.location == SegmentLocation::Head && subsegment_idx == 0 {
         match part_of_round_head {
-            Fully => render_arc_tip_straight(description, fraction),
+            Fully => render_arc_tip_straight(desc, fraction),
             Partly => todo!(),
             Not => unreachable!("the first segment of the snake should always be part of the round head"),
         }
     } else {
         let head_base = tip_y - head_radius;
         match part_of_round_head {
-            Fully => render_split_arc(description, fraction, head_base),
+            Fully => render_split_arc(desc, fraction, head_base),
             Partly => {
                 // the fraction at which the segment starts being part of the round head
                 let head_base_start = head_base / height;
                 let round_fraction = SegmentFraction { start: head_base_start, ..fraction };
 
                 // TODO: figure out maximum number of points and use stack vectors instead
-                let mut points = render_split_arc(description, round_fraction, head_base);
+                let mut points = render_split_arc(desc, round_fraction, head_base);
                 // complete the square part
                 points.push(Point {
                     x: cos + side,
@@ -202,31 +205,28 @@ fn render_default_straight_segment(
                 points.push(Point { x: cos, y: fraction.start * height });
                 points
             }
-            Not => render_box(description.cell_dim, fraction),
+            Not => render_box(desc.cell_dim, fraction),
         }
     }
 }
 
-fn render_default_curved_segment(
-    description: &SegmentDescription,
-    mut turn_fraction: f32,
-    subsegment_idx: usize,
-    fraction: SegmentFraction,
-    round_head: RoundHeadDescription,
-) -> Vec<Point> {
+fn render_curved_subsegment_default_orientation(desc: &SegmentDescription, subsegment: Subsegment) -> Vec<Point> {
+    let Subsegment { fraction, .. } = subsegment;
+    let mut turn_fraction = desc.turn.fraction;
+
     // a blunt turn is equivalent to half a sharp turn
-    if let TurnType::Blunt(_) = description.turn.turn_type() {
+    if let TurnType::Blunt(_) = desc.turn.turn_type() {
         turn_fraction /= 2.;
     }
 
-    let CellDim { side, sin, cos } = description.cell_dim;
+    let CellDim { side, sin, cos } = desc.cell_dim;
 
     let pivot = {
         // distance of the pivot from where it is for a sharp turn
         let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
         // too straight to be drawn as curved, default to straight drawing
         if pivot_dist.is_infinite() {
-            return render_default_straight_segment(description, subsegment_idx, fraction, round_head);
+            return render_straight_subsegment_default_orientation(desc, subsegment);
         }
         Point { x: side + cos + pivot_dist, y: 0. }
     };
@@ -300,13 +300,7 @@ fn render_default_curved_segment(
     points
 }
 
-fn render_subsegment(
-    description: &SegmentDescription,
-    subsegment_idx: usize,
-    turn_fraction: f32,
-    fraction: SegmentFraction,
-    round_head: RoundHeadDescription,
-) -> Vec<Point> {
+fn render_subsegment(description: &SegmentDescription, subsegment: Subsegment) -> Vec<Point> {
     use TurnDirection::*;
     use TurnType::*;
 
@@ -314,11 +308,10 @@ fn render_subsegment(
     match description.turn.turn_type() {
         Straight => {
             // TODO: convert segments to shapes
-            segment = render_default_straight_segment(description, subsegment_idx, fraction, round_head).into()
+            segment = render_straight_subsegment_default_orientation(description, subsegment).into()
         }
         Blunt(turn_direction) | Sharp(turn_direction) => {
-            segment =
-                render_default_curved_segment(description, turn_fraction, subsegment_idx, fraction, round_head).into();
+            segment = render_curved_subsegment_default_orientation(description, subsegment).into();
             if turn_direction == Clockwise {
                 segment = segment.flip_horizontally(description.cell_dim.center().x);
             }
@@ -338,31 +331,15 @@ fn render_subsegment(
 impl SegmentRenderer for SmoothSegments {
     fn render_segment(
         description: &SegmentDescription,
-        turn_fraction: f32,
-        round_head: RoundHeadDescription,
-        color_resolution: usize,
+        color_resolution: ColorResolution,
     ) -> Box<dyn Iterator<Item = Polygon> + '_> {
-        let mut end = description.fraction.start;
-
-        // TODO: in general, this isn't pretty
-        Box::new(
-            description
-                .get_subsegments(color_resolution)
-                .map(move |subsegment| {
-                    let start = end;
-                    end = subsegment.end;
-                    (subsegment.subsegment_idx, start, end, subsegment.color)
-                })
-                .map(move |(subsegment_idx, start, end, color)| {
-                    let points = render_subsegment(
-                        description,
-                        subsegment_idx,
-                        turn_fraction,
-                        SegmentFraction { start, end },
-                        round_head,
-                    );
-                    Polygon { points, color }
-                }),
-        )
+        Box::new(description.get_subsegments(color_resolution).map(move |subsegment| {
+            let points = render_subsegment(description, subsegment);
+            Polygon {
+                subsegment_idx: subsegment.idx,
+                points,
+                color: subsegment.color,
+            }
+        }))
     }
 }

@@ -11,6 +11,7 @@ use crate::app::portal::Portal;
 pub use crate::app::prefs::Prefs;
 use crate::apple::Apple;
 use crate::error::{Error, ErrorConversion, Result};
+use crate::rendering::GraphicsCache;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
 
@@ -58,6 +59,7 @@ pub struct Environment<Rng = ThreadRng> {
     pub portals: Vec<Portal>,
     pub gtx: GameContext,
     pub rng: Rng,
+    pub graphics_cache: GraphicsCache,
 }
 
 impl<Rng> Environment<Rng> {

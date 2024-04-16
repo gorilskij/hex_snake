@@ -13,12 +13,12 @@ use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::Environment;
 use crate::app::snake_management::{advance_snakes, find_collisions, handle_collisions};
 use crate::app::stats::Stats;
-use crate::app::Palette;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
+use crate::rendering::GraphicsCache;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake_control::pathfinder;
@@ -71,11 +71,12 @@ impl DebugScenario {
                 gtx: GameContext {
                     board_dim: HexDim { h: 20, v: 10 },
                     cell_dim,
-                    palette: Palette::dark(),
+                    palette: app::Palette::dark(),
                     prefs: Default::default(),
                     apple_spawn_policy: SpawnPolicy::None,
                 },
                 rng: thread_rng(),
+                graphics_cache: Default::default(),
             },
             fps_control: FpsControl::new(3.),
 
@@ -124,11 +125,12 @@ impl DebugScenario {
                 gtx: GameContext {
                     board_dim: HexDim { h: 20, v: 10 },
                     cell_dim,
-                    palette: Palette::dark(),
+                    palette: app::Palette::dark(),
                     prefs: Default::default(),
                     apple_spawn_policy: SpawnPolicy::None,
                 },
                 rng: thread_rng(),
+                graphics_cache: Default::default(),
             },
             fps_control: FpsControl::new(3.),
 
@@ -177,11 +179,12 @@ impl DebugScenario {
                 gtx: GameContext {
                     board_dim: HexDim { h: 20, v: 10 },
                     cell_dim,
-                    palette: Palette::dark(),
+                    palette: app::Palette::dark(),
                     prefs: Default::default(),
                     apple_spawn_policy: SpawnPolicy::None,
                 },
                 rng: thread_rng(),
+                graphics_cache: Default::default(),
             },
             fps_control: FpsControl::new(3.),
 
@@ -238,6 +241,7 @@ impl DebugScenario {
                     apple_spawn_policy: SpawnPolicy::Random { apple_count: 10 },
                 },
                 rng: thread_rng(),
+                graphics_cache: Default::default(),
             },
             fps_control: FpsControl::new(3.),
 
@@ -316,6 +320,7 @@ impl DebugScenario {
                     apple_spawn_policy: SpawnPolicy::None,
                 },
                 rng: thread_rng(),
+                graphics_cache: Default::default(),
             },
             fps_control: FpsControl::new(3.),
 
@@ -408,7 +413,14 @@ impl EventHandler<Error> for DebugScenario {
             snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx, ctx);
         }
 
-        let snake_mesh = rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut self.stats)?;
+        let snake_mesh = rendering::snake_mesh(
+            &mut env.snakes,
+            &mut env.graphics_cache.snakes,
+            &env.gtx,
+            ftx,
+            ctx,
+            &mut self.stats,
+        )?;
         canvas.draw(&snake_mesh, draw_param);
 
         if !env.apples.is_empty() {

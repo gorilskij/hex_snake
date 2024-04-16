@@ -148,6 +148,7 @@ impl SnakeDemo {
                 portals: vec![],
                 gtx: GameContext::new(board_dim, cell_dim, app_palette, Prefs::default(), apple_spawn_policy),
                 rng: NoRng,
+                graphics_cache: Default::default(),
             },
 
             palettes: snake_palettes,
@@ -212,7 +213,14 @@ impl SnakeDemo {
         let fps_control = self.fps_control.borrow();
         let ftx = fps_control.context();
 
-        let snake_mesh = rendering::snake_mesh(&mut self.env.snakes, &self.env.gtx, ftx, ctx, stats)?;
+        let snake_mesh = rendering::snake_mesh(
+            &mut self.env.snakes,
+            &mut self.env.graphics_cache.snakes,
+            &self.env.gtx,
+            ftx,
+            ctx,
+            stats,
+        )?;
         canvas.draw(&snake_mesh, draw_param);
 
         if !self.env.apples.is_empty() {

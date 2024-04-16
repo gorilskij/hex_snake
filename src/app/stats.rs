@@ -1,6 +1,7 @@
 use crate::app::message;
 use crate::app::message::Message;
 use crate::color::Color;
+use crate::rendering::point_factory::ColorResolution;
 
 /// Collect statistics about the current game state
 #[derive(Default)]
@@ -11,7 +12,7 @@ pub struct Stats {
     /// Number of subsegments per segment (note
     /// that head and tail will have fewer).
     /// Maximum in the case of multiple snakes
-    pub max_color_resolution: usize,
+    pub max_color_resolution: ColorResolution,
     pub redrawing_apples: bool,
     pub redrawing_snakes: bool,
 }

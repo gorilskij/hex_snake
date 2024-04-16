@@ -2,8 +2,9 @@
 
 use crate::basic::{CellDim, Dir, Point};
 use crate::color::Color;
+use crate::rendering::segments::smooth_segments::SubsegmentIdx;
 use crate::snake::palette::SegmentStyle;
-use crate::snake::{SegmentType, ZIndex};
+use crate::snake::{SegmentId, SegmentType, ZIndex};
 use crate::{rendering, snake};
 
 // A full (solid) segment starts at 0. and ends at 1.
@@ -104,6 +105,7 @@ impl SegmentLocation {
 
 #[derive(Clone, Debug)]
 pub struct SegmentDescription {
+    pub segment_id: SegmentId,
     pub location: SegmentLocation,
     pub destination: Point,
     pub turn: TurnDescription,
@@ -145,6 +147,7 @@ impl SegmentFraction {
 }
 
 pub struct Polygon {
+    pub subsegment_idx: SubsegmentIdx,
     pub points: Vec<Point>,
     pub color: Color,
 }
