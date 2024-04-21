@@ -146,14 +146,12 @@ impl BuilderBucket {
                         match places.entry(key) {
                             Entry::Occupied(entry) => {
                                 // recolor
-                                println!("recolor");
-                                // TODO: re-enable
-                                // entry
-                                //     .get()
-                                //     .vertices
-                                //     .clone()
-                                //     .into_iter()
-                                //     .for_each(|i| self.inner.buffer.vertices[i].color = (*polygon.color).into())
+                                entry
+                                    .get()
+                                    .vertices
+                                    .clone()
+                                    .into_iter()
+                                    .for_each(|i| self.inner.buffer.vertices[i].color = (*polygon.color).into())
                             }
                             Entry::Vacant(entry) => {
                                 if let Some(places) = Self::build(&mut self.inner, polygon)? {
@@ -200,7 +198,7 @@ type HeadTailBuilders = HashMap<ZIndex, MeshBuilder>;
 // subsegments than this, however, if they do, no more segments
 // will be added
 // const BUCKET_MAX_LEN: usize = 200;
-const BUCKET_MAX_LEN: usize = 1;
+const BUCKET_MAX_LEN: usize = 50;
 
 struct SnakeCache {
     // if the color resolution changes, the cache is invalidated
@@ -303,40 +301,10 @@ impl SnakeCache {
     }
 }
 
-struct DebugSnakeCache{
-    buckets: Vec<BuilderBucket>,
-}
-
-impl DebugSnakeCache {
-    fn new(_: ColorResolution) -> Self {
-        Self { buckets: Default::default() }
-    }
-
-    fn update(
-        &mut self,
-        head_tail_builders: &mut HeadTailBuilders,
-        color_resolution: ColorResolution,
-        // tail-to-head
-        mut segment_descriptions: impl Iterator<Item=SegmentDescription> + Clone, // TODO: remove Clone
-    ) -> Result {
-        segment_descriptions.try_for_each(|desc| {
-            let builder = head_tail_builders
-                .entry(desc.z_index)
-                .or_insert_with(|| MeshBuilder::new());
-            SmoothSegments::render_segment(&desc, color_resolution).try_for_each(|polygon| {
-                builder
-                    .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
-                    .map(|_| ())
-            })?;
-            Ok(())
-        })
-    }
-}
-
 #[derive(Default)]
 pub struct Cache {
     head_tail_builders: HeadTailBuilders,
-    snake_caches: HashMap<SnakeUUID, DebugSnakeCache>,
+    snake_caches: HashMap<SnakeUUID, SnakeCache>,
 }
 
 impl Cache {
@@ -353,7 +321,7 @@ impl Cache {
     ) -> Result {
         self.snake_caches
             .entry(snake_uuid)
-            .or_insert_with(|| DebugSnakeCache::new(color_resolution))
+            .or_insert_with(|| SnakeCache::new(color_resolution))
             .update(&mut self.head_tail_builders, color_resolution, segment_descriptions)
             .with_trace_step("Cache::update")
     }

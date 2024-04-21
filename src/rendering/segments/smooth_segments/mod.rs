@@ -192,12 +192,12 @@ fn render_straight_subsegment_default_orientation(desc: &SegmentDescription, sub
 
     if desc.location == SegmentLocation::Head && subsegment_idx == 0 {
         // TODO: re-enable and debug
-        // match part_of_round_head {
-        //     Fully => render_arc_tip_straight(desc, fraction),
-        //     Partly => todo!(),
-        //     Not => unreachable!("the first segment of the snake should always be part of the round head"),
-        // }
-        vec![]
+        match part_of_round_head {
+            Fully => render_arc_tip_straight(desc, fraction),
+            Partly => todo!(),
+            Not => unreachable!("the first segment of the snake should always be part of the round head"),
+        }
+        // vec![]
     } else {
         let head_base = tip_y - head_radius;
         match part_of_round_head {

@@ -175,11 +175,9 @@ pub fn snake_meshes(
                 .zip(snake.palette.segment_styles(body, frame_fraction))
                 .enumerate()
                 // TODO: change all iterators to be tail-to-head in the first place and remove this collect
-                .collect_vec()
-                .into_iter()
-                // tail-to-head
-                .rev()
                 .map(move |(segment_idx, (segment, style))| {
+                    debug_assert!(!(segment_idx == 0 && prev_fraction.is_some()));
+
                     let desc = segment_description(
                         segment,
                         SegmentLocation::new(segment_idx, body),
@@ -193,7 +191,12 @@ pub fn snake_meshes(
                     prev_fraction = Some(desc.fraction);
 
                     desc
-                });
+                })
+                .collect_vec()
+                .into_iter()
+                // tail-to-head
+                // TODO: make all iterators tail-to-head and remove this
+                .rev();
             cache.update(snake.body.uuid, color_resolution, desc_iter)
         })
         .with_trace_step("snake_meshes")?;

@@ -133,14 +133,14 @@ pub enum RoundHeadDescription {
 
 impl SegmentFraction {
     pub fn round_head_description(self, prev: Option<Self>, cell_dim: CellDim) -> RoundHeadDescription {
-        let CellDim { side, sin, .. } = cell_dim;
-        let head_radius = side / 2.;
+        let height = cell_dim.height();
+        let head_radius = cell_dim.side / 2.;
 
         use RoundHeadDescription::*;
         match prev {
-            None if self.end * 2. * sin < head_radius => Tip { segment_end: self.end },
+            None if self.end * height < head_radius => Tip { segment_end: self.end },
             None => Full { segment_end: self.end },
-            Some(next) if next.end * 2. * sin < head_radius => Tail { prev_segment_end: next.end },
+            Some(prev) if prev.end * height < head_radius => Tail { prev_segment_end: prev.end },
             Some(_) => Gone,
         }
     }
