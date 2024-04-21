@@ -6,6 +6,7 @@ use ggez::graphics::{DrawMode, LinearColor, Mesh, MeshBuilder, MeshData, Vertex}
 use ggez::Context;
 use itertools::{peek_nth, Itertools};
 
+use crate::app::stats::Stats;
 use crate::error::{ErrorConversion, Result};
 use crate::rendering::segments::descriptions::{Polygon, SegmentDescription};
 use crate::rendering::segments::point_factory::ColorResolution;
@@ -113,7 +114,12 @@ impl BuilderBucket {
         }))
     }
 
-    fn add_or_update_segment(&mut self, desc: SegmentDescription, color_resolution: ColorResolution) -> Result {
+    fn add_or_update_segment(
+        &mut self,
+        desc: SegmentDescription,
+        color_resolution: ColorResolution,
+        stats: &mut Stats,
+    ) -> Result {
         desc.render(color_resolution)
             .try_for_each(|polygon| {
                 let key = SubsegmentKey {
@@ -134,6 +140,7 @@ impl BuilderBucket {
                     Entry::Vacant(entry) => {
                         // add new segments to the builder
                         if let Some(places) = Self::build(&mut self.inner, &mut self.mirror, polygon)? {
+                            stats.polygons += 1;
                             entry.insert(places);
                         }
                     }
@@ -153,7 +160,7 @@ type HeadTailBuilders = HashMap<ZIndex, MeshBuilder>;
 // subsegments than this, however, if they do, no more segments
 // will be added
 // const BUCKET_MAX_LEN: usize = 200;
-const BUCKET_MAX_LEN: usize = 150;
+const BUCKET_MAX_LEN: usize = 20;
 
 struct SnakeCache {
     // if the color resolution changes, the cache is invalidated
@@ -177,6 +184,7 @@ impl SnakeCache {
         color_resolution: ColorResolution,
         // tail-to-head
         segment_descriptions: impl Iterator<Item = SegmentDescription>,
+        stats: &mut Stats,
     ) -> Result {
         let res: Result = try {
             // TODO: have a mechanism to prevent color_resolution from changing too often
@@ -201,7 +209,7 @@ impl SnakeCache {
             let builder = head_tail_builders
                 .entry(tail.z_index)
                 .or_insert_with(|| MeshBuilder::new());
-            tail.build(builder, color_resolution)?;
+            stats.polygons += tail.build(builder, color_resolution)?;
 
             // re-color existing segments and build head
             while let Some(desc) = segment_descriptions.next() {
@@ -211,7 +219,7 @@ impl SnakeCache {
                     let builder = head_tail_builders
                         .entry(desc.z_index)
                         .or_insert_with(|| MeshBuilder::new());
-                    desc.build(builder, color_resolution)?;
+                    stats.polygons += desc.build(builder, color_resolution)?;
                 } else {
                     let bucket = {
                         let bucket = self.buckets.iter_mut().find(|bucket| {
@@ -227,7 +235,7 @@ impl SnakeCache {
                         }
                     };
 
-                    bucket.add_or_update_segment(desc, color_resolution)?;
+                    bucket.add_or_update_segment(desc, color_resolution, stats)?;
                 }
             }
         };
@@ -260,12 +268,13 @@ impl FrameBuilder<'_> {
         color_resolution: ColorResolution,
         // tail-to-head
         segment_descriptions: impl Iterator<Item = SegmentDescription>,
+        stats: &mut Stats,
     ) -> Result {
         self.0
             .snake_caches
             .entry(snake_uuid)
             .or_insert_with(|| SnakeCache::new(color_resolution))
-            .update(&mut self.0.head_tail_builders, color_resolution, segment_descriptions)
+            .update(&mut self.0.head_tail_builders, color_resolution, segment_descriptions, stats)
             .with_trace_step("Cache::update")
     }
 

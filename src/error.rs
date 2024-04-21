@@ -73,6 +73,7 @@ impl error::Error for Error {
     }
 }
 
+#[must_use]
 pub type Result<T = ()> = result::Result<T, Error>;
 
 pub trait ErrorConversion {

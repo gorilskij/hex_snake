@@ -192,7 +192,7 @@ pub fn snake_meshes(
                 // tail-to-head
                 // TODO: make all iterators tail-to-head and remove this
                 .rev();
-            builder.update(snake.body.uuid, color_resolution, desc_iter)
+            builder.update(snake.body.uuid, color_resolution, desc_iter, stats)
         })
         .with_trace_step("snake_meshes")?;
 
