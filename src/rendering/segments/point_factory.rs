@@ -15,30 +15,20 @@ impl SegmentDescription {
     /// there should be (longer snakes have lower subsegment
     /// resolution)
     pub fn render(&self, color_resolution: ColorResolution) -> Box<dyn Iterator<Item = Polygon> + '_> {
-        // TODO: pass prefs or some fragment of it instead of random arguments
         match self.draw_style {
             rendering::Style::Hexagon => HexagonSegments::render_segment(self, 0),
             rendering::Style::Smooth => SmoothSegments::render_segment(self, color_resolution),
         }
     }
 
-    /// Returns number of polygons built
+    /// Return number of polygons built
     pub fn build(self, builder: &mut MeshBuilder, color_resolution: ColorResolution) -> Result<usize> {
-        let mut polygons = 0;
         self.render(color_resolution)
-            .try_for_each(|Polygon { points, color, .. }| {
-                if points.len() >= 3 {
-                    polygons += 1;
-                    builder.polygon(DrawMode::fill(), &points, *color).map(|_| ())
-                } else {
-                    // TODO: re-enable (and switch to log levels)
-                    // eprintln!("warning: SegmentDescription::render returned a Vec with < 3 points");
-                    Ok(())
-                }
+            .try_fold(0, |polygons, Polygon { points, color, .. }| {
+                builder.polygon(DrawMode::fill(), &points, *color).map(|_| polygons + 1)
             })
             .map_err(Error::from)
-            .with_trace_step("SegmentDescription::build")?;
-        Ok(polygons)
+            .with_trace_step("SegmentDescription::build")
     }
 }
 

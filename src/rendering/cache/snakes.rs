@@ -7,23 +7,12 @@ use ggez::Context;
 use itertools::{peek_nth, Itertools};
 
 use crate::error::{ErrorConversion, Result};
-use crate::rendering::point_factory::SegmentRenderer;
 use crate::rendering::segments::descriptions::{Polygon, SegmentDescription};
 use crate::rendering::segments::point_factory::ColorResolution;
-use crate::rendering::segments::smooth_segments::{SmoothSegments, SubsegmentIdx};
+use crate::rendering::segments::smooth_segments::SubsegmentIdx;
 use crate::snake::{SegmentId, SnakeUUID, ZIndex};
 
 // TODO: track number of polygons created
-
-// INVARIANT: self.0.start <= self.0.end
-// #[repr(transparent)]
-// struct IdRange(RangeInclusive<SegmentId>);
-
-// impl IdRange {
-//     fn all_ids_lt(&self, id: SegmentId) -> bool {
-//         self.0.end() <= &id
-//     }
-// }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct SubsegmentKey {
@@ -104,29 +93,24 @@ impl BuilderBucket {
     }
 
     fn build(inner: &mut MeshBuilder, mirror: &mut MeshBuilderMirror, polygon: Polygon) -> Result<Option<Places>> {
-        if polygon.points.len() >= 3 {
-            // polygons += 1
+        // polygons += 1
 
-            // build polygon
-            let orig_vertices_len = mirror.vertices.len();
-            let orig_indices_len = mirror.indices.len();
-            inner.polygon(DrawMode::fill(), &polygon.points, *polygon.color)?;
-            let new_data = inner.build();
-            mirror
-                .vertices
-                .extend(new_data.vertices[orig_vertices_len..].iter().copied());
-            mirror
-                .indices
-                .extend(new_data.indices[orig_indices_len..].iter().copied());
+        // build polygon
+        let orig_vertices_len = mirror.vertices.len();
+        let orig_indices_len = mirror.indices.len();
+        inner.polygon(DrawMode::fill(), &polygon.points, *polygon.color)?;
+        let new_data = inner.build();
+        mirror
+            .vertices
+            .extend(new_data.vertices[orig_vertices_len..].iter().copied());
+        mirror
+            .indices
+            .extend(new_data.indices[orig_indices_len..].iter().copied());
 
-            Ok(Some(Places {
-                vertices: orig_vertices_len..mirror.vertices.len(),
-                indices: orig_indices_len..mirror.indices.len(),
-            }))
-        } else {
-            // TODO: log, but actually make sure this doesn't happen
-            Ok(None)
-        }
+        Ok(Some(Places {
+            vertices: orig_vertices_len..mirror.vertices.len(),
+            indices: orig_indices_len..mirror.indices.len(),
+        }))
     }
 
     fn add_or_update_segment(&mut self, desc: SegmentDescription, color_resolution: ColorResolution) -> Result {
@@ -169,7 +153,7 @@ type HeadTailBuilders = HashMap<ZIndex, MeshBuilder>;
 // subsegments than this, however, if they do, no more segments
 // will be added
 // const BUCKET_MAX_LEN: usize = 200;
-const BUCKET_MAX_LEN: usize = 50;
+const BUCKET_MAX_LEN: usize = 150;
 
 struct SnakeCache {
     // if the color resolution changes, the cache is invalidated
@@ -192,28 +176,8 @@ impl SnakeCache {
         head_tail_builders: &mut HeadTailBuilders,
         color_resolution: ColorResolution,
         // tail-to-head
-        segment_descriptions: impl Iterator<Item = SegmentDescription> + Clone,
+        segment_descriptions: impl Iterator<Item = SegmentDescription>,
     ) -> Result {
-        // println!("##### UPDATE, num_buckets: {}", self.buckets.len());
-        // println!("{}", color_resolution);
-        // println!(
-        //     "{:?}",
-        //     segment_descriptions.clone().map(|desc| desc.segment_id).collect_vec()
-        // );
-        // println!(
-        //     "{:?}",
-        //     self.buckets
-        //         .iter()
-        //         .map(|bucket| {
-        //             let x: Box<dyn Iterator<Item = SegmentId>> = match &bucket.state {
-        //                 BucketState::Cached { places } => Box::new(places.iter().map(|(key, _)| key.segment_id)),
-        //                 BucketState::Dying { keys } => Box::new(keys.iter().map(|key| key.segment_id)),
-        //             };
-        //             x.collect::<HashSet<_>>()
-        //         })
-        //         .collect_vec()
-        // );
-
         let res: Result = try {
             // TODO: have a mechanism to prevent color_resolution from changing too often
             //       (make the increase threshold higher than the decrease threshold)
@@ -227,7 +191,6 @@ impl SnakeCache {
             let mut segment_descriptions = peek_nth(segment_descriptions);
             // let mut segment_descriptions = segment_descriptions.peekable();
 
-            // TODO: return Err
             let tail = segment_descriptions.next().expect("iterator empty");
 
             // delete buckets that contain segments that don't exist anymore plus buckets that contain the tail segment
@@ -235,15 +198,10 @@ impl SnakeCache {
                 .retain_mut(|bucket| bucket.places.keys().all(|key| key.segment_id > tail.segment_id));
 
             // build tail
-            // TODO: support different renderers
             let builder = head_tail_builders
                 .entry(tail.z_index)
                 .or_insert_with(|| MeshBuilder::new());
-            SmoothSegments::render_segment(&tail, color_resolution).try_for_each(|polygon| {
-                builder
-                    .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
-                    .map(|_| ())
-            })?;
+            tail.build(builder, color_resolution)?;
 
             // re-color existing segments and build head
             while let Some(desc) = segment_descriptions.next() {
@@ -253,11 +211,7 @@ impl SnakeCache {
                     let builder = head_tail_builders
                         .entry(desc.z_index)
                         .or_insert_with(|| MeshBuilder::new());
-                    SmoothSegments::render_segment(&desc, color_resolution).try_for_each(|polygon| {
-                        builder
-                            .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
-                            .map(|_| ())
-                    })?;
+                    desc.build(builder, color_resolution)?;
                 } else {
                     let bucket = {
                         let bucket = self.buckets.iter_mut().find(|bucket| {
@@ -305,7 +259,7 @@ impl FrameBuilder<'_> {
         snake_uuid: SnakeUUID,
         color_resolution: ColorResolution,
         // tail-to-head
-        segment_descriptions: impl Iterator<Item = SegmentDescription> + Clone, // TODO: remove Clone
+        segment_descriptions: impl Iterator<Item = SegmentDescription>,
     ) -> Result {
         self.0
             .snake_caches

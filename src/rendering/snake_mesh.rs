@@ -149,17 +149,13 @@ pub fn snake_meshes(
         })
         .collect();
 
-    let mut builder = MeshBuilder::new();
-
     // The draw order priority list is:
     //  - higher z-index
     //  - black hole
     //  - other
 
     // needed for concurrency (par_iter, etc.)
-    assert_impl_all!(Snake: Send, Sync);
-
-    // let mut heads = Mutex::new(vec![]);
+    // assert_impl_all!(Snake: Send, Sync);
 
     let mut builder = cache.build_frame();
     snakes
@@ -174,7 +170,6 @@ pub fn snake_meshes(
                 .iter()
                 .zip(snake.palette.segment_styles(body, frame_fraction))
                 .enumerate()
-                // TODO: change all iterators to be tail-to-head in the first place and remove this collect
                 .map(move |(segment_idx, (segment, style))| {
                     debug_assert!(!(segment_idx == 0 && prev_fraction.is_some()));
 

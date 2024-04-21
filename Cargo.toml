@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 ggez = "0.9.3"
-#ggez = { git = "https://github.com/gorilskij/ggez" }
 rand = "0.8"
 itertools = "0.12"
 derive_more = "~0.99"
