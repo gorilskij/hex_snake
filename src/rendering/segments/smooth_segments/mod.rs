@@ -13,6 +13,7 @@ use crate::rendering::segments::descriptions::{
 use crate::rendering::segments::point_factory::{ColorResolution, SegmentRenderer};
 use crate::rendering::segments::smooth_segments::subsegments::Subsegment;
 use crate::rendering::shape::ShapePoints;
+use crate::support::safe_trig::SafeTrig;
 
 mod subsegments;
 
@@ -47,7 +48,7 @@ fn render_arc_tip(fraction: SegmentFraction, center: Point, angle: f32, cell_dim
     let head_radius = cell_dim.side / 2.;
     let slice_thickness = (fraction.end - fraction.start) * 2. * cell_dim.side;
 
-    let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
+    let start_angle = ((head_radius - slice_thickness) / head_radius).safe_asin();
     let end_angle = PI - start_angle;
 
     CleanArc {
@@ -73,7 +74,7 @@ fn render_arc_tip_straight(description: &SegmentDescription, fraction: SegmentFr
 
     // let slice_thickness = (fraction.end - fraction.start) * 2. * side;
     //
-    // let start_angle = ((head_radius - slice_thickness) / head_radius).asin();
+    // let start_angle = ((head_radius - slice_thickness) / head_radius).safe_asin();
     // let end_angle = PI - start_angle;
     //
     // CleanArc {
@@ -101,14 +102,16 @@ fn render_split_arc(
         y: head_base,
     };
 
+    center.debug_assert_not_nan();
+
     let d1 = fraction.end * 2. * sin - head_base;
     let d2 = fraction.start * 2. * sin - head_base;
 
     let arc1 = CleanArc {
         center,
         radius: head_radius,
-        start_angle: (d1 / head_radius).asin(),
-        end_angle: (d2 / head_radius).asin(),
+        start_angle: (d1 / head_radius).safe_asin(),
+        end_angle: (d2 / head_radius).safe_asin(),
     };
 
     let arc2 = CleanArc {
@@ -119,13 +122,15 @@ fn render_split_arc(
         end_angle: PI - arc1.start_angle,
     };
 
-    arc2.flattened(TOLERANCE).chain(arc1.flattened(TOLERANCE)).collect()
+    let points: Vec<_> = arc2.flattened(TOLERANCE).chain(arc1.flattened(TOLERANCE)).collect();
+    points.iter().for_each(|point| point.debug_assert_not_nan());
+    points
 }
 
 fn render_box(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
     let CellDim { side, cos, .. } = cell_dim;
     let height = cell_dim.height();
-    vec![
+    let points = vec![
         Point { x: cos, y: fraction.end * height },
         Point {
             x: cos + side,
@@ -136,7 +141,9 @@ fn render_box(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<Point> {
             y: fraction.start * height,
         },
         Point { x: cos, y: fraction.start * height },
-    ]
+    ];
+    points.iter().for_each(|point| point.debug_assert_not_nan());
+    points
 }
 
 enum PartOfRoundHead {
@@ -146,10 +153,13 @@ enum PartOfRoundHead {
 }
 
 fn render_straight_subsegment_default_orientation(desc: &SegmentDescription, subsegment: Subsegment) -> Vec<Point> {
+    desc.cell_dim.debug_assert_not_nan();
     let CellDim { side, cos, .. } = desc.cell_dim;
     let head_radius = side / 2.;
 
     let Subsegment { idx: subsegment_idx, fraction, .. } = subsegment;
+    debug_assert!(!fraction.start.is_nan());
+    debug_assert!(!fraction.end.is_nan());
 
     let round_head = desc.fraction.round_head_description(desc.prev_fraction, desc.cell_dim);
 
@@ -205,6 +215,7 @@ fn render_straight_subsegment_default_orientation(desc: &SegmentDescription, sub
                     y: fraction.start * height,
                 });
                 points.push(Point { x: cos, y: fraction.start * height });
+                points.iter().for_each(|point| point.debug_assert_not_nan());
                 points
             }
             Not => render_box(desc.cell_dim, fraction),
@@ -310,12 +321,16 @@ fn render_subsegment(description: &SegmentDescription, subsegment: Subsegment) -
     match description.turn.turn_type() {
         Straight => {
             // TODO: convert segments to shapes
-            segment = render_straight_subsegment_default_orientation(description, subsegment).into()
+            segment = render_straight_subsegment_default_orientation(description, subsegment).into();
+            segment.debug_assert_not_nan();
         }
         Blunt(turn_direction) | Sharp(turn_direction) => {
             segment = render_curved_subsegment_default_orientation(description, subsegment).into();
+            segment.debug_assert_not_nan();
+
             if turn_direction == Clockwise {
                 segment = segment.flip_horizontally(description.cell_dim.center().x);
+                segment.debug_assert_not_nan();
             }
         }
     }
@@ -323,9 +338,11 @@ fn render_subsegment(description: &SegmentDescription, subsegment: Subsegment) -
     let rotation_angle = Dir::U.clockwise_angle_to(description.turn.coming_from);
     if rotation_angle != 0. {
         segment = segment.rotate_clockwise(description.cell_dim.center(), rotation_angle);
+        segment.debug_assert_not_nan();
     }
 
     segment = segment.translate(description.destination);
+    segment.debug_assert_not_nan();
 
     segment.into()
 }

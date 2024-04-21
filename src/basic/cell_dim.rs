@@ -28,6 +28,12 @@ impl From<f32> for CellDim {
 }
 
 impl CellDim {
+    pub fn debug_assert_not_nan(&self) {
+        debug_assert!(!self.side.is_nan());
+        debug_assert!(!self.sin.is_nan());
+        debug_assert!(!self.cos.is_nan());
+    }
+
     pub const fn center(self) -> Point {
         Point {
             x: self.cos + self.side / 2.,

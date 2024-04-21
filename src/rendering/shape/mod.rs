@@ -21,11 +21,17 @@ struct Line {
 fn bounding_box_of(points: &[Point]) -> (Point, Point) {
     let (min_x, max_x) = points.iter().map(|p| p.x).partial_minmax_copy().unwrap_or((0., 0.));
     let (min_y, max_y) = points.iter().map(|p| p.y).partial_minmax_copy().unwrap_or((0., 0.));
+    debug_assert!(!min_x.is_nan());
+    debug_assert!(!max_x.is_nan());
+    debug_assert!(!min_y.is_nan());
+    debug_assert!(!max_y.is_nan());
     (Point { x: min_x, y: min_y }, Point { x: max_x, y: max_y })
 }
 
 fn center_of(points: &[Point]) -> Point {
     let (a, b) = bounding_box_of(points);
+    a.debug_assert_not_nan();
+    b.debug_assert_not_nan();
     (a + b) / 2.
 }
 
@@ -63,6 +69,13 @@ impl From<ShapePoints> for Vec<Point> {
 }
 
 impl ShapePoints {
+    pub fn debug_assert_not_nan(&self) {
+        self.center.debug_assert_not_nan();
+        self.points.iter().for_each(|point| {
+            point.debug_assert_not_nan();
+        });
+    }
+
     pub fn points(&self) -> &ShapePointsSlice {
         unsafe { std::mem::transmute(self.points.as_slice()) }
     }

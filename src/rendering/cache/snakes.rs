@@ -303,10 +303,40 @@ impl SnakeCache {
     }
 }
 
+struct DebugSnakeCache{
+    buckets: Vec<BuilderBucket>,
+}
+
+impl DebugSnakeCache {
+    fn new(_: ColorResolution) -> Self {
+        Self { buckets: Default::default() }
+    }
+
+    fn update(
+        &mut self,
+        head_tail_builders: &mut HeadTailBuilders,
+        color_resolution: ColorResolution,
+        // tail-to-head
+        mut segment_descriptions: impl Iterator<Item=SegmentDescription> + Clone, // TODO: remove Clone
+    ) -> Result {
+        segment_descriptions.try_for_each(|desc| {
+            let builder = head_tail_builders
+                .entry(desc.z_index)
+                .or_insert_with(|| MeshBuilder::new());
+            SmoothSegments::render_segment(&desc, color_resolution).try_for_each(|polygon| {
+                builder
+                    .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
+                    .map(|_| ())
+            })?;
+            Ok(())
+        })
+    }
+}
+
 #[derive(Default)]
 pub struct Cache {
     head_tail_builders: HeadTailBuilders,
-    snake_caches: HashMap<SnakeUUID, SnakeCache>,
+    snake_caches: HashMap<SnakeUUID, DebugSnakeCache>,
 }
 
 impl Cache {
@@ -323,12 +353,11 @@ impl Cache {
     ) -> Result {
         self.snake_caches
             .entry(snake_uuid)
-            .or_insert_with(|| SnakeCache::new(color_resolution))
+            .or_insert_with(|| DebugSnakeCache::new(color_resolution))
             .update(&mut self.head_tail_builders, color_resolution, segment_descriptions)
             .with_trace_step("Cache::update")
     }
 
-    // TODO: write z-index-aware draw method, or return multiple meshes or something
     pub fn build(&self, ctx: &Context) -> Vec<Mesh> {
         self.head_tail_builders
             .iter()

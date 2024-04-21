@@ -82,6 +82,11 @@ impl Div<f32> for Point {
 }
 
 impl Point {
+    pub fn debug_assert_not_nan(&self) {
+        debug_assert!(!self.x.is_nan());
+        debug_assert!(!self.y.is_nan());
+    }
+
     pub fn zero() -> Self {
         Self { x: 0., y: 0. }
     }
