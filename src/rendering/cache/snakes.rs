@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
-use ggez::graphics::{DrawMode, LinearColor, Mesh, MeshBuilder};
+use ggez::graphics::{DrawMode, LinearColor, Mesh, MeshBuilder, MeshData, Vertex};
 use ggez::Context;
 use itertools::{peek_nth, Itertools};
 
@@ -59,18 +59,35 @@ impl Places {
     }
 }
 
+#[derive(Default)]
+struct MeshBuilderMirror {
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+}
+
+impl MeshBuilderMirror {
+    fn data(&self) -> MeshData {
+        MeshData {
+            vertices: &self.vertices,
+            indices: &self.indices,
+        }
+    }
+}
+
 struct BuilderBucket {
     z_index: ZIndex,
-    places: HashMap<SubsegmentKey, Places>,
     inner: MeshBuilder,
+    mirror: MeshBuilderMirror,
+    places: HashMap<SubsegmentKey, Places>,
 }
 
 impl BuilderBucket {
     fn new(z_index: ZIndex) -> Self {
         Self {
             z_index,
-            places: Default::default(),
             inner: MeshBuilder::new(),
+            mirror: Default::default(),
+            places: Default::default(),
         }
     }
 
@@ -86,18 +103,25 @@ impl BuilderBucket {
         self.places.keys().any(|key| key.segment_id == segment_id)
     }
 
-    fn build(inner: &mut MeshBuilder, polygon: Polygon) -> Result<Option<Places>> {
+    fn build(inner: &mut MeshBuilder, mirror: &mut MeshBuilderMirror, polygon: Polygon) -> Result<Option<Places>> {
         if polygon.points.len() >= 3 {
             // polygons += 1
 
             // build polygon
-            let orig_vertices_len = inner.buffer.vertices.len();
-            let orig_indices_len = inner.buffer.indices.len();
+            let orig_vertices_len = mirror.vertices.len();
+            let orig_indices_len = mirror.indices.len();
             inner.polygon(DrawMode::fill(), &polygon.points, *polygon.color)?;
+            let new_data = inner.build();
+            mirror
+                .vertices
+                .extend(new_data.vertices[orig_vertices_len..].iter().copied());
+            mirror
+                .indices
+                .extend(new_data.indices[orig_indices_len..].iter().copied());
 
             Ok(Some(Places {
-                vertices: orig_vertices_len..inner.buffer.vertices.len(),
-                indices: orig_indices_len..inner.buffer.indices.len(),
+                vertices: orig_vertices_len..mirror.vertices.len(),
+                indices: orig_indices_len..mirror.indices.len(),
             }))
         } else {
             // TODO: log, but actually make sure this doesn't happen
@@ -116,12 +140,16 @@ impl BuilderBucket {
                 match self.places.entry(key) {
                     Entry::Occupied(entry) => {
                         // recolor
-                        entry.get().vertices.clone().into_iter().for_each(|i| {
-                            self.inner.buffer.vertices[i].color = LinearColor::from(*polygon.color).into()
-                        })
+                        entry
+                            .get()
+                            .vertices
+                            .clone()
+                            .into_iter()
+                            .for_each(|i| self.mirror.vertices[i].color = LinearColor::from(*polygon.color).into())
                     }
                     Entry::Vacant(entry) => {
-                        if let Some(places) = Self::build(&mut self.inner, polygon)? {
+                        // add new segments to the builder
+                        if let Some(places) = Self::build(&mut self.inner, &mut self.mirror, polygon)? {
                             entry.insert(places);
                         }
                     }
@@ -292,14 +320,15 @@ impl FrameBuilder<'_> {
             .0
             .head_tail_builders
             .iter()
+            .map(|(z_index, builder)| (z_index, builder.build()))
             .chain(self.0.snake_caches.iter().flat_map(|(_, snake_cache)| {
                 snake_cache
                     .buckets
                     .iter()
-                    .map(|bucket| (&bucket.z_index, &bucket.inner))
+                    .map(|bucket| (&bucket.z_index, bucket.mirror.data()))
             }))
             .sorted_unstable_by_key(|(z_index, _)| *z_index)
-            .map(|(_, builder)| Mesh::from_data(ctx, builder.build()))
+            .map(|(_, data)| Mesh::from_data(ctx, data))
             .collect();
 
         self.0.head_tail_builders.clear();
