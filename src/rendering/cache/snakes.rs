@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
 use ggez::{Context, GameError};
-use itertools::{Itertools, peek_nth};
+use itertools::{peek_nth, Itertools};
 
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::point_factory::SegmentRenderer;
@@ -219,14 +219,23 @@ impl SnakeCache {
         segment_descriptions: impl Iterator<Item = SegmentDescription> + Clone,
     ) -> Result {
         println!("##### UPDATE, num_buckets: {}", self.buckets.len());
-        println!("{:?}", segment_descriptions.clone().map(|desc| desc.segment_id).collect_vec());
-        println!("{:?}", self.buckets.iter().map(|bucket| {
-            let x: Box<dyn Iterator<Item=SegmentId>> = match &bucket.state {
-                BucketState::Cached { places } => Box::new(places.iter().map(|(key, _)| key.segment_id)),
-                BucketState::Dying { keys } => Box::new(keys.iter().map(|key| key.segment_id)),
-            };
-            x.collect::<HashSet<_>>()
-        }).collect_vec());
+        println!(
+            "{:?}",
+            segment_descriptions.clone().map(|desc| desc.segment_id).collect_vec()
+        );
+        println!(
+            "{:?}",
+            self.buckets
+                .iter()
+                .map(|bucket| {
+                    let x: Box<dyn Iterator<Item = SegmentId>> = match &bucket.state {
+                        BucketState::Cached { places } => Box::new(places.iter().map(|(key, _)| key.segment_id)),
+                        BucketState::Dying { keys } => Box::new(keys.iter().map(|key| key.segment_id)),
+                    };
+                    x.collect::<HashSet<_>>()
+                })
+                .collect_vec()
+        );
 
         let res: Result = try {
             // TODO: have a mechanism to prevent color_resolution from changing too often
