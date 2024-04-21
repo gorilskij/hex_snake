@@ -3,7 +3,7 @@ pub use cache::GraphicsCache;
 pub use grid_mesh::{border_mesh, grid_dot_mesh, grid_mesh};
 pub use player_path_mesh::player_path_mesh;
 pub use portal_mesh::portal_mesh;
-pub use segments::{descriptions, point_factory};
+pub use segments::point_factory;
 pub use snake_mesh::snake_meshes;
 
 mod apple_mesh;

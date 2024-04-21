@@ -291,7 +291,7 @@ impl Snake {
                 self.update_dir(other_snakes, apples, gtx, ftx, ctx);
 
                 // create new head for snake
-                let mut dir = self.body.dir;
+                let dir = self.body.dir;
 
                 let head_pos = self.head().pos;
                 let new_head_pos_raw = head_pos.translate(dir, 1);

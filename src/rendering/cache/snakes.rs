@@ -1,12 +1,12 @@
 use std::collections::hash_map::Entry;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
-use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
-use ggez::{Context, GameError};
+use ggez::graphics::{DrawMode, LinearColor, Mesh, MeshBuilder};
+use ggez::Context;
 use itertools::{peek_nth, Itertools};
 
-use crate::error::{Error, ErrorConversion, Result};
+use crate::error::{ErrorConversion, Result};
 use crate::rendering::point_factory::SegmentRenderer;
 use crate::rendering::segments::descriptions::{Polygon, SegmentDescription};
 use crate::rendering::segments::point_factory::ColorResolution;
@@ -90,17 +90,10 @@ impl BuilderBucket {
         if polygon.points.len() >= 3 {
             // polygons += 1
 
-            // debug
-            let orig_vertices = inner.buffer.vertices.clone();
-            let orig_indices = inner.buffer.indices.clone();
-
             // build polygon
             let orig_vertices_len = inner.buffer.vertices.len();
             let orig_indices_len = inner.buffer.indices.len();
             inner.polygon(DrawMode::fill(), &polygon.points, *polygon.color)?;
-
-            debug_assert_eq!(&orig_vertices, &inner.buffer.vertices[..orig_vertices_len]);
-            debug_assert_eq!(&orig_indices, &inner.buffer.indices[..orig_indices_len]);
 
             Ok(Some(Places {
                 vertices: orig_vertices_len..inner.buffer.vertices.len(),
@@ -123,12 +116,9 @@ impl BuilderBucket {
                 match self.places.entry(key) {
                     Entry::Occupied(entry) => {
                         // recolor
-                        entry
-                            .get()
-                            .vertices
-                            .clone()
-                            .into_iter()
-                            .for_each(|i| self.inner.buffer.vertices[i].color = (*polygon.color).into())
+                        entry.get().vertices.clone().into_iter().for_each(|i| {
+                            self.inner.buffer.vertices[i].color = LinearColor::from(*polygon.color).into()
+                        })
                     }
                     Entry::Vacant(entry) => {
                         if let Some(places) = Self::build(&mut self.inner, polygon)? {
@@ -176,11 +166,12 @@ impl SnakeCache {
         // tail-to-head
         segment_descriptions: impl Iterator<Item = SegmentDescription> + Clone,
     ) -> Result {
-        println!("##### UPDATE, num_buckets: {}", self.buckets.len());
-        println!(
-            "{:?}",
-            segment_descriptions.clone().map(|desc| desc.segment_id).collect_vec()
-        );
+        // println!("##### UPDATE, num_buckets: {}", self.buckets.len());
+        // println!("{}", color_resolution);
+        // println!(
+        //     "{:?}",
+        //     segment_descriptions.clone().map(|desc| desc.segment_id).collect_vec()
+        // );
         // println!(
         //     "{:?}",
         //     self.buckets
@@ -269,10 +260,18 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn reset_head_tail_builder(&mut self) {
-        self.head_tail_builders.clear()
+    pub fn clear(&mut self) {
+        self.snake_caches.clear();
     }
 
+    pub fn build_frame(&mut self) -> FrameBuilder {
+        FrameBuilder(self)
+    }
+}
+
+pub struct FrameBuilder<'a>(&'a mut Cache);
+
+impl FrameBuilder<'_> {
     pub fn update(
         &mut self,
         snake_uuid: SnakeUUID,
@@ -280,17 +279,20 @@ impl Cache {
         // tail-to-head
         segment_descriptions: impl Iterator<Item = SegmentDescription> + Clone, // TODO: remove Clone
     ) -> Result {
-        self.snake_caches
+        self.0
+            .snake_caches
             .entry(snake_uuid)
             .or_insert_with(|| SnakeCache::new(color_resolution))
-            .update(&mut self.head_tail_builders, color_resolution, segment_descriptions)
+            .update(&mut self.0.head_tail_builders, color_resolution, segment_descriptions)
             .with_trace_step("Cache::update")
     }
 
-    pub fn build(&self, ctx: &Context) -> Vec<Mesh> {
-        self.head_tail_builders
+    pub fn build(self, ctx: &Context) -> Vec<Mesh> {
+        let meshes = self
+            .0
+            .head_tail_builders
             .iter()
-            .chain(self.snake_caches.iter().flat_map(|(_, snake_cache)| {
+            .chain(self.0.snake_caches.iter().flat_map(|(_, snake_cache)| {
                 snake_cache
                     .buckets
                     .iter()
@@ -298,6 +300,9 @@ impl Cache {
             }))
             .sorted_unstable_by_key(|(z_index, _)| *z_index)
             .map(|(_, builder)| Mesh::from_data(ctx, builder.build()))
-            .collect()
+            .collect();
+
+        self.0.head_tail_builders.clear();
+        meshes
     }
 }

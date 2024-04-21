@@ -74,8 +74,8 @@ impl App {
                     .snake_type(snake::Type::Player)
                     .eat_mechanics(eat_mechanics)
                     .palette(snake::PaletteTemplate::rainbow(true))
-                    // .palette(PaletteTemplate::dark_blue_to_red(false))
-                    // .palette(PaletteTemplate::zebra())
+                    // .palette(snake::PaletteTemplate::dark_blue_to_red(false))
+                    // .palette(snake::PaletteTemplate::zebra())
                     .controller(snake_control::Template::Keyboard { control_setup, knowledge })
                     .speed(1.)
                     .autopilot(pathfinder::Template::WithBackup {

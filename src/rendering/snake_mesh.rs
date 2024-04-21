@@ -3,7 +3,6 @@ use std::result;
 use ggez::graphics::{Color, Mesh, MeshBuilder};
 use ggez::Context;
 use itertools::Itertools;
-use rayon::prelude::*;
 use static_assertions::assert_impl_all;
 
 use crate::app::fps_control::FpsContext;
@@ -162,6 +161,7 @@ pub fn snake_meshes(
 
     // let mut heads = Mutex::new(vec![]);
 
+    let mut builder = cache.build_frame();
     snakes
         .iter_mut()
         .zip(color_resolutions.into_iter())
@@ -197,13 +197,11 @@ pub fn snake_meshes(
                 // tail-to-head
                 // TODO: make all iterators tail-to-head and remove this
                 .rev();
-            cache.update(snake.body.uuid, color_resolution, desc_iter)
+            builder.update(snake.body.uuid, color_resolution, desc_iter)
         })
         .with_trace_step("snake_meshes")?;
 
-    let meshes = cache.build(ctx);
-    cache.reset_head_tail_builder();
-    Ok(meshes)
+    Ok(builder.build(ctx))
 
     // descs.par_sort_unstable_by(|(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
     //     Ordering::Equal => {

@@ -1,5 +1,3 @@
-use std::iter;
-
 use crate::rendering::point_factory::ColorResolution;
 use crate::rendering::segments::descriptions::{Polygon, SegmentDescription};
 use crate::rendering::segments::point_factory::SegmentRenderer;

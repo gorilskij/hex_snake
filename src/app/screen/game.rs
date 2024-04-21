@@ -197,6 +197,8 @@ impl Game {
         env.snakes.clear();
         env.apples.clear();
 
+        env.graphics_cache.snakes.clear();
+
         self.snake_meshes = None;
         self.apple_mesh = None;
         self.distance_grid_mesh = None;
