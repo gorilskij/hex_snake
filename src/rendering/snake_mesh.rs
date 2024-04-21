@@ -163,9 +163,6 @@ pub fn snake_meshes(
     // let mut heads = Mutex::new(vec![]);
 
     snakes
-        // .par_iter_mut()
-        // .zip(styles.into_par_iter())
-        // .zip(color_resolutions.par_iter())
         .iter_mut()
         .zip(color_resolutions.into_iter())
         .try_for_each(|(snake, color_resolution)| {
@@ -174,17 +171,15 @@ pub fn snake_meshes(
             let desc_iter = snake
                 .body
                 .segments
-                // .par_iter()
-                // .enumerate()
-                // .zip(style.into_par_iter())
                 .iter()
-                .enumerate()
                 .zip(snake.palette.segment_styles(body, frame_fraction))
+                .enumerate()
                 // TODO: change all iterators to be tail-to-head in the first place and remove this collect
                 .collect_vec()
                 .into_iter()
+                // tail-to-head
                 .rev()
-                .map(move |((segment_idx, segment), style)| {
+                .map(move |(segment_idx, (segment, style))| {
                     let desc = segment_description(
                         segment,
                         SegmentLocation::new(segment_idx, body),
@@ -199,7 +194,7 @@ pub fn snake_meshes(
 
                     desc
                 });
-            cache.update(snake.body.uuid, desc_iter, color_resolution)
+            cache.update(snake.body.uuid, color_resolution, desc_iter)
         })
         .with_trace_step("snake_meshes")?;
 

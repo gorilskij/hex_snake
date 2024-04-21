@@ -6,8 +6,9 @@ use rand::Rng;
 pub mod oklab;
 pub mod to_color;
 
-#[derive(Copy, Clone, Debug)]
-pub struct Color(pub graphics::Color);
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug, From)]
+pub struct Color(graphics::Color);
 
 impl From<Color> for graphics::Color {
     fn from(value: Color) -> Self {

@@ -12,7 +12,7 @@ macro_rules! gray {
         gray!($lightness, 1.)
     };
     ($lightness:expr, $opacity:expr) => {
-        crate::color::Color(ggez::graphics::Color {
+        crate::color::Color::from(ggez::graphics::Color {
             r: $lightness,
             g: $lightness,
             b: $lightness,
@@ -39,12 +39,13 @@ pub enum EatenColor {
 // }
 
 fn invert_rgb(color: Color) -> Color {
-    Color(graphics::Color {
+    graphics::Color {
         r: 1. - color.r,
         g: 1. - color.g,
         b: 1. - color.b,
         a: color.a,
-    })
+    }
+    .into()
 }
 
 impl EatenColor {

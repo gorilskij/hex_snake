@@ -82,6 +82,7 @@ impl App {
                         main: Box::new(pathfinder::Template::WeightedBFS),
                         backup: Box::new(pathfinder::Template::SpaceFilling),
                     })
+                    .len(3)
                 // .snake_control(snake_control::Template::Mouse)
                 // .snake_control(SnakeControllerTemplate::PlayerController12)
             })

@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::ops::Range;
 
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
@@ -25,9 +25,8 @@ use crate::snake::{SegmentId, SnakeUUID, ZIndex};
 //     }
 // }
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct SubsegmentKey {
-    snake_uuid: SnakeUUID,
     segment_id: SegmentId,
     subsegment_idx: SubsegmentIdx,
 }
@@ -60,176 +59,185 @@ impl Places {
     }
 }
 
-#[derive(Default)]
+enum BucketState {
+    Cached { places: HashMap<SubsegmentKey, Places> },
+    Dying { keys: HashSet<SubsegmentKey> },
+}
+
 struct BuilderBucket {
-    // id_range: IdRange,
-    // cache blocks contain segments that all share a z-index
+    z_index: ZIndex,
+    state: BucketState,
     inner: MeshBuilder,
-    places: HashMap<SubsegmentKey, Places>,
 }
 
 impl BuilderBucket {
-    fn new() -> Self {
+    fn new(z_index: ZIndex) -> Self {
         Self {
+            z_index,
+            state: BucketState::Cached { places: Default::default() },
             inner: MeshBuilder::new(),
-            places: Default::default(),
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.places.is_empty()
+        match &self.state {
+            BucketState::Cached { places, .. } => places.is_empty(),
+            BucketState::Dying { keys, .. } => keys.is_empty(),
+        }
     }
 
     fn len(&self) -> usize {
-        self.places.len()
+        match &self.state {
+            BucketState::Cached { places, .. } => places.len(),
+            BucketState::Dying { keys, .. } => keys.len(),
+        }
     }
 
-    fn contains(&self, snake_uuid: SnakeUUID, segment_id: SegmentId) -> bool {
-        self.places
-            .keys()
-            .any(|key| key.snake_uuid == snake_uuid && key.segment_id == segment_id)
+    fn contains(&self, segment_id: SegmentId) -> bool {
+        match &self.state {
+            BucketState::Cached { places, .. } => places.keys().any(|key| key.segment_id == segment_id),
+            BucketState::Dying { keys, .. } => keys.iter().any(|key| key.segment_id == segment_id),
+        }
     }
 
-    fn add_or_update_segment(
-        &mut self,
-        snake_uuid: SnakeUUID,
-        desc: SegmentDescription,
-        color_resolution: ColorResolution,
-    ) -> Result {
+    // called before adding segments
+    fn reset(&mut self) {
+        if let BucketState::Dying { .. } = self.state {
+            self.inner = MeshBuilder::new();
+        }
+    }
+
+    fn build(inner: &mut MeshBuilder, polygon: Polygon) -> Result<Option<Places>> {
+        if polygon.points.len() >= 3 {
+            // polygons += 1
+
+            // debug
+            let orig_vertices = inner.buffer.vertices.clone();
+            let orig_indices = inner.buffer.indices.clone();
+
+            // build polygon
+            let orig_vertices_len = inner.buffer.vertices.len();
+            let orig_indices_len = inner.buffer.indices.len();
+            inner.polygon(DrawMode::fill(), &polygon.points, *polygon.color)?;
+
+            debug_assert_eq!(&orig_vertices, &inner.buffer.vertices[..orig_vertices_len]);
+            debug_assert_eq!(&orig_indices, &inner.buffer.indices[..orig_indices_len]);
+
+            Ok(Some(Places {
+                vertices: orig_vertices_len..inner.buffer.vertices.len(),
+                indices: orig_indices_len..inner.buffer.indices.len(),
+            }))
+        } else {
+            // TODO: log, but actually make sure this doesn't happen
+            Ok(None)
+        }
+    }
+
+    fn add_or_update_segment(&mut self, desc: SegmentDescription, color_resolution: ColorResolution) -> Result {
         desc.render(color_resolution)
-            .try_for_each(|Polygon { subsegment_idx, points, color, .. }| {
+            .try_for_each(|polygon| {
                 let key = SubsegmentKey {
-                    snake_uuid,
                     segment_id: desc.segment_id,
-                    subsegment_idx,
+                    subsegment_idx: polygon.subsegment_idx,
                 };
 
-                match self.places.entry(key) {
-                    Entry::Occupied(entry) => {
-                        // assert_eq!(places.vertices.len(), 1);
-                        entry
-                            .get()
-                            .vertices
-                            .clone()
-                            .into_iter()
-                            .for_each(|i| self.inner.buffer.vertices[i].color = (*color).into())
-                    }
-                    Entry::Vacant(entry) => {
-                        if points.len() >= 3 {
-                            // polygons += 1
-                            // builder.polygon(DrawMode::fill(), &points, *color).map(|_| ())
-
-                            let orig_vertices_len = self.inner.buffer.vertices.len();
-                            let orig_indices_len = self.inner.buffer.indices.len();
-                            self.inner.polygon(DrawMode::fill(), &points, *color)?;
-                            entry.insert(Places {
-                                vertices: Range {
-                                    start: orig_vertices_len,
-                                    end: self.inner.buffer.vertices.len(),
-                                },
-                                indices: Range {
-                                    start: orig_indices_len,
-                                    end: self.inner.buffer.indices.len(),
-                                },
-                            });
-                        } else {
-                            // TODO: log, but actually make sure this doesn't happen
-                            // Ok(())
+                match &mut self.state {
+                    BucketState::Cached { places, .. } => {
+                        match places.entry(key) {
+                            Entry::Occupied(entry) => {
+                                // recolor
+                                println!("recolor");
+                                // TODO: re-enable
+                                // entry
+                                //     .get()
+                                //     .vertices
+                                //     .clone()
+                                //     .into_iter()
+                                //     .for_each(|i| self.inner.buffer.vertices[i].color = (*polygon.color).into())
+                            }
+                            Entry::Vacant(entry) => {
+                                if let Some(places) = Self::build(&mut self.inner, polygon)? {
+                                    entry.insert(places);
+                                }
+                            }
                         }
                     }
+                    BucketState::Dying { .. } => {
+                        Self::build(&mut self.inner, polygon)?;
+                    }
                 }
-                Ok::<_, GameError>(())
+
+                Ok(())
             })
-            .map_err(Error::from)
             .with_trace_step("BuilderBucket::add_or_update_segment")
     }
 
-    fn remove_vertices(&mut self, range: Range<usize>) {
-        let _ = self.inner.buffer.vertices.drain(range.clone());
-        // correct other vertices
-        self.places.iter_mut().for_each(|(_, places_to_correct)| {
-            places_to_correct.correct_for_removal_of_vertices(range.clone())
-        })
-    }
+    fn remove_segment_ids_lte(&mut self, segment_id: SegmentId) {
+        if self.contains(segment_id) {
+            match &mut self.state {
+                BucketState::Dying { keys } => keys.retain(|key| key.segment_id != segment_id),
+                BucketState::Cached { places } => {
+                    self.state = BucketState::Dying {
+                        keys: places
+                            .keys()
+                            .filter(|key| key.segment_id != segment_id)
+                            .copied()
+                            .collect(),
+                    };
 
-    fn remove_indices(&mut self, range: Range<usize>) {
-        let _ = self.inner.buffer.indices.drain(range.clone());
-        // correct other indices
-        self.places.iter_mut().for_each(|(_, places_to_correct)| {
-            places_to_correct.correct_for_removal_of_indices(range.clone())
-        })
-    }
-
-    fn remove_segment_ids_lte(&mut self, snake_uuid: SnakeUUID, segment_id: SegmentId) {
-        println!(">>> remove_segment_ids_lte");
-        // max-heaps
-        let mut remove_vertices = BinaryHeap::new();
-        let mut remove_indices = BinaryHeap::new();
-        self.places.retain(|key, places| {
-            !(key.snake_uuid == snake_uuid && key.segment_id <= segment_id) || {
-                remove_vertices.push((places.vertices.start, places.vertices.end));
-                remove_indices.push((places.indices.start, places.indices.end));
-                false
+                    // we can rely on the fact that reset() will be called so we don't need to clear self.inner here
+                }
             }
-        });
-        remove_vertices.into_iter().for_each(|(start, end)| self.remove_vertices(start..end));
-        remove_indices.into_iter().for_each(|(start, end)| self.remove_indices(start..end));
-    }
-
-    fn remove_all(&mut self, snake_uuid: SnakeUUID) {
-        println!(">>> remove_all");
-        // max-heaps
-        let mut remove_vertices = BinaryHeap::new();
-        let mut remove_indices = BinaryHeap::new();
-        self.places.retain(|key, places| {
-            key.snake_uuid != snake_uuid || {
-                remove_vertices.push((places.vertices.start, places.vertices.end));
-                remove_indices.push((places.indices.start, places.indices.end));
-                false
-            }
-        });
-        remove_vertices.into_iter().for_each(|(start, end)| self.remove_vertices(start..end));
-        remove_indices.into_iter().for_each(|(start, end)| self.remove_indices(start..end));
+        }
     }
 }
 
-#[derive(Default)]
-pub struct Cache {
-    head_tail_builders: HashMap<ZIndex, MeshBuilder>,
-    cached_builders: HashMap<ZIndex, Vec<BuilderBucket>>,
-    color_resolutions: HashMap<SnakeUUID, ColorResolution>,
+type HeadTailBuilders = HashMap<ZIndex, MeshBuilder>;
+
+// TODO: make variable
+// this is a soft limit in terms of subsegments,
+// segments are added one at a time so buckets can contain more
+// subsegments than this, however, if they do, no more segments
+// will be added
+// const BUCKET_MAX_LEN: usize = 200;
+const BUCKET_MAX_LEN: usize = 1;
+
+struct SnakeCache {
+    // if the color resolution changes, the cache is invalidated
+    color_resolution: ColorResolution,
+    buckets: Vec<BuilderBucket>,
 }
 
-impl Cache {
-    // TODO: make variable
-    // this is a soft limit in terms of subsegments,
-    // segments are added one at a time so buckets can contain more
-    // subsegments than this, however, if they do, no more segments
-    // will be added
-    const BUCKET_MAX_LEN: usize = 1;
-
-    pub fn reset_head_tail_builder(&mut self) {
-        self.head_tail_builders.clear()
+impl SnakeCache {
+    fn new(color_resolution: ColorResolution) -> Self {
+        Self { color_resolution, buckets: vec![] }
     }
 
-    pub fn update(
+    fn update(
         &mut self,
-        snake_uuid: SnakeUUID,
-        // tail-to-head
-        segment_descriptions: impl Iterator<Item = SegmentDescription>,
+        head_tail_builders: &mut HeadTailBuilders,
         color_resolution: ColorResolution,
+        // tail-to-head
+        segment_descriptions: impl Iterator<Item = SegmentDescription> + Clone,
     ) -> Result {
+        println!("##### UPDATE, num_buckets: {}", self.buckets.len());
+        println!("{:?}", segment_descriptions.clone().map(|desc| desc.segment_id).collect_vec());
+        println!("{:?}", self.buckets.iter().map(|bucket| {
+            let x: Box<dyn Iterator<Item=SegmentId>> = match &bucket.state {
+                BucketState::Cached { places } => Box::new(places.iter().map(|(key, _)| key.segment_id)),
+                BucketState::Dying { keys } => Box::new(keys.iter().map(|key| key.segment_id)),
+            };
+            x.collect::<HashSet<_>>()
+        }).collect_vec());
+
         let res: Result = try {
-            // if a snake changes color resolution, its whole cache is invalidated
-            if self
-                .color_resolutions
-                .get(&snake_uuid)
-                .map(|res| res == &color_resolution)
-                .unwrap_or(false)
-            {
-                self.cached_builders
-                    .values_mut()
-                    .for_each(|buckets| buckets.iter_mut().for_each(|bucket| bucket.remove_all(snake_uuid)));
+            // TODO: have a mechanism to prevent color_resolution from changing too often
+            //       (make the increase threshold higher than the decrease threshold)
+            //       but either this needs to be done above the cache, or the c_r calculation
+            //           code needs to be moved into the cache
+            if color_resolution != self.color_resolution {
+                // invalidate the cache
+                self.buckets.clear();
             }
 
             let mut segment_descriptions = segment_descriptions.peekable();
@@ -238,78 +246,99 @@ impl Cache {
             let tail = segment_descriptions.next().expect("iterator empty");
 
             // delete all segments that don't exist anymore, plus the segment that will be replaced by the tail
-            self.cached_builders.retain(|_, buckets| {
-                buckets.retain_mut(|bucket| {
-                    bucket.remove_segment_ids_lte(snake_uuid, tail.segment_id);
-                    !bucket.is_empty()
-                });
-                !buckets.is_empty()
+            self.buckets.retain_mut(|bucket| {
+                bucket.remove_segment_ids_lte(tail.segment_id);
+                !bucket.is_empty()
             });
+
+            // clear the builders of dying buckets as these are redrawn at every iteration
+            self.buckets.iter_mut().for_each(|bucket| bucket.reset());
 
             // build tail
             // TODO: support different renderers
-            println!("build tail");
+            let builder = head_tail_builders
+                .entry(tail.z_index)
+                .or_insert_with(|| MeshBuilder::new());
             SmoothSegments::render_segment(&tail, color_resolution).try_for_each(|polygon| {
-                self.head_tail_builders
-                    .entry(tail.z_index)
-                    .or_insert_with(|| MeshBuilder::new())
+                builder
                     .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
                     .map(|_| ())
             })?;
-            println!("done");
 
             // re-color existing segments and build head
             while let Some(desc) = segment_descriptions.next() {
                 if segment_descriptions.peek().is_none() {
                     let head = desc;
-                    println!("build head");
+                    let builder = head_tail_builders
+                        .entry(head.z_index)
+                        .or_insert_with(|| MeshBuilder::new());
                     SmoothSegments::render_segment(&head, color_resolution).try_for_each(|polygon| {
-                        self.head_tail_builders
-                            .entry(head.z_index)
-                            .or_insert_with(|| MeshBuilder::new())
+                        builder
                             .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
                             .map(|_| ())
                     })?;
-                    println!("done");
                 } else {
-                    let buckets = self
-                        .cached_builders
-                        .entry(desc.z_index)
-                        .or_insert_with(|| Default::default());
-                    let mut bucket = buckets
-                        .iter_mut()
-                        .find(|bucket| bucket.contains(snake_uuid, desc.segment_id));
-                    if bucket.is_none() {
-                        // find the fullest bucket that isn't completely full
-                        bucket = buckets
-                            .iter_mut()
-                            .filter(|bucket| bucket.len() < Self::BUCKET_MAX_LEN)
-                            .max_by_key(|bucket| bucket.len());
-                    }
-                    if bucket.is_none() {
-                        buckets.push(Default::default());
-                        bucket = buckets.last_mut();
-                    }
-                    let bucket = bucket.unwrap();
+                    let bucket = {
+                        let bucket = self.buckets.iter_mut().find(|bucket| {
+                            bucket.contains(desc.segment_id) || {
+                                let BucketState::Cached { places } = &bucket.state else {
+                                    return false;
+                                };
+                                bucket.z_index == desc.z_index && places.len() < BUCKET_MAX_LEN
+                            }
+                        });
+                        if let Some(bucket) = bucket {
+                            bucket
+                        } else {
+                            self.buckets.push(BuilderBucket::new(desc.z_index));
+                            self.buckets.last_mut().unwrap()
+                        }
+                    };
 
-                    bucket.add_or_update_segment(snake_uuid, desc, color_resolution)?;
+                    bucket.add_or_update_segment(desc, color_resolution)?;
                 }
             }
         };
+        res.with_trace_step("SnakeCache::update")
+    }
+}
 
-        res.with_trace_step("Cache::update")
+#[derive(Default)]
+pub struct Cache {
+    head_tail_builders: HeadTailBuilders,
+    snake_caches: HashMap<SnakeUUID, SnakeCache>,
+}
+
+impl Cache {
+    pub fn reset_head_tail_builder(&mut self) {
+        self.head_tail_builders.clear()
+    }
+
+    pub fn update(
+        &mut self,
+        snake_uuid: SnakeUUID,
+        color_resolution: ColorResolution,
+        // tail-to-head
+        segment_descriptions: impl Iterator<Item = SegmentDescription> + Clone, // TODO: remove Clone
+    ) -> Result {
+        self.snake_caches
+            .entry(snake_uuid)
+            .or_insert_with(|| SnakeCache::new(color_resolution))
+            .update(&mut self.head_tail_builders, color_resolution, segment_descriptions)
+            .with_trace_step("Cache::update")
     }
 
     // TODO: write z-index-aware draw method, or return multiple meshes or something
     pub fn build(&self, ctx: &Context) -> Vec<Mesh> {
         self.head_tail_builders
             .iter()
-            .chain(
-                self.cached_builders
+            .chain(self.snake_caches.iter().flat_map(|(_, snake_cache)| {
+                snake_cache
+                    .buckets
                     .iter()
-                    .flat_map(|(z_index, buckets)| buckets.iter().map(move |bucket| (z_index, &bucket.inner))),
-            )
-            .sorted_unstable_by_key(|(key, _)| *key)
+                    .map(|bucket| (&bucket.z_index, &bucket.inner))
+            }))
+            .sorted_unstable_by_key(|(z_index, _)| *z_index)
             .map(|(_, builder)| Mesh::from_data(ctx, builder.build()))
             .collect()
     }
