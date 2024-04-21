@@ -502,15 +502,16 @@ impl EventHandler<Error> for Game {
                 .chain(
                     [&self.apple_mesh, &self.border_mesh, &self.portal_mesh]
                         .into_iter()
-                        .map(|o| o.as_ref()),
+                        .map(Option::as_ref),
                 )
+                .flatten()
                 .collect_vec();
 
-            if !message_drawables.is_empty() || meshes.iter().any(|mesh| mesh.is_some()) {
+            if !message_drawables.is_empty() || !meshes.is_empty() {
                 let mut canvas = Canvas::from_frame(ctx, self.env.gtx.palette.background_color);
 
                 let draw_param = DrawParam::default().dest(self.offset);
-                for mesh in meshes.into_iter().flatten() {
+                for mesh in meshes {
                     canvas.draw(mesh, draw_param);
                 }
 
@@ -518,7 +519,7 @@ impl EventHandler<Error> for Game {
                     drawable.draw(&mut canvas);
                 }
 
-                canvas.finish(ctx).map_err(Error::from).with_trace_step("Game::draw")?;
+                canvas.finish(ctx).map_err(Error::from)?;
             }
         };
 

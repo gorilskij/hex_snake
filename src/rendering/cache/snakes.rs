@@ -13,8 +13,6 @@ use crate::rendering::segments::point_factory::ColorResolution;
 use crate::rendering::segments::smooth_segments::SubsegmentIdx;
 use crate::snake::{SegmentId, SnakeUUID, ZIndex};
 
-// TODO: track number of polygons created
-
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct SubsegmentKey {
     segment_id: SegmentId,
@@ -94,8 +92,6 @@ impl BuilderBucket {
     }
 
     fn build(inner: &mut MeshBuilder, mirror: &mut MeshBuilderMirror, polygon: Polygon) -> Result<Option<Places>> {
-        // polygons += 1
-
         // build polygon
         let orig_vertices_len = mirror.vertices.len();
         let orig_indices_len = mirror.indices.len();
@@ -194,6 +190,7 @@ impl SnakeCache {
             if color_resolution != self.color_resolution {
                 // invalidate the cache
                 self.buckets.clear();
+                self.color_resolution = color_resolution;
             }
 
             let mut segment_descriptions = peek_nth(segment_descriptions);
@@ -274,11 +271,19 @@ impl FrameBuilder<'_> {
             .snake_caches
             .entry(snake_uuid)
             .or_insert_with(|| SnakeCache::new(color_resolution))
-            .update(&mut self.0.head_tail_builders, color_resolution, segment_descriptions, stats)
+            .update(
+                &mut self.0.head_tail_builders,
+                color_resolution,
+                segment_descriptions,
+                stats,
+            )
             .with_trace_step("Cache::update")
     }
 
     pub fn build(self, ctx: &Context) -> Vec<Mesh> {
+        // #[cfg(debug_assertions)]
+        // println!("# buckets: {}", self.0.snake_caches.iter().map(|(_, cache)| cache.buckets.len()).sum::<usize>());
+
         let meshes = self
             .0
             .head_tail_builders
