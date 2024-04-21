@@ -42,8 +42,7 @@ impl SegmentDescription {
     }
 }
 
-// TODO: just have render_segment, the straight/curved distinction can be made by smooth_segments internally
-// TODO: rework documentation (switched to subsegments)
+// TODO: redo documentation
 /// The `render_default_*` functions are without position or rotation,
 /// they assume a default orientation and the transformation is performed
 /// afterwards

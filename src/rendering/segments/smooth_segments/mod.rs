@@ -163,12 +163,6 @@ fn render_straight_subsegment_default_orientation(desc: &SegmentDescription, sub
 
     let round_head = desc.fraction.round_head_description(desc.prev_fraction, desc.cell_dim);
 
-    // TODO: assert this upstream and figure out how to handle snake growing from 0
-    // assert!(
-    //     fraction.end - fraction.start >= side,
-    //     "segment too short, must be at least as long as it is wide"
-    // );
-
     let height = desc.cell_dim.height();
     let subsegment_start_y = fraction.start * height;
     let subsegment_end_y = fraction.end * height;
@@ -191,13 +185,12 @@ fn render_straight_subsegment_default_orientation(desc: &SegmentDescription, sub
     };
 
     if desc.location == SegmentLocation::Head && subsegment_idx == 0 {
-        // TODO: re-enable and debug
         match part_of_round_head {
             Fully => render_arc_tip_straight(desc, fraction),
+            // TODO: figure out why Partly never triggers
             Partly => todo!(),
             Not => unreachable!("the first segment of the snake should always be part of the round head"),
         }
-        // vec![]
     } else {
         let head_base = tip_y - head_radius;
         match part_of_round_head {

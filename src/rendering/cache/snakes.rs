@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
 use ggez::{Context, GameError};
-use itertools::Itertools;
+use itertools::{Itertools, peek_nth};
 
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering::point_factory::SegmentRenderer;
@@ -238,7 +238,8 @@ impl SnakeCache {
                 self.buckets.clear();
             }
 
-            let mut segment_descriptions = segment_descriptions.peekable();
+            let mut segment_descriptions = peek_nth(segment_descriptions);
+            // let mut segment_descriptions = segment_descriptions.peekable();
 
             // TODO: return Err
             let tail = segment_descriptions.next().expect("iterator empty");
@@ -265,7 +266,8 @@ impl SnakeCache {
 
             // re-color existing segments and build head
             while let Some(desc) = segment_descriptions.next() {
-                if segment_descriptions.peek().is_none() {
+                // always redraw the first two segments as both can contain parts of the round head
+                if segment_descriptions.peek_nth(1).is_none() {
                     let head = desc;
                     let builder = head_tail_builders
                         .entry(head.z_index)
