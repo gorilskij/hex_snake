@@ -59,14 +59,9 @@ impl Places {
     }
 }
 
-enum BucketState {
-    Cached { places: HashMap<SubsegmentKey, Places> },
-    Dying { keys: HashSet<SubsegmentKey> },
-}
-
 struct BuilderBucket {
     z_index: ZIndex,
-    state: BucketState,
+    places: HashMap<SubsegmentKey, Places>,
     inner: MeshBuilder,
 }
 
@@ -74,37 +69,21 @@ impl BuilderBucket {
     fn new(z_index: ZIndex) -> Self {
         Self {
             z_index,
-            state: BucketState::Cached { places: Default::default() },
+            places: Default::default(),
             inner: MeshBuilder::new(),
         }
     }
 
     fn is_empty(&self) -> bool {
-        match &self.state {
-            BucketState::Cached { places, .. } => places.is_empty(),
-            BucketState::Dying { keys, .. } => keys.is_empty(),
-        }
+        self.places.is_empty()
     }
 
     fn len(&self) -> usize {
-        match &self.state {
-            BucketState::Cached { places, .. } => places.len(),
-            BucketState::Dying { keys, .. } => keys.len(),
-        }
+        self.places.len()
     }
 
     fn contains(&self, segment_id: SegmentId) -> bool {
-        match &self.state {
-            BucketState::Cached { places, .. } => places.keys().any(|key| key.segment_id == segment_id),
-            BucketState::Dying { keys, .. } => keys.iter().any(|key| key.segment_id == segment_id),
-        }
-    }
-
-    // called before adding segments
-    fn reset(&mut self) {
-        if let BucketState::Dying { .. } = self.state {
-            self.inner = MeshBuilder::new();
-        }
+        self.places.keys().any(|key| key.segment_id == segment_id)
     }
 
     fn build(inner: &mut MeshBuilder, polygon: Polygon) -> Result<Option<Places>> {
@@ -141,52 +120,26 @@ impl BuilderBucket {
                     subsegment_idx: polygon.subsegment_idx,
                 };
 
-                match &mut self.state {
-                    BucketState::Cached { places, .. } => {
-                        match places.entry(key) {
-                            Entry::Occupied(entry) => {
-                                // recolor
-                                entry
-                                    .get()
-                                    .vertices
-                                    .clone()
-                                    .into_iter()
-                                    .for_each(|i| self.inner.buffer.vertices[i].color = (*polygon.color).into())
-                            }
-                            Entry::Vacant(entry) => {
-                                if let Some(places) = Self::build(&mut self.inner, polygon)? {
-                                    entry.insert(places);
-                                }
-                            }
-                        }
+                match self.places.entry(key) {
+                    Entry::Occupied(entry) => {
+                        // recolor
+                        entry
+                            .get()
+                            .vertices
+                            .clone()
+                            .into_iter()
+                            .for_each(|i| self.inner.buffer.vertices[i].color = (*polygon.color).into())
                     }
-                    BucketState::Dying { .. } => {
-                        Self::build(&mut self.inner, polygon)?;
+                    Entry::Vacant(entry) => {
+                        if let Some(places) = Self::build(&mut self.inner, polygon)? {
+                            entry.insert(places);
+                        }
                     }
                 }
 
                 Ok(())
             })
             .with_trace_step("BuilderBucket::add_or_update_segment")
-    }
-
-    fn remove_segment_ids_lte(&mut self, segment_id: SegmentId) {
-        if self.contains(segment_id) {
-            match &mut self.state {
-                BucketState::Dying { keys } => keys.retain(|key| key.segment_id != segment_id),
-                BucketState::Cached { places } => {
-                    self.state = BucketState::Dying {
-                        keys: places
-                            .keys()
-                            .filter(|key| key.segment_id != segment_id)
-                            .copied()
-                            .collect(),
-                    };
-
-                    // we can rely on the fact that reset() will be called so we don't need to clear self.inner here
-                }
-            }
-        }
     }
 }
 
@@ -204,11 +157,16 @@ struct SnakeCache {
     // if the color resolution changes, the cache is invalidated
     color_resolution: ColorResolution,
     buckets: Vec<BuilderBucket>,
+    trailing_segments: HashSet<SegmentId>,
 }
 
 impl SnakeCache {
     fn new(color_resolution: ColorResolution) -> Self {
-        Self { color_resolution, buckets: vec![] }
+        Self {
+            color_resolution,
+            buckets: vec![],
+            trailing_segments: Default::default(),
+        }
     }
 
     fn update(
@@ -223,19 +181,19 @@ impl SnakeCache {
             "{:?}",
             segment_descriptions.clone().map(|desc| desc.segment_id).collect_vec()
         );
-        println!(
-            "{:?}",
-            self.buckets
-                .iter()
-                .map(|bucket| {
-                    let x: Box<dyn Iterator<Item = SegmentId>> = match &bucket.state {
-                        BucketState::Cached { places } => Box::new(places.iter().map(|(key, _)| key.segment_id)),
-                        BucketState::Dying { keys } => Box::new(keys.iter().map(|key| key.segment_id)),
-                    };
-                    x.collect::<HashSet<_>>()
-                })
-                .collect_vec()
-        );
+        // println!(
+        //     "{:?}",
+        //     self.buckets
+        //         .iter()
+        //         .map(|bucket| {
+        //             let x: Box<dyn Iterator<Item = SegmentId>> = match &bucket.state {
+        //                 BucketState::Cached { places } => Box::new(places.iter().map(|(key, _)| key.segment_id)),
+        //                 BucketState::Dying { keys } => Box::new(keys.iter().map(|key| key.segment_id)),
+        //             };
+        //             x.collect::<HashSet<_>>()
+        //         })
+        //         .collect_vec()
+        // );
 
         let res: Result = try {
             // TODO: have a mechanism to prevent color_resolution from changing too often
@@ -253,14 +211,9 @@ impl SnakeCache {
             // TODO: return Err
             let tail = segment_descriptions.next().expect("iterator empty");
 
-            // delete all segments that don't exist anymore, plus the segment that will be replaced by the tail
-            self.buckets.retain_mut(|bucket| {
-                bucket.remove_segment_ids_lte(tail.segment_id);
-                !bucket.is_empty()
-            });
-
-            // clear the builders of dying buckets as these are redrawn at every iteration
-            self.buckets.iter_mut().for_each(|bucket| bucket.reset());
+            // delete buckets that contain segments that don't exist anymore plus buckets that contain the tail segment
+            self.buckets
+                .retain_mut(|bucket| bucket.places.keys().all(|key| key.segment_id > tail.segment_id));
 
             // build tail
             // TODO: support different renderers
@@ -276,12 +229,12 @@ impl SnakeCache {
             // re-color existing segments and build head
             while let Some(desc) = segment_descriptions.next() {
                 // always redraw the first two segments as both can contain parts of the round head
-                if segment_descriptions.peek_nth(1).is_none() {
-                    let head = desc;
+                // always redraw trailing segments whose bucket has been deleted
+                if self.trailing_segments.contains(&desc.segment_id) || segment_descriptions.peek_nth(1).is_none() {
                     let builder = head_tail_builders
-                        .entry(head.z_index)
+                        .entry(desc.z_index)
                         .or_insert_with(|| MeshBuilder::new());
-                    SmoothSegments::render_segment(&head, color_resolution).try_for_each(|polygon| {
+                    SmoothSegments::render_segment(&desc, color_resolution).try_for_each(|polygon| {
                         builder
                             .polygon(DrawMode::fill(), &polygon.points, *polygon.color)
                             .map(|_| ())
@@ -290,10 +243,7 @@ impl SnakeCache {
                     let bucket = {
                         let bucket = self.buckets.iter_mut().find(|bucket| {
                             bucket.contains(desc.segment_id) || {
-                                let BucketState::Cached { places } = &bucket.state else {
-                                    return false;
-                                };
-                                bucket.z_index == desc.z_index && places.len() < BUCKET_MAX_LEN
+                                bucket.z_index == desc.z_index && bucket.places.len() < BUCKET_MAX_LEN
                             }
                         });
                         if let Some(bucket) = bucket {
