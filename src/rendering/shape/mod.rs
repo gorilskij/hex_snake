@@ -77,6 +77,7 @@ impl ShapePoints {
     }
 
     pub fn points(&self) -> &ShapePointsSlice {
+        // SAFETY: ShapePointsSlice is repr(transparent)
         unsafe { std::mem::transmute(self.points.as_slice()) }
     }
 
@@ -118,6 +119,7 @@ impl ShapePoints {
 }
 
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct ShapePointsSlice([Point]);
 
 impl Deref for ShapePoints {
