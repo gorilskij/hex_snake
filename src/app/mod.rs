@@ -56,9 +56,9 @@ impl App {
                     by_segment_type! {
                         SegmentType::DISCR_EATEN => EatBehavior::PassOver,
                         _ => EatBehavior::Crash,
+                        // _ => EatBehavior::Cut,
                     },
                     by_snake_type! {
-                        // TODO: this doesn't work as expected
                         snake::Type::Rain => by_segment_type! {
                             _ => EatBehavior::PassUnder,
                         },

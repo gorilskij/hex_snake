@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::mem::size_of;
 use std::ops::Range;
 
 use ggez::graphics::{DrawMode, LinearColor, Mesh, MeshBuilder, MeshData, Vertex};
@@ -20,12 +21,12 @@ struct SubsegmentKey {
 }
 
 #[derive(Clone)]
-struct Places {
+struct Place {
     vertices: Range<usize>,
     indices: Range<usize>,
 }
 
-impl Places {
+impl Place {
     fn correct_for_removal_of_vertices(&mut self, removed: Range<usize>) {
         // assert that the ranges don't overlap
         assert!(self.vertices.end <= removed.start || removed.end <= self.vertices.start);
@@ -48,55 +49,54 @@ impl Places {
 }
 
 #[derive(Default)]
-struct MeshBuilderMirror {
+struct Mirror {
     vertices: Vec<Vertex>,
     indices: Vec<u32>,
 }
 
-impl MeshBuilderMirror {
-    fn data(&self) -> MeshData {
-        MeshData {
-            vertices: &self.vertices,
-            indices: &self.indices,
-        }
-    }
+enum Inner {
+    Filling { builder: MeshBuilder, mirror: Mirror },
+    Full(Mesh),
 }
 
-struct BuilderBucket {
+struct MemoryMesh {
     z_index: ZIndex,
-    inner: MeshBuilder,
-    mirror: MeshBuilderMirror,
-    places: HashMap<SubsegmentKey, Places>,
+    inner: Inner,
+    places: HashMap<SubsegmentKey, Place>,
 }
 
-impl BuilderBucket {
+impl MemoryMesh {
     fn new(z_index: ZIndex) -> Self {
         Self {
             z_index,
-            inner: MeshBuilder::new(),
-            mirror: Default::default(),
+            inner: Inner::Filling {
+                builder: MeshBuilder::new(),
+                mirror: Default::default(),
+            },
             places: Default::default(),
         }
     }
+}
 
-    fn is_empty(&self) -> bool {
-        self.places.is_empty()
-    }
-
+impl MemoryMesh {
     fn len(&self) -> usize {
         self.places.len()
+    }
+
+    fn is_full(&self) -> bool {
+        matches!(&self.inner, Inner::Full(_))
     }
 
     fn contains(&self, segment_id: SegmentId) -> bool {
         self.places.keys().any(|key| key.segment_id == segment_id)
     }
 
-    fn build(inner: &mut MeshBuilder, mirror: &mut MeshBuilderMirror, polygon: Polygon) -> Result<Option<Places>> {
+    fn build(builder: &mut MeshBuilder, mirror: &mut Mirror, polygon: Polygon) -> Result<Place> {
         // build polygon
         let orig_vertices_len = mirror.vertices.len();
         let orig_indices_len = mirror.indices.len();
-        inner.polygon(DrawMode::fill(), &polygon.points, *polygon.color)?;
-        let new_data = inner.build();
+        builder.polygon(DrawMode::fill(), &polygon.points, *polygon.color)?;
+        let new_data = builder.build();
         mirror
             .vertices
             .extend(new_data.vertices[orig_vertices_len..].iter().copied());
@@ -104,13 +104,22 @@ impl BuilderBucket {
             .indices
             .extend(new_data.indices[orig_indices_len..].iter().copied());
 
-        Ok(Some(Places {
+        Ok(Place {
             vertices: orig_vertices_len..mirror.vertices.len(),
             indices: orig_indices_len..mirror.indices.len(),
-        }))
+        })
     }
 
-    fn add_or_update_segment(
+    fn mark_full(&mut self, ctx: &Context) {
+        match &mut self.inner {
+            Inner::Filling { builder, .. } => {
+                self.inner = Inner::Full(Mesh::from_data(ctx, builder.build()));
+            }
+            Inner::Full(_) => panic!("mark_full called on a full mesh"),
+        }
+    }
+
+    fn add_or_recolor_segment(
         &mut self,
         desc: SegmentDescription,
         color_resolution: ColorResolution,
@@ -126,19 +135,26 @@ impl BuilderBucket {
                 match self.places.entry(key) {
                     Entry::Occupied(entry) => {
                         // recolor
-                        entry
-                            .get()
-                            .vertices
-                            .clone()
-                            .into_iter()
-                            .for_each(|i| self.mirror.vertices[i].color = LinearColor::from(*polygon.color).into())
+                        let Inner::Full(mesh) = &mut self.inner else {
+                            panic!("subsegment exists but inner is Filling");
+                        };
+
+                        entry.get().vertices.clone().into_iter().for_each(|i| {
+                            let len = mesh.vertex_count() * size_of::<Vertex>();
+                            let verts = &mut mesh.verts.slice(..len as u64).get_mapped_range_mut() as &mut [_];
+                            let verts: &mut [Vertex] = bytemuck::cast_slice_mut(verts);
+                            verts[i].color = LinearColor::from(*polygon.color).into()
+                        })
                     }
                     Entry::Vacant(entry) => {
                         // add new segments to the builder
-                        if let Some(places) = Self::build(&mut self.inner, &mut self.mirror, polygon)? {
-                            stats.polygons += 1;
-                            entry.insert(places);
-                        }
+                        let Inner::Filling { builder, mirror } = &mut self.inner else {
+                            panic!("subsegment doesn't exist but inner is Full");
+                        };
+
+                        let places = Self::build(builder, mirror, polygon)?;
+                        stats.polygons += 1;
+                        entry.insert(places);
                     }
                 }
 
@@ -161,7 +177,7 @@ const BUCKET_MAX_LEN: usize = 20;
 struct SnakeCache {
     // if the color resolution changes, the cache is invalidated
     color_resolution: ColorResolution,
-    buckets: Vec<BuilderBucket>,
+    buckets: Vec<MemoryMesh>,
     trailing_segments: HashSet<SegmentId>,
 }
 
@@ -227,12 +243,12 @@ impl SnakeCache {
                         if let Some(bucket) = bucket {
                             bucket
                         } else {
-                            self.buckets.push(BuilderBucket::new(desc.z_index));
+                            self.buckets.push(MemoryMesh::new(desc.z_index));
                             self.buckets.last_mut().unwrap()
                         }
                     };
 
-                    bucket.add_or_update_segment(desc, color_resolution, stats)?;
+                    bucket.add_or_recolor_segment(desc, color_resolution, stats)?;
                 }
             }
         };
@@ -281,22 +297,30 @@ impl FrameBuilder<'_> {
     }
 
     pub fn build(self, ctx: &Context) -> Vec<Mesh> {
-        // #[cfg(debug_assertions)]
-        // println!("# buckets: {}", self.0.snake_caches.iter().map(|(_, cache)| cache.buckets.len()).sum::<usize>());
+        self.0.snake_caches.values_mut().flat_map(|snake_cache| {
+           snake_cache.buckets.iter_mut()
+        }).for_each(|bucket| {
+            if bucket.len() >= BUCKET_MAX_LEN {
+                bucket.mark_full(ctx);
+            }
+        });
 
         let meshes = self
             .0
             .head_tail_builders
             .iter()
-            .map(|(z_index, builder)| (z_index, builder.build()))
-            .chain(self.0.snake_caches.iter().flat_map(|(_, snake_cache)| {
+            .map(|(z_index, builder)| (*z_index, Mesh::from_data(ctx, builder.build())))
+            .chain(self.0.snake_caches.values().flat_map(|snake_cache| {
                 snake_cache
                     .buckets
                     .iter()
-                    .map(|bucket| (&bucket.z_index, bucket.mirror.data()))
+                    .map(|bucket| match &bucket.inner {
+                        Inner::Filling { builder, .. } => (bucket.z_index, Mesh::from_data(ctx, builder.build())),
+                        Inner::Full(mesh) => (bucket.z_index, mesh.clone()),
+                    })
             }))
             .sorted_unstable_by_key(|(z_index, _)| *z_index)
-            .map(|(_, data)| Mesh::from_data(ctx, data))
+            .map(|(_, mesh)| mesh)
             .collect();
 
         self.0.head_tail_builders.clear();

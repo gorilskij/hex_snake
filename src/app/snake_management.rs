@@ -125,7 +125,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                     SpawnRain => {
                         let seed = SnakeBuilder::default()
                             .snake_type(snake::Type::Rain)
-                            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                            .eat_mechanics(EatMechanics::always(Die))
                             // TODO: factor out palette into game palette
                             // .palette(snake::PaletteTemplate::alternating_white())
                             .palette(env.gtx.palette.palette_rain)
@@ -200,7 +200,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                     }
                 }
             }
-            Collision::Portal(behavior) => todo!(),
+            Collision::Portal(_behavior) => todo!(),
         }
     }
 
