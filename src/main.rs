@@ -1,14 +1,8 @@
 #![feature(stmt_expr_attributes)]
-#![feature(if_let_guard)]
 #![feature(try_blocks)]
-#![feature(never_type)]
 #![feature(exhaustive_patterns)]
 #![deny(unused_must_use)]
 // #![deny(unsafe_code)]
-#![feature(const_fn_floating_point_arithmetic)]
-#![feature(associated_type_defaults)]
-#![feature(type_alias_impl_trait)]
-#![feature(trace_macros)]
 // #![feature(return_position_impl_trait_in_trait)]
 
 #[macro_use]
@@ -92,7 +86,7 @@ fn main() {
 
     let app = App::new(
         vec![ControlSetup {
-            layout: Layout::Qwerty,
+            layout: Layout::Dvorak,
             keyboard_side: Side::Right,
             hand: Side::Right,
         }],

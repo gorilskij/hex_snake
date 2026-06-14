@@ -264,7 +264,6 @@ pub struct StartScreen {
     // palettes: Vec<app::Palette>,
     // current_palette: usize,
     palette: app::Palette,
-    cell_dim: CellDim,
 
     player1_demo: SnakeDemo,
     player2_demo: SnakeDemo,
@@ -313,7 +312,6 @@ impl StartScreen {
             },
 
             palette: app_palette.clone(),
-            cell_dim,
 
             player1_demo: SnakeDemo::new(
                 cell_dim,
