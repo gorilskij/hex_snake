@@ -5,12 +5,12 @@ use ggez::graphics::{Canvas, Rect};
 use ggez::input::keyboard::KeyInput;
 use ggez::Context;
 use itertools::Itertools;
-use keyboard_control::ControlSetup;
+use keyboard_control::{ControlSetup, Controls};
 pub use palette::Palette;
 use screen::Screen;
 use snake::builder::Builder as SnakeBuilder;
 
-use crate::app::screen::StartScreen;
+use crate::app::screen::{SnakeControlCreatorScreen, StartScreen};
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::CellDim;
 use crate::error::{Error, ErrorConversion, Result};
@@ -48,6 +48,8 @@ impl App {
             players.len(),
             "found multiple players on the same side of the keyboard"
         );
+
+        let controls = Controls::from(players[0].clone());
 
         let seeds: Vec<_> = players
             .into_iter()

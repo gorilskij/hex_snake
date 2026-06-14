@@ -9,6 +9,7 @@ use ggez::input::keyboard::{KeyCode, KeyInput};
 use ggez::Context;
 use rand::prelude::*;
 
+use super::Game;
 use crate::app::fps_control::FpsControl;
 use crate::app::game_context::GameContext;
 use crate::app::prefs::Prefs;
@@ -17,7 +18,6 @@ use crate::app::snake_management::{find_collisions, handle_collisions};
 use crate::app::stats::Stats;
 use crate::app::{self, Screen};
 use crate::apple::spawn::{spawn_apples, SpawnPolicy, SpawnScheduleBuilder};
-use super::Game;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::button::{Button, ButtonDataBuilder, ButtonType, TriColor};
 use crate::color::Color;
@@ -47,13 +47,13 @@ struct SnakeDemo {
 impl SnakeDemo {
     fn new(cell_dim: CellDim, pos: Point, app_palette: app::Palette, control: Rc<RefCell<FpsControl>>) -> Self {
         let board_dim = HexPoint { h: 11, v: 8 };
-        let start_pos = HexPoint { h: 4, v: 4 };
+        let start_pos = HexPoint { h: 5, v: 1 };
         let start_dir = Dir::U;
         let start_len = 10;
 
         let spawn_schedule = SpawnScheduleBuilder::new()
-            .spawn(HexPoint { h: 5, v: 4 }, apple::Type::Food(1))
-            .wait(40)
+            .spawn(HexPoint { h: 5, v: 3 }, apple::Type::Food(1))
+            .wait(20)
             .build();
         let apple_spawn_policy = SpawnPolicy::ScheduledOnEat {
             apple_count: 1,
@@ -71,6 +71,10 @@ impl SnakeDemo {
             snake::PaletteTemplate::green_to_red(false),
             // snake::PaletteTemplate::zebra(),
         ];
+
+        use Dir::*;
+
+        use crate::snake_control::Move::*;
 
         let seed = SnakeBuilder::default()
             .snake_type(snake::Type::Simulated)
@@ -90,7 +94,33 @@ impl SnakeDemo {
                 color: Color::RED,
                 eaten: Color::RED,
             })
-            .controller(Template::demo_8_pattern(0))
+            // .controller(Template::demo_8_pattern(0))
+            .controller(Template::Programmed(vec![
+                Turn(Dr),
+                Turn(D),
+                Turn(Dl),
+                Wait(1),
+                Turn(D),
+                Turn(Dr),
+                Turn(Ur),
+                Turn(U),
+                Turn(Ul),
+                Wait(1),
+                Turn(U),
+                Turn(Ur),
+                Turn(Dr),
+                Wait(1),
+                Turn(D),
+                Wait(2),
+                Turn(Dl),
+                Wait(1),
+                Turn(Ul),
+                Wait(1),
+                Turn(U),
+                Wait(2),
+                Turn(Ur),
+                Wait(1),
+            ]))
             .pos(start_pos)
             .dir(start_dir)
             .len(start_len)
@@ -320,7 +350,7 @@ impl StartScreen {
         };
 
         let start_button = Button {
-            pos: Point { x: 1200., y: 50. },
+            pos: Point { x: 800., y: 1400. },
             button_type: ButtonType::Click(
                 proto
                     .text("Start", 50., TextLayout::center(), button_text_pos, color)
