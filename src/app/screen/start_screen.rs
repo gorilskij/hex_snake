@@ -17,6 +17,7 @@ use crate::app::snake_management::{find_collisions, handle_collisions};
 use crate::app::stats::Stats;
 use crate::app::{self, Screen};
 use crate::apple::spawn::{spawn_apples, SpawnPolicy, SpawnScheduleBuilder};
+use super::Game;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::button::{Button, ButtonDataBuilder, ButtonType, TriColor};
 use crate::color::Color;
@@ -258,7 +259,13 @@ impl RngCore for NoRng {
 pub struct StartScreen {
     fps_control: Rc<RefCell<FpsControl>>,
 
+    cell_dim: CellDim,
+    seeds: Vec<SnakeBuilder>,
+    spawn_policy: Option<SpawnPolicy>,
+
     multiplayer_button: Button,
+    start_button: Button,
+    start_game: bool,
 
     // TODO: implement palette choice
     // palettes: Vec<app::Palette>,
@@ -272,8 +279,12 @@ pub struct StartScreen {
 }
 
 impl StartScreen {
-    #[allow(dead_code)]
-    pub fn new(cell_dim: CellDim, app_palette: app::Palette) -> Self {
+    pub fn new(
+        cell_dim: CellDim,
+        seeds: Vec<SnakeBuilder>,
+        app_palette: app::Palette,
+        spawn_policy: SpawnPolicy,
+    ) -> Self {
         let fps_control = Rc::new(RefCell::new(FpsControl::new(7.)));
 
         let stroke_thickness = 15.;
@@ -286,30 +297,48 @@ impl StartScreen {
             click: Color::RED,
         };
         let button_shape = ButtonShape::new(button_dim);
-        let player_button_prototype =
-            ButtonDataBuilder::new().outer_shape(button_shape.clone(), stroke_thickness, color);
+        let proto = ButtonDataBuilder::new().outer_shape(button_shape.clone(), stroke_thickness, color);
         let button_text_pos = button_shape.center();
+
+        let multiplayer_button = Button {
+            pos: Point { x: 800., y: 50. },
+            button_type: ButtonType::Rotate {
+                options: vec![
+                    proto
+                        .clone()
+                        .text("One player", 50., TextLayout::center(), button_text_pos, color)
+                        .build()
+                        .unwrap(),
+                    proto
+                        .clone()
+                        .text("Two players", 50., TextLayout::center(), button_text_pos, color)
+                        .build()
+                        .unwrap(),
+                ],
+                index: 0,
+            },
+        };
+
+        let start_button = Button {
+            pos: Point { x: 1200., y: 50. },
+            button_type: ButtonType::Click(
+                proto
+                    .text("Start", 50., TextLayout::center(), button_text_pos, color)
+                    .build()
+                    .unwrap(),
+            ),
+        };
 
         Self {
             fps_control: fps_control.clone(),
 
-            multiplayer_button: Button {
-                pos: Point { x: 800., y: 50. },
-                button_type: ButtonType::Rotate {
-                    options: vec![
-                        player_button_prototype
-                            .clone()
-                            .text("One player", 50., TextLayout::center(), button_text_pos, color)
-                            .build()
-                            .unwrap(),
-                        player_button_prototype
-                            .text("Two players", 50., TextLayout::center(), button_text_pos, color)
-                            .build()
-                            .unwrap(),
-                    ],
-                    index: 0,
-                },
-            },
+            cell_dim,
+            seeds,
+            spawn_policy: Some(spawn_policy),
+
+            multiplayer_button,
+            start_button,
+            start_game: false,
 
             palette: app_palette.clone(),
 
@@ -349,7 +378,9 @@ impl EventHandler<Error> for StartScreen {
         self.player2_demo.draw(&mut canvas, ctx, &mut self.stats)?;
 
         let _ = self.multiplayer_button.draw(&mut canvas, ctx)?;
-        // let two_player_clicked = self.two_player_button.draw(&mut canvas, ctx)?;
+        if self.start_button.draw(&mut canvas, ctx)? {
+            self.start_game = true;
+        }
 
         canvas.finish(ctx).map_err(Error::from).with_trace_step("Game::draw")
     }
@@ -365,7 +396,18 @@ impl EventHandler<Error> for StartScreen {
 }
 
 impl StartScreen {
-    pub fn next_screen(&self) -> Option<Screen> {
-        None
+    pub fn next_screen(&mut self, ctx: &mut Context) -> Option<Screen> {
+        if self.start_game {
+            Some(Screen::Game(Game::new(
+                self.cell_dim,
+                3.,
+                std::mem::take(&mut self.seeds),
+                self.palette.clone(),
+                self.spawn_policy.take()?,
+                ctx,
+            )))
+        } else {
+            None
+        }
     }
 }

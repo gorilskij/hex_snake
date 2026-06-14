@@ -51,7 +51,7 @@ pub mod snake_control;
 fn main() {
     let width = 2000.;
     let height = 1600.;
-    
+
     let window_mode = WindowMode {
         width,
         height,
