@@ -18,8 +18,7 @@ lyon_geom = "~1.0"
 rayon = "~1.8"
 static_assertions = "~1.1"
 # local dependencies
-# TODO: publish all local dependencies before merging into master
-enum_rotate = { path = "../enum_rotate" }
+enum-rotate = "0.1.0"
 
 [profile.release]
 debug = true
