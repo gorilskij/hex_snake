@@ -47,17 +47,6 @@ fn invert_rgb(color: Color) -> Color {
     })
 }
 
-impl EatenColor {
-    fn paint_segment(&self, normal_color: &Color) -> Color {
-        match self {
-            EatenColor::Fixed(color) => *color,
-            EatenColor::RGBInverted => {
-                let (r, g, b) = normal_color.to_rgb();
-                Color::from_rgb(255 - r, 255 - g, 255 - b)
-            }
-        }
-    }
-}
 
 #[derive(Copy, Clone, Debug)]
 pub enum PaletteTemplate {

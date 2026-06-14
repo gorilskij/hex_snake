@@ -3,13 +3,12 @@ use ggez::Context;
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
-use crate::basic::{Dir, HexPoint};
+use crate::basic::Dir;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
-use crate::view::targets::Targets;
 
 // TODO: rename to something more descriptive like apple seeker
 pub struct Algorithm {

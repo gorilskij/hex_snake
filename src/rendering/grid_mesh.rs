@@ -14,8 +14,9 @@ pub fn grid_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
     // two kinds of alternating vertical lines
-    let mut vline_a = vec![]; // lines that start from the top with /
-    let mut vline_b = vec![]; // lines that start from the top with \
+    let cap = 2 * (board_v as usize + 1);
+    let mut vline_a = Vec::with_capacity(cap); // lines that start from the top with /
+    let mut vline_b = Vec::with_capacity(cap); // lines that start from the top with \
 
     #[rustfmt::skip]
     for dv in (0..=board_v).map(|v| v as f32 * 2. * sin) {
@@ -30,7 +31,7 @@ pub fn grid_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let draw_mode = DrawMode::stroke(gtx.palette.grid_thickness);
     let color = gtx.palette.grid_color;
 
-    let res: Result<_> = try {
+    let res = try {
         for h in 0..(board_h + 1) / 2 {
             if h == 0 {
                 builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
@@ -82,10 +83,8 @@ pub fn grid_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
 
         builder.build()
     };
-    // TODO: write a proc macro that does this with an #[annotation]
-    //  i.e. it automatically wraps the method in a try block and
-    //  attaches a trace step to it
-    res.map(|mesh_data| Mesh::from_data(ctx, mesh_data))
+    res.map_err(Error::from)
+        .map(|mesh_data| Mesh::from_data(ctx, mesh_data))
         .with_trace_step("grid_mesh")
 }
 
@@ -100,7 +99,7 @@ pub fn grid_dot_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let mut builder = MeshBuilder::new();
     let mut circle = |point| builder.circle(draw_mode, point, radius, 0.1, color).map(|_| {});
 
-    let res: Result<_> = try {
+    let res = try {
         for h in 0..(board_h + 1) / 2 {
             let dh = h as f32 * 2. * (side + cos);
 
@@ -125,8 +124,9 @@ pub fn grid_dot_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
         }
         builder.build()
     };
-    res.map(|mesh_data| Mesh::from_data(ctx, mesh_data))
-        .with_trace_step("grid_mesh")
+    res.map_err(Error::from)
+        .map(|mesh_data| Mesh::from_data(ctx, mesh_data))
+        .with_trace_step("grid_dot_mesh")
 }
 
 pub fn border_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
@@ -134,8 +134,9 @@ pub fn border_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
     // two kinds of alternating vertical lines
-    let mut vline_a = vec![]; // lines that start from the top with /
-    let mut vline_b = vec![]; // lines that start from the top with \
+    let cap = 2 * (board_v as usize + 1);
+    let mut vline_a = Vec::with_capacity(cap); // lines that start from the top with /
+    let mut vline_b = Vec::with_capacity(cap); // lines that start from the top with \
 
     #[rustfmt::skip]
     for dv in (0..=board_v).map(|v| v as f32 * 2. * sin) {
@@ -150,7 +151,7 @@ pub fn border_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
     let draw_mode = DrawMode::stroke(gtx.palette.border_thickness);
     let color = gtx.palette.border_color;
 
-    let res: Result<_> = try {
+    let res = try {
         // left border
         builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
 
@@ -195,7 +196,7 @@ pub fn border_mesh(gtx: &GameContext, ctx: &Context) -> Result<Mesh> {
         builder.build()
     };
 
-    res.map(|mesh_data| Mesh::from_data(ctx, mesh_data))
-        .map_err(Error::from)
+    res.map_err(Error::from)
+        .map(|mesh_data| Mesh::from_data(ctx, mesh_data))
         .with_trace_step("border_mesh")
 }

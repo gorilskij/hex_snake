@@ -5,8 +5,7 @@ authors = ["gorilskij <43991400@users.noreply.github.com>"]
 edition = "2021"
 
 [dependencies]
-#ggez = "0.8"
-ggez = { git = "https://github.com/ggez/ggez", rev = "81544de" }
+ggez = "0.9.3"
 rand = "0.8"
 itertools = "0.12"
 derive_more = "~0.99"
@@ -15,10 +14,11 @@ hsl = "0.1.1"
 lazy_static = "1.4.0"
 ezing = "~0.2"
 lyon_geom = "~1.0"
-rayon = "~1.8"
+rayon = "~1.10"
 static_assertions = "~1.1"
-# local dependencies
 enum-rotate = "0.1.0"
+num-traits = "0.2.18"
 
 [profile.release]
 debug = true
+opt-level = 2

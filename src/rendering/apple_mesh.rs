@@ -23,7 +23,7 @@ pub fn apple_mesh(
 
     let mut builder = MeshBuilder::new();
 
-    let res: Result<Mesh> = try {
+    let res = try {
         for apple in apples {
             use crate::apple::Type::*;
             let color = match apple.apple_type {
@@ -53,5 +53,5 @@ pub fn apple_mesh(
 
         Mesh::from_data(ctx, builder.build())
     };
-    res.with_trace_step("apple_mesh")
+    res.map_err(Into::into).with_trace_step("apple_mesh")
 }

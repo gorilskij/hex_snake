@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::default::Default;
 use std::f32::consts::TAU;
 use std::rc::Rc;
 use std::result;
@@ -146,6 +145,7 @@ impl SnakeDemo {
             env: Environment {
                 snakes: vec![seed.build().unwrap()],
                 apples: vec![],
+                portals: vec![],
                 gtx: GameContext::new(board_dim, cell_dim, app_palette, Prefs::default(), apple_spawn_policy),
                 rng: NoRng,
             },
@@ -177,6 +177,7 @@ impl SnakeDemo {
         self.env.snakes[0].advance(
             OtherSnakes::empty(),
             &self.env.apples,
+            &self.env.portals,
             &self.env.gtx,
             self.fps_control.borrow().context(),
             ctx,
@@ -263,7 +264,6 @@ pub struct StartScreen {
     // palettes: Vec<app::Palette>,
     // current_palette: usize,
     palette: app::Palette,
-    cell_dim: CellDim,
 
     player1_demo: SnakeDemo,
     player2_demo: SnakeDemo,
@@ -312,7 +312,6 @@ impl StartScreen {
             },
 
             palette: app_palette.clone(),
-            cell_dim,
 
             player1_demo: SnakeDemo::new(
                 cell_dim,

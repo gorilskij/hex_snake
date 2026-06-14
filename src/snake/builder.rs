@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 
 use super::*;
-use crate::snake::eat_mechanics::EatMechanics;
 
 #[derive(Debug, Error)]
 #[must_use]
@@ -123,6 +122,7 @@ impl Builder {
             segment_type: SegmentType::Normal,
             pos,
             coming_from: -dir,
+            going_to: None,
             teleported: None,
             z_index: 0,
         };
