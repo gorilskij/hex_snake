@@ -1,7 +1,7 @@
 use ggez::input::keyboard::KeyCode;
 use ggez::Context;
 use itertools::{repeat_n, Itertools};
-use programmed::Move;
+pub use programmed::Move;
 
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;

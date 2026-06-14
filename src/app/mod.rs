@@ -5,12 +5,12 @@ use ggez::graphics::{Canvas, Rect};
 use ggez::input::keyboard::KeyInput;
 use ggez::Context;
 use itertools::Itertools;
-use keyboard_control::ControlSetup;
+use keyboard_control::{ControlSetup, Controls};
 pub use palette::Palette;
-use screen::{Game, Screen};
+use screen::Screen;
 use snake::builder::Builder as SnakeBuilder;
 
-use crate::app::screen::{DebugScenario, StartScreen};
+use crate::app::screen::{SnakeControlCreatorScreen, StartScreen};
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::CellDim;
 use crate::error::{Error, ErrorConversion, Result};
@@ -48,6 +48,8 @@ impl App {
             players.len(),
             "found multiple players on the same side of the keyboard"
         );
+
+        let controls = Controls::from(players[0].clone());
 
         let seeds: Vec<_> = players
             .into_iter()
@@ -89,25 +91,13 @@ impl App {
 
         let cell_dim = CellDim::from(50.);
 
-        // Manual selection of what to launch
         Self {
-            screen: match 0 {
-                6 => Screen::DebugScenario(DebugScenario::head_head_collision_apple(cell_dim)),
-                5 => Screen::DebugScenario(DebugScenario::double_head_body_collision(cell_dim)),
-                // 4 => Screen::DebugScenario(DebugScenario::many_snakes()),
-                3 => Screen::DebugScenario(DebugScenario::head_body_collision(cell_dim)),
-                2 => Screen::DebugScenario(DebugScenario::head_head_collision(cell_dim)),
-                1 => Screen::StartScreen(StartScreen::new(cell_dim, Palette::dark())),
-                0 => Screen::Game(Game::new(
-                    cell_dim,
-                    3.,
-                    seeds,
-                    Palette::dark(),
-                    SpawnPolicy::Random { apple_count: 5 },
-                    ctx,
-                )),
-                _ => unreachable!(),
-            },
+            screen: Screen::StartScreen(StartScreen::new(
+                cell_dim,
+                seeds,
+                Palette::dark(),
+                SpawnPolicy::Random { apple_count: 5 },
+            )),
         }
 
         // let seeds = vec![SnakeSeed {
@@ -180,10 +170,13 @@ impl App {
 
 impl EventHandler<Error> for App {
     fn update(&mut self, ctx: &mut Context) -> Result {
-        if let Screen::StartScreen(start_screen) = &self.screen {
-            if let Some(next_screen) = start_screen.next_screen() {
-                self.screen = next_screen
-            }
+        let next = if let Screen::StartScreen(ref mut ss) = self.screen {
+            ss.next_screen(ctx)
+        } else {
+            None
+        };
+        if let Some(next_screen) = next {
+            self.screen = next_screen;
         }
         self.screen.update(ctx).with_trace_step("App::update")
     }

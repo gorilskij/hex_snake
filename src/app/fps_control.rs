@@ -109,11 +109,6 @@ pub struct FpsControl {
     start: Instant,
     last_update: Instant,
 
-    // amount of time which game frames have not yet
-    // been accounted for (will be included next time
-    // this in done)
-    remainder: f64, // secs
-
     // number of game frames that still need to be
     // performed to catch up with the current time
     // TODO: zero this when it gets too large to prevent lag
@@ -141,7 +136,6 @@ impl FpsControl {
             game_frame_duration: Duration::from_nanos((1_000_000_000.0 / fps) as u64),
             start: now,
             last_update: now,
-            remainder: 0.,
 
             missed_updates: None,
 
@@ -171,17 +165,9 @@ impl FpsControl {
 
     // adjust self.last_update to make it match the expected
     // frame_fraction, this is done when resuming a paused game
-    // and when adjust fps to ensure smoothness
+    // and when adjusting fps to ensure smoothness
     fn set_last_update_to_match_frame_fraction(&mut self, frac: f32) {
-        let mut elapsed = (frac - self.remainder as f32) * self.game_frame_duration.as_secs_f32();
-        // slight tolerance
-        if (-0.01..0.).contains(&elapsed) {
-            elapsed = 0.;
-        } else {
-            assert!(elapsed >= 0., "elapsed ({elapsed}s) < 0");
-        }
-
-        self.last_update = Instant::now() - Duration::from_secs_f32(elapsed);
+        self.last_update = Instant::now() - Duration::from_secs_f32(frac * self.game_frame_duration.as_secs_f32());
     }
 
     pub fn set_game_fps(&mut self, fps: f64) {
@@ -222,12 +208,13 @@ impl FpsControl {
                 // calculate how many game frames should have occurred
                 // since the last call to can_update
                 let game_frames =
-                    self.last_update.elapsed().as_secs_f64() / self.game_frame_duration.as_secs_f64() + self.remainder;
+                    self.last_update.elapsed().as_secs_f64() / self.game_frame_duration.as_secs_f64();
                 let missed_updates = game_frames as usize;
 
                 if missed_updates > 0 {
-                    self.remainder = game_frames % 1.;
-                    self.last_update = Instant::now();
+                    // set last_update to the ideal frame boundary so frame_fraction()
+                    // counts from the right origin without a separate remainder term
+                    self.last_update = Instant::now() - self.game_frame_duration.mul_f64(game_frames.fract());
 
                     self.missed_updates = Some(missed_updates - 1);
 
@@ -284,14 +271,8 @@ impl FpsControl {
         match self.frozen_frame_fraction {
             Some(frac) => frac,
             None => {
-                let frac = self.last_update.elapsed().as_secs_f32() / self.game_frame_duration.as_secs_f32()
-                    + self.remainder as f32;
-                if frac > 1. {
-                    eprintln!("warning: frame fraction > 1 ({frac})");
-                    1.
-                } else {
-                    frac
-                }
+                let frac = self.last_update.elapsed().as_secs_f32() / self.game_frame_duration.as_secs_f32();
+                frac.min(1.)
             }
         }
     }
