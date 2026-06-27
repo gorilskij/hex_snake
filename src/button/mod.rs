@@ -2,8 +2,8 @@ use std::error;
 use std::fmt::{Debug, Display, Formatter};
 
 use ggez::event::MouseButton;
-use ggez::graphics::{Canvas, DrawMode, DrawParam, Mesh, MeshBuilder, PxScale, Text, TextLayout};
-use ggez::Context;
+use crate::gfx::graphics::{Canvas, DrawMode, DrawParam, Mesh, MeshBuilder, PxScale, Text, TextLayout};
+use crate::gfx::Context;
 
 use crate::basic::Point;
 use crate::button::Delta::{Changed, Unchanged};

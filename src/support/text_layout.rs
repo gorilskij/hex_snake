@@ -1,4 +1,4 @@
-use ggez::graphics::{TextAlign, TextLayout};
+use crate::gfx::graphics::{TextAlign, TextLayout};
 pub trait TextLayoutExtension {
     fn top_right() -> Self;
 }

@@ -1,8 +1,9 @@
 use std::cmp::max;
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::basic::FrameStamp;
+use crate::gfx::time::Instant;
 
 /// Stores an instant along with the number of frames it represents
 struct NFrameInstant(usize, Instant);

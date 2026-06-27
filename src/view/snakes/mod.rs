@@ -1,20 +1,9 @@
 pub use other_snakes::OtherSnakes;
-use rayon::prelude::ParallelIterator;
 
 use crate::snake::{Segment, Snake};
 
 mod all_snakes;
 mod other_snakes;
-
-// pub struct BoxedParallelIterator<I: ParallelIterator>(I);
-
-pub trait ObjectSafeParallelIterator {
-    type Item;
-}
-
-impl<I: ParallelIterator> ObjectSafeParallelIterator for I {
-    type Item = I::Item;
-}
 
 pub trait Snakes {
     // fn nth(&self, n: usize) -> &Snake;
@@ -22,10 +11,6 @@ pub trait Snakes {
 
     fn iter(&self) -> Box<dyn Iterator<Item = &Snake> + '_>;
     // fn iter_mut<'a>(&'a mut self) -> Self::IterMut<'a>;
-
-    fn par_iter(&self) -> Box<dyn ObjectSafeParallelIterator<Item = &Snake> + '_>;
-
-    // fn par_iter_mut(&self) -> Box<dyn ParallelIterator<Item = &mut Snake>>;
 
     // fn iter_bodies(&self) -> Box<dyn Iterator<Item = &Body>> {
     //     Box::new(self.iter().map(|Snake { body, .. }| body))
@@ -61,9 +46,5 @@ pub trait Snakes {
 impl Snakes for &dyn Snakes {
     fn iter(&self) -> Box<dyn Iterator<Item = &Snake> + '_> {
         (*self).iter()
-    }
-
-    fn par_iter(&self) -> Box<dyn ObjectSafeParallelIterator<Item = &Snake> + '_> {
-        (*self).par_iter()
     }
 }

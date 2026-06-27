@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use enum_rotate::EnumRotate;
-use ggez::event::EventHandler;
-use ggez::graphics::{Canvas, DrawParam, Mesh};
-use ggez::input::keyboard::{KeyCode, KeyInput};
-use ggez::input::mouse;
-use ggez::Context;
+use crate::gfx::event::EventHandler;
+use crate::gfx::graphics::{Canvas, DrawParam, Mesh};
+use crate::gfx::input::keyboard::{KeyCode, KeyInput};
+use crate::gfx::input::mouse;
+use crate::gfx::Context;
 use rand::prelude::*;
 
 use crate::app::distance_grid::DistanceGrid;
@@ -85,25 +85,8 @@ impl Game {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
-                portals: vec![
-                    // Portal::cell(
-                    //     HexPoint { h: 4, v: 4},
-                    //     HexPoint { h: 20, v: 4},
-                    // ),
-                    // Portal::cell(
-                    //     HexPoint { h: 20, v: 4},
-                    //     HexPoint { h: 4, v: 4},
-                    // ),
-                    // Portal::cell(
-                    //     HexPoint { h: 20, v: 12},
-                    //     HexPoint { h: 4, v: 12},
-                    // ),
-                    // Portal::cell(
-                    //     HexPoint { h: 4, v: 12},
-                    //     HexPoint { h: 20, v: 12},
-                    // ),
-                    Portal::sun_cell(),
-                ],
+                // no portals in the minimal wasm build
+                portals: vec![],
                 gtx: GameContext::new(
                     // updated immediately after creation
                     HexPoint { h: 0, v: 0 },

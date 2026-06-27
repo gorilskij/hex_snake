@@ -1,7 +1,5 @@
-use rayon::prelude::*;
-
 use crate::snake::Snake;
-use crate::view::snakes::{ObjectSafeParallelIterator, Snakes};
+use crate::view::snakes::Snakes;
 
 #[derive(Copy, Clone)]
 pub struct OtherSnakes<'a>(&'a [Snake], &'a [Snake]);
@@ -47,10 +45,6 @@ impl<'a> OtherSnakes<'a> {
 impl Snakes for OtherSnakes<'_> {
     fn iter(&self) -> Box<dyn Iterator<Item = &Snake> + '_> {
         Box::new(self.0.iter().chain(self.1.iter()))
-    }
-
-    fn par_iter(&self) -> Box<dyn ObjectSafeParallelIterator<Item = &Snake> + '_> {
-        Box::new(self.0.par_iter().chain(self.1.par_iter()))
     }
 
     // fn nth(&self, n: usize) -> &Snake {

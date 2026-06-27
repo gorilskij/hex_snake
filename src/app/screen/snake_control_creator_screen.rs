@@ -1,7 +1,7 @@
-use ggez::event::EventHandler;
-use ggez::graphics::{Canvas, Color, DrawMode, DrawParam, Mesh, MeshBuilder};
-use ggez::input::keyboard::{KeyCode, KeyInput};
-use ggez::Context;
+use crate::gfx::event::EventHandler;
+use crate::gfx::graphics::{Canvas, Color, DrawMode, DrawParam, Mesh, MeshBuilder};
+use crate::gfx::input::keyboard::{KeyCode, KeyInput};
+use crate::gfx::Context;
 
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::Controls;

@@ -1,4 +1,4 @@
-use ggez::Context;
+use crate::gfx::Context;
 
 use crate::basic::{CellDim, HexDim, Point};
 

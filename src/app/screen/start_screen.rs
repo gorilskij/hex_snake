@@ -3,10 +3,10 @@ use std::f32::consts::TAU;
 use std::rc::Rc;
 use std::result;
 
-use ggez::event::EventHandler;
-use ggez::graphics::{Canvas, DrawParam, TextLayout};
-use ggez::input::keyboard::{KeyCode, KeyInput};
-use ggez::Context;
+use crate::gfx::event::EventHandler;
+use crate::gfx::graphics::{Canvas, DrawParam, TextLayout};
+use crate::gfx::input::keyboard::{KeyCode, KeyInput};
+use crate::gfx::Context;
 use rand::prelude::*;
 
 use super::Game;

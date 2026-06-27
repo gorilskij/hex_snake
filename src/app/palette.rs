@@ -1,4 +1,4 @@
-use ggez::graphics::Color;
+use crate::gfx::graphics::Color;
 
 use crate::snake;
 

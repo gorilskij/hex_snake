@@ -5,16 +5,21 @@ authors = ["gorilskij <43991400@users.noreply.github.com>"]
 edition = "2021"
 
 [dependencies]
-ggez = "0.9.3"
+macroquad = "0.4"
+lyon_geom = "~1.0"
+lyon_path = "1.0"
+lyon_tessellation = "1.0"
 rand = "0.8"
+# custom backend lets getrandom work on wasm32-unknown-unknown (where there is
+# no default backend) without pulling in wasm-bindgen, which would clash with
+# macroquad's own JS loader. On native, the OS backend is still used.
+getrandom = { version = "0.2", features = ["custom"] }
 itertools = "0.12"
 derive_more = "~0.99"
 num-integer = "~0.1"
 hsl = "0.1.1"
 lazy_static = "1.4.0"
 ezing = "~0.2"
-lyon_geom = "~1.0"
-rayon = "~1.10"
 static_assertions = "~1.1"
 enum-rotate = "0.1.0"
 num-traits = "0.2.18"

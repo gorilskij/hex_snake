@@ -1,4 +1,4 @@
-use ggez::graphics::{DrawMode, MeshBuilder};
+use crate::gfx::graphics::{DrawMode, MeshBuilder};
 
 use crate::error::{Error, ErrorConversion, Result};
 use crate::rendering;

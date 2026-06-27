@@ -1,8 +1,7 @@
 use std::cmp::Ordering;
 
-use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
-use ggez::Context;
-use rayon::prelude::*;
+use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use crate::gfx::Context;
 use static_assertions::assert_impl_all;
 
 use crate::app::fps_control::FpsContext;
@@ -188,7 +187,7 @@ pub fn snake_mesh(
         })
         .collect();
 
-    descs.par_sort_unstable_by(|(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
+    descs.sort_unstable_by(|(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
         Ordering::Equal => {
             if let SegmentType::BlackHole { .. } = desc1.segment_type {
                 Ordering::Greater

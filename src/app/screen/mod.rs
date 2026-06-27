@@ -1,11 +1,5 @@
-use std::ops::{Deref, DerefMut};
-
-pub use debug_scenario::DebugScenario;
 pub use game::Game;
-use ggez::event::EventHandler;
 use rand::rngs::ThreadRng;
-pub use snake_control_creator_screen::SnakeControlCreatorScreen;
-pub use start_screen::StartScreen;
 
 use crate::app::game_context::GameContext;
 use crate::app::portal::Portal;
@@ -16,44 +10,7 @@ use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
 
 mod board_dim;
-mod debug_scenario;
 mod game;
-mod snake_control_creator_screen;
-mod start_screen;
-
-#[allow(dead_code)]
-pub enum Screen {
-    DebugScenario(DebugScenario),
-    StartScreen(StartScreen),
-    SnakeControlCreator(SnakeControlCreatorScreen),
-    Game(Game),
-}
-
-impl Deref for Screen {
-    type Target = dyn EventHandler<Error>;
-
-    fn deref(&self) -> &Self::Target {
-        use Screen::*;
-        match self {
-            DebugScenario(x) => x,
-            StartScreen(x) => x,
-            SnakeControlCreator(x) => x,
-            Game(x) => x,
-        }
-    }
-}
-
-impl DerefMut for Screen {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        use Screen::*;
-        match self {
-            DebugScenario(x) => x,
-            StartScreen(x) => x,
-            SnakeControlCreator(x) => x,
-            Game(x) => x,
-        }
-    }
-}
 
 pub struct Environment<Rng = ThreadRng> {
     pub snakes: Vec<Snake>,
