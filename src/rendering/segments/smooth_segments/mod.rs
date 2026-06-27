@@ -209,13 +209,19 @@ fn render_default_straight_segment(
     }
 }
 
-fn render_default_curved_segment(
-    description: &SegmentDescription,
-    mut turn_fraction: f32,
-    subsegment_idx: usize,
-    fraction: SegmentFraction,
-    round_head: RoundHeadDescription,
-) -> Vec<Point> {
+/// Geometry of a curved segment in the default orientation: an annular sector
+/// around `pivot`, spanning `total_angle`, with the inner and outer edges of
+/// the band at `inner_radius` and `outer_radius` (always `side` apart).
+struct CurvedGeometry {
+    pivot: Point,
+    inner_radius: f32,
+    outer_radius: f32,
+    total_angle: f32,
+}
+
+/// Compute the curved geometry, or `None` if the turn is too gentle to be drawn
+/// as a curve (in which case the caller should fall back to straight drawing).
+fn curved_geometry(description: &SegmentDescription, mut turn_fraction: f32) -> Option<CurvedGeometry> {
     // a blunt turn is equivalent to half a sharp turn
     if let TurnType::Blunt(_) = description.turn.turn_type() {
         turn_fraction /= 2.;
@@ -223,15 +229,13 @@ fn render_default_curved_segment(
 
     let CellDim { side, sin, cos } = description.cell_dim;
 
-    let pivot = {
-        // distance of the pivot from where it is for a sharp turn
-        let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
-        // too straight to be drawn as curved, default to straight drawing
-        if pivot_dist.is_infinite() {
-            return render_default_straight_segment(description, subsegment_idx, fraction, round_head);
-        }
-        Point { x: side + cos + pivot_dist, y: 0. }
-    };
+    // distance of the pivot from where it is for a sharp turn
+    let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
+    // too straight to be drawn as curved
+    if pivot_dist.is_infinite() {
+        return None;
+    }
+    let pivot = Point { x: side + cos + pivot_dist, y: 0. };
 
     let inner_radius = pivot.x - side - cos;
     let outer_radius = pivot.x - cos;
@@ -259,6 +263,68 @@ fn render_default_curved_segment(
             TAU / 2. - (intersection_point.y / (intersection_point.x - pivot.x)).atan()
         }
     };
+
+    Some(CurvedGeometry { pivot, inner_radius, outer_radius, total_angle })
+}
+
+/// Render the rounded front cap for a curved head segment (default orientation).
+///
+/// The cap is the forward half of a circle of radius `hr = side / 2` centered on
+/// the band's centerline, pulled back from the leading edge (`f_tip`) by an arc
+/// length of `hr`. At that pullback angle the head circle's diameter lies on a
+/// radial line and is tangent to both the inner and outer arcs of the band, so
+/// the cap's flat side coincides exactly with the band cut at `f_c` (see
+/// `cap_cutoff_fraction`) and its tip reaches the center of the leading surface.
+fn render_curved_head_cap(geom: &CurvedGeometry, f_tip: f32, cell_dim: CellDim) -> Vec<Point> {
+    let hr = cell_dim.side / 2.;
+    let r_mid = (geom.inner_radius + geom.outer_radius) / 2.;
+    let d_theta = hr / r_mid;
+
+    // angle (around the pivot) of the leading edge, and of the pulled-back
+    // diameter line; fraction f maps to pivot angle `PI - f * total_angle`
+    let theta_tip = PI - f_tip * geom.total_angle;
+    let theta_c = theta_tip + d_theta;
+
+    let c = geom.pivot
+        + Point {
+            x: r_mid * theta_c.cos(),
+            y: r_mid * theta_c.sin(),
+        };
+
+    // forward semicircle: from the outer tangent point (angle theta_c around c),
+    // sweeping through the tip (theta_c - PI/2), to the inner tangent point
+    CleanArc {
+        center: c,
+        radius: hr,
+        start_angle: theta_c,
+        end_angle: theta_c - PI,
+    }
+    .flattened(TOLERANCE)
+    .collect()
+}
+
+/// The fraction at which the band should be cut to make room for the rounded
+/// cap, i.e. the radial line carrying the head circle's diameter.
+fn cap_cutoff_fraction(geom: &CurvedGeometry, f_tip: f32, cell_dim: CellDim) -> f32 {
+    let hr = cell_dim.side / 2.;
+    let r_mid = (geom.inner_radius + geom.outer_radius) / 2.;
+    let d_theta = hr / r_mid;
+    f_tip - d_theta / geom.total_angle
+}
+
+fn render_default_curved_segment(
+    description: &SegmentDescription,
+    turn_fraction: f32,
+    subsegment_idx: usize,
+    fraction: SegmentFraction,
+    round_head: RoundHeadDescription,
+) -> Vec<Point> {
+    let CurvedGeometry { pivot, inner_radius, outer_radius, total_angle } =
+        match curved_geometry(description, turn_fraction) {
+            Some(geom) => geom,
+            // too straight to be drawn as curved, default to straight drawing
+            None => return render_default_straight_segment(description, subsegment_idx, fraction, round_head),
+        };
 
     let start_radians = fraction.start * total_angle;
     let end_radians = fraction.end * total_angle;
@@ -302,6 +368,26 @@ fn render_default_curved_segment(
     points
 }
 
+/// Move a segment from the default orientation to its actual position: flip it
+/// for clockwise turns, rotate it to match `coming_from`, and translate it onto
+/// the destination cell.
+fn place_segment(mut segment: ShapePoints, description: &SegmentDescription) -> ShapePoints {
+    use TurnDirection::*;
+    use TurnType::*;
+
+    let center = description.cell_dim.center();
+    if let Blunt(Clockwise) | Sharp(Clockwise) = description.turn.turn_type() {
+        segment = segment.flip_horizontally(center.x);
+    }
+
+    let rotation_angle = Dir::U.clockwise_angle_to(description.turn.coming_from);
+    if rotation_angle != 0. {
+        segment = segment.rotate_clockwise(center, rotation_angle);
+    }
+
+    segment.translate(description.destination)
+}
+
 fn render_subsegment(
     description: &SegmentDescription,
     subsegment_idx: usize,
@@ -309,32 +395,17 @@ fn render_subsegment(
     fraction: SegmentFraction,
     round_head: RoundHeadDescription,
 ) -> Vec<Point> {
-    use TurnDirection::*;
     use TurnType::*;
 
-    let mut segment: ShapePoints;
-    match description.turn.turn_type() {
-        Straight => {
-            // TODO: convert segments to shapes
-            segment = render_default_straight_segment(description, subsegment_idx, fraction, round_head).into()
+    let segment: ShapePoints = match description.turn.turn_type() {
+        // TODO: convert segments to shapes
+        Straight => render_default_straight_segment(description, subsegment_idx, fraction, round_head).into(),
+        Blunt(_) | Sharp(_) => {
+            render_default_curved_segment(description, turn_fraction, subsegment_idx, fraction, round_head).into()
         }
-        Blunt(turn_direction) | Sharp(turn_direction) => {
-            segment =
-                render_default_curved_segment(description, turn_fraction, subsegment_idx, fraction, round_head).into();
-            if turn_direction == Clockwise {
-                segment = segment.flip_horizontally(description.cell_dim.center().x);
-            }
-        }
-    }
+    };
 
-    let rotation_angle = Dir::U.clockwise_angle_to(description.turn.coming_from);
-    if rotation_angle != 0. {
-        segment = segment.rotate_clockwise(description.cell_dim.center(), rotation_angle);
-    }
-
-    segment = segment.translate(description.destination);
-
-    segment.into()
+    place_segment(segment, description).into()
 }
 
 impl SegmentRenderer for SmoothSegments {
@@ -344,27 +415,53 @@ impl SegmentRenderer for SmoothSegments {
         round_head: RoundHeadDescription,
         color_resolution: usize,
     ) -> Box<dyn Iterator<Item = Polygon> + '_> {
-        let mut end = description.fraction.start;
+        // A turning head gets a rounded front: cut the band back to `cutoff` and
+        // cap it with the forward half of the head circle. The cap is tangent to
+        // the band edges at the cut, so the two meet seamlessly.
+        let curved_head = if description.segment_idx == 0
+            && !matches!(description.turn.turn_type(), TurnType::Straight)
+        {
+            curved_geometry(description, turn_fraction).map(|geom| {
+                let f_tip = description.fraction.end;
+                let cutoff = cap_cutoff_fraction(&geom, f_tip, description.cell_dim).max(description.fraction.start);
+                (geom, f_tip, cutoff)
+            })
+        } else {
+            None
+        };
 
-        // TODO: in general, this isn't pretty
-        Box::new(
-            description
-                .get_subsegments(color_resolution)
-                .map(move |subsegment| {
-                    let start = end;
-                    end = subsegment.end;
-                    (subsegment.subsegment_idx, start, end, subsegment.color)
-                })
-                .map(move |(subsegment_idx, start, end, color)| {
-                    let points = render_subsegment(
-                        description,
-                        subsegment_idx,
-                        turn_fraction,
-                        SegmentFraction { start, end },
-                        round_head,
-                    );
-                    Polygon { points, color }
-                }),
-        )
+        let mut polygons = vec![];
+        let mut end = description.fraction.start;
+        for subsegment in description.get_subsegments(color_resolution) {
+            let start = end;
+            end = subsegment.end;
+            let (mut start, mut end) = (start, end);
+
+            if let Some((geom, f_tip, cutoff)) = &curved_head {
+                // emit the cap once, sharing the frontmost subsegment's color
+                if subsegment.subsegment_idx == 0 {
+                    let cap = render_curved_head_cap(geom, *f_tip, description.cell_dim);
+                    let points = place_segment(cap.into(), description).into();
+                    polygons.push(Polygon { points, color: subsegment.color });
+                }
+                // keep the band behind the cap's diameter
+                start = start.min(*cutoff);
+                end = end.min(*cutoff);
+                if end <= start {
+                    continue;
+                }
+            }
+
+            let points = render_subsegment(
+                description,
+                subsegment.subsegment_idx,
+                turn_fraction,
+                SegmentFraction { start, end },
+                round_head,
+            );
+            polygons.push(Polygon { points, color: subsegment.color });
+        }
+
+        Box::new(polygons.into_iter())
     }
 }
