@@ -1,5 +1,5 @@
-use ggez::graphics::{Mesh, MeshBuilder};
-use ggez::Context;
+use crate::gfx::graphics::{Mesh, MeshBuilder};
+use crate::gfx::Context;
 
 use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};

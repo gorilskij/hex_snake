@@ -1,4 +1,4 @@
-use ggez::input::keyboard::KeyCode::{self, *};
+use crate::gfx::input::keyboard::KeyCode::{self, *};
 
 use crate::basic::Side;
 use crate::keyboard_layout::{Layout, LayoutConverter};

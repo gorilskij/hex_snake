@@ -1,0 +1,6 @@
+# macroquad/miniquad declare their JS-host functions (init_webgl, gl*, console_log,
+# …) as `extern "C"`. Recent rust-lld errors on these unless told to emit them as
+# wasm imports, which the macroquad JS bundle (mq_js_bundle.js) then satisfies at
+# instantiation. Only affects the wasm target; native builds are untouched.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--import-undefined"]

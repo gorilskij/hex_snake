@@ -1,0 +1,7 @@
+[toolchain]
+# The crate uses nightly-only features (see the `#![feature(...)]` attrs in
+# src/main.rs), so pin nightly. `targets` makes rustup auto-install the wasm
+# target on first build — important for the Cloudflare Pages builder, which
+# starts from a clean toolchain.
+channel = "nightly"
+targets = ["wasm32-unknown-unknown"]

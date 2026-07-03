@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 use std::mem;
 use std::mem::Discriminant;
 
-use ggez::Context;
+use crate::gfx::Context;
 pub use palette::{Palette, PaletteTemplate};
 
 use crate::app::fps_control::FpsContext;

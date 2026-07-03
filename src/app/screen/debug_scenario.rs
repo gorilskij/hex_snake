@@ -1,9 +1,9 @@
 use std::{iter, result};
 
-use ggez::event::EventHandler;
-use ggez::graphics::{Canvas, DrawParam};
-use ggez::input::keyboard::{KeyCode, KeyInput};
-use ggez::Context;
+use crate::gfx::event::EventHandler;
+use crate::gfx::graphics::{Canvas, DrawParam};
+use crate::gfx::input::keyboard::{KeyCode, KeyInput};
+use crate::gfx::Context;
 use rand::prelude::*;
 
 use crate::app::fps_control::{self, FpsControl};

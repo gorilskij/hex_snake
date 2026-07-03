@@ -1,8 +1,8 @@
 use std::f32::consts::PI;
 use std::iter;
 
-use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
-use ggez::Context;
+use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use crate::gfx::Context;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;

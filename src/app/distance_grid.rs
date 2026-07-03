@@ -2,8 +2,8 @@ use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 
-use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
-use ggez::Context;
+use crate::gfx::graphics::{DrawMode, Mesh, MeshBuilder};
+use crate::gfx::Context;
 use itertools::Itertools;
 
 use crate::app::fps_control::FpsContext;

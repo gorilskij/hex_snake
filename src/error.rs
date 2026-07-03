@@ -1,11 +1,10 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::{error, fmt, result};
 
-use ggez::GameError;
+use crate::gfx::GameError;
 use snake::builder::BuilderError as SnakeBuilderError;
 use static_assertions::assert_impl_all;
 
-use crate::button::ButtonDataBuilderError;
 use crate::snake;
 
 assert_impl_all!(GameError: error::Error);
@@ -15,7 +14,6 @@ assert_impl_all!(SnakeBuilderError: error::Error);
 pub enum ErrorType {
     GameError(GameError),
     SnakeBuilderError(SnakeBuilderError),
-    ButtonDataBuilderError(ButtonDataBuilderError),
 }
 
 /// The second member contains a trace in reverse order
@@ -31,12 +29,6 @@ impl From<GameError> for Error {
 impl From<SnakeBuilderError> for Error {
     fn from(e: SnakeBuilderError) -> Self {
         Self(ErrorType::SnakeBuilderError(e), vec![])
-    }
-}
-
-impl From<ButtonDataBuilderError> for Error {
-    fn from(e: ButtonDataBuilderError) -> Self {
-        Self(ErrorType::ButtonDataBuilderError(e), vec![])
     }
 }
 
@@ -68,7 +60,6 @@ impl error::Error for Error {
         match &self.0 {
             ErrorType::GameError(e) => Some(e),
             ErrorType::SnakeBuilderError(e) => Some(e),
-            ErrorType::ButtonDataBuilderError(e) => Some(e),
         }
     }
 }

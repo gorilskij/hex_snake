@@ -1,5 +1,5 @@
-use ggez::graphics::{Color, DrawMode, Mesh, MeshBuilder};
-use ggez::Context;
+use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use crate::gfx::Context;
 use hsl::HSL;
 
 use crate::app::fps_control::FpsContext;

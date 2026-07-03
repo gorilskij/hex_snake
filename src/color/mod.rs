@@ -1,6 +1,6 @@
 use std::ops::{Add, Deref, DerefMut, Div, Mul, Sub};
 
-use ggez::graphics;
+use crate::gfx::graphics;
 use rand::Rng;
 
 pub mod oklab;

@@ -1,4 +1,4 @@
-use ggez::graphics;
+use crate::gfx::graphics;
 use hsl::HSL;
 
 use crate::basic::HexPoint;
@@ -12,7 +12,7 @@ macro_rules! gray {
         gray!($lightness, 1.)
     };
     ($lightness:expr, $opacity:expr) => {
-        crate::color::Color(ggez::graphics::Color {
+        crate::color::Color(crate::gfx::graphics::Color {
             r: $lightness,
             g: $lightness,
             b: $lightness,

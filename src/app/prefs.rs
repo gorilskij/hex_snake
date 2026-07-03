@@ -36,8 +36,8 @@ pub struct Prefs {
 impl Default for Prefs {
     fn default() -> Self {
         Self {
-            draw_grid: DrawGrid::None,
-            draw_border: false,
+            draw_grid: DrawGrid::Grid,
+            draw_border: true,
             draw_distance_grid: false,
             draw_player_path: false,
 

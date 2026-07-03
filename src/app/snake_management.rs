@@ -1,7 +1,7 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
-use ggez::Context;
+use crate::gfx::Context;
 use rand::distributions::uniform::SampleRange;
 
 use crate::app::fps_control::FpsContext;

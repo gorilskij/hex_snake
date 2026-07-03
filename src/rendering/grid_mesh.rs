@@ -1,5 +1,5 @@
-use ggez::graphics::{DrawMode, Mesh, MeshBuilder};
-use ggez::Context;
+use crate::gfx::graphics::{DrawMode, Mesh, MeshBuilder};
+use crate::gfx::Context;
 use num_integer::Integer;
 
 use crate::app::game_context::GameContext;

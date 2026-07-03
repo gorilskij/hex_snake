@@ -1,5 +1,5 @@
-use ggez::input::keyboard::KeyCode;
-use ggez::Context;
+use crate::gfx::input::keyboard::KeyCode;
+use crate::gfx::Context;
 
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
