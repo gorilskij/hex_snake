@@ -1,17 +1,24 @@
-use std::cmp::Ordering;
-
 use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use crate::gfx::material::PaletteLut;
 use crate::gfx::Context;
-use static_assertions::assert_impl_all;
 
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
-use crate::error::{Error, ErrorConversion, Result};
+use crate::error::Result;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
-use crate::snake::palette::SegmentStyle;
+use crate::snake::palette::{build_snake_lut, SegmentStyle};
 use crate::snake::{Body, Segment, SegmentType, Snake};
 use crate::support::partial_min_max::partial_min;
+
+/// Drawable output for all snakes: one shaded mesh + palette LUT per snake, plus
+/// an optional plain (default-material) mesh for black-hole circles.
+pub struct SnakeRender {
+    /// One entry per snake: the segment mesh (with its LUT baked in as texture)
+    /// and the LUT itself (kept alive so the texture isn't freed).
+    pub shaded: Vec<(Mesh, PaletteLut)>,
+    pub black_holes: Option<Mesh>,
+}
 
 fn segment_description(
     segment: &Segment,
@@ -97,162 +104,80 @@ fn segment_description(
     }
 }
 
-// TODO: the draw order is actually more complicated
-//  heads of non-dying snakes that are going towards
-//  the black hole need to be drawn on top of it but
-//  those that are going away from the black hole need
-//  to be drawn below it (see debug scenario 3)
+/// Build the drawable meshes for every snake. Each snake becomes one polygon per
+/// segment (no color subdivision); color is applied per-pixel by the snake
+/// shader sampling that snake's palette LUT. Black-hole circles are collected
+/// separately and drawn on the default material.
 pub fn snake_mesh(
     snakes: &mut [Snake],
     gtx: &GameContext,
     ftx: &FpsContext,
     ctx: &Context,
     stats: &mut Stats,
-) -> Result<Mesh> {
+) -> Result<SnakeRender> {
     stats.redrawing_snakes = true;
 
     let frame_fraction = ftx.last_graphics_update.1;
 
-    // Desired total number of subsegments for the whole snake
-    // smaller snakes have higher resolution to show more detail
-    // (this is intended to work with rainbows)
-    const TOTAL_SUBSEGMENTS: usize = 1000;
-
-    // Bounds on the number of subsegments per segment to avoid
-    // very high numbers of polygons or empty segments
-    const MIN_SUBSEGMENTS: usize = 1;
-    const MAX_SUBSEGMENTS: usize = 20;
-
     // TODO (easy): factor out into palette
     let black_hole_color = Color::from_rgb(1, 36, 92);
 
-    // TODO (advanced): make resolution depend on color darkness
-    //  (it's easier to discern small differences in blues than in yellows)
-    // resolution = solid color subsegments per snake segment
-    let color_resolutions: Vec<_> = snakes
-        .iter()
-        .map(|snake| {
-            let resolution = (TOTAL_SUBSEGMENTS / snake.body.visible_len()).clamp(MIN_SUBSEGMENTS, MAX_SUBSEGMENTS);
+    let mut black_hole_builder = MeshBuilder::new();
+    let mut has_black_hole = false;
+    let mut shaded = Vec::with_capacity(snakes.len());
 
-            if resolution > stats.max_color_resolution {
-                stats.max_color_resolution = resolution;
-            }
+    for snake in snakes.iter_mut() {
+        let body = &snake.body;
+        let num_segments = body.segments.len();
 
-            resolution
-        })
-        .collect();
+        // Per-snake palette LUT (the whole-body gradient the shader samples).
+        let styles: Vec<SegmentStyle> = snake.palette.segment_styles(body, frame_fraction).collect();
+        let lut = PaletteLut::new(&build_snake_lut(&styles));
 
-    let mut builder = MeshBuilder::new();
+        // Per-segment descriptions (head → tail).
+        let mut prev_fraction = None;
+        let descs: Vec<SegmentDescription> = body
+            .segments
+            .iter()
+            .enumerate()
+            .zip(styles)
+            .map(|((segment_idx, segment), style)| {
+                let desc = segment_description(segment, segment_idx, body, prev_fraction, frame_fraction, style, gtx);
+                prev_fraction = Some(desc.fraction);
+                desc
+            })
+            .collect();
 
-    // The draw order priority list is:
-    //  - higher z-index
-    //  - black hole
-    //  - other
-
-    // needed for concurrency (par_iter, etc.)
-    assert_impl_all!(Snake: Send, Sync);
-
-    // let mut heads = Mutex::new(vec![]);
-
-    let mut descs: Vec<_> = snakes
-        // .par_iter_mut()
-        // .zip(styles.into_par_iter())
-        // .zip(color_resolutions.par_iter())
-        .iter_mut()
-        .zip(color_resolutions.iter())
-        .flat_map(|(snake, resolution)| {
-            let body = &snake.body;
-            let mut prev_fraction = None;
-            snake
-                .body
-                .segments
-                // .par_iter()
-                // .enumerate()
-                // .zip(style.into_par_iter())
-                .iter()
-                .enumerate()
-                .zip(snake.palette.segment_styles(body, frame_fraction))
-                .map(move |((segment_idx, segment), style)| {
-                    let desc =
-                        segment_description(segment, segment_idx, body, prev_fraction, frame_fraction, style, gtx);
-
-                    prev_fraction = Some(desc.fraction);
-
-                    // if segment_idx == 0 {
-                    //     heads.lock().unwrap().push(desc.clone());
-                    // }
-
-                    (desc, *resolution)
-                })
-        })
-        .collect();
-
-    descs.sort_unstable_by(|(desc1, _), (desc2, _)| match desc1.z_index.cmp(&desc2.z_index) {
-        Ordering::Equal => {
-            if let SegmentType::BlackHole { .. } = desc1.segment_type {
-                Ordering::Greater
-            } else if let SegmentType::BlackHole { .. } = desc2.segment_type {
-                Ordering::Less
-            } else {
-                Ordering::Equal
-            }
-        }
-        ordering => ordering,
-    });
-
-    // for desc in heads.into_inner().unwrap() {
-    //     let mut dest = desc.destination + gtx.cell_dim.center();
-    //
-    //     let mut delta = Point::zero();
-    //     if frame_fraction < 0.5 {
-    //         delta.y -= gtx.cell_dim.sin * ((0.5 - frame_fraction) / 0.5);
-    //     } else {
-    //         delta.y += gtx.cell_dim.sin * ((frame_fraction - 0.5) / 0.5);
-    //     }
-    //     rotate_clockwise(
-    //         slice::from_mut(&mut delta),
-    //         Point::zero(),
-    //         Dir::D.clockwise_angle_to(desc.turn.going_to),
-    //     );
-    //     translate(slice::from_mut(&mut dest), delta);
-    //
-    //     let color = match desc.segment_style {
-    //         SegmentStyle::Solid(c) => c,
-    //         SegmentStyle::RGBGradient { start_color: c, .. } => c,
-    //         SegmentStyle::HSLGradient { start_hue: h, lightness: l, .. } => {
-    //             HSL { h, s: 1.0, l }.to_color()
-    //         }
-    //         SegmentStyle::OkLabGradient { start_hue: h, lightness: l, .. } => {
-    //             OkLab::from_lch(l, 1.0, h).to_color()
-    //         }
-    //     };
-    //
-    //     builder.circle(DrawMode::fill(), dest, gtx.cell_dim.side / 2., 0.1, *color)?;
-    // }
-
-    descs
-        .into_iter()
-        .try_for_each(|(desc, resolution)| {
-            // TODO: animate black hole in
+        // Black-hole circles (default material), drawn separately.
+        for desc in &descs {
             if let SegmentType::BlackHole { .. } = desc.segment_type {
                 let destination = desc.destination + gtx.cell_dim.center();
                 let SegmentFraction { start, end } = desc.fraction;
                 let real_cell_dim = if (start - end).abs() < f32::EPSILON {
                     // snake has died, animate black hole out
-                    assert!(frame_fraction >= 0.5, "frame fraction ({frame_fraction}) < 0.5",);
                     let animation_fraction = frame_fraction - 0.5;
                     gtx.cell_dim * (1. - animation_fraction)
                 } else {
                     gtx.cell_dim
                 };
+                black_hole_builder.circle(DrawMode::fill(), destination, real_cell_dim.side, 0.1, black_hole_color)?;
+                has_black_hole = true;
                 stats.polygons += 1;
-                builder.circle(DrawMode::fill(), destination, real_cell_dim.side, 0.1, black_hole_color)?;
             }
+        }
 
-            stats.polygons += desc.build(&mut builder, resolution)?;
-            Ok::<_, Error>(())
-        })
-        .with_trace_step("snake_mesh")?;
+        // Shaded segments. Draw tail → head so the head paints on top.
+        let mut builder = MeshBuilder::new();
+        for desc in descs.iter().rev() {
+            desc.build_shaded(&mut builder, num_segments);
+            stats.polygons += 1;
+        }
+        let mut mesh = Mesh::from_data(ctx, builder.build());
+        mesh.set_texture(lut.texture());
+        shaded.push((mesh, lut));
+    }
 
-    Ok(Mesh::from_data(ctx, builder.build()))
+    let black_holes = has_black_hole.then(|| Mesh::from_data(ctx, black_hole_builder.build()));
+
+    Ok(SnakeRender { shaded, black_holes })
 }

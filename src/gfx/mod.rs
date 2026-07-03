@@ -15,6 +15,7 @@ use crate::basic::Point;
 pub mod event;
 pub mod graphics;
 pub mod input;
+pub mod material;
 pub mod time;
 
 /// Opaque rendering context. In ggez this carried the GPU device, window, etc.

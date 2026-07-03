@@ -228,6 +228,39 @@ impl SegmentStyle {
     }
 }
 
+/// Texels per segment in the whole-snake color LUT. The LUT is the
+/// concatenation of every segment's color ramp; since it is sampled with linear
+/// filtering, a handful of samples per segment already reads as smooth. Short
+/// snakes (few segments) get more per segment, so a wide hue sweep still has
+/// enough resolution — mirroring the old per-segment subsegment count.
+fn lut_texels_per_segment(num_segments: usize) -> usize {
+    (1000 / num_segments.max(1)).clamp(4, 32)
+}
+
+/// Build the whole-body color lookup table for a snake from its per-segment
+/// styles (head → tail). This replaces the old approach of drawing N flat
+/// subsegments per segment: instead, each segment's style is sampled into a
+/// shared 1-D texture that the snake shader reads per pixel.
+///
+/// Global body coordinate `g ∈ [0, num_segments]` runs head→tail; segment `i`
+/// owns `g ∈ [i, i+1]`. `SegmentStyle::color_at_fraction(f)` yields the head-side
+/// color at `f = 1` and the tail-side at `f = 0`, so at head→tail offset `t`
+/// within a segment we sample `color_at_fraction(1 - t)`. Geometry sets each
+/// vertex's `uv.x = g / num_segments`, so a partially-drawn head/tail segment
+/// automatically samples only the portion of its ramp it actually covers.
+pub fn build_snake_lut(styles: &[SegmentStyle]) -> Vec<graphics::Color> {
+    let per_seg = lut_texels_per_segment(styles.len());
+    let mut lut = Vec::with_capacity(styles.len() * per_seg);
+    for style in styles {
+        let color_at = style.color_at_fraction();
+        for k in 0..per_seg {
+            let t = (k as f64 + 0.5) / per_seg as f64; // head-side → tail-side
+            lut.push(graphics::Color::from(color_at(1.0 - t)));
+        }
+    }
+    lut
+}
+
 pub trait Palette: Send + Sync {
     fn segment_styles<'a>(
         &'a mut self,
