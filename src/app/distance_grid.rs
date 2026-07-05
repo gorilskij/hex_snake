@@ -8,7 +8,6 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::color::Color;
-use anyhow::Result;
 use crate::gfx::graphics::{build_polygon, DrawMode, Mesh};
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;
@@ -117,10 +116,10 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
 }
 
 fn generate_mesh(
-    mut iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
+    iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
     gtx: &GameContext,
     ftx: &FpsContext,
-) -> Result<Mesh> {
+) -> Mesh {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
     let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
@@ -157,7 +156,7 @@ fn generate_mesh(
         let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
         build_polygon(DrawMode::fill(), &hexagon, *color)
     });
-    Ok(Mesh::combine(parts))
+    Mesh::combine(parts)
 }
 
 pub struct DistanceGrid {
@@ -182,7 +181,7 @@ impl DistanceGrid {
         other_snakes: impl Snakes,
         gtx: &GameContext,
         ftx: &FpsContext,
-    ) -> Result<Mesh> {
+    ) -> Mesh {
         if self.current.is_none() || ftx.game_frame_num > self.last_update {
             self.last_update = ftx.game_frame_num;
             self.last = mem::replace(

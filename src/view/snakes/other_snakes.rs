@@ -14,7 +14,7 @@ impl<'a> OtherSnakes<'a> {
     //     Self(a, b)
     // }
 
-    pub fn split_snakes(snakes: &mut [Snake], idx: usize) -> (&mut Snake, OtherSnakes) {
+    pub fn split_snakes(snakes: &mut [Snake], idx: usize) -> (&mut Snake, OtherSnakes<'_>) {
         let (other_snakes1, rest) = snakes.split_at_mut(idx);
         let (snake, other_snakes2) = rest.split_first_mut().unwrap();
         (snake, OtherSnakes(other_snakes1, other_snakes2))

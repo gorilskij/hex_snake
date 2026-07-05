@@ -1,7 +1,5 @@
 #![feature(stmt_expr_attributes)]
-#![feature(try_blocks)]
 #![feature(exhaustive_patterns)]
-#![feature(if_let_guard)]
 #![deny(unused_must_use)]
 
 #[macro_use]

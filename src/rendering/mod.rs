@@ -5,7 +5,6 @@ pub use portal_mesh::portal_mesh;
 pub use snake_mesh::{snake_mesh, SnakeRender};
 
 mod apple_mesh;
-mod clean_arc;
 mod grid_mesh;
 mod player_path_mesh;
 mod portal_mesh;

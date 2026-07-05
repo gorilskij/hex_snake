@@ -22,9 +22,7 @@ fn segment_description(
     segment: &Segment,
     segment_idx: usize,
     body: &Body,
-    prev_fraction: Option<SegmentFraction>,
     frame_fraction: f32,
-    segment_style: SegmentStyle,
     gtx: &GameContext,
 ) -> SegmentDescription {
     let coming_from = segment.coming_from;
@@ -92,11 +90,9 @@ fn segment_description(
             going_to,
             fraction: turn_fraction,
         },
-        prev_fraction,
         fraction,
         draw_style: gtx.prefs.draw_style,
         segment_type: segment.segment_type,
-        segment_style,
         z_index: segment.z_index,
         cell_dim: gtx.cell_dim,
     }
@@ -128,17 +124,11 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, ftx: &FpsContext, sta
         let lut = PaletteLut::new(&lut_colors);
 
         // Per-segment descriptions (head → tail).
-        let mut prev_fraction = None;
         let descs: Vec<SegmentDescription> = body
             .segments
             .iter()
             .enumerate()
-            .zip(styles)
-            .map(|((segment_idx, segment), style)| {
-                let desc = segment_description(segment, segment_idx, body, prev_fraction, frame_fraction, style, gtx);
-                prev_fraction = Some(desc.fraction);
-                desc
-            })
+            .map(|(segment_idx, segment)| segment_description(segment, segment_idx, body, frame_fraction, gtx))
             .collect();
 
         // Black-hole circles (default material), drawn separately.
