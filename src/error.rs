@@ -1,7 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::{error, fmt, result};
 
-use crate::gfx::GameError;
 use snake::builder::BuilderError as SnakeBuilderError;
 use static_assertions::assert_impl_all;
 
@@ -12,23 +11,23 @@ assert_impl_all!(SnakeBuilderError: error::Error);
 
 #[derive(Debug)]
 pub enum ErrorType {
-    GameError(GameError),
     SnakeBuilderError(SnakeBuilderError),
+    MacroQuadError(macroquad::Error),
 }
 
 /// The second member contains a trace in reverse order
 #[must_use]
 pub struct Error(ErrorType, Vec<String>);
 
-impl From<GameError> for Error {
-    fn from(e: GameError) -> Self {
-        Self(ErrorType::GameError(e), vec![])
-    }
-}
-
 impl From<SnakeBuilderError> for Error {
     fn from(e: SnakeBuilderError) -> Self {
         Self(ErrorType::SnakeBuilderError(e), vec![])
+    }
+}
+
+impl From<macroquad::Error> for Error {
+    fn from(e: macroquad::Error) -> Self {
+        Self(ErrorType::MacroQuadError(e), vec![])
     }
 }
 

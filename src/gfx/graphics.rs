@@ -1,11 +1,13 @@
 //! Drawing primitives backed by macroquad + lyon tessellation.
 //!
-//! `MeshBuilder` accumulates polygons / lines / circles, tessellating each into
-//! triangles (ggez did this internally; macroquad needs pre-triangulated
-//! vertices). `Mesh::from_data` packs them into macroquad meshes, chunked to stay
-//! under the u16 vertex-index limit.
+//! Each `build_*` free function tessellates one shape (polygon / line / circle /
+//! shaded ribbon) into triangles and returns a self-contained [`Mesh`] (macroquad
+//! needs pre-triangulated vertices; ggez did this internally). [`Mesh::combine`]
+//! packs several such meshes into one, chunked to stay under macroquad's
+//! per-`draw_mesh` clamp.
 
 use std::f32::consts::TAU;
+use std::mem::take;
 
 use lyon_path::Path;
 use lyon_tessellation::{
@@ -21,7 +23,6 @@ use macroquad::texture::Texture2D;
 use macroquad::window::{screen_height, screen_width};
 
 use crate::basic::Point;
-use crate::gfx::GameResult;
 
 /// Drop-in replacement for `crate::gfx::graphics::Color` (named f32 fields so existing
 /// struct literals and field access keep working).
@@ -85,144 +86,113 @@ impl DrawMode {
     }
 }
 
-#[derive(Clone, Default)]
-struct Primitive {
-    vertices: Vec<Vertex>,
-    indices: Vec<u16>,
+/// Build a flat-colored polygon: `Fill` triangulates the interior, `Stroke(w)`
+/// outlines it with a closed stroke of width `w`.
+pub fn build_polygon(mode: DrawMode, points: &[Point], color: impl Into<Color>) -> Mesh {
+    let color = color.into().into();
+    let (vertices, indices) = match mode {
+        DrawMode::Fill => tessellate_fill(points, color),
+        DrawMode::Stroke(w) => tessellate_stroke(points, w, true, color),
+    };
+    Mesh::raw(vertices, indices)
 }
 
-#[derive(Default)]
-pub struct MeshBuilder {
-    primitives: Vec<Primitive>,
+/// Build a flat-colored circle, approximated as a regular polygon.
+pub fn build_circle(mode: DrawMode, center: Point, radius: f32, color: impl Into<Color>) -> Mesh {
+    build_polygon(mode, &circle_points(center, radius), color)
 }
 
-impl MeshBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn polygon(&mut self, mode: DrawMode, points: &[Point], color: impl Into<Color>) -> GameResult<&mut Self> {
-        let color = color.into().into();
-        let prim = match mode {
-            DrawMode::Fill => tessellate_fill(points, color),
-            DrawMode::Stroke(w) => tessellate_stroke(points, w, true, color),
-        };
-        self.primitives.push(prim);
-        Ok(self)
-    }
-
-    /// Add a filled polygon whose color comes from a shader (via a palette LUT)
-    /// rather than a flat vertex color. `default_points` are the polygon outline
-    /// in the segment's *default orientation*; `uv_of` maps each tessellated
-    /// vertex (still in default orientation) to its `(u, v)` texture coords, and
-    /// `transform` places the vertex on the board. Computing uv before the
-    /// transform keeps it in body space (rotation/translation invariant); the
-    /// vertex color is unused by the snake shader, so it is left white.
-    pub fn push_shaded_polygon<U, T>(&mut self, default_points: &[Point], uv_of: U, transform: T)
-    where
-        U: Fn(Point) -> (f32, f32),
-        T: Fn(Point) -> Point,
-    {
-        let (positions, indices) = tessellate_fill_positions(default_points);
-        if positions.is_empty() {
-            return;
-        }
-        let white = MqColor::new(1., 1., 1., 1.);
-        // seg_bounds (0,1) → the shader's clamp is a no-op (flat color per poly)
-        let vertices = positions
-            .into_iter()
-            .map(|p| {
-                let (u, v) = uv_of(p);
-                let tp = transform(p);
-                let mut vert = Vertex::new(tp.x, tp.y, 0., u, v, white);
-                vert.normal = vec4(0., 1., 0., 0.);
-                vert
-            })
-            .collect();
-        self.primitives.push(Primitive { vertices, indices });
-    }
-
-    /// Add a shaded triangle-strip ribbon. Each entry is a cross-section
-    /// `(inner, outer, frac)` in default orientation: `inner`/`outer` are the
-    /// two edge points and `frac` is the segment-local body fraction. `u_of`
-    /// maps `frac` to the global `uv.x`; `transform` places points on the board.
-    /// Adjacent cross-sections share vertices, so radial edges are single
-    /// constant-`frac` lines (seamless) — even when `inner` collapses to one
-    /// pivot point, which is then reused across cross-sections with distinct uv.
-    ///
-    /// `seg_bounds` is this segment's `(lo, hi)` uv range; it is passed to every
-    /// vertex (in `normal.xy`) so the shader can clamp the LUT lookup to it,
-    /// keeping color boundaries on the geometry seam instead of a texel.
-    pub fn push_shaded_ribbon<U, T>(
-        &mut self,
-        cross_sections: &[(Point, Point, f32)],
-        seg_bounds: (f32, f32),
-        u_of: U,
-        transform: T,
-    ) where
-        U: Fn(f32) -> f32,
-        T: Fn(Point) -> Point,
-    {
-        if cross_sections.len() < 2 {
-            return;
-        }
-        let white = MqColor::new(1., 1., 1., 1.);
-        let bounds = vec4(seg_bounds.0, seg_bounds.1, 0., 0.);
-        let mut vertices = Vec::with_capacity(cross_sections.len() * 2);
-        for &(inner, outer, frac) in cross_sections {
-            let u = u_of(frac);
-            let ti = transform(inner);
-            let to = transform(outer);
-            let mut vi = Vertex::new(ti.x, ti.y, 0., u, 0., white);
-            let mut vo = Vertex::new(to.x, to.y, 0., u, 1., white);
-            vi.normal = bounds;
-            vo.normal = bounds;
-            vertices.push(vi);
-            vertices.push(vo);
-        }
-        let mut indices = Vec::with_capacity((cross_sections.len() - 1) * 6);
-        for k in 0..cross_sections.len() - 1 {
-            let i = (k * 2) as u16;
-            // inner_k = i, outer_k = i+1, inner_{k+1} = i+2, outer_{k+1} = i+3
-            indices.extend_from_slice(&[i, i + 1, i + 3, i, i + 3, i + 2]);
-        }
-        self.primitives.push(Primitive { vertices, indices });
-    }
-
-    pub fn circle(
-        &mut self,
-        mode: DrawMode,
-        center: Point,
-        radius: f32,
-        _tolerance: f32,
-        color: impl Into<Color>,
-    ) -> GameResult<&mut Self> {
-        let pts = circle_points(center, radius);
-        self.polygon(mode, &pts, color)
-    }
-
-    pub fn line(&mut self, points: &[Point], width: f32, color: impl Into<Color>) -> GameResult<&mut Self> {
-        let color = color.into().into();
-        self.primitives.push(tessellate_stroke(points, width, false, color));
-        Ok(self)
-    }
-
-    pub fn polyline(&mut self, mode: DrawMode, points: &[Point], color: impl Into<Color>) -> GameResult<&mut Self> {
-        let width = match mode {
-            DrawMode::Stroke(w) => w,
-            DrawMode::Fill => 1.,
-        };
-        self.line(points, width, color)
-    }
-
-    pub fn build(&self) -> MeshData {
-        MeshData { primitives: self.primitives.clone() }
-    }
+/// Build a flat-colored open stroke (polyline) of width `width`.
+pub fn build_line(points: &[Point], width: f32, color: impl Into<Color>) -> Mesh {
+    let (vertices, indices) = tessellate_stroke(points, width, false, color.into().into());
+    Mesh::raw(vertices, indices)
 }
 
-/// Tessellated geometry, not yet uploaded.
-pub struct MeshData {
-    primitives: Vec<Primitive>,
+/// Build an open polyline; `Stroke(w)` sets the width, `Fill` falls back to 1px.
+pub fn build_polyline(mode: DrawMode, points: &[Point], color: impl Into<Color>) -> Mesh {
+    let width = match mode {
+        DrawMode::Stroke(w) => w,
+        DrawMode::Fill => 1.,
+    };
+    build_line(points, width, color)
+}
+
+/// Build a filled polygon whose color comes from a shader (via a palette LUT)
+/// rather than a flat vertex color. `default_points` are the polygon outline in
+/// the segment's *default orientation*; `uv_of` maps each tessellated vertex
+/// (still in default orientation) to its `(u, v)` texture coords, and
+/// `transform` places the vertex on the board. Computing uv before the transform
+/// keeps it in body space (rotation/translation invariant); the vertex color is
+/// unused by the snake shader, so it is left white.
+pub fn build_shaded_polygon<U, T>(default_points: &[Point], uv_of: U, transform: T) -> Mesh
+where
+    U: Fn(Point) -> (f32, f32),
+    T: Fn(Point) -> Point,
+{
+    let (positions, indices) = tessellate_fill_positions(default_points);
+    if positions.is_empty() {
+        return Mesh::empty();
+    }
+    let white = MqColor::new(1., 1., 1., 1.);
+    // seg_bounds (0,1) → the shader's clamp is a no-op (flat color per poly)
+    let vertices = positions
+        .into_iter()
+        .map(|p| {
+            let (u, v) = uv_of(p);
+            let tp = transform(p);
+            let mut vert = Vertex::new(tp.x, tp.y, 0., u, v, white);
+            vert.normal = vec4(0., 1., 0., 0.);
+            vert
+        })
+        .collect();
+    Mesh::raw(vertices, indices)
+}
+
+/// Build a shaded triangle-strip ribbon. Each entry is a cross-section
+/// `(inner, outer, frac)` in default orientation: `inner`/`outer` are the two
+/// edge points and `frac` is the segment-local body fraction. `u_of` maps `frac`
+/// to the global `uv.x`; `transform` places points on the board. Adjacent
+/// cross-sections share vertices, so radial edges are single constant-`frac`
+/// lines (seamless) — even when `inner` collapses to one pivot point, which is
+/// then reused across cross-sections with distinct uv.
+///
+/// `seg_bounds` is this segment's `(lo, hi)` uv range; it is passed to every
+/// vertex (in `normal.xy`) so the shader can clamp the LUT lookup to it, keeping
+/// color boundaries on the geometry seam instead of a texel.
+pub fn build_shaded_ribbon<U, T>(
+    cross_sections: &[(Point, Point, f32)],
+    seg_bounds: (f32, f32),
+    u_of: U,
+    transform: T,
+) -> Mesh
+where
+    U: Fn(f32) -> f32,
+    T: Fn(Point) -> Point,
+{
+    if cross_sections.len() < 2 {
+        return Mesh::empty();
+    }
+    let white = MqColor::new(1., 1., 1., 1.);
+    let bounds = vec4(seg_bounds.0, seg_bounds.1, 0., 0.);
+    let mut vertices = Vec::with_capacity(cross_sections.len() * 2);
+    for &(inner, outer, frac) in cross_sections {
+        let u = u_of(frac);
+        let ti = transform(inner);
+        let to = transform(outer);
+        let mut vi = Vertex::new(ti.x, ti.y, 0., u, 0., white);
+        let mut vo = Vertex::new(to.x, to.y, 0., u, 1., white);
+        vi.normal = bounds;
+        vo.normal = bounds;
+        vertices.push(vi);
+        vertices.push(vo);
+    }
+    let mut indices = Vec::with_capacity((cross_sections.len() - 1) * 6);
+    for k in 0..cross_sections.len() - 1 {
+        let i = (k * 2) as u16;
+        // inner_k = i, outer_k = i+1, inner_{k+1} = i+2, outer_{k+1} = i+3
+        indices.extend_from_slice(&[i, i + 1, i + 3, i, i + 3, i + 2]);
+    }
+    Mesh::raw(vertices, indices)
 }
 
 /// A drawable mesh, split into chunks that each stay under macroquad's
@@ -239,27 +209,49 @@ const MAX_VERTS: usize = 9000;
 const MAX_INDICES: usize = 4500;
 
 impl Mesh {
-    pub fn from_data(data: MeshData) -> Mesh {
+    /// A mesh that draws nothing.
+    pub fn empty() -> Mesh {
+        Mesh { meshes: vec![] }
+    }
+
+    /// Wrap one tessellated shape (a single chunk). A single shape never
+    /// approaches the per-draw clamp, so no splitting is needed here — that
+    /// happens in [`Mesh::combine`] when many shapes are packed together.
+    fn raw(vertices: Vec<Vertex>, indices: Vec<u16>) -> Mesh {
+        if vertices.is_empty() {
+            Mesh::empty()
+        } else {
+            Mesh { meshes: vec![MqMesh { vertices, indices, texture: None }] }
+        }
+    }
+
+    /// Pack several per-shape meshes into one, re-batching their chunks so each
+    /// stays under the per-`draw_mesh` clamp (rather than one draw call per
+    /// shape). Textures are dropped — apply one afterwards with [`set_texture`]
+    /// if needed (all callers build untextured shapes and texture the whole).
+    ///
+    /// [`set_texture`]: Mesh::set_texture
+    pub fn combine(parts: impl IntoIterator<Item = Mesh>) -> Mesh {
         let mut meshes = vec![];
         let mut vertices: Vec<Vertex> = vec![];
         let mut indices: Vec<u16> = vec![];
 
-        for prim in data.primitives {
-            if prim.vertices.is_empty() {
+        for chunk in parts.into_iter().flat_map(|m| m.meshes) {
+            if chunk.vertices.is_empty() {
                 continue;
             }
-            let over_verts = vertices.len() + prim.vertices.len() > MAX_VERTS;
-            let over_indices = indices.len() + prim.indices.len() > MAX_INDICES;
+            let over_verts = vertices.len() + chunk.vertices.len() > MAX_VERTS;
+            let over_indices = indices.len() + chunk.indices.len() > MAX_INDICES;
             if (over_verts || over_indices) && !vertices.is_empty() {
                 meshes.push(MqMesh {
-                    vertices: std::mem::take(&mut vertices),
-                    indices: std::mem::take(&mut indices),
+                    vertices: take(&mut vertices),
+                    indices: take(&mut indices),
                     texture: None,
                 });
             }
             let base = vertices.len() as u16;
-            vertices.extend(prim.vertices);
-            indices.extend(prim.indices.into_iter().map(|i| i + base));
+            vertices.extend(chunk.vertices);
+            indices.extend(chunk.indices.into_iter().map(|i| i + base));
         }
 
         if !vertices.is_empty() {
@@ -313,15 +305,6 @@ pub fn set_board_camera(dest: Point) {
     set_camera(&cam);
 }
 
-fn to_primitive(buffers: VertexBuffers<[f32; 2], u16>, color: MqColor) -> Primitive {
-    let vertices = buffers
-        .vertices
-        .iter()
-        .map(|[x, y]| Vertex::new(*x, *y, 0., 0., 0., color))
-        .collect();
-    Primitive { vertices, indices: buffers.indices }
-}
-
 /// Triangulate a filled polygon, returning the vertex positions and indices
 /// (no color/uv). Shared by the flat-color and shaded paths.
 fn tessellate_fill_positions(points: &[Point]) -> (Vec<Point>, Vec<u16>) {
@@ -350,18 +333,18 @@ fn tessellate_fill_positions(points: &[Point]) -> (Vec<Point>, Vec<u16>) {
     (positions, buffers.indices)
 }
 
-fn tessellate_fill(points: &[Point], color: MqColor) -> Primitive {
+fn tessellate_fill(points: &[Point], color: MqColor) -> (Vec<Vertex>, Vec<u16>) {
     let (positions, indices) = tessellate_fill_positions(points);
     let vertices = positions
         .into_iter()
         .map(|p| Vertex::new(p.x, p.y, 0., 0., 0., color))
         .collect();
-    Primitive { vertices, indices }
+    (vertices, indices)
 }
 
-fn tessellate_stroke(points: &[Point], width: f32, closed: bool, color: MqColor) -> Primitive {
+fn tessellate_stroke(points: &[Point], width: f32, closed: bool, color: MqColor) -> (Vec<Vertex>, Vec<u16>) {
     if points.len() < 2 {
-        return Primitive::default();
+        return (vec![], vec![]);
     }
     let mut pb = Path::builder();
     pb.begin(lyon_path::math::point(points[0].x, points[0].y));
@@ -386,7 +369,12 @@ fn tessellate_stroke(points: &[Point], width: f32, closed: bool, color: MqColor)
             [p.x, p.y]
         }),
     );
-    to_primitive(buffers, color)
+    let vertices = buffers
+        .vertices
+        .iter()
+        .map(|[x, y]| Vertex::new(*x, *y, 0., 0., 0., color))
+        .collect();
+    (vertices, buffers.indices)
 }
 
 fn circle_points(center: Point, radius: f32) -> Vec<Point> {

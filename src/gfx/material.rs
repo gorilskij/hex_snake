@@ -53,7 +53,7 @@ void main() {
     gl_FragColor = texture2D(Texture, vec2(u, 0.5));
 }"#;
 
-pub fn snake_material() -> GameResult<Material> {
+pub fn snake_material() -> Result<Material, macroquad::Error> {
     load_material(
         ShaderSource::Glsl { vertex: VERTEX, fragment: FRAGMENT },
         MaterialParams {
@@ -70,7 +70,6 @@ pub fn snake_material() -> GameResult<Material> {
             ..Default::default()
         },
     )
-    .map_err(|e| GameError(format!("failed to load snake material: {e:?}")))
 }
 
 /// A 1-D palette lookup texture: one row of RGBA texels, sampled by body

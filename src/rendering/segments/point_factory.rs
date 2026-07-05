@@ -1,21 +1,21 @@
 use crate::basic::{Dir, Point};
-use crate::gfx::graphics::MeshBuilder;
+use crate::gfx::graphics::{build_shaded_polygon, build_shaded_ribbon, Mesh};
 use crate::rendering;
 use crate::rendering::segments::descriptions::SegmentDescription;
 use crate::rendering::segments::hexagon_segments::hexagon_outline;
 use crate::rendering::segments::smooth_segments::segment_cross_sections;
 
 impl SegmentDescription {
-    /// Tessellate this segment into a single shaded polygon and add it to
-    /// `builder`. Each vertex carries `uv.x` = position along the whole body
-    /// (so the snake shader can sample the palette LUT) and `uv.y` = across
-    /// width. `num_segments` is the snake's segment count (normalizes the body
-    /// coordinate into `[0, 1]`); `lut_size` is the LUT texture width (used to
-    /// inset this segment's clamp bounds by half a texel).
+    /// Tessellate this segment into a single shaded [`Mesh`]. Each vertex carries
+    /// `uv.x` = position along the whole body (so the snake shader can sample the
+    /// palette LUT) and `uv.y` = across width. `num_segments` is the snake's
+    /// segment count (normalizes the body coordinate into `[0, 1]`); `lut_size`
+    /// is the LUT texture width (used to inset this segment's clamp bounds by
+    /// half a texel).
     ///
     /// Replaces the old subsegment approach: instead of many flat-colored
     /// slices, the segment is one polygon and color is per-pixel on the GPU.
-    pub fn build_shaded(&self, builder: &mut MeshBuilder, num_segments: usize, lut_size: usize) {
+    pub fn build_shaded(&self, num_segments: usize, lut_size: usize) -> Mesh {
         let seg_idx = self.segment_idx as f32;
         let num = num_segments.max(1) as f32;
         // half a texel, in uv units — the shader clamps to these bounds
@@ -26,7 +26,7 @@ impl SegmentDescription {
                 let points = hexagon_outline(self);
                 // one flat color per hexagon: sample the segment's midpoint
                 let u = (seg_idx + 0.5) / num;
-                builder.push_shaded_polygon(&points, move |_| (u, 0.5), |p| p);
+                build_shaded_polygon(&points, move |_| (u, 0.5), |p| p)
             }
             rendering::Style::Smooth => {
                 let (cross_sections, cw) = segment_cross_sections(self);
@@ -54,7 +54,7 @@ impl SegmentDescription {
                 // pass it inset by half a texel so the shader's clamp keeps
                 // linear filtering from bleeding into the neighbor segment.
                 let seg_bounds = (seg_idx / num + half_texel, (seg_idx + 1.0) / num - half_texel);
-                builder.push_shaded_ribbon(&cross_sections, seg_bounds, u_of, transform);
+                build_shaded_ribbon(&cross_sections, seg_bounds, u_of, transform)
             }
         }
     }

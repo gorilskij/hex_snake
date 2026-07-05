@@ -2,8 +2,8 @@ use num_integer::Integer;
 
 use crate::app::game_context::GameContext;
 use crate::basic::{CellDim, HexDim, Point};
-use crate::error::{Error, ErrorConversion, Result};
-use crate::gfx::graphics::{DrawMode, Mesh, MeshBuilder};
+use crate::error::Result;
+use crate::gfx::graphics::{build_circle, build_line, build_polyline, DrawMode, Mesh};
 
 // TODO: make this readable
 // TODO: add option to exclude border from grid mesh
@@ -25,66 +25,61 @@ pub fn grid_mesh(gtx: &GameContext) -> Result<Mesh> {
         vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
     }
 
-    let mut builder = MeshBuilder::new();
+    let mut parts: Vec<Mesh> = vec![];
 
     let draw_mode = DrawMode::stroke(gtx.palette.grid_thickness);
     let color = gtx.palette.grid_color;
 
-    let res = try {
-        for h in 0..(board_h + 1) / 2 {
-            if h == 0 {
-                builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
-            } else {
-                builder.polyline(draw_mode, &vline_a, color)?;
-            }
-            if board_h.is_odd() && h == (board_h + 1) / 2 - 1 {
-                builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
-            } else {
-                builder.polyline(draw_mode, &vline_b, color)?;
-            }
+    for h in 0..(board_h + 1) / 2 {
+        if h == 0 {
+            parts.push(build_polyline(draw_mode, &vline_a[..vline_a.len() - 1], color));
+        } else {
+            parts.push(build_polyline(draw_mode, &vline_a, color));
+        }
+        if board_h.is_odd() && h == (board_h + 1) / 2 - 1 {
+            parts.push(build_polyline(draw_mode, &vline_b[..vline_b.len() - 1], color));
+        } else {
+            parts.push(build_polyline(draw_mode, &vline_b, color));
+        }
 
-            let dh = h as f32 * 2. * (side + cos);
+        let dh = h as f32 * 2. * (side + cos);
 
-            for v in 0..=board_v {
-                let dv = v as f32 * 2. * sin;
+        for v in 0..=board_v {
+            let dv = v as f32 * 2. * sin;
 
-                // line between a and b
-                builder.line(
+            // line between a and b
+            parts.push(build_line(
+                #[rustfmt::skip] &[
+                    Point { x: cos + dh, y: dv },
+                    Point { x: cos + side + dh, y: dv },
+                ],
+                gtx.palette.grid_thickness,
+                color,
+            ));
+
+            // line between b and a
+            if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
+                parts.push(build_line(
                     #[rustfmt::skip] &[
-                        Point { x: cos + dh, y: dv },
-                        Point { x: cos + side + dh, y: dv },
+                        Point { x: 2. * cos + side + dh, y: sin + dv },
+                        Point { x: 2. * cos + 2. * side + dh, y: sin + dv },
                     ],
                     gtx.palette.grid_thickness,
                     color,
-                )?;
-
-                // line between b and a
-                if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
-                    builder.line(
-                        #[rustfmt::skip] &[
-                            Point { x: 2. * cos + side + dh, y: sin + dv },
-                            Point { x: 2. * cos + 2. * side + dh, y: sin + dv },
-                        ],
-                        gtx.palette.grid_thickness,
-                        color,
-                    )?;
-                }
+                ));
             }
-
-            // shift the lines right by 2 cells
-            let offset = 2. * (side + cos);
-            vline_a.iter_mut().for_each(|a| a.x += offset);
-            vline_b.iter_mut().for_each(|b| b.x += offset);
-        }
-        if board_h.is_even() {
-            builder.polyline(draw_mode, &vline_a[1..], color)?;
         }
 
-        builder.build()
-    };
-    res.map_err(Error::from)
-        .map(|mesh_data| Mesh::from_data(mesh_data))
-        .with_trace_step("grid_mesh")
+        // shift the lines right by 2 cells
+        let offset = 2. * (side + cos);
+        vline_a.iter_mut().for_each(|a| a.x += offset);
+        vline_b.iter_mut().for_each(|b| b.x += offset);
+    }
+    if board_h.is_even() {
+        parts.push(build_polyline(draw_mode, &vline_a[1..], color));
+    }
+
+    Ok(Mesh::combine(parts))
 }
 
 pub fn grid_dot_mesh(gtx: &GameContext) -> Result<Mesh> {
@@ -95,37 +90,32 @@ pub fn grid_dot_mesh(gtx: &GameContext) -> Result<Mesh> {
     let radius = gtx.palette.grid_dot_radius;
     let color = gtx.palette.grid_dot_color;
 
-    let mut builder = MeshBuilder::new();
-    let mut circle = |point| builder.circle(draw_mode, point, radius, 0.1, color).map(|_| {});
+    let mut parts: Vec<Mesh> = vec![];
+    let mut circle = |point| parts.push(build_circle(draw_mode, point, radius, color));
 
-    let res = try {
-        for h in 0..(board_h + 1) / 2 {
-            let dh = h as f32 * 2. * (side + cos);
+    for h in 0..(board_h + 1) / 2 {
+        let dh = h as f32 * 2. * (side + cos);
 
-            for v in 0..=board_v {
-                let dv = v as f32 * 2. * sin;
+        for v in 0..=board_v {
+            let dv = v as f32 * 2. * sin;
 
-                circle(Point { x: cos + dh, y: dv })?;
-                circle(Point { x: cos + side + dh, y: dv })?;
+            circle(Point { x: cos + dh, y: dv });
+            circle(Point { x: cos + side + dh, y: dv });
 
-                // line between b and a
-                if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
-                    circle(Point {
-                        x: 2. * cos + side + dh,
-                        y: sin + dv,
-                    })?;
-                    circle(Point {
-                        x: 2. * cos + 2. * side + dh,
-                        y: sin + dv,
-                    })?;
-                }
+            // line between b and a
+            if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
+                circle(Point {
+                    x: 2. * cos + side + dh,
+                    y: sin + dv,
+                });
+                circle(Point {
+                    x: 2. * cos + 2. * side + dh,
+                    y: sin + dv,
+                });
             }
         }
-        builder.build()
-    };
-    res.map_err(Error::from)
-        .map(|mesh_data| Mesh::from_data(mesh_data))
-        .with_trace_step("grid_dot_mesh")
+    }
+    Ok(Mesh::combine(parts))
 }
 
 pub fn border_mesh(gtx: &GameContext) -> Result<Mesh> {
@@ -145,57 +135,51 @@ pub fn border_mesh(gtx: &GameContext) -> Result<Mesh> {
         vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
     }
 
-    let mut builder = MeshBuilder::new();
+    let mut parts: Vec<Mesh> = vec![];
 
     let draw_mode = DrawMode::stroke(gtx.palette.border_thickness);
     let color = gtx.palette.border_color;
 
-    let res = try {
-        // left border
-        builder.polyline(draw_mode, &vline_a[..vline_a.len() - 1], color)?;
+    // left border
+    parts.push(build_polyline(draw_mode, &vline_a[..vline_a.len() - 1], color));
 
-        // right border
-        let single_offset = 2. * (side + cos);
-        if board_h.is_even() {
-            let offset = (board_h / 2) as f32 * single_offset;
-            vline_a.iter_mut().for_each(|a| a.x += offset);
-            builder.polyline(draw_mode, &vline_a[1..], color)?;
-        } else {
-            let offset = ((board_h - 1) / 2) as f32 * single_offset;
-            vline_b.iter_mut().for_each(|b| b.x += offset);
-            builder.polyline(draw_mode, &vline_b[..vline_b.len() - 1], color)?;
-        }
+    // right border
+    let single_offset = 2. * (side + cos);
+    if board_h.is_even() {
+        let offset = (board_h / 2) as f32 * single_offset;
+        vline_a.iter_mut().for_each(|a| a.x += offset);
+        parts.push(build_polyline(draw_mode, &vline_a[1..], color));
+    } else {
+        let offset = ((board_h - 1) / 2) as f32 * single_offset;
+        vline_b.iter_mut().for_each(|b| b.x += offset);
+        parts.push(build_polyline(draw_mode, &vline_b[..vline_b.len() - 1], color));
+    }
 
-        let mut hline = vec![];
-        for h in 0..board_h / 2 {
-            let dh = 2. * (side + cos) * h as f32;
-            hline.push(Point { x: dh + cos, y: 0. });
-            hline.push(Point { x: dh + side + cos, y: 0. });
-            hline.push(Point { x: dh + side + 2. * cos, y: sin });
-            hline.push(Point {
-                x: dh + 2. * side + 2. * cos,
-                y: sin,
-            });
-        }
-        if board_h.is_odd() {
-            let dh = 2. * (side + cos) * (board_h / 2) as f32;
-            hline.push(Point { x: dh + cos, y: 0. });
-            hline.push(Point { x: dh + side + cos, y: 0. });
-        }
+    let mut hline = vec![];
+    for h in 0..board_h / 2 {
+        let dh = 2. * (side + cos) * h as f32;
+        hline.push(Point { x: dh + cos, y: 0. });
+        hline.push(Point { x: dh + side + cos, y: 0. });
+        hline.push(Point { x: dh + side + 2. * cos, y: sin });
+        hline.push(Point {
+            x: dh + 2. * side + 2. * cos,
+            y: sin,
+        });
+    }
+    if board_h.is_odd() {
+        let dh = 2. * (side + cos) * (board_h / 2) as f32;
+        hline.push(Point { x: dh + cos, y: 0. });
+        hline.push(Point { x: dh + side + cos, y: 0. });
+    }
 
-        // top border
-        builder.polyline(draw_mode, &hline, color)?;
+    // top border
+    parts.push(build_polyline(draw_mode, &hline, color));
 
-        // bottom border
-        // shift hline
-        let offset = board_v as f32 * 2. * sin;
-        hline.iter_mut().for_each(|p| p.y += offset);
-        builder.polyline(draw_mode, &hline, color)?;
+    // bottom border
+    // shift hline
+    let offset = board_v as f32 * 2. * sin;
+    hline.iter_mut().for_each(|p| p.y += offset);
+    parts.push(build_polyline(draw_mode, &hline, color));
 
-        builder.build()
-    };
-
-    res.map_err(Error::from)
-        .map(|mesh_data| Mesh::from_data(mesh_data))
-        .with_trace_step("border_mesh")
+    Ok(Mesh::combine(parts))
 }

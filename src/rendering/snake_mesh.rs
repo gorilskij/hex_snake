@@ -2,7 +2,7 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::error::Result;
-use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use crate::gfx::graphics::{build_circle, Color, DrawMode, Mesh};
 use crate::gfx::material::PaletteLut;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
 use crate::snake::palette::{build_snake_lut, SegmentStyle};
@@ -114,8 +114,7 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, ftx: &FpsContext, sta
     // TODO (easy): factor out into palette
     let black_hole_color = Color::from_rgb(1, 36, 92);
 
-    let mut black_hole_builder = MeshBuilder::new();
-    let mut has_black_hole = false;
+    let mut black_hole_parts: Vec<Mesh> = vec![];
     let mut shaded = Vec::with_capacity(snakes.len());
 
     for snake in snakes.iter_mut() {
@@ -154,24 +153,22 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, ftx: &FpsContext, sta
                 } else {
                     gtx.cell_dim
                 };
-                black_hole_builder.circle(DrawMode::fill(), destination, real_cell_dim.side, 0.1, black_hole_color)?;
-                has_black_hole = true;
+                black_hole_parts.push(build_circle(DrawMode::fill(), destination, real_cell_dim.side, black_hole_color));
                 stats.polygons += 1;
             }
         }
 
         // Shaded segments. Draw tail → head so the head paints on top.
-        let mut builder = MeshBuilder::new();
-        for desc in descs.iter().rev() {
-            desc.build_shaded(&mut builder, num_segments, lut_size);
+        let segments = descs.iter().rev().map(|desc| {
             stats.polygons += 1;
-        }
-        let mut mesh = Mesh::from_data(builder.build());
+            desc.build_shaded(num_segments, lut_size)
+        });
+        let mut mesh = Mesh::combine(segments);
         mesh.set_texture(lut.texture());
         shaded.push((mesh, lut));
     }
 
-    let black_holes = has_black_hole.then(|| Mesh::from_data(black_hole_builder.build()));
+    let black_holes = (!black_hole_parts.is_empty()).then(|| Mesh::combine(black_hole_parts));
 
     Ok(SnakeRender { shaded, black_holes })
 }

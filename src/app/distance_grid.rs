@@ -9,7 +9,7 @@ use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::color::Color;
 use crate::error::Result;
-use crate::gfx::graphics::{DrawMode, Mesh, MeshBuilder};
+use crate::gfx::graphics::{build_polygon, DrawMode, Mesh};
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;
 use crate::view::snakes::Snakes;
@@ -125,8 +125,7 @@ fn generate_mesh(
     // higher gets the same color
     let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
 
-    let mut builder = MeshBuilder::new();
-    iter.try_for_each(|(pos, dist_a, dist_b)| {
+    let parts = iter.map(|(pos, dist_a, dist_b)| {
         const ALPHA: f32 = 0.3;
         const CLOSEST_COLOR: Color = Color::from_rgb(51, 204, 51).with_alpha(ALPHA);
         const MIDWAY_COLOR: Color = Color::from_rgb(255, 255, 0).with_alpha(ALPHA);
@@ -156,9 +155,9 @@ fn generate_mesh(
         let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
 
         let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
-        builder.polygon(DrawMode::fill(), &hexagon, *color).map(|_| ())
-    })?;
-    Ok(Mesh::from_data(builder.build()))
+        build_polygon(DrawMode::fill(), &hexagon, *color)
+    });
+    Ok(Mesh::combine(parts))
 }
 
 pub struct DistanceGrid {
