@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use enum_rotate::EnumRotate;
+use macroquad::input::{show_mouse, KeyCode};
 use macroquad::material::Material;
 use macroquad::window::clear_background;
 use rand::prelude::*;
@@ -24,8 +25,6 @@ use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::gfx::event::EventHandler;
 use crate::gfx::graphics::Mesh;
-use crate::gfx::input::keyboard::{KeyCode, KeyInput};
-use crate::gfx::input::mouse;
 use crate::gfx::material::snake_material;
 use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
@@ -512,15 +511,15 @@ impl EventHandler<Error> for Game {
     }
 
     fn mouse_motion_event(&mut self, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result {
-        mouse::set_cursor_hidden(false);
+        show_mouse(true);
         Ok(())
     }
 
-    fn key_down_event(&mut self, input: KeyInput, _repeated: bool) -> Result {
+    fn key_down_event(&mut self, keycode: KeyCode) -> Result {
         let prefs = &mut self.env.gtx.prefs;
 
         if prefs.hide_cursor {
-            mouse::set_cursor_hidden(true);
+            show_mouse(false);
         }
 
         use KeyCode::*;
@@ -528,170 +527,169 @@ impl EventHandler<Error> for Game {
         let numeric_keys = [Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9];
 
         // TODO: also tie these to a keymap (dvorak-centric for now)
-        if let Some(keycode) = input.keycode {
-            match keycode {
-                Space => {
-                    if let Boost::NoBoost = self.boost {
-                        let fps = self.fps_control.game_fps();
-                        self.boost = Boost::Boost { previous_fps: fps };
-                        self.fps_control.set_game_fps(2. * fps);
-                    }
+        match keycode {
+            Space => {
+                if let Boost::NoBoost = self.boost {
+                    let fps = self.fps_control.game_fps();
+                    self.boost = Boost::Boost { previous_fps: fps };
+                    self.fps_control.set_game_fps(2. * fps);
                 }
-                Escape => match self.fps_control.state() {
-                    fps_control::State::GameOver => {
-                        self.restart();
-                        self.fps_control.play();
-                    }
-                    fps_control::State::Playing => {
-                        self.fps_control.pause();
-                        self.draw_cache_invalid = 5;
-                    }
-                    fps_control::State::Paused => self.fps_control.play(),
-                },
-                B => {
-                    let text = match prefs.draw_border.flip() {
-                        true => "Border on",
-                        false => "Border off",
-                    };
-                    self.border_mesh = None;
-                    self.display_notification(text);
+            }
+            Escape => match self.fps_control.state() {
+                fps_control::State::GameOver => {
+                    self.restart();
+                    self.fps_control.play();
                 }
-                G => {
-                    let text = match prefs.draw_grid.rotate_next() {
-                        DrawGrid::Grid => "Grid",
-                        DrawGrid::Dots => "Dot grid",
-                        DrawGrid::None => "Grid off",
-                    };
-                    self.grid_mesh = None;
-                    self.display_notification(text);
+                fps_control::State::Playing => {
+                    self.fps_control.pause();
+                    self.draw_cache_invalid = 5;
                 }
-                D => {
-                    let text = if prefs.draw_distance_grid.flip() {
-                        "Distance grid on"
-                    } else {
-                        self.distance_grid_mesh = None;
-                        "Distance grid off"
-                    };
-                    self.display_notification(text);
+                fps_control::State::Paused => self.fps_control.play(),
+            },
+            B => {
+                let text = match prefs.draw_border.flip() {
+                    true => "Border on",
+                    false => "Border off",
+                };
+                self.border_mesh = None;
+                self.display_notification(text);
+            }
+            G => {
+                let text = match prefs.draw_grid.rotate_next() {
+                    DrawGrid::Grid => "Grid",
+                    DrawGrid::Dots => "Dot grid",
+                    DrawGrid::None => "Grid off",
+                };
+                self.grid_mesh = None;
+                self.display_notification(text);
+            }
+            D => {
+                let text = if prefs.draw_distance_grid.flip() {
+                    "Distance grid on"
+                } else {
+                    self.distance_grid_mesh = None;
+                    "Distance grid off"
+                };
+                self.display_notification(text);
+            }
+            P => {
+                let text = if prefs.draw_player_path.flip() {
+                    "Path on"
+                } else {
+                    self.player_path_mesh = None;
+                    "Path off"
+                };
+                self.display_notification(text);
+            }
+            F => {
+                if !prefs.display_fps.flip() {
+                    self.messages.remove(&MessageID::Fps);
+                    self.draw_cache_invalid = 5;
                 }
-                P => {
-                    let text = if prefs.draw_player_path.flip() {
-                        "Path on"
-                    } else {
-                        self.player_path_mesh = None;
-                        "Path off"
-                    };
-                    self.display_notification(text);
+            }
+            S => {
+                if !prefs.display_stats.flip() {
+                    self.messages.remove(&MessageID::Stats);
+                    self.draw_cache_invalid = 5;
                 }
-                F => {
-                    if !prefs.display_fps.flip() {
-                        self.messages.remove(&MessageID::Fps);
-                        self.draw_cache_invalid = 5;
-                    }
-                }
-                S => {
-                    if !prefs.display_stats.flip() {
-                        self.messages.remove(&MessageID::Stats);
-                        self.draw_cache_invalid = 5;
-                    }
-                }
-                A => {
-                    // only apply if there is exactly one player snake
-                    if self.seeds.len() == 1 {
-                        let player_snake = self
-                            .env
-                            .snakes
-                            .iter_mut()
-                            .find(|snake| snake.snake_type == snake::Type::Player)
-                            .unwrap();
+            }
+            A => {
+                // only apply if there is exactly one player snake
+                if self.seeds.len() == 1 {
+                    let player_snake = self
+                        .env
+                        .snakes
+                        .iter_mut()
+                        .find(|snake| snake.snake_type == snake::Type::Player)
+                        .unwrap();
 
-                        if player_snake.autopilot.is_some() {
-                            let text = if player_snake.autopilot_control.flip() {
-                                "Autopilot on"
-                            } else {
-                                player_snake.controller.reset(player_snake.body.dir);
-                                "Autopilot off"
-                            };
-                            self.display_notification(text);
+                    if player_snake.autopilot.is_some() {
+                        let text = if player_snake.autopilot_control.flip() {
+                            "Autopilot on"
                         } else {
-                            self.display_notification("Autopilot not available");
-                        }
+                            player_snake.controller.reset(player_snake.body.dir);
+                            "Autopilot off"
+                        };
+                        self.display_notification(text);
                     } else {
-                        self.display_notification(format!("Can't use autopilot with {} players", self.seeds.len()));
+                        self.display_notification("Autopilot not available");
+                    }
+                } else {
+                    self.display_notification(format!("Can't use autopilot with {} players", self.seeds.len()));
+                }
+            }
+            LeftBracket => {
+                let mut new_fps = match self.fps_control.game_fps() {
+                    f if f <= 0.1 => 0.05,
+                    // f if f <= 0.2 => 0.1,
+                    f if f <= 1. => f - 0.1,
+                    f if f <= 20. => f - 1.,
+                    f if f <= 50. => f - 5.,
+                    f if f <= 100. => f - 10.,
+                    f if f <= 500. => f - 50.,
+                    f if f <= 1000. => f - 100.,
+                    f if f <= 10_000. => f - 1000.,
+                    f => f - 10_000.,
+                };
+                new_fps = (new_fps * 100.).round() / 100.;
+
+                self.fps_control.set_game_fps(new_fps);
+                self.display_notification(format!("fps: {new_fps}"));
+            }
+            RightBracket => {
+                let mut new_fps = match self.fps_control.game_fps() {
+                    f if f <= 0.05 => 0.1,
+                    // f if f <= 0.1 => 0.2,
+                    f if f < 1. => f + 0.1,
+                    f if f < 20. => (f + 1.).floor(),
+                    f if f < 50. => f + 5.,
+                    f if f < 100. => f + 10.,
+                    f if f < 500. => f + 50.,
+                    f if f < 1000. => f + 100.,
+                    f if f < 10_000. => f + 1000.,
+                    f => f + 10_000.,
+                };
+                new_fps = (new_fps * 100.).round() / 100.;
+
+                self.fps_control.set_game_fps(new_fps);
+                self.display_notification(format!("fps: {new_fps}"));
+            }
+            Tab => {
+                let text;
+                match prefs.draw_style {
+                    rendering::Style::Hexagon => {
+                        prefs.draw_style = rendering::Style::Smooth;
+                        text = "draw style: smooth";
+                    }
+                    rendering::Style::Smooth => {
+                        prefs.draw_style = rendering::Style::Hexagon;
+                        text = "draw style: hexagon";
                     }
                 }
-                LBracket => {
-                    let mut new_fps = match self.fps_control.game_fps() {
-                        f if f <= 0.1 => 0.05,
-                        // f if f <= 0.2 => 0.1,
-                        f if f <= 1. => f - 0.1,
-                        f if f <= 20. => f - 1.,
-                        f if f <= 50. => f - 5.,
-                        f if f <= 100. => f - 10.,
-                        f if f <= 500. => f - 50.,
-                        f if f <= 1000. => f - 100.,
-                        f if f <= 10_000. => f - 1000.,
-                        f => f - 10_000.,
-                    };
-                    new_fps = (new_fps * 100.).round() / 100.;
-
-                    self.fps_control.set_game_fps(new_fps);
-                    self.display_notification(format!("fps: {new_fps}"));
-                }
-                RBracket => {
-                    let mut new_fps = match self.fps_control.game_fps() {
-                        f if f <= 0.05 => 0.1,
-                        // f if f <= 0.1 => 0.2,
-                        f if f < 1. => f + 0.1,
-                        f if f < 20. => (f + 1.).floor(),
-                        f if f < 50. => f + 5.,
-                        f if f < 100. => f + 10.,
-                        f if f < 500. => f + 50.,
-                        f if f < 1000. => f + 100.,
-                        f if f < 10_000. => f + 1000.,
-                        f => f + 10_000.,
-                    };
-                    new_fps = (new_fps * 100.).round() / 100.;
-
-                    self.fps_control.set_game_fps(new_fps);
-                    self.display_notification(format!("fps: {new_fps}"));
-                }
-                Tab => {
-                    let text;
-                    match prefs.draw_style {
-                        rendering::Style::Hexagon => {
-                            prefs.draw_style = rendering::Style::Smooth;
-                            text = "draw style: smooth";
-                        }
-                        rendering::Style::Smooth => {
-                            prefs.draw_style = rendering::Style::Hexagon;
-                            text = "draw style: hexagon";
-                        }
-                    }
-                    self.snake_render = None;
-                    self.apple_mesh = None;
-                    self.display_notification(text);
-                }
-                X => {
-                    let text = if prefs.special_apples.flip() {
-                        "Special apples enabled"
-                    } else {
-                        // replace special apples with normal apples
-                        let apple_food = prefs.apple_food;
-                        self.env.apples.iter_mut().for_each(|apple| {
-                            if !matches!(apple.apple_type, apple::Type::Food(_)) {
-                                *apple = Apple {
-                                    pos: apple.pos,
-                                    apple_type: apple::Type::Food(apple_food),
-                                }
+                self.snake_render = None;
+                self.apple_mesh = None;
+                self.display_notification(text);
+            }
+            X => {
+                let text = if prefs.special_apples.flip() {
+                    "Special apples enabled"
+                } else {
+                    // replace special apples with normal apples
+                    let apple_food = prefs.apple_food;
+                    self.env.apples.iter_mut().for_each(|apple| {
+                        if !matches!(apple.apple_type, apple::Type::Food(_)) {
+                            *apple = Apple {
+                                pos: apple.pos,
+                                apple_type: apple::Type::Food(apple_food),
                             }
-                        });
-                        self.apple_mesh = None;
-                        "Special apples disabled"
-                    };
-                    self.display_notification(text);
-                }
-                #[rustfmt::skip] // rustfmt doesn't know about let guards
+                        }
+                    });
+                    self.apple_mesh = None;
+                    "Special apples disabled"
+                };
+                self.display_notification(text);
+            }
+            #[rustfmt::skip] // rustfmt doesn't know about let guards
                 k if let Some(idx) = numeric_keys
                     .iter()
                     .position(|nk| *nk == k) =>
@@ -706,19 +704,18 @@ impl EventHandler<Error> for Game {
                         }
                         self.display_notification(format!("Apple food: {new_food}"));
                     }
-                k @ Down | k @ Up => {
-                    let factor = if k == Down { 0.9 } else { 1. / 0.9 };
-                    let mut new_side_length = self.env.gtx.cell_dim.side * factor;
-                    new_side_length = new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
-                    self.env.gtx.cell_dim = CellDim::from(new_side_length);
-                    self.update_dim();
-                    self.display_notification(format!("Cell side: {new_side_length}"));
-                }
-                k => {
-                    if self.fps_control.state() == fps_control::State::Playing {
-                        for snake in &mut self.env.snakes {
-                            snake.controller.key_pressed(k)
-                        }
+            k @ Down | k @ Up => {
+                let factor = if k == Down { 0.9 } else { 1. / 0.9 };
+                let mut new_side_length = self.env.gtx.cell_dim.side * factor;
+                new_side_length = new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
+                self.env.gtx.cell_dim = CellDim::from(new_side_length);
+                self.update_dim();
+                self.display_notification(format!("Cell side: {new_side_length}"));
+            }
+            k => {
+                if self.fps_control.state() == fps_control::State::Playing {
+                    for snake in &mut self.env.snakes {
+                        snake.controller.key_pressed(k)
                     }
                 }
             }
@@ -727,10 +724,10 @@ impl EventHandler<Error> for Game {
         Ok(())
     }
 
-    fn key_up_event(&mut self, input: KeyInput) -> Result {
+    fn key_up_event(&mut self, keycode: KeyCode) -> Result {
         use KeyCode::*;
 
-        if let Some(Space) = input.keycode {
+        if keycode == Space {
             if let Boost::Boost { previous_fps } = self.boost {
                 self.boost = Boost::NoBoost;
                 self.fps_control.set_game_fps(previous_fps);

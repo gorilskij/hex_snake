@@ -1,4 +1,5 @@
 use itertools::{repeat_n, Itertools};
+use macroquad::input::KeyCode;
 pub use programmed::Move;
 
 use crate::app::fps_control::FpsContext;
@@ -6,7 +7,6 @@ use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12, Side};
-use crate::gfx::input::keyboard::KeyCode;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::pathfinder::Path;

@@ -1,11 +1,12 @@
 use std::collections::VecDeque;
 
+use macroquad::input::KeyCode;
+
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::Controls;
 use crate::apple::Apple;
 use crate::basic::Dir;
-use crate::gfx::input::keyboard::KeyCode;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::Controller;

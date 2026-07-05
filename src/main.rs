@@ -18,7 +18,6 @@ use crate::app::screen::Game;
 use crate::app::Palette;
 use crate::basic::{CellDim, Side};
 use crate::gfx::event::EventHandler;
-use crate::gfx::input::keyboard::{KeyCode, KeyInput};
 use crate::keyboard_layout::Layout;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
 use crate::snake::SegmentType;
@@ -128,15 +127,11 @@ async fn main() {
             let _ = game.resize_event(size.0, size.1);
         }
 
-        for k in get_keys_pressed() {
-            if let Some(keycode) = KeyCode::from_macroquad(k) {
-                let _ = game.key_down_event(KeyInput { keycode: Some(keycode) }, false);
-            }
+        for key in get_keys_pressed() {
+            let _ = game.key_down_event(key);
         }
-        for k in get_keys_released() {
-            if let Some(keycode) = KeyCode::from_macroquad(k) {
-                let _ = game.key_up_event(KeyInput { keycode: Some(keycode) });
-            }
+        for key in get_keys_released() {
+            let _ = game.key_up_event(key);
         }
 
         let _ = game.update();

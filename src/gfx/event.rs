@@ -1,7 +1,7 @@
 //! Compat for `ggez::event::EventHandler`. Same method shapes (over our
 //! `Context`), with no-op defaults so a screen only implements what it needs.
 
-use crate::gfx::input::keyboard::KeyInput;
+use macroquad::input::KeyCode;
 
 #[allow(unused_variables)]
 pub trait EventHandler<E> {
@@ -9,11 +9,11 @@ pub trait EventHandler<E> {
 
     fn draw(&mut self) -> Result<(), E>;
 
-    fn key_down_event(&mut self, input: KeyInput, repeated: bool) -> Result<(), E> {
+    fn key_down_event(&mut self, keycode: KeyCode) -> Result<(), E> {
         Ok(())
     }
 
-    fn key_up_event(&mut self, input: KeyInput) -> Result<(), E> {
+    fn key_up_event(&mut self, keycode: KeyCode) -> Result<(), E> {
         Ok(())
     }
 

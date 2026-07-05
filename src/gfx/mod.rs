@@ -9,7 +9,6 @@ use std::fmt::{self, Display, Formatter};
 
 pub mod event;
 pub mod graphics;
-pub mod input;
 pub mod material;
 pub mod time;
 
