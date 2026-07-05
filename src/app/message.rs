@@ -5,7 +5,6 @@ use macroquad::text::{draw_text, measure_text};
 use macroquad::window::screen_width;
 
 use crate::color::Color;
-use crate::gfx::graphics::Canvas;
 use crate::gfx::time::Instant;
 
 /// Finite number of possible messages
@@ -61,7 +60,7 @@ pub struct MessageDrawable {
 }
 
 impl MessageDrawable {
-    pub fn draw(&self, _canvas: &mut Canvas) {
+    pub fn draw(&self) {
         // text lives in screen space, not the board-offset camera
         set_default_camera();
         let color = *self.color;

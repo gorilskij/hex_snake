@@ -10,8 +10,7 @@
 //! macOS defaults to OpenGL and the web target is WebGL, so a single GLSL-ES 100
 //! shader covers both — no Metal variant required.
 
-use macroquad::color::Color as MqColor;
-use macroquad::material::{gl_use_default_material, gl_use_material, load_material, Material, MaterialParams};
+use macroquad::material::{load_material, Material, MaterialParams};
 use macroquad::miniquad::{BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource};
 use macroquad::texture::{FilterMode, Texture2D};
 
@@ -54,43 +53,24 @@ void main() {
     gl_FragColor = texture2D(Texture, vec2(u, 0.5));
 }"#;
 
-/// The shader that colors snakes from a palette LUT. One instance is shared by
-/// every snake; each snake binds its own LUT (as the mesh's texture) per frame.
-pub struct SnakeMaterial {
-    material: Material,
-}
-
-impl SnakeMaterial {
-    pub fn new() -> GameResult<Self> {
-        let material = load_material(
-            ShaderSource::Glsl { vertex: VERTEX, fragment: FRAGMENT },
-            MaterialParams {
-                // Match the default alpha-over blending the standard mesh path
-                // uses, so semi-transparent segments composite the same way.
-                pipeline_params: PipelineParams {
-                    color_blend: Some(BlendState::new(
-                        Equation::Add,
-                        BlendFactor::Value(BlendValue::SourceAlpha),
-                        BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                    )),
-                    ..Default::default()
-                },
+pub fn snake_material() -> GameResult<Material> {
+    load_material(
+        ShaderSource::Glsl { vertex: VERTEX, fragment: FRAGMENT },
+        MaterialParams {
+            // Match the default alpha-over blending the standard mesh path
+            // uses, so semi-transparent segments composite the same way.
+            pipeline_params: PipelineParams {
+                color_blend: Some(BlendState::new(
+                    Equation::Add,
+                    BlendFactor::Value(BlendValue::SourceAlpha),
+                    BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+                )),
                 ..Default::default()
             },
-        )
-        .map_err(|e| GameError(format!("failed to load snake material: {e:?}")))?;
-        Ok(Self { material })
-    }
-
-    /// Route subsequent `draw_mesh` calls through this shader.
-    pub fn bind(&self) {
-        gl_use_material(&self.material);
-    }
-
-    /// Restore macroquad's default material.
-    pub fn unbind(&self) {
-        gl_use_default_material();
-    }
+            ..Default::default()
+        },
+    )
+    .map_err(|e| GameError(format!("failed to load snake material: {e:?}")))
 }
 
 /// A 1-D palette lookup texture: one row of RGBA texels, sampled by body

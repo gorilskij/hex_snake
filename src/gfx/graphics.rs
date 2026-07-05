@@ -12,15 +12,15 @@ use lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, LineCap, LineJoin, StrokeOptions, StrokeTessellator,
     StrokeVertex, VertexBuffers,
 };
-use macroquad::camera::{set_camera, set_default_camera, Camera2D};
+use macroquad::camera::{set_camera, Camera2D};
 use macroquad::color::Color as MqColor;
+use macroquad::material::{gl_use_default_material, gl_use_material, Material};
 use macroquad::math::{vec2, vec4};
 use macroquad::models::{draw_mesh, Mesh as MqMesh, Vertex};
 use macroquad::texture::Texture2D;
-use macroquad::window::{clear_background, screen_height, screen_width};
+use macroquad::window::{screen_height, screen_width};
 
 use crate::basic::Point;
-use crate::gfx::material::SnakeMaterial;
 use crate::gfx::GameResult;
 
 /// Drop-in replacement for `crate::gfx::graphics::Color` (named f32 fields so existing
@@ -276,66 +276,21 @@ impl Mesh {
             m.texture = Some(texture.clone());
         }
     }
-}
 
-#[derive(Copy, Clone)]
-pub struct DrawParam {
-    pub dest: Point,
-    pub color: Color,
-}
-
-#[allow(clippy::should_implement_trait)]
-impl DrawParam {
-    pub fn default() -> Self {
-        Self {
-            dest: Point::zero(),
-            color: Color::WHITE,
-        }
-    }
-
-    pub fn dest(mut self, dest: impl Into<Point>) -> Self {
-        self.dest = dest.into();
-        self
-    }
-
-    pub fn color(mut self, color: impl Into<Color>) -> Self {
-        self.color = color.into();
-        self
-    }
-}
-
-// TODO: nuke
-/// Mirrors `ggez::graphics::Canvas`. Drawing happens immediately under macroquad;
-/// this just clears the frame and sets the board-offset camera per draw.
-pub struct Canvas;
-
-impl Canvas {
-    pub fn from_frame(clear: impl Into<Color>) -> Canvas {
-        clear_background(clear.into().into());
-        Canvas
-    }
-
-    pub fn draw(&mut self, mesh: &Mesh, param: DrawParam) {
-        set_board_camera(param.dest);
-        for m in &mesh.meshes {
+    pub fn draw(&self, dest: Point) {
+        set_board_camera(dest);
+        for m in &self.meshes {
             draw_mesh(m);
         }
     }
 
-    /// Draw a mesh through the snake shader material. The mesh's chunks must
-    /// carry their palette LUT as their texture (see [`Mesh::set_texture`]).
-    pub fn draw_shaded(&mut self, mesh: &Mesh, material: &SnakeMaterial, param: DrawParam) {
-        set_board_camera(param.dest);
-        material.bind();
-        for m in &mesh.meshes {
+    pub fn draw_shaded(&self, dest: Point, material: &Material) {
+        set_board_camera(dest);
+        gl_use_material(material);
+        for m in &self.meshes {
             draw_mesh(m);
         }
-        material.unbind();
-    }
-
-    pub fn finish(&mut self) -> GameResult {
-        set_default_camera();
-        Ok(())
+        gl_use_default_material();
     }
 }
 

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
 use enum_rotate::EnumRotate;
+use macroquad::material::Material;
+use macroquad::window::clear_background;
 use rand::prelude::*;
 
 use crate::app::distance_grid::DistanceGrid;
@@ -21,10 +23,10 @@ use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
 use crate::gfx::event::EventHandler;
-use crate::gfx::graphics::{Canvas, DrawParam, Mesh};
+use crate::gfx::graphics::Mesh;
 use crate::gfx::input::keyboard::{KeyCode, KeyInput};
 use crate::gfx::input::mouse;
-use crate::gfx::material::SnakeMaterial;
+use crate::gfx::material::snake_material;
 use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
@@ -59,7 +61,7 @@ pub struct Game {
     snake_render: Option<rendering::SnakeRender>,
     /// Shader material for coloring snakes from their palette LUT. Compiled
     /// lazily on first draw (needs a live GL context).
-    snake_material: Option<SnakeMaterial>,
+    snake_material: Option<Material>,
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
@@ -464,7 +466,7 @@ impl EventHandler<Error> for Game {
 
         // Compile the snake shader lazily (GL context is live during draw).
         if self.snake_material.is_none() {
-            self.snake_material = Some(SnakeMaterial::new().map_err(Error::from)?);
+            self.snake_material = Some(snake_material()?);
         }
 
         let message_drawables = self.get_message_drawables();
@@ -481,33 +483,29 @@ impl EventHandler<Error> for Game {
         let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
-            let mut canvas = Canvas::from_frame(self.env.gtx.palette.background_color);
-
-            let draw_param = DrawParam::default().dest(self.offset);
+            clear_background(self.env.gtx.palette.background_color.into());
 
             for mesh in before_snake.into_iter().flatten() {
-                canvas.draw(mesh, draw_param);
+                mesh.draw(self.offset);
             }
 
             if let Some(render) = &self.snake_render {
                 let material = self.snake_material.as_ref().unwrap();
                 for (mesh, _lut) in &render.shaded {
-                    canvas.draw_shaded(mesh, material, draw_param);
+                    mesh.draw_shaded(self.offset, material);
                 }
                 if let Some(black_holes) = &render.black_holes {
-                    canvas.draw(black_holes, draw_param);
+                    black_holes.draw(self.offset);
                 }
             }
 
             for mesh in after_snake.into_iter().flatten() {
-                canvas.draw(mesh, draw_param);
+                mesh.draw(self.offset);
             }
 
             for drawable in message_drawables {
-                drawable.draw(&mut canvas);
+                drawable.draw();
             }
-
-            canvas.finish().map_err(Error::from).with_trace_step("Game::draw")?;
         }
 
         Ok(())
