@@ -1,7 +1,7 @@
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
-use crate::error::Result;
+use anyhow::Result;
 use crate::gfx::graphics::{build_circle, Color, DrawMode, Mesh};
 use crate::gfx::material::PaletteLut;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};

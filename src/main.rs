@@ -35,7 +35,6 @@ mod snake;
 mod view;
 #[macro_use]
 mod apple;
-mod error;
 mod rendering;
 pub mod snake_control;
 

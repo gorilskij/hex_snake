@@ -2,7 +2,7 @@ use num_integer::Integer;
 
 use crate::app::game_context::GameContext;
 use crate::basic::{CellDim, HexDim, Point};
-use crate::error::Result;
+use anyhow::Result;
 use crate::gfx::graphics::{build_circle, build_line, build_polyline, DrawMode, Mesh};
 
 // TODO: make this readable

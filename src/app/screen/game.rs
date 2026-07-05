@@ -22,7 +22,7 @@ use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::{self, Apple};
 use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
 use crate::color::Color;
-use crate::error::{Error, ErrorConversion, Result};
+use anyhow::{Context, Result};
 use crate::gfx::event::EventHandler;
 use crate::gfx::graphics::Mesh;
 use crate::gfx::material::snake_material;
@@ -243,7 +243,7 @@ impl Game {
         self.spawn_apples();
     }
 
-    fn advance_snakes(&mut self) -> Result {
+    fn advance_snakes(&mut self) -> Result<()> {
         let env = &mut self.env;
 
         advance_snakes(env, self.fps_control.context());
@@ -277,9 +277,7 @@ impl Game {
             self.fps_control.game_over()
         }
 
-        spawn_snakes(&mut self.env, seeds)
-            .map_err(Error::from)
-            .with_trace_step("Game::advance_snakes")
+        spawn_snakes(&mut self.env, seeds).context("Game::advance_snakes")
     }
 }
 
@@ -371,17 +369,17 @@ impl Game {
     }
 }
 
-impl EventHandler<Error> for Game {
-    fn update(&mut self) -> Result {
+impl EventHandler<anyhow::Error> for Game {
+    fn update(&mut self) -> Result<()> {
         while self.fps_control.can_update() {
-            self.advance_snakes().with_trace_step("Game::update")?;
+            self.advance_snakes().context("Game::update")?;
             self.spawn_apples();
         }
 
         Ok(())
     }
 
-    fn draw(&mut self) -> Result {
+    fn draw(&mut self) -> Result<()> {
         self.fps_control.graphics_frame();
 
         if self.env.gtx.prefs.display_fps {
@@ -510,12 +508,12 @@ impl EventHandler<Error> for Game {
         Ok(())
     }
 
-    fn mouse_motion_event(&mut self, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result {
+    fn mouse_motion_event(&mut self, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result<()> {
         show_mouse(true);
         Ok(())
     }
 
-    fn key_down_event(&mut self, keycode: KeyCode) -> Result {
+    fn key_down_event(&mut self, keycode: KeyCode) -> Result<()> {
         let prefs = &mut self.env.gtx.prefs;
 
         if prefs.hide_cursor {
@@ -724,7 +722,7 @@ impl EventHandler<Error> for Game {
         Ok(())
     }
 
-    fn key_up_event(&mut self, keycode: KeyCode) -> Result {
+    fn key_up_event(&mut self, keycode: KeyCode) -> Result<()> {
         use KeyCode::*;
 
         if keycode == Space {
@@ -738,7 +736,7 @@ impl EventHandler<Error> for Game {
     }
 
     // TODO: forbid resizing in-game
-    fn resize_event(&mut self, _width: f32, _height: f32) -> Result {
+    fn resize_event(&mut self, _width: f32, _height: f32) -> Result<()> {
         self.update_dim();
         let HexDim { h, v } = self.env.gtx.board_dim;
         self.display_notification(format!("{h}x{v}"));

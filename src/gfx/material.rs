@@ -14,8 +14,9 @@ use macroquad::material::{load_material, Material, MaterialParams};
 use macroquad::miniquad::{BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource};
 use macroquad::texture::{FilterMode, Texture2D};
 
+use anyhow::{Context, Result};
+
 use crate::gfx::graphics::Color;
-use crate::gfx::{GameError, GameResult};
 
 const VERTEX: &str = r#"#version 100
 precision highp float;
@@ -53,7 +54,7 @@ void main() {
     gl_FragColor = texture2D(Texture, vec2(u, 0.5));
 }"#;
 
-pub fn snake_material() -> Result<Material, macroquad::Error> {
+pub fn snake_material() -> Result<Material> {
     load_material(
         ShaderSource::Glsl { vertex: VERTEX, fragment: FRAGMENT },
         MaterialParams {
@@ -70,6 +71,7 @@ pub fn snake_material() -> Result<Material, macroquad::Error> {
             ..Default::default()
         },
     )
+    .context("compiling snake shader")
 }
 
 /// A 1-D palette lookup texture: one row of RGBA texels, sampled by body

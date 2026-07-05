@@ -8,7 +8,7 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::color::Color;
-use crate::error::Result;
+use anyhow::Result;
 use crate::gfx::graphics::{build_polygon, DrawMode, Mesh};
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;

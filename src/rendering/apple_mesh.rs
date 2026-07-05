@@ -4,7 +4,7 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
-use crate::error::Result;
+use anyhow::Result;
 use crate::gfx::graphics::{build_circle, build_polygon, Color, DrawMode, Mesh};
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape};

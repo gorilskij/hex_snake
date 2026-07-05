@@ -3,7 +3,7 @@ use crate::app::portal::{Behavior, Portal};
 use crate::app::stats::Stats;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::color::Color;
-use crate::error::Result;
+use anyhow::Result;
 use crate::gfx::graphics::{build_line, Mesh};
 use crate::rendering::shape::ShapePoints;
 

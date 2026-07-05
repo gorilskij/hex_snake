@@ -8,7 +8,7 @@ use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::{Dir, HexPoint};
-use crate::error::{Error, ErrorConversion, Result};
+use anyhow::{Context, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, SegmentType, State};
@@ -208,7 +208,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
     (spawn_snakes, game_over)
 }
 
-pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) -> Result {
+pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) -> Result<()> {
     let board_dim = env.gtx.board_dim;
 
     for mut snake_builder in snake_builders {
@@ -251,9 +251,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
             .len
             .get_or_insert_with(|| (7..15).sample_single(&mut env.rng));
 
-        env.add_snake(&snake_builder)
-            .map_err(Error::from)
-            .with_trace_step("spawn_snakes")?;
+        env.add_snake(&snake_builder).context("spawn_snakes")?;
     }
 
     Ok(())
