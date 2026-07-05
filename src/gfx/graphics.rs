@@ -9,8 +9,8 @@ use std::f32::consts::TAU;
 
 use lyon_path::Path;
 use lyon_tessellation::{
-    BuffersBuilder, FillOptions, FillTessellator, FillVertex, LineCap, LineJoin, StrokeOptions,
-    StrokeTessellator, StrokeVertex, VertexBuffers,
+    BuffersBuilder, FillOptions, FillTessellator, FillVertex, LineCap, LineJoin, StrokeOptions, StrokeTessellator,
+    StrokeVertex, VertexBuffers,
 };
 use macroquad::camera::{set_camera, set_default_camera, Camera2D};
 use macroquad::color::Color as MqColor;
@@ -21,7 +21,7 @@ use macroquad::window::{clear_background, screen_height, screen_width};
 
 use crate::basic::Point;
 use crate::gfx::material::SnakeMaterial;
-use crate::gfx::{Context, GameResult};
+use crate::gfx::GameResult;
 
 /// Drop-in replacement for `crate::gfx::graphics::Color` (named f32 fields so existing
 /// struct literals and field access keep working).
@@ -101,12 +101,7 @@ impl MeshBuilder {
         Self::default()
     }
 
-    pub fn polygon(
-        &mut self,
-        mode: DrawMode,
-        points: &[Point],
-        color: impl Into<Color>,
-    ) -> GameResult<&mut Self> {
+    pub fn polygon(&mut self, mode: DrawMode, points: &[Point], color: impl Into<Color>) -> GameResult<&mut Self> {
         let color = color.into().into();
         let prim = match mode {
             DrawMode::Fill => tessellate_fill(points, color),
@@ -212,12 +207,7 @@ impl MeshBuilder {
         Ok(self)
     }
 
-    pub fn polyline(
-        &mut self,
-        mode: DrawMode,
-        points: &[Point],
-        color: impl Into<Color>,
-    ) -> GameResult<&mut Self> {
+    pub fn polyline(&mut self, mode: DrawMode, points: &[Point], color: impl Into<Color>) -> GameResult<&mut Self> {
         let width = match mode {
             DrawMode::Stroke(w) => w,
             DrawMode::Fill => 1.,
@@ -249,7 +239,7 @@ const MAX_VERTS: usize = 9000;
 const MAX_INDICES: usize = 4500;
 
 impl Mesh {
-    pub fn from_data(_ctx: &Context, data: MeshData) -> Mesh {
+    pub fn from_data(data: MeshData) -> Mesh {
         let mut meshes = vec![];
         let mut vertices: Vec<Vertex> = vec![];
         let mut indices: Vec<u16> = vec![];
@@ -314,12 +304,13 @@ impl DrawParam {
     }
 }
 
+// TODO: nuke
 /// Mirrors `ggez::graphics::Canvas`. Drawing happens immediately under macroquad;
 /// this just clears the frame and sets the board-offset camera per draw.
 pub struct Canvas;
 
 impl Canvas {
-    pub fn from_frame(_ctx: &mut Context, clear: impl Into<Color>) -> Canvas {
+    pub fn from_frame(clear: impl Into<Color>) -> Canvas {
         clear_background(clear.into().into());
         Canvas
     }
@@ -342,7 +333,7 @@ impl Canvas {
         material.unbind();
     }
 
-    pub fn finish(&mut self, _ctx: &mut Context) -> GameResult {
+    pub fn finish(&mut self) -> GameResult {
         set_default_camera();
         Ok(())
     }

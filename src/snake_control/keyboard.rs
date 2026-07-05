@@ -1,13 +1,11 @@
 use std::collections::VecDeque;
 
-use crate::gfx::input::keyboard::KeyCode;
-use crate::gfx::Context;
-
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::Controls;
 use crate::apple::Apple;
 use crate::basic::Dir;
+use crate::gfx::input::keyboard::KeyCode;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::Controller;
@@ -57,7 +55,6 @@ impl Controller for Keyboard {
         _: &[Apple],
         _: &GameContext,
         ftx: &FpsContext,
-        _: &Context,
     ) -> Option<Dir> {
         if self.deferred || ftx.last_graphics_update.1 < Self::LAST_ACTIONABLE_THRESHOLD {
             self.deferred = false;

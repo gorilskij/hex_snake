@@ -1,7 +1,6 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
-use crate::gfx::Context;
 use rand::distributions::uniform::SampleRange;
 
 use crate::app::fps_control::FpsContext;
@@ -262,7 +261,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
 
 /// Returns the indices of snakes to be deleted (in reverse order so they
 /// can be deleted straight away)
-pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext, ctx: &Context) {
+pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext) {
     let snakes = &mut env.snakes;
 
     let mut remove_snakes = vec![];
@@ -282,7 +281,7 @@ pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext, ctx: &Context) {
         let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
 
         // advance the snake
-        snake.advance(other_snakes, &env.apples, &env.portals, &env.gtx, ftx, ctx);
+        snake.advance(other_snakes, &env.apples, &env.portals, &env.gtx, ftx);
 
         // remove snake if it ran out of body
         if snake.body.visible_len() == 0 {

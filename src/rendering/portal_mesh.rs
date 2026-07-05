@@ -1,12 +1,10 @@
-use crate::gfx::graphics::{Mesh, MeshBuilder};
-use crate::gfx::Context;
-
 use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};
 use crate::app::stats::Stats;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{ErrorConversion, Result};
+use crate::gfx::graphics::{Mesh, MeshBuilder};
 use crate::rendering::shape::ShapePoints;
 
 pub fn render_hexagon_edge(dir: Dir, CellDim { side, sin, cos }: CellDim) -> ShapePoints {
@@ -61,7 +59,7 @@ fn behavior_color(behavior: Behavior) -> Color {
 }
 
 // TODO: update stats
-pub fn portal_mesh(portals: &mut [Portal], gtx: &GameContext, ctx: &Context, stats: &mut Stats) -> Result<Mesh> {
+pub fn portal_mesh(portals: &mut [Portal], gtx: &GameContext, stats: &mut Stats) -> Result<Mesh> {
     let builder = &mut MeshBuilder::new();
 
     let res: Result<_> = try {
@@ -75,7 +73,7 @@ pub fn portal_mesh(portals: &mut [Portal], gtx: &GameContext, ctx: &Context, sta
             }
         }
 
-        Mesh::from_data(ctx, builder.build())
+        Mesh::from_data(builder.build())
     };
 
     res.with_trace_step("apple_mesh")

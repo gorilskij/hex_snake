@@ -2,8 +2,6 @@ use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 
-use crate::gfx::graphics::{DrawMode, Mesh, MeshBuilder};
-use crate::gfx::Context;
 use itertools::Itertools;
 
 use crate::app::fps_control::FpsContext;
@@ -11,6 +9,7 @@ use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::color::Color;
 use crate::error::Result;
+use crate::gfx::graphics::{DrawMode, Mesh, MeshBuilder};
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;
 use crate::view::snakes::Snakes;
@@ -121,7 +120,6 @@ fn generate_mesh(
     mut iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
     gtx: &GameContext,
     ftx: &FpsContext,
-    ctx: &Context,
 ) -> Result<Mesh> {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
@@ -160,7 +158,7 @@ fn generate_mesh(
         let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
         builder.polygon(DrawMode::fill(), &hexagon, *color).map(|_| ())
     })?;
-    Ok(Mesh::from_data(ctx, builder.build()))
+    Ok(Mesh::from_data(builder.build()))
 }
 
 pub struct DistanceGrid {
@@ -183,7 +181,6 @@ impl DistanceGrid {
         &mut self,
         player_snake: &Snake,
         other_snakes: impl Snakes,
-        ctx: &Context,
         gtx: &GameContext,
         ftx: &FpsContext,
     ) -> Result<Mesh> {
@@ -200,12 +197,7 @@ impl DistanceGrid {
             Some(current) => match &self.last {
                 None => {
                     // TODO: this is a terrible hack, rewrite this
-                    generate_mesh(
-                        current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))),
-                        gtx,
-                        ftx,
-                        ctx,
-                    )
+                    generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), gtx, ftx)
                 }
                 Some(last) => {
                     // let frame_frac = gtx.frame_stamp.1;
@@ -213,7 +205,7 @@ impl DistanceGrid {
                         let dist_b = current.get(pos).copied();
                         (*pos, dist_a, dist_b)
                     });
-                    generate_mesh(iter, gtx, ftx, ctx)
+                    generate_mesh(iter, gtx, ftx)
                 }
             },
         }

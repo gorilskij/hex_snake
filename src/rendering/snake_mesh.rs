@@ -1,11 +1,9 @@
-use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
-use crate::gfx::material::PaletteLut;
-use crate::gfx::Context;
-
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::error::Result;
+use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
+use crate::gfx::material::PaletteLut;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
 use crate::snake::palette::{build_snake_lut, SegmentStyle};
 use crate::snake::{Body, Segment, SegmentType, Snake};
@@ -108,13 +106,7 @@ fn segment_description(
 /// segment (no color subdivision); color is applied per-pixel by the snake
 /// shader sampling that snake's palette LUT. Black-hole circles are collected
 /// separately and drawn on the default material.
-pub fn snake_mesh(
-    snakes: &mut [Snake],
-    gtx: &GameContext,
-    ftx: &FpsContext,
-    ctx: &Context,
-    stats: &mut Stats,
-) -> Result<SnakeRender> {
+pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, ftx: &FpsContext, stats: &mut Stats) -> Result<SnakeRender> {
     stats.redrawing_snakes = true;
 
     let frame_fraction = ftx.last_graphics_update.1;
@@ -174,12 +166,12 @@ pub fn snake_mesh(
             desc.build_shaded(&mut builder, num_segments, lut_size);
             stats.polygons += 1;
         }
-        let mut mesh = Mesh::from_data(ctx, builder.build());
+        let mut mesh = Mesh::from_data(builder.build());
         mesh.set_texture(lut.texture());
         shaded.push((mesh, lut));
     }
 
-    let black_holes = has_black_hole.then(|| Mesh::from_data(ctx, black_hole_builder.build()));
+    let black_holes = has_black_hole.then(|| Mesh::from_data(black_hole_builder.build()));
 
     Ok(SnakeRender { shaded, black_holes })
 }

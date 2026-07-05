@@ -10,14 +10,69 @@ pub mod keyboard {
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
     #[allow(dead_code)]
     pub enum KeyCode {
-        Escape, Grave,
-        Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9, Key0,
-        Minus, Equals, Back, Tab,
-        Q, W, E, R, T, Y, U, I, O, P, LBracket, RBracket, Backslash,
-        A, S, D, F, G, H, J, K, L, Semicolon, Apostrophe, Return,
-        LShift, Z, X, C, V, B, N, M, Comma, Period, Slash, RShift,
-        LControl, LAlt, LWin, Space, RWin, RAlt,
-        Left, Up, Down, Right,
+        Escape,
+        Grave,
+        Key1,
+        Key2,
+        Key3,
+        Key4,
+        Key5,
+        Key6,
+        Key7,
+        Key8,
+        Key9,
+        Key0,
+        Minus,
+        Equals,
+        Back,
+        Tab,
+        Q,
+        W,
+        E,
+        R,
+        T,
+        Y,
+        U,
+        I,
+        O,
+        P,
+        LBracket,
+        RBracket,
+        Backslash,
+        A,
+        S,
+        D,
+        F,
+        G,
+        H,
+        J,
+        K,
+        L,
+        Semicolon,
+        Apostrophe,
+        Return,
+        LShift,
+        Z,
+        X,
+        C,
+        V,
+        B,
+        N,
+        M,
+        Comma,
+        Period,
+        Slash,
+        RShift,
+        LControl,
+        LAlt,
+        LWin,
+        Space,
+        RWin,
+        RAlt,
+        Left,
+        Up,
+        Down,
+        Right,
     }
 
     impl KeyCode {
@@ -104,9 +159,7 @@ pub mod keyboard {
 pub mod mouse {
     use macroquad::input::show_mouse;
 
-    use crate::gfx::Context;
-
-    pub fn set_cursor_hidden(_ctx: &mut Context, hidden: bool) {
+    pub fn set_cursor_hidden(hidden: bool) {
         show_mouse(!hidden);
     }
 }

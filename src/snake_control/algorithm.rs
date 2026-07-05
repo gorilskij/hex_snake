@@ -1,5 +1,3 @@
-use crate::gfx::Context;
-
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
@@ -79,7 +77,6 @@ impl Controller for Algorithm {
         apples: &[Apple],
         gtx: &GameContext,
         _ftx: &FpsContext,
-        _ctx: &Context,
     ) -> Option<Dir> {
         self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
 

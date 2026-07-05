@@ -1,10 +1,8 @@
-use crate::gfx::input::keyboard::KeyCode;
-use crate::gfx::Context;
-
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12};
+use crate::gfx::input::keyboard::KeyCode;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::Controller;
@@ -27,7 +25,6 @@ impl Controller for KeyboardClock {
         _: &[Apple],
         _: &GameContext,
         _: &FpsContext,
-        _: &Context,
     ) -> Option<Dir> {
         if let Some(new_dir) = self.next_dir.take() {
             self.dir = new_dir;

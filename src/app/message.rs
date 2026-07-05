@@ -7,7 +7,6 @@ use macroquad::window::screen_width;
 use crate::color::Color;
 use crate::gfx::graphics::Canvas;
 use crate::gfx::time::Instant;
-use crate::gfx::Context;
 
 /// Finite number of possible messages
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
@@ -73,7 +72,7 @@ impl MessageDrawable {
 impl Message {
     /// A return value of None signifies that the message has reached its end of
     /// life and should be removed.
-    pub fn get_drawable(&self, _ctx: &Context) -> Option<MessageDrawable> {
+    pub fn get_drawable(&self) -> Option<MessageDrawable> {
         let screen_w = screen_width();
 
         // fade out

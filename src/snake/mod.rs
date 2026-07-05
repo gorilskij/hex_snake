@@ -2,7 +2,6 @@ use std::collections::{HashSet, VecDeque};
 use std::mem;
 use std::mem::Discriminant;
 
-use crate::gfx::Context;
 pub use palette::{Palette, PaletteTemplate};
 
 use crate::app::fps_control::FpsContext;
@@ -184,14 +183,7 @@ impl Snake {
         out
     }
 
-    pub fn update_dir(
-        &mut self,
-        other_snakes: impl Snakes,
-        apples: &[Apple],
-        gtx: &GameContext,
-        ftx: &FpsContext,
-        ctx: &Context,
-    ) {
+    pub fn update_dir(&mut self, other_snakes: impl Snakes, apples: &[Apple], gtx: &GameContext, ftx: &FpsContext) {
         if self.body.dir_grace || self.state != State::Living {
             return;
         }
@@ -200,12 +192,13 @@ impl Snake {
         let knowledge = Knowledge::accurate(&self.eat_mechanics);
         let controller_dir =
             self.controller
-                .next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx, ctx);
+                .next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx);
 
         // advance autopilot
-        let autopilot_dir = self.autopilot.as_mut().map(|autopilot| {
-            autopilot.next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx, ctx)
-        });
+        let autopilot_dir = self
+            .autopilot
+            .as_mut()
+            .map(|autopilot| autopilot.next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx));
 
         let new_dir = if self.autopilot_control {
             autopilot_dir.expect("autopilot_control == true with missing autopilot")
@@ -242,7 +235,6 @@ impl Snake {
         portals: &[Portal],
         gtx: &GameContext,
         ftx: &FpsContext,
-        ctx: &Context,
     ) {
         let last_idx = self.body.visible_len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.segments[last_idx].segment_type {
@@ -257,7 +249,7 @@ impl Snake {
         match &mut self.state {
             State::Dying => self.body.missing_front += 1,
             State::Living => {
-                self.update_dir(other_snakes, apples, gtx, ftx, ctx);
+                self.update_dir(other_snakes, apples, gtx, ftx);
 
                 // create new head for snake
                 let mut dir = self.body.dir;

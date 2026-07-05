@@ -1,14 +1,12 @@
 use std::f32::consts::PI;
 use std::iter;
 
-use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
-use crate::gfx::Context;
-
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::basic::{Dir, Point};
 use crate::error::{ErrorConversion, Result};
+use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use crate::rendering::shape::ShapePoints;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
@@ -18,7 +16,6 @@ pub fn player_path_mesh(
     player_snake: &mut Snake,
     other_snakes: OtherSnakes,
     apples: &[Apple],
-    ctx: &Context,
     gtx: &GameContext,
     stats: &mut Stats,
 ) -> Option<Result<Mesh>> {
@@ -77,6 +74,6 @@ pub fn player_path_mesh(
         return Some(Err(e).with_trace_step("player_path_mesh"));
     }
 
-    let mesh = Mesh::from_data(ctx, builder.build());
+    let mesh = Mesh::from_data(builder.build());
     Some(Ok(mesh))
 }

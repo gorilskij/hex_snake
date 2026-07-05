@@ -1,12 +1,6 @@
 use std::collections::HashMap;
 
 use enum_rotate::EnumRotate;
-use crate::gfx::event::EventHandler;
-use crate::gfx::graphics::{Canvas, DrawParam, Mesh};
-use crate::gfx::input::keyboard::{KeyCode, KeyInput};
-use crate::gfx::input::mouse;
-use crate::gfx::material::SnakeMaterial;
-use crate::gfx::Context;
 use rand::prelude::*;
 
 use crate::app::distance_grid::DistanceGrid;
@@ -26,6 +20,11 @@ use crate::apple::{self, Apple};
 use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
 use crate::color::Color;
 use crate::error::{Error, ErrorConversion, Result};
+use crate::gfx::event::EventHandler;
+use crate::gfx::graphics::{Canvas, DrawParam, Mesh};
+use crate::gfx::input::keyboard::{KeyCode, KeyInput};
+use crate::gfx::input::mouse;
+use crate::gfx::material::SnakeMaterial;
 use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
@@ -81,7 +80,6 @@ impl Game {
         seeds: Vec<SnakeBuilder>,
         palette: Palette,
         apple_spawn_policy: SpawnPolicy,
-        ctx: &Context,
     ) -> Self {
         assert!(!seeds.is_empty(), "No players specified");
 
@@ -125,18 +123,18 @@ impl Game {
 
             draw_cache_invalid: 0,
         };
-        this.update_dim(ctx);
+        this.update_dim();
         // warning: this spawns apples before there are any snakes
         this.restart();
         this
     }
 
-    fn update_dim(&mut self, ctx: &Context) {
+    fn update_dim(&mut self) {
         let env = &mut self.env;
 
-        let board_dim = calculate_board_dim(ctx, env.gtx.cell_dim);
+        let board_dim = calculate_board_dim(env.gtx.cell_dim);
 
-        self.offset = calculate_offset(ctx, board_dim, env.gtx.cell_dim);
+        self.offset = calculate_offset(board_dim, env.gtx.cell_dim);
 
         if env.gtx.board_dim != board_dim {
             env.gtx.board_dim = board_dim;
@@ -244,10 +242,10 @@ impl Game {
         self.spawn_apples();
     }
 
-    fn advance_snakes(&mut self, ctx: &Context) -> Result {
+    fn advance_snakes(&mut self) -> Result {
         let env = &mut self.env;
 
-        advance_snakes(env, self.fps_control.context(), ctx);
+        advance_snakes(env, self.fps_control.context());
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
@@ -299,7 +297,7 @@ impl Game {
         self.apple_mesh = None;
     }
 
-    fn get_message_drawables(&mut self, ctx: &Context) -> Vec<MessageDrawable> {
+    fn get_message_drawables(&mut self) -> Vec<MessageDrawable> {
         // draw messages and remove the ones that have
         // outlived their durations
         let mut drawables = vec![];
@@ -307,7 +305,7 @@ impl Game {
 
         self.messages
             .iter()
-            .for_each(|(id, message)| match message.get_drawable(ctx) {
+            .for_each(|(id, message)| match message.get_drawable() {
                 Some(drawable) => drawables.push(drawable),
                 None => remove.push(*id),
             });
@@ -373,16 +371,16 @@ impl Game {
 }
 
 impl EventHandler<Error> for Game {
-    fn update(&mut self, ctx: &mut Context) -> Result {
+    fn update(&mut self) -> Result {
         while self.fps_control.can_update() {
-            self.advance_snakes(ctx).with_trace_step("Game::update")?;
+            self.advance_snakes().with_trace_step("Game::update")?;
             self.spawn_apples();
         }
 
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> Result {
+    fn draw(&mut self) -> Result {
         self.fps_control.graphics_frame();
 
         if self.env.gtx.prefs.display_fps {
@@ -413,35 +411,35 @@ impl EventHandler<Error> for Game {
             // same game frame are blocked
             for idx in 0..env.snakes.len() {
                 let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
-                snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx, ctx);
+                snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx);
             }
         }
 
         if self.grid_mesh.is_none() {
             match env.gtx.prefs.draw_grid {
-                DrawGrid::Grid => self.grid_mesh = Some(rendering::grid_mesh(&env.gtx, ctx)?),
-                DrawGrid::Dots => self.grid_mesh = Some(rendering::grid_dot_mesh(&env.gtx, ctx)?),
+                DrawGrid::Grid => self.grid_mesh = Some(rendering::grid_mesh(&env.gtx)?),
+                DrawGrid::Dots => self.grid_mesh = Some(rendering::grid_dot_mesh(&env.gtx)?),
                 _ => {}
             }
         }
 
         if env.gtx.prefs.draw_border && self.border_mesh.is_none() {
-            self.border_mesh = Some(rendering::border_mesh(&env.gtx, ctx)?);
+            self.border_mesh = Some(rendering::border_mesh(&env.gtx)?);
         }
 
         if self.portal_mesh.is_none() {
-            self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, ctx, &mut stats)?);
+            self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, &mut stats)?);
         }
 
         if self.snake_render.is_none() || playing {
-            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut stats)?);
+            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, &mut stats)?);
         }
 
         if env.apples.is_empty() {
             self.apple_mesh = None;
         } else if self.apple_mesh.is_none() || self.animated_apples {
             // only recompute apple mesh if there are animated apples
-            self.apple_mesh = Some(rendering::apple_mesh(&env.apples, &env.gtx, ftx, ctx, &mut stats)?);
+            self.apple_mesh = Some(rendering::apple_mesh(&env.apples, &env.gtx, ftx, &mut stats)?);
         }
 
         let player_idx = self.first_player_snake_idx().expect("no player snake");
@@ -450,17 +448,13 @@ impl EventHandler<Error> for Game {
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
         if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
-            self.distance_grid_mesh = Some(
-                self.distance_grid
-                    .mesh(player_snake, other_snakes, ctx, &env.gtx, ftx)?,
-            );
+            self.distance_grid_mesh = Some(self.distance_grid.mesh(player_snake, other_snakes, &env.gtx, ftx)?);
         }
 
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
             self.player_path_mesh =
-                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, ctx, &env.gtx, &mut stats)
-                    .invert()?;
+                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats).invert()?;
         }
 
         if env.gtx.prefs.display_stats {
@@ -473,7 +467,7 @@ impl EventHandler<Error> for Game {
             self.snake_material = Some(SnakeMaterial::new().map_err(Error::from)?);
         }
 
-        let message_drawables = self.get_message_drawables(ctx);
+        let message_drawables = self.get_message_drawables();
 
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
@@ -487,7 +481,7 @@ impl EventHandler<Error> for Game {
         let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
-            let mut canvas = Canvas::from_frame(ctx, self.env.gtx.palette.background_color);
+            let mut canvas = Canvas::from_frame(self.env.gtx.palette.background_color);
 
             let draw_param = DrawParam::default().dest(self.offset);
 
@@ -513,22 +507,22 @@ impl EventHandler<Error> for Game {
                 drawable.draw(&mut canvas);
             }
 
-            canvas.finish(ctx).map_err(Error::from).with_trace_step("Game::draw")?;
+            canvas.finish().map_err(Error::from).with_trace_step("Game::draw")?;
         }
 
         Ok(())
     }
 
-    fn mouse_motion_event(&mut self, ctx: &mut Context, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result {
-        mouse::set_cursor_hidden(ctx, false);
+    fn mouse_motion_event(&mut self, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result {
+        mouse::set_cursor_hidden(false);
         Ok(())
     }
 
-    fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, _repeated: bool) -> Result {
+    fn key_down_event(&mut self, input: KeyInput, _repeated: bool) -> Result {
         let prefs = &mut self.env.gtx.prefs;
 
         if prefs.hide_cursor {
-            mouse::set_cursor_hidden(ctx, true);
+            mouse::set_cursor_hidden(true);
         }
 
         use KeyCode::*;
@@ -719,7 +713,7 @@ impl EventHandler<Error> for Game {
                     let mut new_side_length = self.env.gtx.cell_dim.side * factor;
                     new_side_length = new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
                     self.env.gtx.cell_dim = CellDim::from(new_side_length);
-                    self.update_dim(ctx);
+                    self.update_dim();
                     self.display_notification(format!("Cell side: {new_side_length}"));
                 }
                 k => {
@@ -735,7 +729,7 @@ impl EventHandler<Error> for Game {
         Ok(())
     }
 
-    fn key_up_event(&mut self, _ctx: &mut Context, input: KeyInput) -> Result {
+    fn key_up_event(&mut self, input: KeyInput) -> Result {
         use KeyCode::*;
 
         if let Some(Space) = input.keycode {
@@ -749,8 +743,8 @@ impl EventHandler<Error> for Game {
     }
 
     // TODO: forbid resizing in-game
-    fn resize_event(&mut self, ctx: &mut Context, _width: f32, _height: f32) -> Result {
-        self.update_dim(ctx);
+    fn resize_event(&mut self, _width: f32, _height: f32) -> Result {
+        self.update_dim();
         let HexDim { h, v } = self.env.gtx.board_dim;
         self.display_notification(format!("{h}x{v}"));
         Ok(())

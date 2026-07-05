@@ -100,8 +100,6 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut ctx = gfx::Context::new();
-
     let control_setup = ControlSetup {
         // web delivers physical (qwerty-position) key codes, so use the qwerty
         // bindings directly: ul=J u=K ur=L dl=M d=Comma dr=Period
@@ -119,43 +117,30 @@ async fn main() {
         seeds,
         Palette::dark(),
         crate::apple::spawn::SpawnPolicy::Random { apple_count: 5 },
-        &ctx,
     );
 
     let mut last_size = (screen_width(), screen_height());
 
-    // --- Stage 0 spike: validate shader + LUT path. Remove after Stage 3. ---
-    const SPIKE: bool = false;
-    let spike_mat = gfx::material::SnakeMaterial::new().expect("snake material");
-    let spike_lut = gfx::material::spike_rainbow_lut(256);
-
     loop {
-        if SPIKE {
-            macroquad::window::clear_background(macroquad::color::BLACK);
-            gfx::material::spike_draw_test_quad(&spike_mat, &spike_lut);
-            next_frame().await;
-            continue;
-        }
-
         let size = (screen_width(), screen_height());
         if size != last_size {
             last_size = size;
-            let _ = game.resize_event(&mut ctx, size.0, size.1);
+            let _ = game.resize_event(size.0, size.1);
         }
 
         for k in get_keys_pressed() {
             if let Some(keycode) = KeyCode::from_macroquad(k) {
-                let _ = game.key_down_event(&mut ctx, KeyInput { keycode: Some(keycode) }, false);
+                let _ = game.key_down_event(KeyInput { keycode: Some(keycode) }, false);
             }
         }
         for k in get_keys_released() {
             if let Some(keycode) = KeyCode::from_macroquad(k) {
-                let _ = game.key_up_event(&mut ctx, KeyInput { keycode: Some(keycode) });
+                let _ = game.key_up_event(KeyInput { keycode: Some(keycode) });
             }
         }
 
-        let _ = game.update(&mut ctx);
-        if let Err(e) = game.draw(&mut ctx) {
+        let _ = game.update();
+        if let Err(e) = game.draw() {
             eprintln!("{e:?}");
         }
 

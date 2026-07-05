@@ -1,5 +1,3 @@
-use crate::gfx::Context;
-
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
@@ -45,7 +43,6 @@ impl Controller for Programmed {
         _: &[Apple],
         _: &GameContext,
         _: &FpsContext,
-        _: &Context,
     ) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;

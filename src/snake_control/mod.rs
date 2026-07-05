@@ -1,5 +1,3 @@
-use crate::gfx::input::keyboard::KeyCode;
-use crate::gfx::Context;
 use itertools::{repeat_n, Itertools};
 pub use programmed::Move;
 
@@ -8,6 +6,7 @@ use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
 use crate::basic::{Dir, Dir12, Side};
+use crate::gfx::input::keyboard::KeyCode;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::pathfinder::Path;
@@ -49,7 +48,6 @@ pub trait Controller {
         apples: &[Apple],
         gtx: &GameContext,
         ftx: &FpsContext,
-        ctx: &Context,
     ) -> Option<Dir>;
 
     // only implemented for autopilot-like controllers

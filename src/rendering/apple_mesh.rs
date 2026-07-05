@@ -1,5 +1,3 @@
-use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
-use crate::gfx::Context;
 use hsl::HSL;
 
 use crate::app::fps_control::FpsContext;
@@ -7,16 +5,11 @@ use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::error::{ErrorConversion, Result};
+use crate::gfx::graphics::{Color, DrawMode, Mesh, MeshBuilder};
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape};
 
-pub fn apple_mesh(
-    apples: &[Apple],
-    gtx: &GameContext,
-    ftx: &FpsContext,
-    ctx: &Context,
-    stats: &mut Stats,
-) -> Result<Mesh> {
+pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, ftx: &FpsContext, stats: &mut Stats) -> Result<Mesh> {
     assert!(!apples.is_empty(), "tried to draw a mesh with 0 apples");
 
     stats.redrawing_apples = true;
@@ -51,7 +44,7 @@ pub fn apple_mesh(
             }
         }
 
-        Mesh::from_data(ctx, builder.build())
+        Mesh::from_data(builder.build())
     };
     res.map_err(Into::into).with_trace_step("apple_mesh")
 }
