@@ -9,14 +9,17 @@ impl SegmentDescription {
     /// Tessellate this segment into a single shaded polygon and add it to
     /// `builder`. Each vertex carries `uv.x` = position along the whole body
     /// (so the snake shader can sample the palette LUT) and `uv.y` = across
-    /// width. `num_segments` is the snake's segment count, used to normalize the
-    /// body coordinate into `[0, 1]`.
+    /// width. `num_segments` is the snake's segment count (normalizes the body
+    /// coordinate into `[0, 1]`); `lut_size` is the LUT texture width (used to
+    /// inset this segment's clamp bounds by half a texel).
     ///
     /// Replaces the old subsegment approach: instead of many flat-colored
     /// slices, the segment is one polygon and color is per-pixel on the GPU.
-    pub fn build_shaded(&self, builder: &mut MeshBuilder, num_segments: usize) {
+    pub fn build_shaded(&self, builder: &mut MeshBuilder, num_segments: usize, lut_size: usize) {
         let seg_idx = self.segment_idx as f32;
         let num = num_segments.max(1) as f32;
+        // half a texel, in uv units — the shader clamps to these bounds
+        let half_texel = 0.5 / lut_size.max(1) as f32;
 
         match self.draw_style {
             rendering::Style::Hexagon => {
@@ -47,7 +50,11 @@ impl SegmentDescription {
                     p + dest
                 };
 
-                builder.push_shaded_ribbon(&cross_sections, u_of, transform);
+                // This segment owns uv range [seg_idx/num, (seg_idx+1)/num];
+                // pass it inset by half a texel so the shader's clamp keeps
+                // linear filtering from bleeding into the neighbor segment.
+                let seg_bounds = (seg_idx / num + half_texel, (seg_idx + 1.0) / num - half_texel);
+                builder.push_shaded_ribbon(&cross_sections, seg_bounds, u_of, transform);
             }
         }
     }

@@ -130,9 +130,11 @@ pub fn snake_mesh(
         let body = &snake.body;
         let num_segments = body.segments.len();
 
-        // Per-snake palette LUT (the whole-body gradient the shader samples).
+        // Per-snake palette LUT (each segment its own fixed-size slot).
         let styles: Vec<SegmentStyle> = snake.palette.segment_styles(body, frame_fraction).collect();
-        let lut = PaletteLut::new(&build_snake_lut(&styles));
+        let lut_colors = build_snake_lut(&styles);
+        let lut_size = lut_colors.len();
+        let lut = PaletteLut::new(&lut_colors);
 
         // Per-segment descriptions (head → tail).
         let mut prev_fraction = None;
@@ -169,7 +171,7 @@ pub fn snake_mesh(
         // Shaded segments. Draw tail → head so the head paints on top.
         let mut builder = MeshBuilder::new();
         for desc in descs.iter().rev() {
-            desc.build_shaded(&mut builder, num_segments);
+            desc.build_shaded(&mut builder, num_segments, lut_size);
             stats.polygons += 1;
         }
         let mut mesh = Mesh::from_data(ctx, builder.build());

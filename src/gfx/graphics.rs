@@ -14,7 +14,7 @@ use lyon_tessellation::{
 };
 use macroquad::camera::{set_camera, set_default_camera, Camera2D};
 use macroquad::color::Color as MqColor;
-use macroquad::math::vec2;
+use macroquad::math::{vec2, vec4};
 use macroquad::models::{draw_mesh, Mesh as MqMesh, Vertex};
 use macroquad::texture::Texture2D;
 use macroquad::window::{clear_background, screen_height, screen_width};
@@ -133,12 +133,15 @@ impl MeshBuilder {
             return;
         }
         let white = MqColor::new(1., 1., 1., 1.);
+        // seg_bounds (0,1) → the shader's clamp is a no-op (flat color per poly)
         let vertices = positions
             .into_iter()
             .map(|p| {
                 let (u, v) = uv_of(p);
                 let tp = transform(p);
-                Vertex::new(tp.x, tp.y, 0., u, v, white)
+                let mut vert = Vertex::new(tp.x, tp.y, 0., u, v, white);
+                vert.normal = vec4(0., 1., 0., 0.);
+                vert
             })
             .collect();
         self.primitives.push(Primitive { vertices, indices });
@@ -151,8 +154,17 @@ impl MeshBuilder {
     /// Adjacent cross-sections share vertices, so radial edges are single
     /// constant-`frac` lines (seamless) — even when `inner` collapses to one
     /// pivot point, which is then reused across cross-sections with distinct uv.
-    pub fn push_shaded_ribbon<U, T>(&mut self, cross_sections: &[(Point, Point, f32)], u_of: U, transform: T)
-    where
+    ///
+    /// `seg_bounds` is this segment's `(lo, hi)` uv range; it is passed to every
+    /// vertex (in `normal.xy`) so the shader can clamp the LUT lookup to it,
+    /// keeping color boundaries on the geometry seam instead of a texel.
+    pub fn push_shaded_ribbon<U, T>(
+        &mut self,
+        cross_sections: &[(Point, Point, f32)],
+        seg_bounds: (f32, f32),
+        u_of: U,
+        transform: T,
+    ) where
         U: Fn(f32) -> f32,
         T: Fn(Point) -> Point,
     {
@@ -160,13 +172,18 @@ impl MeshBuilder {
             return;
         }
         let white = MqColor::new(1., 1., 1., 1.);
+        let bounds = vec4(seg_bounds.0, seg_bounds.1, 0., 0.);
         let mut vertices = Vec::with_capacity(cross_sections.len() * 2);
         for &(inner, outer, frac) in cross_sections {
             let u = u_of(frac);
             let ti = transform(inner);
             let to = transform(outer);
-            vertices.push(Vertex::new(ti.x, ti.y, 0., u, 0., white));
-            vertices.push(Vertex::new(to.x, to.y, 0., u, 1., white));
+            let mut vi = Vertex::new(ti.x, ti.y, 0., u, 0., white);
+            let mut vo = Vertex::new(to.x, to.y, 0., u, 1., white);
+            vi.normal = bounds;
+            vo.normal = bounds;
+            vertices.push(vi);
+            vertices.push(vo);
         }
         let mut indices = Vec::with_capacity((cross_sections.len() - 1) * 6);
         for k in 0..cross_sections.len() - 1 {

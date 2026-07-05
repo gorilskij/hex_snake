@@ -19,25 +19,39 @@ use crate::gfx::graphics::Color;
 use crate::gfx::{GameError, GameResult};
 
 const VERTEX: &str = r#"#version 100
+precision highp float;
 attribute vec3 position;
 attribute vec2 texcoord;
-varying lowp vec2 uv;
+attribute vec4 normal;
+varying vec2 uv;
+varying vec2 seg_bounds;
 uniform mat4 Model;
 uniform mat4 Projection;
 void main() {
     gl_Position = Projection * Model * vec4(position, 1);
     uv = texcoord;
+    // normal.xy carries this segment's [lo, hi] uv range (see push_shaded_ribbon)
+    seg_bounds = normal.xy;
 }"#;
 
 // Samples the palette LUT by uv.x ("distance along body"). The LUT is a
 // single-row texture, so v is fixed at 0.5. uv.y (across-width) is currently
 // ignored, matching the old flat-across-width look; it is available for future
 // shading.
+//
+// The lookup is clamped to this segment's own uv range (already inset by half a
+// texel on the CPU, see build_shaded) so linear filtering never bleeds across a
+// segment boundary: each segment samples only its own LUT slot, so hard color
+// steps land exactly on the geometry seam while gradients within a segment stay
+// smooth.
 const FRAGMENT: &str = r#"#version 100
-varying lowp vec2 uv;
+precision highp float;
+varying vec2 uv;
+varying vec2 seg_bounds;
 uniform sampler2D Texture;
 void main() {
-    gl_FragColor = texture2D(Texture, vec2(uv.x, 0.5));
+    float u = clamp(uv.x, seg_bounds.x, seg_bounds.y);
+    gl_FragColor = texture2D(Texture, vec2(u, 0.5));
 }"#;
 
 /// The shader that colors snakes from a palette LUT. One instance is shared by
@@ -88,6 +102,9 @@ pub struct PaletteLut {
 impl PaletteLut {
     pub fn new(colors: &[Color]) -> Self {
         let texture = Texture2D::from_rgba8(colors.len() as u16, 1, &to_rgba8(colors));
+        // Linear keeps within-segment gradients smooth. The shader clamps each
+        // segment to its own LUT slot, so hard steps between segments stay sharp
+        // and stable regardless of this filtering.
         texture.set_filter(FilterMode::Linear);
         Self { texture }
     }
