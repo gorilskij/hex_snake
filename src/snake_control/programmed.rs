@@ -6,6 +6,7 @@ use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
+
 #[allow(unused_macros)]
 macro_rules! move_sequence {
     (@ turn($dir:expr) ) => {

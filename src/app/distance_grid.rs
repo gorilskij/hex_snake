@@ -3,15 +3,15 @@ use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use itertools::Itertools;
+use macroquad::color::Color;
 
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
-use macroquad::color::Color;
 use crate::color::lerp;
-use crate::support::mesh::{build_polygon, DrawMode, Mesh};
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;
+use crate::support::mesh::{build_polygon, DrawMode, Mesh};
 use crate::view::snakes::Snakes;
 
 type Distance = f32;
@@ -185,10 +185,9 @@ impl DistanceGrid {
     ) -> Mesh {
         if self.current.is_none() || ftx.game_frame_num > self.last_update {
             self.last_update = ftx.game_frame_num;
-            self.last = mem::replace(
-                &mut self.current,
-                Some(find_distances(player_snake, other_snakes, gtx.board_dim)),
-            );
+            self.last = self
+                .current
+                .replace(find_distances(player_snake, other_snakes, gtx.board_dim));
         }
 
         match &self.current {

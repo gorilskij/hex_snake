@@ -1,6 +1,5 @@
 use crate::app::message;
 use crate::app::message::Message;
-use macroquad::color::Color;
 
 /// Collect statistics about the current game state
 #[derive(Default)]

@@ -13,7 +13,6 @@ impl Shape for TriangleArrowLeft {
             Point { x: width, y: side },
             Point { x: width, y: 0. },
         ]
-        .into()
     }
 
     fn center(CellDim { side, .. }: CellDim) -> Point {

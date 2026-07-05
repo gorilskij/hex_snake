@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
+use anyhow::{Context, Result};
 use enum_rotate::EnumRotate;
+use macroquad::color::Color;
 use macroquad::input::{show_mouse, KeyCode};
 use macroquad::material::Material;
 use macroquad::window::clear_background;
@@ -12,25 +14,21 @@ use crate::app::game_context::GameContext;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
-use crate::app::portal::Portal;
 use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
-use crate::app::screen::Environment;
+use crate::app::screen::{Environment, Screen};
 use crate::app::snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes};
 use crate::app::stats::Stats;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::{self, Apple};
 use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
-use macroquad::color::Color;
-use anyhow::{Context, Result};
-use crate::app::screen::Screen;
-use crate::support::mesh::Mesh;
-use crate::support::material::snake_material;
 use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
 use crate::support::invert::Invert;
+use crate::support::material::snake_material;
+use crate::support::mesh::Mesh;
 use crate::view::snakes::OtherSnakes;
 
 #[derive(Copy, Clone)]
@@ -106,7 +104,7 @@ impl Game {
             // updated immediately after creation
             offset: Point { x: 0., y: 0. },
 
-            seeds: seeds.into_iter().map(Into::into).collect(),
+            seeds,
             animated_apples: false,
 
             distance_grid: DistanceGrid::new(),
@@ -191,7 +189,7 @@ impl Game {
         let unpositioned = self
             .seeds
             .iter()
-            .filter(|seed| !matches!(seed.snake_type, Some(snake::Type::Simulated { .. })))
+            .filter(|seed| !matches!(seed.snake_type, Some(snake::Type::Simulated)))
             .count();
 
         // TODO: clean this mess
@@ -480,7 +478,7 @@ impl Screen for Game {
         let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
-            clear_background(self.env.gtx.palette.background_color.into());
+            clear_background(self.env.gtx.palette.background_color);
 
             for mesh in before_snake.into_iter().flatten() {
                 mesh.draw(self.offset);

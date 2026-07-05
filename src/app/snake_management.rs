@@ -1,6 +1,7 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
+use anyhow::{Context, Result};
 use rand::distributions::uniform::SampleRange;
 
 use crate::app::fps_control::FpsContext;
@@ -8,7 +9,6 @@ use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
 use crate::basic::{Dir, HexPoint};
-use anyhow::{Context, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, SegmentType, State};
@@ -92,7 +92,7 @@ pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
 // TODO: maybe replace Environment with GameContext
 /// Returns `(spawn_snakes, game_over)` where
 ///  - `spawn_snakes` describes the new snakes to spawn
-/// (competitors, killers, etc.)
+///    (competitors, killers, etc.)
 ///  - `game_over` tells whether a snake crashed and ended the game
 #[must_use]
 pub fn handle_collisions<Rng: rand::Rng>(

@@ -12,10 +12,10 @@ use macroquad::input::{get_keys_pressed, get_keys_released};
 use macroquad::window::{next_frame, screen_height, screen_width, Conf};
 
 use crate::app::keyboard_control::ControlSetup;
-use crate::app::screen::Game;
+use crate::app::screen::{Game, Screen};
 use crate::app::Palette;
+use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Side};
-use crate::app::screen::Screen;
 use crate::keyboard_layout::Layout;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
 use crate::snake::SegmentType;
@@ -111,7 +111,7 @@ async fn main() {
         7.,
         seeds,
         Palette::dark(),
-        crate::apple::spawn::SpawnPolicy::Random { apple_count: 5 },
+        SpawnPolicy::Random { apple_count: 5 },
     );
 
     let mut last_size = (screen_width(), screen_height());

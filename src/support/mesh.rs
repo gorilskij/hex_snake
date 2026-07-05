@@ -174,7 +174,9 @@ impl Mesh {
         if vertices.is_empty() {
             Mesh::empty()
         } else {
-            Mesh { meshes: vec![MqMesh { vertices, indices, texture: None }] }
+            Mesh {
+                meshes: vec![MqMesh { vertices, indices, texture: None }],
+            }
         }
     }
 

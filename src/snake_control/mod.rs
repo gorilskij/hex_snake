@@ -6,7 +6,7 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
-use crate::basic::{Dir, Dir12, Side};
+use crate::basic::{Dir, Side};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::pathfinder::Path;
@@ -14,7 +14,6 @@ use crate::view::snakes::Snakes;
 
 mod algorithm;
 mod keyboard;
-mod keyboard_clock;
 mod killer;
 mod mouse;
 pub mod pathfinder;
@@ -28,7 +27,6 @@ pub enum Template {
         control_setup: ControlSetup,
         knowledge: Knowledge,
     },
-    KeyboardClock,
     Mouse,
     Programmed(Vec<Move>),
     Killer,
@@ -163,7 +161,6 @@ impl Template {
         // use crate::snake_control::a_star::AStar;
         use algorithm::Algorithm;
         use keyboard::Keyboard;
-        use keyboard_clock::KeyboardClock;
         use killer::Killer;
         use mouse::Mouse;
         use programmed::Programmed;
@@ -173,11 +170,6 @@ impl Template {
             Template::Keyboard { control_setup, knowledge } => {
                 Box::new(Keyboard::new(control_setup, start_dir, knowledge))
             }
-            Template::KeyboardClock => Box::new(KeyboardClock {
-                dir: Dir12::Single(start_dir),
-                alternation: false,
-                next_dir: None,
-            }),
             Template::Mouse => Box::new(Mouse),
             Template::Programmed(move_sequence) => Box::new(Programmed {
                 move_sequence,

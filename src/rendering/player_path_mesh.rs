@@ -1,16 +1,16 @@
 use std::f32::consts::PI;
 use std::iter;
 
+use anyhow::Result;
+
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::basic::{Dir, Point};
-use anyhow::Result;
-use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
-use macroquad::color::Color;
 use crate::rendering::shape::ShapePoints;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
+use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
 use crate::view::snakes::OtherSnakes;
 
 pub fn player_path_mesh(
