@@ -5,7 +5,8 @@ use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
 use anyhow::Result;
-use crate::gfx::graphics::{build_circle, build_polygon, Color, DrawMode, Mesh};
+use crate::color::to_color::ToColor;
+use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape};
 
@@ -23,7 +24,7 @@ pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, ftx: &FpsContext, stats: 
             SpawnSnake(_) | SpawnRain => {
                 let hue = 360. * (ftx.elapsed_millis as f64 / 1000. % 1.);
                 let hsl = HSL { h: hue, s: 1., l: 0.3 };
-                Color::from(hsl.to_rgb())
+                hsl.to_color()
             }
         };
 

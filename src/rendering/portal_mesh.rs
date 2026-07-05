@@ -2,9 +2,9 @@ use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};
 use crate::app::stats::Stats;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
-use crate::color::Color;
+use macroquad::color::Color;
 use anyhow::Result;
-use crate::gfx::graphics::{build_line, Mesh};
+use crate::support::mesh::{build_line, Mesh};
 use crate::rendering::shape::ShapePoints;
 
 pub fn render_hexagon_edge(dir: Dir, CellDim { side, sin, cos }: CellDim) -> ShapePoints {
@@ -40,17 +40,17 @@ fn build_half_edge(from: HexPoint, to: HexPoint, color: Color, gtx: &GameContext
 
     points = points.translate(location);
 
-    build_line(&points, gtx.palette.border_thickness * 2.0, *color)
+    build_line(&points, gtx.palette.border_thickness * 2.0, color)
 }
 
 // TODO: make this part of palette
 fn behavior_color(behavior: Behavior) -> Color {
     match behavior {
-        Behavior::Die => Color::RED,
-        Behavior::TeleportTo(_, _) => Color::from_rgb(50, 105, 168),
-        Behavior::WrapAround => Color::WHITE,
-        Behavior::PassThrough => Color::GREEN,
-        Behavior::Nothing | Behavior::Unreachable => Color::TRANSPARENT,
+        Behavior::Die => crate::color::RED,
+        Behavior::TeleportTo(_, _) => Color::from_rgba(50, 105, 168, 255),
+        Behavior::WrapAround => crate::color::WHITE,
+        Behavior::PassThrough => crate::color::GREEN,
+        Behavior::Nothing | Behavior::Unreachable => Color::new(0., 0., 0., 0.),
     }
 }
 

@@ -1,10 +1,10 @@
-use crate::gfx::graphics;
 use hsl::HSL;
 
 use crate::basic::HexPoint;
+use crate::color::lerp;
 use crate::color::oklab::OkLab;
 use crate::color::to_color::ToColor;
-use crate::color::Color;
+use macroquad::color::Color;
 use crate::snake::{Body, SegmentType};
 
 macro_rules! gray {
@@ -12,19 +12,19 @@ macro_rules! gray {
         gray!($lightness, 1.)
     };
     ($lightness:expr, $opacity:expr) => {
-        crate::color::Color(crate::gfx::graphics::Color {
+        ::macroquad::color::Color {
             r: $lightness,
             g: $lightness,
             b: $lightness,
             a: $opacity,
-        })
+        }
     };
 }
 
 lazy_static! {
-    static ref DEFAULT_EATEN_COLOR: Color = Color::from_rgb(0, 255, 128);
-    static ref DEFAULT_CRASHED_COLOR: Color = Color::from_rgb(255, 0, 128);
-    // static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgb(245, 192, 64);
+    static ref DEFAULT_EATEN_COLOR: Color = Color::from_rgba(0, 255, 128, 255);
+    static ref DEFAULT_CRASHED_COLOR: Color = Color::from_rgba(255, 0, 128, 255);
+    // static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgba(245, 192, 64, 255);
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -39,12 +39,7 @@ pub enum EatenColor {
 // }
 
 fn invert_rgb(color: Color) -> Color {
-    Color(graphics::Color {
-        r: 1. - color.r,
-        g: 1. - color.g,
-        b: 1. - color.b,
-        a: color.a,
-    })
+    Color::new(1. - color.r, 1. - color.g, 1. - color.b, color.a)
 }
 
 
@@ -92,8 +87,8 @@ pub enum PaletteTemplate {
 impl PaletteTemplate {
     pub fn solid_white_red() -> Self {
         Self::Solid {
-            color: Color::WHITE,
-            eaten: Color::RED,
+            color: crate::color::WHITE,
+            eaten: crate::color::RED,
         }
     }
 
@@ -164,15 +159,15 @@ impl PaletteTemplate {
 
     pub fn alternating_white() -> Self {
         Self::AlternatingFixed {
-            color1: Color::WHITE,
-            color2: Color::TRANSPARENT,
+            color1: crate::color::WHITE,
+            color2: Color::new(0., 0., 0., 0.),
         }
     }
 
     pub fn zebra() -> Self {
         Self::Alternating {
-            color1: Color::WHITE,
-            color2: Color::TRANSPARENT,
+            color1: crate::color::WHITE,
+            color2: Color::new(0., 0., 0., 0.),
         }
     }
 }
@@ -211,7 +206,7 @@ impl SegmentStyle {
         match *self {
             SegmentStyle::Solid(color) => Box::new(move |_| color),
             SegmentStyle::RGBGradient { start_color, end_color } => {
-                Box::new(move |f| f * start_color + (1. - f) * end_color)
+                Box::new(move |f| lerp(end_color, start_color, f as f32))
             }
             SegmentStyle::HSLGradient { start_hue, end_hue, lightness } => Box::new(move |f| {
                 HSL {
@@ -255,7 +250,7 @@ pub fn lut_texels_per_segment(num_segments: usize) -> usize {
 /// (frac = 1) and `k = K-1` the tail-side (frac → 0). `color_at_fraction(f)`
 /// gives the head-side color at `f = 1`. Geometry sets each vertex's
 /// `uv.x = (seg_idx + (1 - frac)) / num_segments` to index this same LUT.
-pub fn build_snake_lut(styles: &[SegmentStyle]) -> Vec<graphics::Color> {
+pub fn build_snake_lut(styles: &[SegmentStyle]) -> Vec<Color> {
     let num = styles.len().max(1);
     let per_seg = lut_texels_per_segment(num);
     let mut lut = Vec::with_capacity(num * per_seg);
@@ -263,7 +258,7 @@ pub fn build_snake_lut(styles: &[SegmentStyle]) -> Vec<graphics::Color> {
         let color_at = style.color_at_fraction();
         for k in 0..per_seg {
             let frac = 1.0 - (k as f64 + 0.5) / per_seg as f64; // head-side → tail-side
-            lut.push(graphics::Color::from(color_at(frac)));
+            lut.push(color_at(frac));
         }
     }
     lut
@@ -421,8 +416,8 @@ impl Palette for RGBGradient {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
                 let r = (i + body.missing_front) as f64 + frame_fraction as f64;
-                let start_color = self.head_color + (self.tail_color - self.head_color) * r / logical_len;
-                let end_color = self.head_color + (self.tail_color - self.head_color) * (r + 1.) / logical_len;
+                let start_color = lerp(self.head_color, self.tail_color, (r / logical_len) as f32);
+                let end_color = lerp(self.head_color, self.tail_color, ((r + 1.) / logical_len) as f32);
 
                 match segment.segment_type {
                     Normal | BlackHole { .. } => SegmentStyle::RGBGradient { start_color, end_color },
@@ -612,8 +607,8 @@ impl Palette for Alternating {
                     let ratio1_start = (r.cos() + 1.) / 2.;
                     let ratio1_end = ((r + 1.).cos() + 1.) / 2.;
 
-                    let start_color = ratio1_start * self.color1 + (1. - ratio1_start) * self.color2;
-                    let end_color = ratio1_end * self.color1 + (1. - ratio1_end) * self.color2;
+                    let start_color = lerp(self.color2, self.color1, ratio1_start as f32);
+                    let end_color = lerp(self.color2, self.color1, ratio1_end as f32);
 
                     SegmentStyle::RGBGradient { start_color, end_color }
                 }

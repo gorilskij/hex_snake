@@ -7,8 +7,9 @@ use itertools::Itertools;
 use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::color::Color;
-use crate::gfx::graphics::{build_polygon, DrawMode, Mesh};
+use macroquad::color::Color;
+use crate::color::lerp;
+use crate::support::mesh::{build_polygon, DrawMode, Mesh};
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;
 use crate::view::snakes::Snakes;
@@ -126,9 +127,9 @@ fn generate_mesh(
 
     let parts = iter.map(|(pos, dist_a, dist_b)| {
         const ALPHA: f32 = 0.3;
-        const CLOSEST_COLOR: Color = Color::from_rgb(51, 204, 51).with_alpha(ALPHA);
-        const MIDWAY_COLOR: Color = Color::from_rgb(255, 255, 0).with_alpha(ALPHA);
-        const FARTHEST_COLOR: Color = Color::from_rgb(204, 0, 0).with_alpha(ALPHA);
+        const CLOSEST_COLOR: Color = Color::from_rgba(51, 204, 51, 255).with_alpha(ALPHA);
+        const MIDWAY_COLOR: Color = Color::from_rgba(255, 255, 0, 255).with_alpha(ALPHA);
+        const FARTHEST_COLOR: Color = Color::from_rgba(204, 0, 0, 255).with_alpha(ALPHA);
 
         let calculate_color = |dist: Distance| -> Color {
             let mut ratio = dist as f64 / max_dist;
@@ -137,24 +138,24 @@ fn generate_mesh(
             }
             if ratio < 0.5 {
                 let ratio = ratio * 2.0;
-                (1. - ratio) * CLOSEST_COLOR + ratio * MIDWAY_COLOR
+                lerp(CLOSEST_COLOR, MIDWAY_COLOR, ratio as f32)
             } else {
                 let ratio = ratio * 2.0 - 1.0;
-                (1. - ratio) * MIDWAY_COLOR + ratio * FARTHEST_COLOR
+                lerp(MIDWAY_COLOR, FARTHEST_COLOR, ratio as f32)
             }
         };
 
         let color_a = calculate_color(dist_a);
         let color_b = match dist_b {
-            None => Color::BLACK,
+            None => crate::color::BLACK,
             Some(d) => calculate_color(d),
         };
 
         let frame_frac = ftx.last_graphics_update.1;
-        let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
+        let color = lerp(color_a, color_b, frame_frac);
 
         let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
-        build_polygon(DrawMode::fill(), &hexagon, *color)
+        build_polygon(DrawMode::fill(), &hexagon, color)
     });
     Mesh::combine(parts)
 }

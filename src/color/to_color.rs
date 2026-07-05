@@ -1,7 +1,6 @@
-use crate::gfx::graphics;
 use hsl::HSL;
+use macroquad::color::Color;
 
-use super::Color;
 use crate::color::oklab::OkLab;
 
 pub trait ToColor {
@@ -10,12 +9,14 @@ pub trait ToColor {
 
 impl ToColor for HSL {
     fn to_color(self) -> Color {
-        Color(graphics::Color::from(self.to_rgb()))
+        let (r, g, b) = self.to_rgb();
+        Color::from_rgba(r, g, b, 255)
     }
 }
 
 impl ToColor for OkLab {
     fn to_color(self) -> Color {
-        Color(graphics::Color::from(self.to_rgb()))
+        let (r, g, b) = self.to_rgb();
+        Color::from_rgba(r, g, b, 255)
     }
 }

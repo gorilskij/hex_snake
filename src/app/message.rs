@@ -4,8 +4,8 @@ use macroquad::camera::set_default_camera;
 use macroquad::text::{draw_text, measure_text};
 use macroquad::window::screen_width;
 
-use crate::color::Color;
-use crate::gfx::time::Instant;
+use macroquad::color::Color;
+use crate::support::time::Instant;
 
 /// Finite number of possible messages
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
@@ -63,7 +63,7 @@ impl MessageDrawable {
     pub fn draw(&self) {
         // text lives in screen space, not the board-offset camera
         set_default_camera();
-        let color = *self.color;
+        let color = self.color;
         draw_text(&self.text, self.x, self.y, self.font_size as f32, color.into());
     }
 }

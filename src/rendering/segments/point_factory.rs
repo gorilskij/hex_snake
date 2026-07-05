@@ -1,5 +1,5 @@
 use crate::basic::{Dir, Point};
-use crate::gfx::graphics::{build_shaded_polygon, build_shaded_ribbon, Mesh};
+use crate::support::mesh::{build_shaded_polygon, build_shaded_ribbon, Mesh};
 use crate::rendering;
 use crate::rendering::segments::descriptions::SegmentDescription;
 use crate::rendering::segments::hexagon_segments::hexagon_outline;

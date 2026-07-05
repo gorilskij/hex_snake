@@ -6,7 +6,8 @@ use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::basic::{Dir, Point};
 use anyhow::Result;
-use crate::gfx::graphics::{build_circle, build_polygon, Color, DrawMode, Mesh};
+use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
+use macroquad::color::Color;
 use crate::rendering::shape::ShapePoints;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
@@ -38,7 +39,7 @@ pub fn player_path_mesh(
 
         let radius = gtx.cell_dim.side / 2.5;
 
-        parts.push(build_circle(DrawMode::fill(), dest, radius, Color::WHITE));
+        parts.push(build_circle(DrawMode::fill(), dest, radius, crate::color::WHITE));
         stats.polygons += 1;
 
         if let Some(dir) = arrow {
@@ -60,7 +61,7 @@ pub fn player_path_mesh(
             .rotate_clockwise(Point::zero(), Dir::D.clockwise_angle_to(dir))
             .translate(dest);
 
-            parts.push(build_polygon(DrawMode::fill(), &points, Color::WHITE));
+            parts.push(build_polygon(DrawMode::fill(), &points, crate::color::WHITE));
             stats.polygons += 1;
         }
     }

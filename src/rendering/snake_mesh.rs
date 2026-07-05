@@ -2,8 +2,9 @@ use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use anyhow::Result;
-use crate::gfx::graphics::{build_circle, Color, DrawMode, Mesh};
-use crate::gfx::material::PaletteLut;
+use crate::support::mesh::{build_circle, DrawMode, Mesh};
+use macroquad::color::Color;
+use crate::support::material::PaletteLut;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
 use crate::snake::palette::{build_snake_lut, SegmentStyle};
 use crate::snake::{Body, Segment, SegmentType, Snake};
@@ -108,7 +109,7 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, ftx: &FpsContext, sta
     let frame_fraction = ftx.last_graphics_update.1;
 
     // TODO (easy): factor out into palette
-    let black_hole_color = Color::from_rgb(1, 36, 92);
+    let black_hole_color = Color::from_rgba(1, 36, 92, 255);
 
     let mut black_hole_parts: Vec<Mesh> = vec![];
     let mut shaded = Vec::with_capacity(snakes.len());

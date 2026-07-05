@@ -1,6 +1,6 @@
 use crate::app::message;
 use crate::app::message::Message;
-use crate::color::Color;
+use macroquad::color::Color;
 
 /// Collect statistics about the current game state
 #[derive(Default)]
@@ -28,7 +28,7 @@ impl Stats {
             h_margin: Message::DEFAULT_MARGIN,
             v_margin: Message::DEFAULT_MARGIN * 2. + Message::DEFAULT_FONT_SIZE,
             font_size: Message::DEFAULT_FONT_SIZE,
-            color: Color::WHITE,
+            color: crate::color::WHITE,
             disappear: None,
         }
     }

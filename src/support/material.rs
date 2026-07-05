@@ -16,7 +16,7 @@ use macroquad::texture::{FilterMode, Texture2D};
 
 use anyhow::{Context, Result};
 
-use crate::gfx::graphics::Color;
+use macroquad::color::Color;
 
 const VERTEX: &str = r#"#version 100
 precision highp float;

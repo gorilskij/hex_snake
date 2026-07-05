@@ -1,10 +1,9 @@
-//! Drawing primitives backed by macroquad + lyon tessellation.
+//! Mesh building + drawing primitives backed by macroquad + lyon tessellation.
 //!
 //! Each `build_*` free function tessellates one shape (polygon / line / circle /
 //! shaded ribbon) into triangles and returns a self-contained [`Mesh`] (macroquad
-//! needs pre-triangulated vertices; ggez did this internally). [`Mesh::combine`]
-//! packs several such meshes into one, chunked to stay under macroquad's
-//! per-`draw_mesh` clamp.
+//! needs pre-triangulated vertices). [`Mesh::combine`] packs several such meshes
+//! into one, chunked to stay under macroquad's per-`draw_mesh` clamp.
 
 use std::f32::consts::TAU;
 use std::mem::take;
@@ -24,52 +23,6 @@ use macroquad::window::{screen_height, screen_width};
 
 use crate::basic::Point;
 
-/// Drop-in replacement for `crate::gfx::graphics::Color` (named f32 fields so existing
-/// struct literals and field access keep working).
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Color {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
-    pub a: f32,
-}
-
-#[allow(dead_code)]
-impl Color {
-    pub const WHITE: Self = Self::new(1., 1., 1., 1.);
-    pub const BLACK: Self = Self::new(0., 0., 0., 1.);
-    pub const RED: Self = Self::new(1., 0., 0., 1.);
-    pub const GREEN: Self = Self::new(0., 1., 0., 1.);
-    pub const BLUE: Self = Self::new(0., 0., 1., 1.);
-    pub const CYAN: Self = Self::new(0., 1., 1., 1.);
-    pub const MAGENTA: Self = Self::new(1., 0., 1., 1.);
-    pub const YELLOW: Self = Self::new(1., 1., 0., 1.);
-
-    pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self { r, g, b, a }
-    }
-
-    pub const fn from_rgb(r: u8, g: u8, b: u8) -> Self {
-        Self::new(r as f32 / 255., g as f32 / 255., b as f32 / 255., 1.)
-    }
-
-    pub const fn with_alpha(self, a: f32) -> Self {
-        Self { a, ..self }
-    }
-}
-
-impl From<(u8, u8, u8)> for Color {
-    fn from((r, g, b): (u8, u8, u8)) -> Self {
-        Self::new(r as f32 / 255., g as f32 / 255., b as f32 / 255., 1.)
-    }
-}
-
-impl From<Color> for MqColor {
-    fn from(c: Color) -> Self {
-        MqColor::new(c.r, c.g, c.b, c.a)
-    }
-}
-
 #[derive(Copy, Clone, Debug)]
 pub enum DrawMode {
     Fill,
@@ -88,8 +41,8 @@ impl DrawMode {
 
 /// Build a flat-colored polygon: `Fill` triangulates the interior, `Stroke(w)`
 /// outlines it with a closed stroke of width `w`.
-pub fn build_polygon(mode: DrawMode, points: &[Point], color: impl Into<Color>) -> Mesh {
-    let color = color.into().into();
+pub fn build_polygon(mode: DrawMode, points: &[Point], color: impl Into<MqColor>) -> Mesh {
+    let color = color.into();
     let (vertices, indices) = match mode {
         DrawMode::Fill => tessellate_fill(points, color),
         DrawMode::Stroke(w) => tessellate_stroke(points, w, true, color),
@@ -98,18 +51,18 @@ pub fn build_polygon(mode: DrawMode, points: &[Point], color: impl Into<Color>) 
 }
 
 /// Build a flat-colored circle, approximated as a regular polygon.
-pub fn build_circle(mode: DrawMode, center: Point, radius: f32, color: impl Into<Color>) -> Mesh {
+pub fn build_circle(mode: DrawMode, center: Point, radius: f32, color: impl Into<MqColor>) -> Mesh {
     build_polygon(mode, &circle_points(center, radius), color)
 }
 
 /// Build a flat-colored open stroke (polyline) of width `width`.
-pub fn build_line(points: &[Point], width: f32, color: impl Into<Color>) -> Mesh {
-    let (vertices, indices) = tessellate_stroke(points, width, false, color.into().into());
+pub fn build_line(points: &[Point], width: f32, color: impl Into<MqColor>) -> Mesh {
+    let (vertices, indices) = tessellate_stroke(points, width, false, color.into());
     Mesh::raw(vertices, indices)
 }
 
 /// Build an open polyline; `Stroke(w)` sets the width, `Fill` falls back to 1px.
-pub fn build_polyline(mode: DrawMode, points: &[Point], color: impl Into<Color>) -> Mesh {
+pub fn build_polyline(mode: DrawMode, points: &[Point], color: impl Into<MqColor>) -> Mesh {
     let width = match mode {
         DrawMode::Stroke(w) => w,
         DrawMode::Fill => 1.,

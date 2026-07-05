@@ -21,11 +21,11 @@ use crate::app::stats::Stats;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::{self, Apple};
 use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
-use crate::color::Color;
+use macroquad::color::Color;
 use anyhow::{Context, Result};
-use crate::gfx::event::EventHandler;
-use crate::gfx::graphics::Mesh;
-use crate::gfx::material::snake_material;
+use crate::app::screen::Screen;
+use crate::support::mesh::Mesh;
+use crate::support::material::snake_material;
 use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
@@ -325,7 +325,7 @@ impl Game {
             Message::default(
                 text.to_string(),
                 message::Position::TopRight,
-                Color::WHITE,
+                crate::color::WHITE,
                 Some(self.env.gtx.prefs.message_duration),
             ),
         );
@@ -341,13 +341,13 @@ impl Game {
         let graphics_fps_undershoot = (60. - graphics_fps) / graphics_fps;
         let color = if game_fps_undershoot > 0.05 || graphics_fps_undershoot > 0.05 {
             // > 5% undershoot: red
-            Color::from_rgb(200, 0, 0)
+            Color::from_rgba(200, 0, 0, 255)
         } else if game_fps_undershoot > 0.02 || graphics_fps_undershoot > 0.02 {
             // > 2% undershoot: orange
-            Color::from_rgb(235, 168, 52)
+            Color::from_rgba(235, 168, 52, 255)
         } else {
             // at or overshoot: white
-            Color::WHITE
+            crate::color::WHITE
         };
 
         self.messages.insert(
@@ -369,7 +369,7 @@ impl Game {
     }
 }
 
-impl EventHandler<anyhow::Error> for Game {
+impl Screen for Game {
     fn update(&mut self) -> Result<()> {
         while self.fps_control.can_update() {
             self.advance_snakes().context("Game::update")?;
@@ -505,11 +505,6 @@ impl EventHandler<anyhow::Error> for Game {
             }
         }
 
-        Ok(())
-    }
-
-    fn mouse_motion_event(&mut self, _x: f32, _y: f32, _dx: f32, _dy: f32) -> Result<()> {
-        show_mouse(true);
         Ok(())
     }
 
