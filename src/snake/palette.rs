@@ -228,6 +228,47 @@ impl SegmentStyle {
     }
 }
 
+/// Texels per segment in the snake color LUT. Each segment gets its **own**
+/// fixed-size slot, so segment boundaries always fall on exact texel edges,
+/// independent of the total snake length. That is what keeps color boundaries
+/// stable as the snake grows (a shared whole-body LUT re-normalized by the total
+/// count, so boundaries drifted → edge wobble). 64 is dense enough that the
+/// within-segment gradient is smooth under linear filtering.
+pub const LUT_TEXELS_PER_SEGMENT: usize = 64;
+
+/// Cap on total LUT width (WebGL1-safe). For very long snakes the per-segment
+/// count is reduced so `num_segments * per_seg` stays under this.
+const LUT_MAX_TEXELS: usize = 8192;
+
+/// Texels per segment for a snake of `num_segments`, reduced from
+/// [`LUT_TEXELS_PER_SEGMENT`] only if needed to stay under [`LUT_MAX_TEXELS`].
+pub fn lut_texels_per_segment(num_segments: usize) -> usize {
+    (LUT_MAX_TEXELS / num_segments.max(1)).clamp(8, LUT_TEXELS_PER_SEGMENT)
+}
+
+/// Build the snake color LUT from its per-segment styles (head → tail). Each
+/// segment fills its own contiguous slot of `lut_texels_per_segment` texels, so
+/// segment `i` owns texels `[i*K, (i+1)*K)` — boundaries are texel-aligned and
+/// independent of the total length.
+///
+/// Within a slot, texel offset `k` maps to head→tail: `k = 0` is the head-side
+/// (frac = 1) and `k = K-1` the tail-side (frac → 0). `color_at_fraction(f)`
+/// gives the head-side color at `f = 1`. Geometry sets each vertex's
+/// `uv.x = (seg_idx + (1 - frac)) / num_segments` to index this same LUT.
+pub fn build_snake_lut(styles: &[SegmentStyle]) -> Vec<graphics::Color> {
+    let num = styles.len().max(1);
+    let per_seg = lut_texels_per_segment(num);
+    let mut lut = Vec::with_capacity(num * per_seg);
+    for style in styles {
+        let color_at = style.color_at_fraction();
+        for k in 0..per_seg {
+            let frac = 1.0 - (k as f64 + 0.5) / per_seg as f64; // head-side → tail-side
+            lut.push(graphics::Color::from(color_at(frac)));
+        }
+    }
+    lut
+}
+
 pub trait Palette: Send + Sync {
     fn segment_styles<'a>(
         &'a mut self,

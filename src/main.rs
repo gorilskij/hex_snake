@@ -124,7 +124,19 @@ async fn main() {
 
     let mut last_size = (screen_width(), screen_height());
 
+    // --- Stage 0 spike: validate shader + LUT path. Remove after Stage 3. ---
+    const SPIKE: bool = false;
+    let spike_mat = gfx::material::SnakeMaterial::new().expect("snake material");
+    let spike_lut = gfx::material::spike_rainbow_lut(256);
+
     loop {
+        if SPIKE {
+            macroquad::window::clear_background(macroquad::color::BLACK);
+            gfx::material::spike_draw_test_quad(&spike_mat, &spike_lut);
+            next_frame().await;
+            continue;
+        }
+
         let size = (screen_width(), screen_height());
         if size != last_size {
             last_size = size;

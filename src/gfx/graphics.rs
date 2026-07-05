@@ -14,11 +14,13 @@ use lyon_tessellation::{
 };
 use macroquad::camera::{set_camera, set_default_camera, Camera2D};
 use macroquad::color::Color as MqColor;
-use macroquad::math::vec2;
+use macroquad::math::{vec2, vec4};
 use macroquad::models::{draw_mesh, Mesh as MqMesh, Vertex};
+use macroquad::texture::Texture2D;
 use macroquad::window::{clear_background, screen_height, screen_width};
 
 use crate::basic::Point;
+use crate::gfx::material::SnakeMaterial;
 use crate::gfx::{Context, GameResult};
 
 /// Drop-in replacement for `crate::gfx::graphics::Color` (named f32 fields so existing
@@ -114,6 +116,84 @@ impl MeshBuilder {
         Ok(self)
     }
 
+    /// Add a filled polygon whose color comes from a shader (via a palette LUT)
+    /// rather than a flat vertex color. `default_points` are the polygon outline
+    /// in the segment's *default orientation*; `uv_of` maps each tessellated
+    /// vertex (still in default orientation) to its `(u, v)` texture coords, and
+    /// `transform` places the vertex on the board. Computing uv before the
+    /// transform keeps it in body space (rotation/translation invariant); the
+    /// vertex color is unused by the snake shader, so it is left white.
+    pub fn push_shaded_polygon<U, T>(&mut self, default_points: &[Point], uv_of: U, transform: T)
+    where
+        U: Fn(Point) -> (f32, f32),
+        T: Fn(Point) -> Point,
+    {
+        let (positions, indices) = tessellate_fill_positions(default_points);
+        if positions.is_empty() {
+            return;
+        }
+        let white = MqColor::new(1., 1., 1., 1.);
+        // seg_bounds (0,1) → the shader's clamp is a no-op (flat color per poly)
+        let vertices = positions
+            .into_iter()
+            .map(|p| {
+                let (u, v) = uv_of(p);
+                let tp = transform(p);
+                let mut vert = Vertex::new(tp.x, tp.y, 0., u, v, white);
+                vert.normal = vec4(0., 1., 0., 0.);
+                vert
+            })
+            .collect();
+        self.primitives.push(Primitive { vertices, indices });
+    }
+
+    /// Add a shaded triangle-strip ribbon. Each entry is a cross-section
+    /// `(inner, outer, frac)` in default orientation: `inner`/`outer` are the
+    /// two edge points and `frac` is the segment-local body fraction. `u_of`
+    /// maps `frac` to the global `uv.x`; `transform` places points on the board.
+    /// Adjacent cross-sections share vertices, so radial edges are single
+    /// constant-`frac` lines (seamless) — even when `inner` collapses to one
+    /// pivot point, which is then reused across cross-sections with distinct uv.
+    ///
+    /// `seg_bounds` is this segment's `(lo, hi)` uv range; it is passed to every
+    /// vertex (in `normal.xy`) so the shader can clamp the LUT lookup to it,
+    /// keeping color boundaries on the geometry seam instead of a texel.
+    pub fn push_shaded_ribbon<U, T>(
+        &mut self,
+        cross_sections: &[(Point, Point, f32)],
+        seg_bounds: (f32, f32),
+        u_of: U,
+        transform: T,
+    ) where
+        U: Fn(f32) -> f32,
+        T: Fn(Point) -> Point,
+    {
+        if cross_sections.len() < 2 {
+            return;
+        }
+        let white = MqColor::new(1., 1., 1., 1.);
+        let bounds = vec4(seg_bounds.0, seg_bounds.1, 0., 0.);
+        let mut vertices = Vec::with_capacity(cross_sections.len() * 2);
+        for &(inner, outer, frac) in cross_sections {
+            let u = u_of(frac);
+            let ti = transform(inner);
+            let to = transform(outer);
+            let mut vi = Vertex::new(ti.x, ti.y, 0., u, 0., white);
+            let mut vo = Vertex::new(to.x, to.y, 0., u, 1., white);
+            vi.normal = bounds;
+            vo.normal = bounds;
+            vertices.push(vi);
+            vertices.push(vo);
+        }
+        let mut indices = Vec::with_capacity((cross_sections.len() - 1) * 6);
+        for k in 0..cross_sections.len() - 1 {
+            let i = (k * 2) as u16;
+            // inner_k = i, outer_k = i+1, inner_{k+1} = i+2, outer_{k+1} = i+3
+            indices.extend_from_slice(&[i, i + 1, i + 3, i, i + 3, i + 2]);
+        }
+        self.primitives.push(Primitive { vertices, indices });
+    }
+
     pub fn circle(
         &mut self,
         mode: DrawMode,
@@ -198,6 +278,14 @@ impl Mesh {
 
         Mesh { meshes }
     }
+
+    /// Attach a texture (e.g. a snake's palette LUT) to every chunk, so the
+    /// shader's `Texture` sampler resolves to it when the mesh is drawn.
+    pub fn set_texture(&mut self, texture: Texture2D) {
+        for m in &mut self.meshes {
+            m.texture = Some(texture.clone());
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -243,6 +331,17 @@ impl Canvas {
         }
     }
 
+    /// Draw a mesh through the snake shader material. The mesh's chunks must
+    /// carry their palette LUT as their texture (see [`Mesh::set_texture`]).
+    pub fn draw_shaded(&mut self, mesh: &Mesh, material: &SnakeMaterial, param: DrawParam) {
+        set_board_camera(param.dest);
+        material.bind();
+        for m in &mesh.meshes {
+            draw_mesh(m);
+        }
+        material.unbind();
+    }
+
     pub fn finish(&mut self, _ctx: &mut Context) -> GameResult {
         set_default_camera();
         Ok(())
@@ -277,9 +376,11 @@ fn to_primitive(buffers: VertexBuffers<[f32; 2], u16>, color: MqColor) -> Primit
     Primitive { vertices, indices: buffers.indices }
 }
 
-fn tessellate_fill(points: &[Point], color: MqColor) -> Primitive {
+/// Triangulate a filled polygon, returning the vertex positions and indices
+/// (no color/uv). Shared by the flat-color and shaded paths.
+fn tessellate_fill_positions(points: &[Point]) -> (Vec<Point>, Vec<u16>) {
     if points.len() < 3 {
-        return Primitive::default();
+        return (vec![], vec![]);
     }
     let mut pb = Path::builder();
     pb.begin(lyon_path::math::point(points[0].x, points[0].y));
@@ -299,7 +400,17 @@ fn tessellate_fill(points: &[Point], color: MqColor) -> Primitive {
             [p.x, p.y]
         }),
     );
-    to_primitive(buffers, color)
+    let positions = buffers.vertices.iter().map(|[x, y]| Point { x: *x, y: *y }).collect();
+    (positions, buffers.indices)
+}
+
+fn tessellate_fill(points: &[Point], color: MqColor) -> Primitive {
+    let (positions, indices) = tessellate_fill_positions(points);
+    let vertices = positions
+        .into_iter()
+        .map(|p| Vertex::new(p.x, p.y, 0., 0., 0., color))
+        .collect();
+    Primitive { vertices, indices }
 }
 
 fn tessellate_stroke(points: &[Point], width: f32, closed: bool, color: MqColor) -> Primitive {

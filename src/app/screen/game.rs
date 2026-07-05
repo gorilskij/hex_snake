@@ -5,6 +5,7 @@ use crate::gfx::event::EventHandler;
 use crate::gfx::graphics::{Canvas, DrawParam, Mesh};
 use crate::gfx::input::keyboard::{KeyCode, KeyInput};
 use crate::gfx::input::mouse;
+use crate::gfx::material::SnakeMaterial;
 use crate::gfx::Context;
 use rand::prelude::*;
 
@@ -56,7 +57,10 @@ pub struct Game {
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
     portal_mesh: Option<Mesh>,
-    snake_mesh: Option<Mesh>,
+    snake_render: Option<rendering::SnakeRender>,
+    /// Shader material for coloring snakes from their palette LUT. Compiled
+    /// lazily on first draw (needs a live GL context).
+    snake_material: Option<SnakeMaterial>,
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
@@ -113,7 +117,8 @@ impl Game {
             grid_mesh: None,
             border_mesh: None,
             portal_mesh: None,
-            snake_mesh: None,
+            snake_render: None,
+            snake_material: None,
             apple_mesh: None,
             distance_grid_mesh: None,
             player_path_mesh: None,
@@ -164,7 +169,7 @@ impl Game {
             self.border_mesh = None;
             self.portal_mesh = None;
             self.apple_mesh = None;
-            self.snake_mesh = None;
+            self.snake_render = None;
             self.distance_grid_mesh = None;
             self.distance_grid.invalidate();
             self.player_path_mesh = None;
@@ -178,7 +183,7 @@ impl Game {
         env.snakes.clear();
         env.apples.clear();
 
-        self.snake_mesh = None;
+        self.snake_render = None;
         self.apple_mesh = None;
         self.distance_grid_mesh = None;
         self.player_path_mesh = None;
@@ -428,8 +433,8 @@ impl EventHandler<Error> for Game {
             self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, ctx, &mut stats)?);
         }
 
-        if self.snake_mesh.is_none() || playing {
-            self.snake_mesh = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut stats)?);
+        if self.snake_render.is_none() || playing {
+            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, ctx, &mut stats)?);
         }
 
         if env.apples.is_empty() {
@@ -463,23 +468,44 @@ impl EventHandler<Error> for Game {
             self.messages.insert(MessageID::Stats, message);
         }
 
+        // Compile the snake shader lazily (GL context is live during draw).
+        if self.snake_material.is_none() {
+            self.snake_material = Some(SnakeMaterial::new().map_err(Error::from)?);
+        }
+
         let message_drawables = self.get_message_drawables(ctx);
 
-        let meshes = [
-            &self.distance_grid_mesh,
-            &self.grid_mesh,
-            &self.player_path_mesh,
-            &self.snake_mesh,
-            &self.apple_mesh,
-            &self.border_mesh,
-            &self.portal_mesh,
-        ];
+        // Meshes drawn on the default material, split around the snake so the
+        // snake keeps its old z-order (below apples/border, above grid/paths).
+        let before_snake = [&self.distance_grid_mesh, &self.grid_mesh, &self.player_path_mesh];
+        let after_snake = [&self.apple_mesh, &self.border_mesh, &self.portal_mesh];
 
-        if !message_drawables.is_empty() || meshes.iter().any(|mesh| mesh.is_some()) {
+        let has_snake = self
+            .snake_render
+            .as_ref()
+            .is_some_and(|r| !r.shaded.is_empty() || r.black_holes.is_some());
+        let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
+
+        if !message_drawables.is_empty() || has_snake || has_plain {
             let mut canvas = Canvas::from_frame(ctx, self.env.gtx.palette.background_color);
 
             let draw_param = DrawParam::default().dest(self.offset);
-            for mesh in meshes.into_iter().flatten() {
+
+            for mesh in before_snake.into_iter().flatten() {
+                canvas.draw(mesh, draw_param);
+            }
+
+            if let Some(render) = &self.snake_render {
+                let material = self.snake_material.as_ref().unwrap();
+                for (mesh, _lut) in &render.shaded {
+                    canvas.draw_shaded(mesh, material, draw_param);
+                }
+                if let Some(black_holes) = &render.black_holes {
+                    canvas.draw(black_holes, draw_param);
+                }
+            }
+
+            for mesh in after_snake.into_iter().flatten() {
                 canvas.draw(mesh, draw_param);
             }
 
@@ -650,7 +676,7 @@ impl EventHandler<Error> for Game {
                             text = "draw style: hexagon";
                         }
                     }
-                    self.snake_mesh = None;
+                    self.snake_render = None;
                     self.apple_mesh = None;
                     self.display_notification(text);
                 }
