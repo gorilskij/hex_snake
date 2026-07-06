@@ -380,17 +380,17 @@ impl Screen for Game {
         //     L = Some(Instant::now());
         // }
 
-        if playing {
-            // Update the direction of the snake early
-            // to see it turning as soon as possible,
-            // this could happen in the middle of a
-            // game frame. Repeated update s during the
-            // same game frame are blocked
-            for idx in 0..env.snakes.len() {
-                let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
-                snake.update_dir(other_snakes, &env.apples, &env.gtx);
-            }
-        }
+        // if playing {
+        //     // Update the direction of the snake early
+        //     // to see it turning as soon as possible,
+        //     // this could happen in the middle of a
+        //     // game frame. Repeated update s during the
+        //     // same game frame are blocked
+        //     for idx in 0..env.snakes.len() {
+        //         let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
+        //         snake.update_dir(other_snakes, &env.apples, &env.gtx);
+        //     }
+        // }
 
         if self.grid_mesh.is_none() {
             match env.gtx.prefs.draw_grid {

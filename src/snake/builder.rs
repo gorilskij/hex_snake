@@ -155,6 +155,7 @@ impl Builder {
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,
             body,
             state: State::Living,
+            dir_updated: false,
             controller: self
                 .controller
                 .as_ref()

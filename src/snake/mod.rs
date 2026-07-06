@@ -123,11 +123,15 @@ impl Body {
 pub struct Snake {
     pub snake_type: Type,
     pub eat_mechanics: EatMechanics,
-    /// speed is measured in cells/s
+    /// Speed is measured in cells/s
     pub speed: f32,
 
     pub body: Body,
     pub state: State,
+    /// Indicates whether the controller already set a new direction
+    /// within this cell. Direction changes can happen at most once
+    /// per cell.
+    pub dir_updated: bool,
 
     pub controller: Box<dyn Controller + Send + Sync>,
     pub palette: Box<dyn Palette + Send + Sync>,
@@ -187,6 +191,8 @@ impl Snake {
 
     pub fn update_dir(&mut self, other_snakes: impl Snakes, apples: &[Apple], gtx: &GameContext) {
         if self.state != State::Living {
+            // to avoid calling this function again
+            self.dir_updated = true;
             return;
         }
 
@@ -217,6 +223,7 @@ impl Snake {
                 );
             }
             Some(dir) => {
+                self.dir_updated = true;
                 self.body.dir = dir;
                 self.body.turn_start = Some(self.body.segment_fraction);
             }
@@ -227,15 +234,20 @@ impl Snake {
     /// Return value indicates whether a call to advance_cell should be made
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         self.body.segment_fraction += self.speed * elapsed.as_secs_f32();
+
+        let mut cell_boundary_crossed = false;
+
         if self.body.segment_fraction >= 1.0 {
             // TODO: might need to do multiple calls to advance_cell at high speeds
             assert!(self.body.segment_fraction < 2.0);
 
             self.body.segment_fraction -= 1.0;
-            return true;
+            self.dir_updated = false;
+
+            cell_boundary_crossed = true;
         }
 
-        false
+        cell_boundary_crossed
     }
 
     pub fn advance_cell(&mut self, other_snakes: impl Snakes, apples: &[Apple], portals: &[Portal], gtx: &GameContext) {
@@ -252,8 +264,6 @@ impl Snake {
         match &mut self.state {
             State::Dying => self.body.missing_front += 1,
             State::Living => {
-                self.update_dir(other_snakes, apples, gtx);
-
                 // create new head for snake
                 let dir = self.body.dir;
 

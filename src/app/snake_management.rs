@@ -286,6 +286,10 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
             snake.advance_cell(other_snakes, &env.apples, &env.portals, &env.gtx);
         }
 
+        if !snake.dir_updated {
+            snake.update_dir(other_snakes, &env.apples, &env.gtx);
+        }
+
         // remove snake if it ran out of body
         if snake.body.visible_len() == 0 {
             remove_snakes.push(snake_idx);
