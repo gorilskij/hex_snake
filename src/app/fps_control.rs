@@ -117,11 +117,13 @@ impl FpsControl {
         }
     }
 
-    pub fn update(&mut self) -> Duration {
-        let new_update = Instant::now();
-        let elapsed = new_update - self.last_update;
-        self.last_update = new_update;
-        elapsed
+    pub fn update(&mut self) -> Option<Duration> {
+        (self.game_state == State::Playing).then(|| {
+            let new_update = Instant::now();
+            let elapsed = new_update - self.last_update;
+            self.last_update = new_update;
+            elapsed
+        })
     }
 
     // call in draw()
@@ -141,6 +143,7 @@ impl FpsControl {
 
     pub fn play(&mut self) {
         self.game_state = State::Playing;
+        self.last_update = Instant::now();
     }
 
     pub fn pause(&mut self) {

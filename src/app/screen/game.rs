@@ -349,10 +349,10 @@ impl Game {
 
 impl Screen for Game {
     fn update(&mut self) -> Result<()> {
-        let elapsed = self.fps_control.update();
-
-        if self.advance_snakes(elapsed).context("Game::update")? {
-            self.spawn_apples();
+        if let Some(elapsed) = self.fps_control.update() {
+            if self.advance_snakes(elapsed).context("Game::update")? {
+                self.spawn_apples();
+            }
         }
 
         Ok(())

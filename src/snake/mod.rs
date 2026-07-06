@@ -202,15 +202,11 @@ impl Snake {
             .controller
             .next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx);
 
-        // TODO: make conditional and maybe remove from here
-        // advance autopilot
-        let autopilot_dir = self
-            .autopilot
-            .as_mut()
-            .map(|autopilot| autopilot.next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx));
-
         let new_dir = if self.autopilot_control {
-            autopilot_dir.expect("autopilot_control == true with missing autopilot")
+            self.autopilot
+                .as_mut()
+                .map(|autopilot| autopilot.next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx))
+                .expect("autopilot_control == true with missing autopilot")
         } else {
             controller_dir
         };
@@ -233,6 +229,10 @@ impl Snake {
 
     /// Return value indicates whether a call to advance_cell should be made
     pub fn advance(&mut self, elapsed: Duration) -> bool {
+        if self.state == State::Crashed {
+            return false;
+        }
+
         self.body.segment_fraction += self.speed * elapsed.as_secs_f32();
 
         let mut cell_boundary_crossed = false;
@@ -250,7 +250,7 @@ impl Snake {
         cell_boundary_crossed
     }
 
-    pub fn advance_cell(&mut self, other_snakes: impl Snakes, apples: &[Apple], portals: &[Portal], gtx: &GameContext) {
+    pub fn advance_cell(&mut self, portals: &[Portal], gtx: &GameContext) {
         let last_idx = self.body.visible_len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.segments[last_idx].segment_type {
             if *food_left == 0 {
@@ -304,7 +304,7 @@ impl Snake {
                 self.body.segments[0].going_to = Some(dir);
                 self.body.segments.push_front(new_head);
             }
-            State::Crashed => panic!("called advance() on a crashed snake"),
+            State::Crashed => panic!("called advance_cell() on a crashed snake"),
         }
 
         self.body.turn_start = None;

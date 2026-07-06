@@ -283,7 +283,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
         // advance the snake
         if snake.advance(elapsed) {
             new_cell_occupied = true;
-            snake.advance_cell(other_snakes, &env.apples, &env.portals, &env.gtx);
+            snake.advance_cell(&env.portals, &env.gtx);
         }
 
         if !snake.dir_updated {
