@@ -1,10 +1,11 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
+use std::time::Duration;
+
 use anyhow::{Context, Result};
 use rand::distributions::uniform::SampleRange;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
@@ -199,7 +200,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                     }
                 }
             }
-            Collision::Portal(behavior) => todo!(),
+            Collision::Portal(_behavior) => todo!(),
         }
     }
 
@@ -257,10 +258,11 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
     Ok(())
 }
 
-/// Returns the indices of snakes to be deleted (in reverse order so they
-/// can be deleted straight away)
-pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext) {
+/// Return value indicates whether any snake has crossed into a new cell
+pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
     let snakes = &mut env.snakes;
+
+    let mut new_cell_occupied = false;
 
     let mut remove_snakes = vec![];
     for snake_idx in 0..snakes.len() {
@@ -279,7 +281,10 @@ pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext) {
         let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
 
         // advance the snake
-        snake.advance(other_snakes, &env.apples, &env.portals, &env.gtx, ftx);
+        if snake.advance(elapsed) {
+            new_cell_occupied = true;
+            snake.advance_cell(other_snakes, &env.apples, &env.portals, &env.gtx);
+        }
 
         // remove snake if it ran out of body
         if snake.body.visible_len() == 0 {
@@ -291,4 +296,6 @@ pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext) {
     remove_snakes.into_iter().rev().for_each(|i| {
         env.remove_snake(i);
     });
+
+    new_cell_occupied
 }

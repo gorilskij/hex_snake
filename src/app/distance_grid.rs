@@ -5,7 +5,6 @@ use std::mem;
 use itertools::Itertools;
 use macroquad::color::Color;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::color::lerp;
@@ -116,11 +115,7 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
     .collect()
 }
 
-fn generate_mesh(
-    iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
-    gtx: &GameContext,
-    ftx: &FpsContext,
-) -> Mesh {
+fn generate_mesh(iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>, gtx: &GameContext) -> Mesh {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
     let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
@@ -151,8 +146,10 @@ fn generate_mesh(
             Some(d) => calculate_color(d),
         };
 
-        let frame_frac = ftx.last_graphics_update.1;
-        let color = lerp(color_a, color_b, frame_frac);
+        // TODO: think about it
+        // let frame_frac = ftx.last_graphics_update.1;
+        // let color = lerp(color_a, color_b, frame_frac);
+        let color = color_a;
 
         let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
         build_polygon(DrawMode::fill(), &hexagon, color)
@@ -176,26 +173,21 @@ impl DistanceGrid {
     }
 
     // TODO: move to rendering module
-    pub fn mesh(
-        &mut self,
-        player_snake: &Snake,
-        other_snakes: impl Snakes,
-        gtx: &GameContext,
-        ftx: &FpsContext,
-    ) -> Mesh {
-        if self.current.is_none() || ftx.game_frame_num > self.last_update {
-            self.last_update = ftx.game_frame_num;
-            self.last = self
-                .current
-                .replace(find_distances(player_snake, other_snakes, gtx.board_dim));
-        }
+    pub fn mesh(&mut self, player_snake: &Snake, other_snakes: impl Snakes, gtx: &GameContext) -> Mesh {
+        // TODO: think about it
+        // if self.current.is_none() || ftx.game_frame_num > self.last_update {
+        //     self.last_update = ftx.game_frame_num;
+        //     self.last = self
+        //         .current
+        //         .replace(find_distances(player_snake, other_snakes, gtx.board_dim));
+        // }
 
         match &self.current {
             None => unreachable!(),
             Some(current) => match &self.last {
                 None => {
                     // TODO: this is a terrible hack, rewrite this
-                    generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), gtx, ftx)
+                    generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), gtx)
                 }
                 Some(last) => {
                     // let frame_frac = gtx.frame_stamp.1;
@@ -203,7 +195,7 @@ impl DistanceGrid {
                         let dist_b = current.get(pos).copied();
                         (*pos, dist_a, dist_b)
                     });
-                    generate_mesh(iter, gtx, ftx)
+                    generate_mesh(iter, gtx)
                 }
             },
         }

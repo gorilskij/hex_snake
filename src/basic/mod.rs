@@ -21,9 +21,6 @@ pub enum Side {
     Right,
 }
 
-/// (graphics frame number, frame fraction)
-pub type FrameStamp = (usize, f32);
-
 /// Absolute difference between two angles (in radians)
 pub fn angle_distance(angle1: f32, angle2: f32) -> f32 {
     // let d1 = (a1 - a2).abs();

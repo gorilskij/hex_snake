@@ -2,7 +2,6 @@ use itertools::{repeat_n, Itertools};
 use macroquad::input::KeyCode;
 pub use programmed::Move;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
@@ -45,7 +44,6 @@ pub trait Controller {
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
-        ftx: &FpsContext,
     ) -> Option<Dir>;
 
     // only implemented for autopilot-like controllers

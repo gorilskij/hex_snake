@@ -1,16 +1,17 @@
+use std::time::Duration;
+
+use anyhow::Result;
 use hsl::HSL;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
 use crate::apple::Apple;
-use anyhow::Result;
 use crate::color::to_color::ToColor;
-use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape};
+use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
 
-pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, ftx: &FpsContext, stats: &mut Stats) -> Result<Mesh> {
+pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration, stats: &mut Stats) -> Result<Mesh> {
     assert!(!apples.is_empty(), "tried to draw a mesh with 0 apples");
 
     stats.redrawing_apples = true;
@@ -22,7 +23,7 @@ pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, ftx: &FpsContext, stats: 
         let color = match apple.apple_type {
             Food(_) => gtx.palette.apple_color,
             SpawnSnake(_) | SpawnRain => {
-                let hue = 360. * (ftx.elapsed_millis as f64 / 1000. % 1.);
+                let hue = 360. * (elapsed_total.as_millis() as f64 / 1000. % 1.);
                 let hsl = HSL { h: hue, s: 1., l: 0.3 };
                 hsl.to_color()
             }

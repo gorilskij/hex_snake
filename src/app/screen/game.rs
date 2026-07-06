@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use enum_rotate::EnumRotate;
@@ -62,24 +63,10 @@ pub struct Game {
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
-
-    // TODO: move this mechanism to Control
-    /// Consider the draw cache invalid for the
-    /// next n frames, forces a redraw even if
-    /// nothing changed, this is necessary to
-    /// avoid visual glitches
-    draw_cache_invalid: usize,
 }
 
 impl Game {
-    #[allow(dead_code)]
-    pub fn new(
-        cell_dim: CellDim,
-        starting_fps: f64,
-        seeds: Vec<SnakeBuilder>,
-        palette: Palette,
-        apple_spawn_policy: SpawnPolicy,
-    ) -> Self {
+    pub fn new(cell_dim: CellDim, seeds: Vec<SnakeBuilder>, palette: Palette, apple_spawn_policy: SpawnPolicy) -> Self {
         assert!(!seeds.is_empty(), "No players specified");
 
         let mut this = Self {
@@ -98,7 +85,7 @@ impl Game {
                 ),
                 rng: thread_rng(),
             },
-            fps_control: FpsControl::new(starting_fps),
+            fps_control: FpsControl::new(),
             boost: Boost::NoBoost,
 
             // updated immediately after creation
@@ -119,8 +106,6 @@ impl Game {
             apple_mesh: None,
             distance_grid_mesh: None,
             player_path_mesh: None,
-
-            draw_cache_invalid: 0,
         };
         this.update_dim();
         // warning: this spawns apples before there are any snakes
@@ -241,10 +226,12 @@ impl Game {
         self.spawn_apples();
     }
 
-    fn advance_snakes(&mut self) -> Result<()> {
+    // TODO: this doesn't work if a snake advances multiple cells per update call
+    /// Return value indicates whether any snake has advanced through a cell boundary
+    fn advance_snakes(&mut self, elapsed: Duration) -> Result<bool> {
         let env = &mut self.env;
 
-        advance_snakes(env, self.fps_control.context());
+        let new_cells_occupied = advance_snakes(env, elapsed);
 
         // if only ephemeral AIs are left, kill all other snakes
         let dying_or_ephemeral = |snake: &Snake| {
@@ -262,20 +249,20 @@ impl Game {
 
         if env.snakes.is_empty() {
             self.fps_control.game_over();
-            self.draw_cache_invalid = 5;
-            return Ok(());
+            return Ok(false);
         }
 
         let collisions = find_collisions(env);
         let (seeds, game_over) = handle_collisions(env, &collisions);
-        self.refresh_animated_apples();
         self.apple_mesh = None;
 
         if game_over {
             self.fps_control.game_over()
         }
 
-        spawn_snakes(&mut self.env, seeds).context("Game::advance_snakes")
+        spawn_snakes(&mut self.env, seeds).context("Game::advance_snakes")?;
+
+        Ok(new_cells_occupied)
     }
 }
 
@@ -284,13 +271,8 @@ impl Game {
     const CELL_SIDE_MIN: f32 = 5.;
     const CELL_SIDE_MAX: f32 = 1000.;
 
-    fn refresh_animated_apples(&mut self) {
-        self.animated_apples = self.env.apples.iter().any(|apple| apple.apple_type.is_animated());
-    }
-
     fn spawn_apples(&mut self) {
         spawn_apples(&mut self.env);
-        self.refresh_animated_apples();
         self.apple_mesh = None;
     }
 
@@ -332,15 +314,13 @@ impl Game {
     /// Show game and graphics FPS information in the
     /// top-left corner
     fn update_fps_message(&mut self) {
-        let game_fps = self.fps_control.measured_game_fps();
         let graphics_fps = self.fps_control.measured_graphics_fps();
 
-        let game_fps_undershoot = (self.fps_control.game_fps() - game_fps) / game_fps;
         let graphics_fps_undershoot = (60. - graphics_fps) / graphics_fps;
-        let color = if game_fps_undershoot > 0.05 || graphics_fps_undershoot > 0.05 {
+        let color = if graphics_fps_undershoot > 0.05 {
             // > 5% undershoot: red
             Color::from_rgba(200, 0, 0, 255)
-        } else if game_fps_undershoot > 0.02 || graphics_fps_undershoot > 0.02 {
+        } else if graphics_fps_undershoot > 0.02 {
             // > 2% undershoot: orange
             Color::from_rgba(235, 168, 52, 255)
         } else {
@@ -351,7 +331,7 @@ impl Game {
         self.messages.insert(
             MessageID::Fps,
             Message::default(
-                format!("u: {game_fps:.2} g: {graphics_fps:.2}"),
+                format!("fps: {graphics_fps:.2}"),
                 message::Position::TopLeft,
                 color,
                 None,
@@ -369,8 +349,9 @@ impl Game {
 
 impl Screen for Game {
     fn update(&mut self) -> Result<()> {
-        while self.fps_control.can_update() {
-            self.advance_snakes().context("Game::update")?;
+        let elapsed = self.fps_control.update();
+
+        if self.advance_snakes(elapsed).context("Game::update")? {
             self.spawn_apples();
         }
 
@@ -385,7 +366,6 @@ impl Screen for Game {
         }
 
         let env = &mut self.env;
-        let ftx = self.fps_control.context();
         let mut stats = Stats::default();
         let playing = self.fps_control.state() == fps_control::State::Playing;
 
@@ -408,7 +388,7 @@ impl Screen for Game {
             // same game frame are blocked
             for idx in 0..env.snakes.len() {
                 let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
-                snake.update_dir(other_snakes, &env.apples, &env.gtx, ftx);
+                snake.update_dir(other_snakes, &env.apples, &env.gtx);
             }
         }
 
@@ -429,14 +409,19 @@ impl Screen for Game {
         }
 
         if self.snake_render.is_none() || playing {
-            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, ftx, &mut stats)?);
+            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, &mut stats)?);
         }
 
         if env.apples.is_empty() {
             self.apple_mesh = None;
         } else if self.apple_mesh.is_none() || self.animated_apples {
             // only recompute apple mesh if there are animated apples
-            self.apple_mesh = Some(rendering::apple_mesh(&env.apples, &env.gtx, ftx, &mut stats)?);
+            self.apple_mesh = Some(rendering::apple_mesh(
+                &env.apples,
+                &env.gtx,
+                self.fps_control.elapsed_total(),
+                &mut stats,
+            )?);
         }
 
         let player_idx = self.first_player_snake_idx().expect("no player snake");
@@ -445,7 +430,7 @@ impl Screen for Game {
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
         if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
-            self.distance_grid_mesh = Some(self.distance_grid.mesh(player_snake, other_snakes, &env.gtx, ftx));
+            self.distance_grid_mesh = Some(self.distance_grid.mesh(player_snake, other_snakes, &env.gtx));
         }
 
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
@@ -519,13 +504,14 @@ impl Screen for Game {
 
         // TODO: also tie these to a keymap (dvorak-centric for now)
         match keycode {
-            Space => {
-                if let Boost::NoBoost = self.boost {
-                    let fps = self.fps_control.game_fps();
-                    self.boost = Boost::Boost { previous_fps: fps };
-                    self.fps_control.set_game_fps(2. * fps);
-                }
-            }
+            // TODO: reimplement boost
+            // Space => {
+            //     if let Boost::NoBoost = self.boost {
+            //         let fps = self.fps_control.game_fps();
+            //         self.boost = Boost::Boost { previous_fps: fps };
+            //         self.fps_control.set_game_fps(2. * fps);
+            //     }
+            // }
             Escape => match self.fps_control.state() {
                 fps_control::State::GameOver => {
                     self.restart();
@@ -533,7 +519,6 @@ impl Screen for Game {
                 }
                 fps_control::State::Playing => {
                     self.fps_control.pause();
-                    self.draw_cache_invalid = 5;
                 }
                 fps_control::State::Paused => self.fps_control.play(),
             },
@@ -575,13 +560,11 @@ impl Screen for Game {
             F => {
                 if !prefs.display_fps.flip() {
                     self.messages.remove(&MessageID::Fps);
-                    self.draw_cache_invalid = 5;
                 }
             }
             S => {
                 if !prefs.display_stats.flip() {
                     self.messages.remove(&MessageID::Stats);
-                    self.draw_cache_invalid = 5;
                 }
             }
             A => {
@@ -609,42 +592,42 @@ impl Screen for Game {
                     self.display_notification(format!("Can't use autopilot with {} players", self.seeds.len()));
                 }
             }
-            LeftBracket => {
-                let mut new_fps = match self.fps_control.game_fps() {
-                    f if f <= 0.1 => 0.05,
-                    // f if f <= 0.2 => 0.1,
-                    f if f <= 1. => f - 0.1,
-                    f if f <= 20. => f - 1.,
-                    f if f <= 50. => f - 5.,
-                    f if f <= 100. => f - 10.,
-                    f if f <= 500. => f - 50.,
-                    f if f <= 1000. => f - 100.,
-                    f if f <= 10_000. => f - 1000.,
-                    f => f - 10_000.,
-                };
-                new_fps = (new_fps * 100.).round() / 100.;
+            // LeftBracket => {
+            //     let mut new_fps = match self.fps_control.game_fps() {
+            //         f if f <= 0.1 => 0.05,
+            //         // f if f <= 0.2 => 0.1,
+            //         f if f <= 1. => f - 0.1,
+            //         f if f <= 20. => f - 1.,
+            //         f if f <= 50. => f - 5.,
+            //         f if f <= 100. => f - 10.,
+            //         f if f <= 500. => f - 50.,
+            //         f if f <= 1000. => f - 100.,
+            //         f if f <= 10_000. => f - 1000.,
+            //         f => f - 10_000.,
+            //     };
+            //     new_fps = (new_fps * 100.).round() / 100.;
 
-                self.fps_control.set_game_fps(new_fps);
-                self.display_notification(format!("fps: {new_fps}"));
-            }
-            RightBracket => {
-                let mut new_fps = match self.fps_control.game_fps() {
-                    f if f <= 0.05 => 0.1,
-                    // f if f <= 0.1 => 0.2,
-                    f if f < 1. => f + 0.1,
-                    f if f < 20. => (f + 1.).floor(),
-                    f if f < 50. => f + 5.,
-                    f if f < 100. => f + 10.,
-                    f if f < 500. => f + 50.,
-                    f if f < 1000. => f + 100.,
-                    f if f < 10_000. => f + 1000.,
-                    f => f + 10_000.,
-                };
-                new_fps = (new_fps * 100.).round() / 100.;
+            //     self.fps_control.set_game_fps(new_fps);
+            //     self.display_notification(format!("fps: {new_fps}"));
+            // }
+            // RightBracket => {
+            //     let mut new_fps = match self.fps_control.game_fps() {
+            //         f if f <= 0.05 => 0.1,
+            //         // f if f <= 0.1 => 0.2,
+            //         f if f < 1. => f + 0.1,
+            //         f if f < 20. => (f + 1.).floor(),
+            //         f if f < 50. => f + 5.,
+            //         f if f < 100. => f + 10.,
+            //         f if f < 500. => f + 50.,
+            //         f if f < 1000. => f + 100.,
+            //         f if f < 10_000. => f + 1000.,
+            //         f => f + 10_000.,
+            //     };
+            //     new_fps = (new_fps * 100.).round() / 100.;
 
-                self.fps_control.set_game_fps(new_fps);
-                self.display_notification(format!("fps: {new_fps}"));
-            }
+            //     self.fps_control.set_game_fps(new_fps);
+            //     self.display_notification(format!("fps: {new_fps}"));
+            // }
             Tab => {
                 let text;
                 match prefs.draw_style {
@@ -718,12 +701,12 @@ impl Screen for Game {
     fn key_up_event(&mut self, keycode: KeyCode) -> Result<()> {
         use KeyCode::*;
 
-        if keycode == Space {
-            if let Boost::Boost { previous_fps } = self.boost {
-                self.boost = Boost::NoBoost;
-                self.fps_control.set_game_fps(previous_fps);
-            }
-        }
+        // if keycode == Space {
+        //     if let Boost::Boost { previous_fps } = self.boost {
+        //         self.boost = Boost::NoBoost;
+        //         self.fps_control.set_game_fps(previous_fps);
+        //     }
+        // }
 
         Ok(())
     }

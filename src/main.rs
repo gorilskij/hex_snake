@@ -106,13 +106,7 @@ async fn main() {
     let cell_dim = CellDim::from(50.);
     let seeds = vec![player_seed(control_setup)];
 
-    let mut game = Game::new(
-        cell_dim,
-        7.,
-        seeds,
-        Palette::dark(),
-        SpawnPolicy::Random { apple_count: 5 },
-    );
+    let mut game = Game::new(cell_dim, seeds, Palette::dark(), SpawnPolicy::Random { apple_count: 5 });
 
     let mut last_size = (screen_width(), screen_height());
 
