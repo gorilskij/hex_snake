@@ -134,8 +134,8 @@ impl Builder {
             segments: cells,
             missing_front: 0,
             dir,
+            segment_fraction: 0.0,
             turn_start: None,
-            dir_grace: false,
             grow: self
                 .len
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `len`"))?,
@@ -155,6 +155,7 @@ impl Builder {
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,
             body,
             state: State::Living,
+            dir_updated: false,
             controller: self
                 .controller
                 .as_ref()

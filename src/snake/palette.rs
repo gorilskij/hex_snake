@@ -1,10 +1,10 @@
 use hsl::HSL;
+use macroquad::color::Color;
 
 use crate::basic::HexPoint;
 use crate::color::lerp;
 use crate::color::oklab::OkLab;
 use crate::color::to_color::ToColor;
-use macroquad::color::Color;
 use crate::snake::{Body, SegmentType};
 
 macro_rules! gray {
@@ -41,7 +41,6 @@ pub enum EatenColor {
 fn invert_rgb(color: Color) -> Color {
     Color::new(1. - color.r, 1. - color.g, 1. - color.b, color.a)
 }
-
 
 #[derive(Copy, Clone, Debug)]
 pub enum PaletteTemplate {
@@ -265,11 +264,7 @@ pub fn build_snake_lut(styles: &[SegmentStyle]) -> Vec<Color> {
 }
 
 pub trait Palette: Send + Sync {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a>;
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a>;
     // TODO: refactor as
     //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_fraction: f32) -> Color;
     //  this avoids unnecessary work for hex palette and is called exactly as many times as needed
@@ -376,11 +371,7 @@ pub struct Solid {
 }
 
 impl Palette for Solid {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        _frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         Box::new(body.segments.iter().map(|segment| {
@@ -402,20 +393,16 @@ pub struct RGBGradient {
 }
 
 impl Palette for RGBGradient {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, frame_fraction as f64);
+        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
-                let r = (i + body.missing_front) as f64 + frame_fraction as f64;
+                let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
                 let start_color = lerp(self.head_color, self.tail_color, (r / logical_len) as f32);
                 let end_color = lerp(self.head_color, self.tail_color, ((r + 1.) / logical_len) as f32);
 
@@ -441,20 +428,16 @@ pub struct HSLGradient {
 }
 
 impl Palette for HSLGradient {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, frame_fraction as f64);
+        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
-                let r = (i + body.missing_front) as f64 + frame_fraction as f64;
+                let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
                 let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
 
@@ -497,18 +480,13 @@ pub struct OkLabGradient {
 }
 
 impl Palette for OkLabGradient {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
-        let frame_fraction = frame_fraction as f64;
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, frame_fraction);
+        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
-            let r = (i + body.missing_front) as f64 + frame_fraction;
+            let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
             match segment.segment_type {
@@ -540,11 +518,7 @@ pub struct AlternatingFixed {
 }
 
 impl Palette for AlternatingFixed {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        _frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         let head = Some(body.segments[0].pos);
@@ -582,16 +556,12 @@ pub struct Alternating {
 }
 
 impl Palette for Alternating {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             // How far along the snake we currently are (in units of segments)
-            let r = (i + body.missing_front) as f64 + frame_fraction as f64;
+            let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
 
             match segment.segment_type {
                 Normal | BlackHole { .. } => {

@@ -2,7 +2,6 @@ use std::cmp::max;
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use crate::basic::FrameStamp;
 use crate::support::time::Instant;
 
 /// Stores an instant along with the number of frames it represents
@@ -89,201 +88,70 @@ pub enum State {
     GameOver,
 }
 
-// TODO: rename
-// Carries information useful to game logic
-pub struct FpsContext {
-    pub game_state: State,
-    /// Graphics frame number and fraction as of the last call to draw(),
-    /// note that the speed of graphics frames is decided by the ggez runtime
-    pub last_graphics_update: FrameStamp,
-    /// Logic frame number as of the last call to update()
-    pub game_frame_num: usize, // logic frame number
-    /// Total number of milliseconds that have elapsed
-    /// since the game was started
-    pub elapsed_millis: u128,
-}
-
 // combines fps with game state management
 pub struct FpsControl {
-    game_fps: f64,
-    game_frame_duration: Duration,
+    game_state: State,
+
     start: Instant,
+
     last_update: Instant,
 
-    // number of game frames that still need to be
-    // performed to catch up with the current time
-    // TODO: zero this when it gets too large to prevent lag
-    missed_updates: Option<usize>,
-
-    // counting frames
     graphics_frame_num: usize,
-
-    // empirical measurement of framerates unrelated to
-    // control mechanism
-    measured_game_fps: FpsCounter,
+    elapsed_total: Duration,
     measured_graphics_fps: FpsCounter,
-
-    context: FpsContext,
-
-    // used to store the frame fraction when the game is paused
-    frozen_frame_fraction: Option<f32>,
 }
 
 impl FpsControl {
-    pub fn new(fps: f64) -> Self {
+    pub fn new() -> Self {
         let now = Instant::now();
         Self {
-            game_fps: fps,
-            game_frame_duration: Duration::from_nanos((1_000_000_000.0 / fps) as u64),
+            game_state: State::Playing,
+
             start: now,
+
             last_update: now,
 
-            missed_updates: None,
-
             graphics_frame_num: 0,
-
-            measured_game_fps: FpsCounter::new(fps),
+            elapsed_total: Duration::ZERO,
             measured_graphics_fps: FpsCounter::new(60.),
-
-            context: FpsContext {
-                game_state: State::Playing,
-                last_graphics_update: FrameStamp::default(),
-                game_frame_num: 0,
-                elapsed_millis: 0,
-            },
-
-            frozen_frame_fraction: None,
         }
     }
 
-    pub fn game_fps(&self) -> f64 {
-        self.game_fps
-    }
-
-    pub fn context(&self) -> &FpsContext {
-        &self.context
-    }
-
-    // adjust self.last_update to make it match the expected
-    // frame_fraction, this is done when resuming a paused game
-    // and when adjusting fps to ensure smoothness
-    fn set_last_update_to_match_frame_fraction(&mut self, frac: f32) {
-        self.last_update = Instant::now() - Duration::from_secs_f32(frac * self.game_frame_duration.as_secs_f32());
-    }
-
-    pub fn set_game_fps(&mut self, fps: f64) {
-        if (self.game_fps - fps).abs() < f64::EPSILON {
-            return;
-        }
-
-        // freeze frame fraction
-        let frame_fraction = self.frame_fraction();
-
-        self.game_fps = fps;
-        self.game_frame_duration = Duration::from_nanos((1_000_000_000.0 / fps) as u64);
-        self.measured_game_fps.set_expected_fps(fps);
-
-        // revert to saved frame fraction
-        self.set_last_update_to_match_frame_fraction(frame_fraction);
-    }
-
-    // repeatedly called in update() as while loop condition
-    // WARN: this will perform as many updates as the framerate requires
-    //  this can cause strong lag a high framerates
-    // TODO: automatically lower game framerate to keep up graphics framerate
-    pub fn can_update(&mut self) -> bool {
-        if self.context.game_state != State::Playing {
-            return false;
-        }
-
-        let can_update = match &mut self.missed_updates {
-            Some(0) => {
-                self.missed_updates = None;
-                false
-            }
-            Some(n) => {
-                *n -= 1;
-                true
-            }
-            None => {
-                // calculate how many game frames should have occurred
-                // since the last call to can_update
-                let game_frames =
-                    self.last_update.elapsed().as_secs_f64() / self.game_frame_duration.as_secs_f64();
-                let missed_updates = game_frames as usize;
-
-                if missed_updates > 0 {
-                    // set last_update to the ideal frame boundary so frame_fraction()
-                    // counts from the right origin without a separate remainder term
-                    self.last_update = Instant::now() - self.game_frame_duration.mul_f64(game_frames.fract());
-
-                    self.missed_updates = Some(missed_updates - 1);
-
-                    self.measured_game_fps.register_frames(missed_updates);
-
-                    true
-                } else {
-                    false
-                }
-            }
-        };
-
-        if can_update {
-            self.context.game_frame_num += 1;
-        }
-
-        can_update
+    pub fn update(&mut self) -> Option<Duration> {
+        (self.game_state == State::Playing).then(|| {
+            let new_update = Instant::now();
+            let elapsed = new_update - self.last_update;
+            self.last_update = new_update;
+            elapsed
+        })
     }
 
     // call in draw()
     pub fn graphics_frame(&mut self) {
         self.measured_graphics_fps.register_frames(1);
+        self.elapsed_total = self.start.elapsed();
         self.graphics_frame_num += 1;
-        self.context.last_graphics_update = self.frame_stamp();
-        self.context.elapsed_millis = self.start.elapsed().as_millis();
+    }
+
+    pub fn elapsed_total(&self) -> Duration {
+        self.elapsed_total
     }
 
     pub fn state(&self) -> State {
-        self.context.game_state
+        self.game_state
     }
 
     pub fn play(&mut self) {
-        self.context.game_state = State::Playing;
-        self.measured_game_fps.reset();
-        match self.frozen_frame_fraction.take() {
-            None => (),
-            Some(frac) => self.set_last_update_to_match_frame_fraction(frac),
-        }
+        self.game_state = State::Playing;
+        self.last_update = Instant::now();
     }
 
     pub fn pause(&mut self) {
-        self.context.game_state = State::Paused;
-        self.frozen_frame_fraction = Some(self.frame_fraction());
-        self.missed_updates = None;
+        self.game_state = State::Paused;
     }
 
     pub fn game_over(&mut self) {
-        self.context.game_state = State::GameOver;
-        self.frozen_frame_fraction = Some(self.frame_fraction());
-    }
-
-    // fraction of the current game frame that has elapsed
-    pub fn frame_fraction(&self) -> f32 {
-        match self.frozen_frame_fraction {
-            Some(frac) => frac,
-            None => {
-                let frac = self.last_update.elapsed().as_secs_f32() / self.game_frame_duration.as_secs_f32();
-                frac.min(1.)
-            }
-        }
-    }
-
-    pub fn frame_stamp(&self) -> FrameStamp {
-        (self.graphics_frame_num, self.frame_fraction())
-    }
-
-    pub fn measured_game_fps(&self) -> f64 {
-        self.measured_game_fps.fps()
+        self.game_state = State::GameOver;
     }
 
     pub fn measured_graphics_fps(&self) -> f64 {

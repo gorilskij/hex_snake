@@ -86,7 +86,7 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
         .eat_mechanics(eat_mechanics)
         .palette(snake::PaletteTemplate::rainbow(true))
         .controller(snake_control::Template::Keyboard { control_setup, knowledge })
-        .speed(1.)
+        .speed(7.)
         .autopilot(pathfinder::Template::WithBackup {
             main: Box::new(pathfinder::Template::WeightedBFS),
             backup: Box::new(pathfinder::Template::SpaceFilling),
@@ -106,13 +106,7 @@ async fn main() {
     let cell_dim = CellDim::from(50.);
     let seeds = vec![player_seed(control_setup)];
 
-    let mut game = Game::new(
-        cell_dim,
-        7.,
-        seeds,
-        Palette::dark(),
-        SpawnPolicy::Random { apple_count: 5 },
-    );
+    let mut game = Game::new(cell_dim, seeds, Palette::dark(), SpawnPolicy::Random { apple_count: 5 });
 
     let mut last_size = (screen_width(), screen_height());
 

@@ -1,4 +1,3 @@
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::Dir;
@@ -17,7 +16,6 @@ impl Controller for Rain {
         other_snakes: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,
-        _ftx: &FpsContext,
     ) -> Option<Dir> {
         if body.segments[0].pos.v == gtx.board_dim.v - 1 {
             // todo!("return die")

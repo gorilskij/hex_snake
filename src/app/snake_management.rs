@@ -1,10 +1,11 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
+use std::time::Duration;
+
 use anyhow::{Context, Result};
 use rand::distributions::uniform::SampleRange;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
@@ -199,7 +200,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                     }
                 }
             }
-            Collision::Portal(behavior) => todo!(),
+            Collision::Portal(_behavior) => todo!(),
         }
     }
 
@@ -215,13 +216,20 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
         // avoid spawning too close to player snake heads
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
 
-        let mut occupied_cells = get_occupied_cells(&env.snakes, &env.apples);
+        // cells that are actually taken (snake bodies + apples)
+        let occupied_cells = get_occupied_cells(&env.snakes, &env.apples);
+
+        // additionally avoid spawning too close to player snake heads, but only
+        // as a preference: on a board small enough that the neighborhood wraps
+        // around and covers everything, fall back to plain occupancy so we can
+        // still spawn wherever there is real free space
+        let mut preferred_free = occupied_cells.clone();
         for snake in env.snakes.iter().filter(|s| s.snake_type == snake::Type::Player) {
             let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, board_dim);
-            occupied_cells.extend_from_slice(&neighborhood);
+            preferred_free.extend_from_slice(&neighborhood);
         }
-        occupied_cells.sort_unstable();
-        occupied_cells.dedup();
+        preferred_free.sort_unstable();
+        preferred_free.dedup();
 
         match snake_builder.pos {
             Some(pos) => {
@@ -232,12 +240,14 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
                     .any(|p| p == pos);
 
                 if is_occupied {
-                    eprintln!("warning: failed to spawn snake, no free spaces left");
+                    eprintln!("warning: failed to spawn snake, requested cell is occupied");
                     continue;
                 }
             }
             None => {
-                if let Some(pos) = random_free_spot(&occupied_cells, board_dim, &mut env.rng) {
+                let spot = random_free_spot(&preferred_free, board_dim, &mut env.rng)
+                    .or_else(|| random_free_spot(&occupied_cells, board_dim, &mut env.rng));
+                if let Some(pos) = spot {
                     snake_builder.pos = Some(pos);
                 } else {
                     eprintln!("warning: failed to spawn snake, no free spaces left");
@@ -257,29 +267,39 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
     Ok(())
 }
 
-/// Returns the indices of snakes to be deleted (in reverse order so they
-/// can be deleted straight away)
-pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext) {
+/// Return value indicates whether any snake has crossed into a new cell
+pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
     let snakes = &mut env.snakes;
+
+    let mut new_cell_occupied = false;
 
     let mut remove_snakes = vec![];
     for snake_idx in 0..snakes.len() {
-        // set snake to die if it ran out of life
-        match &mut snakes[snake_idx].snake_type {
-            snake::Type::Competitor { life: Some(life) } | snake::Type::Killer { life: Some(life) } => {
-                if *life == 0 {
-                    snakes[snake_idx].die();
-                } else {
-                    *life -= 1;
-                }
-            }
-            _ => (),
-        }
-
         let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
 
         // advance the snake
-        snake.advance(other_snakes, &env.apples, &env.portals, &env.gtx, ftx);
+        if snake.advance(elapsed) {
+            // block is entered if the snake crossed a cell boundary
+            new_cell_occupied = true;
+
+            match &mut snake.snake_type {
+                snake::Type::Competitor { life: Some(life) } | snake::Type::Killer { life: Some(life) } => {
+                    if *life == 0 {
+                        // set snake to die if it ran out of life
+                        snake.die();
+                    } else {
+                        *life -= 1;
+                    }
+                }
+                _ => (),
+            }
+
+            snake.advance_cell(&env.portals, &env.gtx);
+        }
+
+        if !snake.dir_updated {
+            snake.update_dir(other_snakes, &env.apples, &env.gtx);
+        }
 
         // remove snake if it ran out of body
         if snake.body.visible_len() == 0 {
@@ -291,4 +311,6 @@ pub fn advance_snakes(env: &mut Environment, ftx: &FpsContext) {
     remove_snakes.into_iter().rev().for_each(|i| {
         env.remove_snake(i);
     });
+
+    new_cell_occupied
 }
