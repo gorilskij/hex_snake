@@ -28,7 +28,6 @@ use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
-use crate::support::invert::Invert;
 use crate::support::material::snake_material;
 use crate::support::mesh::{set_board_camera, Mesh};
 use crate::view::snakes::OtherSnakes;
@@ -406,7 +405,7 @@ impl Screen for Game {
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
             self.player_path_mesh =
-                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats).invert()?;
+                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats).transpose()?;
         }
 
         if env.gtx.prefs.display_stats {

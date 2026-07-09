@@ -8,6 +8,7 @@ extern crate derive_more;
 extern crate lazy_static;
 extern crate core;
 
+use enum_map_lite::enum_map;
 use macroquad::input::{get_keys_pressed, get_keys_released};
 use macroquad::window::{next_frame, screen_height, screen_width, Conf};
 
@@ -65,17 +66,14 @@ fn window_conf() -> Conf {
 /// `App::new` used to construct).
 fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
     let eat_mechanics = EatMechanics::new(
-        by_segment_type! {
-            SegmentType::DISCR_EATEN => EatBehavior::PassOver,
+        enum_map! {
+            // any payload works — keying ignores the fields
+            SegmentType::Eaten { original_food: 0, food_left: 0 } => EatBehavior::PassOver,
             _ => EatBehavior::Crash,
         },
-        by_snake_type! {
-            snake::Type::Rain => by_segment_type! {
-                _ => EatBehavior::PassUnder,
-            },
-            _ => by_segment_type! {
-                _ => EatBehavior::Crash,
-            },
+        enum_map! {
+            snake::Type::Rain => enum_map! { _ => EatBehavior::PassUnder },
+            _ => enum_map! { _ => EatBehavior::Crash },
         },
     );
 

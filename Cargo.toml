@@ -24,6 +24,7 @@ ezing = "~0.2"
 static_assertions = "~1.1"
 enum-rotate = "0.1.0"
 num-traits = "0.2.18"
+enum-map-lite = { path = "../enum-map-lite" }
 
 [profile.release]
 debug = true

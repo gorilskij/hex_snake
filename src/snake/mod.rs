@@ -1,8 +1,7 @@
 use std::collections::{HashSet, VecDeque};
-use std::mem;
-use std::mem::Discriminant;
 use std::time::Duration;
 
+use enum_map_lite::Enum;
 pub use palette::{Palette, PaletteTemplate};
 
 use crate::app::game_context::GameContext;
@@ -25,7 +24,7 @@ pub enum State {
     Crashed,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Enum)]
 pub enum Type {
     Player,
     Simulated,
@@ -34,27 +33,13 @@ pub enum Type {
     Rain,
 }
 
-// NOTE: if variants are added, the code should be checked for
-//       usages of Discriminant<SegmentType>, match statements
-//       using this type should be extended accordingly
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Enum)]
 pub enum SegmentType {
     Normal,
     Eaten { original_food: u32, food_left: u32 },
     Crashed,
     // does not advance, sucks the rest of the snake in
     BlackHole { just_created: bool },
-}
-
-impl SegmentType {
-    pub fn discriminant(&self) -> Discriminant<Self> {
-        mem::discriminant(self)
-    }
-
-    pub const DISCR_NORMAL: Discriminant<Self> = mem::discriminant(&Self::Normal);
-    pub const DISCR_EATEN: Discriminant<Self> = mem::discriminant(&Self::Eaten { original_food: 0, food_left: 0 });
-    pub const DISCR_CRASHED: Discriminant<Self> = mem::discriminant(&Self::Crashed);
-    pub const DISCR_BLACK_HOLE: Discriminant<Self> = mem::discriminant(&Self::BlackHole { just_created: false });
 }
 
 pub type ZIndex = i32;

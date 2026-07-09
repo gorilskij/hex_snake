@@ -149,7 +149,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                 let snake1 = &snakes[snake1_index];
                 let snake2 = &snakes[snake2_index];
                 let snake2_type = snake2.snake_type;
-                let snake2_segment_type = snake2.body.segments[snake2_segment_index].segment_type.discriminant();
+                let snake2_segment_type = snake2.body.segments[snake2_segment_index].segment_type;
                 let behavior = snake1.eat_mechanics.eat_other(snake2_type, snake2_segment_type);
 
                 match behavior {
@@ -179,7 +179,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
             }
             Collision::Itself { snake_index, snake_segment_index } => {
                 let snake = &snakes[snake_index];
-                let segment_type = snake.body.segments[snake_segment_index].segment_type.discriminant();
+                let segment_type = snake.body.segments[snake_segment_index].segment_type;
                 let behavior = snake.eat_mechanics.eat_self(segment_type);
                 match behavior {
                     Cut => snakes[snake_index].cut_at(snake_segment_index),
