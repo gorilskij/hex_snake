@@ -266,23 +266,25 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
 
     let mut remove_snakes = vec![];
     for snake_idx in 0..snakes.len() {
-        // set snake to die if it ran out of life
-        match &mut snakes[snake_idx].snake_type {
-            snake::Type::Competitor { life: Some(life) } | snake::Type::Killer { life: Some(life) } => {
-                if *life == 0 {
-                    snakes[snake_idx].die();
-                } else {
-                    *life -= 1;
-                }
-            }
-            _ => (),
-        }
-
         let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
 
         // advance the snake
         if snake.advance(elapsed) {
+            // block is entered if the snake crossed a cell boundary
             new_cell_occupied = true;
+
+            match &mut snake.snake_type {
+                snake::Type::Competitor { life: Some(life) } | snake::Type::Killer { life: Some(life) } => {
+                    if *life == 0 {
+                        // set snake to die if it ran out of life
+                        snake.die();
+                    } else {
+                        *life -= 1;
+                    }
+                }
+                _ => (),
+            }
+
             snake.advance_cell(&env.portals, &env.gtx);
         }
 

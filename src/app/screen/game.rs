@@ -32,16 +32,9 @@ use crate::support::material::snake_material;
 use crate::support::mesh::Mesh;
 use crate::view::snakes::OtherSnakes;
 
-#[derive(Copy, Clone)]
-enum Boost {
-    NoBoost,
-    Boost { previous_fps: f64 },
-}
-
 pub struct Game {
     env: Environment,
     fps_control: FpsControl,
-    boost: Boost,
 
     /// Offset to center the grid in the window
     offset: Point,
@@ -86,7 +79,6 @@ impl Game {
                 rng: thread_rng(),
             },
             fps_control: FpsControl::new(),
-            boost: Boost::NoBoost,
 
             // updated immediately after creation
             offset: Point { x: 0., y: 0. },
@@ -369,29 +361,6 @@ impl Screen for Game {
         let mut stats = Stats::default();
         let playing = self.fps_control.state() == fps_control::State::Playing;
 
-        // TODO: diagnose why the interframe interval is
-        //  1ms sometimes when out of focus
-        // unsafe {
-        //     use std::time::Instant;
-        //     static mut L: Option<Instant> = None;
-        //     if let Some(last) = L {
-        //         println!("{}ms", last.elapsed().as_millis());
-        //     }
-        //     L = Some(Instant::now());
-        // }
-
-        // if playing {
-        //     // Update the direction of the snake early
-        //     // to see it turning as soon as possible,
-        //     // this could happen in the middle of a
-        //     // game frame. Repeated update s during the
-        //     // same game frame are blocked
-        //     for idx in 0..env.snakes.len() {
-        //         let (snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, idx);
-        //         snake.update_dir(other_snakes, &env.apples, &env.gtx);
-        //     }
-        // }
-
         if self.grid_mesh.is_none() {
             match env.gtx.prefs.draw_grid {
                 DrawGrid::Grid => self.grid_mesh = Some(rendering::grid_mesh(&env.gtx)?),
@@ -504,14 +473,6 @@ impl Screen for Game {
 
         // TODO: also tie these to a keymap (dvorak-centric for now)
         match keycode {
-            // TODO: reimplement boost
-            // Space => {
-            //     if let Boost::NoBoost = self.boost {
-            //         let fps = self.fps_control.game_fps();
-            //         self.boost = Boost::Boost { previous_fps: fps };
-            //         self.fps_control.set_game_fps(2. * fps);
-            //     }
-            // }
             Escape => match self.fps_control.state() {
                 fps_control::State::GameOver => {
                     self.restart();
@@ -592,42 +553,6 @@ impl Screen for Game {
                     self.display_notification(format!("Can't use autopilot with {} players", self.seeds.len()));
                 }
             }
-            // LeftBracket => {
-            //     let mut new_fps = match self.fps_control.game_fps() {
-            //         f if f <= 0.1 => 0.05,
-            //         // f if f <= 0.2 => 0.1,
-            //         f if f <= 1. => f - 0.1,
-            //         f if f <= 20. => f - 1.,
-            //         f if f <= 50. => f - 5.,
-            //         f if f <= 100. => f - 10.,
-            //         f if f <= 500. => f - 50.,
-            //         f if f <= 1000. => f - 100.,
-            //         f if f <= 10_000. => f - 1000.,
-            //         f => f - 10_000.,
-            //     };
-            //     new_fps = (new_fps * 100.).round() / 100.;
-
-            //     self.fps_control.set_game_fps(new_fps);
-            //     self.display_notification(format!("fps: {new_fps}"));
-            // }
-            // RightBracket => {
-            //     let mut new_fps = match self.fps_control.game_fps() {
-            //         f if f <= 0.05 => 0.1,
-            //         // f if f <= 0.1 => 0.2,
-            //         f if f < 1. => f + 0.1,
-            //         f if f < 20. => (f + 1.).floor(),
-            //         f if f < 50. => f + 5.,
-            //         f if f < 100. => f + 10.,
-            //         f if f < 500. => f + 50.,
-            //         f if f < 1000. => f + 100.,
-            //         f if f < 10_000. => f + 1000.,
-            //         f => f + 10_000.,
-            //     };
-            //     new_fps = (new_fps * 100.).round() / 100.;
-
-            //     self.fps_control.set_game_fps(new_fps);
-            //     self.display_notification(format!("fps: {new_fps}"));
-            // }
             Tab => {
                 let text;
                 match prefs.draw_style {
@@ -663,21 +588,17 @@ impl Screen for Game {
                 };
                 self.display_notification(text);
             }
-            #[rustfmt::skip] // rustfmt doesn't know about let guards
-                k if let Some(idx) = numeric_keys
-                    .iter()
-                    .position(|nk| *nk == k) =>
-                    {
-                        let new_food = idx as Food + 1;
-                        prefs.apple_food = new_food;
-                        // change existing apples
-                        for apple in &mut self.env.apples {
-                            if let apple::Type::Food(food) = &mut apple.apple_type {
-                                *food = new_food;
-                            }
-                        }
-                        self.display_notification(format!("Apple food: {new_food}"));
+            k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
+                let new_food = idx as Food + 1;
+                prefs.apple_food = new_food;
+                // change existing apples
+                for apple in &mut self.env.apples {
+                    if let apple::Type::Food(food) = &mut apple.apple_type {
+                        *food = new_food;
                     }
+                }
+                self.display_notification(format!("Apple food: {new_food}"));
+            }
             k @ Down | k @ Up => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
                 let mut new_side_length = self.env.gtx.cell_dim.side * factor;
@@ -694,19 +615,6 @@ impl Screen for Game {
                 }
             }
         }
-
-        Ok(())
-    }
-
-    fn key_up_event(&mut self, keycode: KeyCode) -> Result<()> {
-        use KeyCode::*;
-
-        // if keycode == Space {
-        //     if let Boost::Boost { previous_fps } = self.boost {
-        //         self.boost = Boost::NoBoost;
-        //         self.fps_control.set_game_fps(previous_fps);
-        //     }
-        // }
 
         Ok(())
     }
