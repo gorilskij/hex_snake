@@ -126,8 +126,6 @@ pub fn handle_collisions<Rng: rand::Rng>(
                         let seed = SnakeBuilder::default()
                             .snake_type(snake::Type::Rain)
                             .eat_mechanics(EatMechanics::always(EatBehavior::Die))
-                            // TODO: factor out palette into game palette
-                            // .palette(snake::PaletteTemplate::alternating_white())
                             .palette(env.gtx.palette.palette_rain)
                             .controller(snake_control::Template::Rain)
                             .dir(Dir::D);

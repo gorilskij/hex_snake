@@ -7,14 +7,15 @@ use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
-// TODO: rename to something more descriptive like apple seeker
-pub struct Algorithm {
+/// Seeks apples by pathfinding to the nearest one (using the wrapped
+/// [`PathFinder`] strategy) and following the resulting path.
+pub struct AppleSeeker {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
     // implicitly, the target is always the last cell in the path
     pub path: Option<Path>,
 }
 
-impl Algorithm {
+impl AppleSeeker {
     fn recalculate_path(
         &mut self,
         body: &Body,
@@ -69,7 +70,7 @@ impl Algorithm {
     }
 }
 
-impl Controller for Algorithm {
+impl Controller for AppleSeeker {
     fn next_dir(
         &mut self,
         body: &mut Body,

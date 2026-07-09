@@ -11,7 +11,7 @@ use crate::snake::Body;
 use crate::snake_control::pathfinder::Path;
 use crate::view::snakes::Snakes;
 
-mod algorithm;
+mod apple_seeker;
 mod keyboard;
 mod killer;
 mod mouse;
@@ -29,7 +29,7 @@ pub enum Template {
     Mouse,
     Programmed(Vec<Move>),
     Killer,
-    Algorithm(pathfinder::Template),
+    AppleSeeker(pathfinder::Template),
     Rain,
 }
 
@@ -157,7 +157,7 @@ impl Template {
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         // use crate::snake_control::a_star::AStar;
-        use algorithm::Algorithm;
+        use apple_seeker::AppleSeeker;
         use keyboard::Keyboard;
         use killer::Killer;
         use mouse::Mouse;
@@ -176,7 +176,7 @@ impl Template {
                 wait: 0,
             }),
             Template::Killer => Box::new(Killer),
-            Template::Algorithm(template) => Box::new(Algorithm {
+            Template::AppleSeeker(template) => Box::new(AppleSeeker {
                 pathfinder: template.into_pathfinder(start_dir),
                 path: None,
             }),
