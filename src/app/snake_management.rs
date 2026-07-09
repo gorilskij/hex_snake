@@ -216,13 +216,20 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
         // avoid spawning too close to player snake heads
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
 
-        let mut occupied_cells = get_occupied_cells(&env.snakes, &env.apples);
+        // cells that are actually taken (snake bodies + apples)
+        let occupied_cells = get_occupied_cells(&env.snakes, &env.apples);
+
+        // additionally avoid spawning too close to player snake heads, but only
+        // as a preference: on a board small enough that the neighborhood wraps
+        // around and covers everything, fall back to plain occupancy so we can
+        // still spawn wherever there is real free space
+        let mut preferred_free = occupied_cells.clone();
         for snake in env.snakes.iter().filter(|s| s.snake_type == snake::Type::Player) {
             let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, board_dim);
-            occupied_cells.extend_from_slice(&neighborhood);
+            preferred_free.extend_from_slice(&neighborhood);
         }
-        occupied_cells.sort_unstable();
-        occupied_cells.dedup();
+        preferred_free.sort_unstable();
+        preferred_free.dedup();
 
         match snake_builder.pos {
             Some(pos) => {
@@ -233,12 +240,14 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
                     .any(|p| p == pos);
 
                 if is_occupied {
-                    eprintln!("warning: failed to spawn snake, no free spaces left");
+                    eprintln!("warning: failed to spawn snake, requested cell is occupied");
                     continue;
                 }
             }
             None => {
-                if let Some(pos) = random_free_spot(&occupied_cells, board_dim, &mut env.rng) {
+                let spot = random_free_spot(&preferred_free, board_dim, &mut env.rng)
+                    .or_else(|| random_free_spot(&occupied_cells, board_dim, &mut env.rng));
+                if let Some(pos) = spot {
                     snake_builder.pos = Some(pos);
                 } else {
                     eprintln!("warning: failed to spawn snake, no free spaces left");

@@ -37,9 +37,11 @@ impl Algorithm {
                 // recalculate if we're not following the path
                 let head = body.segments[0].pos;
                 if head == path[0] {
-                } else if head == path[1] {
+                } else if path.len() >= 2 && head == path[1] {
                     path.pop_front();
                 } else {
+                    // strayed off the path (or the path is too short to
+                    // still be following it) -> recalculate
                     println!("recalculate: not following path");
                     break 'arm true;
                 }
