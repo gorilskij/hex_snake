@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use enum_rotate::EnumRotate;
+use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
 use macroquad::input::{show_mouse, KeyCode};
 use macroquad::material::Material;
@@ -29,7 +30,7 @@ use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
 use crate::support::invert::Invert;
 use crate::support::material::snake_material;
-use crate::support::mesh::Mesh;
+use crate::support::mesh::{set_board_camera, Mesh};
 use crate::view::snakes::OtherSnakes;
 
 pub struct Game {
@@ -434,26 +435,36 @@ impl Screen for Game {
         if !message_drawables.is_empty() || has_snake || has_plain {
             clear_background(self.env.gtx.palette.background_color);
 
+            // Every board mesh renders under the same board camera, so set it
+            // once here rather than per-mesh: each set_camera flushes the GPU
+            // batch, so per-mesh camera sets were the bulk of the frame's cost.
+            set_board_camera(self.offset);
+
             for mesh in before_snake.into_iter().flatten() {
-                mesh.draw(self.offset);
+                mesh.draw();
             }
 
             if let Some(render) = &self.snake_render {
                 let material = self.snake_material.as_ref().unwrap();
                 for (mesh, _lut) in &render.shaded {
-                    mesh.draw_shaded(self.offset, material);
+                    mesh.draw_shaded(material);
                 }
                 if let Some(black_holes) = &render.black_holes {
-                    black_holes.draw(self.offset);
+                    black_holes.draw();
                 }
             }
 
             for mesh in after_snake.into_iter().flatten() {
-                mesh.draw(self.offset);
+                mesh.draw();
             }
 
-            for drawable in message_drawables {
-                drawable.draw();
+            // Text lives in screen space; switch to the default camera once for
+            // all messages rather than once per message.
+            if !message_drawables.is_empty() {
+                set_default_camera();
+                for drawable in message_drawables {
+                    drawable.draw();
+                }
             }
         }
 

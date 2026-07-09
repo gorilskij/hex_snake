@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
 use macroquad::text::{draw_text, measure_text};
 use macroquad::window::screen_width;
@@ -60,9 +59,10 @@ pub struct MessageDrawable {
 }
 
 impl MessageDrawable {
+    /// Draws the message text. The caller must have set the **default (screen-
+    /// space) camera** (`set_default_camera`) beforehand — text lives in
+    /// screen space, not the board-offset camera.
     pub fn draw(&self) {
-        // text lives in screen space, not the board-offset camera
-        set_default_camera();
         let color = self.color;
         draw_text(&self.text, self.x, self.y, self.font_size as f32, color);
     }

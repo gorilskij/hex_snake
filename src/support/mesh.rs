@@ -224,15 +224,19 @@ impl Mesh {
         }
     }
 
-    pub fn draw(&self, dest: Point) {
-        set_board_camera(dest);
+    /// Draws the mesh's chunks on the default material. The caller must have
+    /// set the **board camera** ([`set_board_camera`]) beforehand — the
+    /// vertices are in board-local space.
+    pub fn draw(&self) {
         for m in &self.meshes {
             draw_mesh(m);
         }
     }
 
-    pub fn draw_shaded(&self, dest: Point, material: &Material) {
-        set_board_camera(dest);
+    /// Draws the mesh's chunks through `material` (e.g. the snake shader). As
+    /// with [`Mesh::draw`], the caller must have set the **board camera**
+    /// beforehand.
+    pub fn draw_shaded(&self, material: &Material) {
         gl_use_material(material);
         for m in &self.meshes {
             draw_mesh(m);
