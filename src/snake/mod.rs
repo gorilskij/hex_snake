@@ -5,7 +5,7 @@ use enum_map_lite::Enum;
 pub use palette::{Palette, PaletteTemplate};
 
 use crate::app::game_context::GameContext;
-use crate::app::portal::{Behavior, Portal};
+use crate::app::portal::{alt, Behavior, Portal};
 use crate::apple::Apple;
 use crate::basic::{Dir, Frames, HexDim, HexPoint};
 use crate::snake::eat_mechanics::{EatMechanics, Knowledge};
@@ -235,7 +235,7 @@ impl Snake {
         cell_boundary_crossed
     }
 
-    pub fn advance_cell(&mut self, portals: &[Portal], gtx: &GameContext) {
+    pub fn advance_cell(&mut self, portals: &[Portal], alt_portals: &[alt::Portal], gtx: &GameContext) {
         let last_idx = self.body.visible_len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.segments[last_idx].segment_type {
             if *food_left == 0 {
@@ -258,6 +258,23 @@ impl Snake {
 
                 let mut dir_changed_in_teleport = None;
                 for portal in portals {
+                    match portal.check(head_pos, new_head_pos_raw) {
+                        Some(Behavior::Die) => self.die(),
+                        Some(Behavior::TeleportTo(dest, new_dir)) => {
+                            new_head_pos = dest;
+                            if dir != new_dir {
+                                dir_changed_in_teleport = Some(new_dir);
+                            }
+                            self.body.dir = new_dir;
+                        }
+                        Some(Behavior::WrapAround) => {
+                            println!("TODO: implement")
+                        }
+                        Some(Behavior::PassThrough) | Some(Behavior::Nothing) | None => {}
+                        Some(Behavior::Unreachable) => panic!("Tried to execute unreachable portal behavior"),
+                    }
+                }
+                for portal in alt_portals {
                     match portal.check(head_pos, new_head_pos_raw) {
                         Some(Behavior::Die) => self.die(),
                         Some(Behavior::TeleportTo(dest, new_dir)) => {

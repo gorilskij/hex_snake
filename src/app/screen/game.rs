@@ -16,6 +16,7 @@ use crate::app::game_context::GameContext;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
+use crate::app::portal::alt;
 use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::{Environment, Screen};
@@ -49,6 +50,7 @@ pub struct Game {
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
     portal_mesh: Option<Mesh>,
+    alt_portal_mesh: Option<Mesh>,
     snake_render: Option<rendering::SnakeRender>,
     /// Shader material for coloring snakes from their palette LUT. Compiled
     /// lazily on first draw (needs a live GL context).
@@ -66,8 +68,11 @@ impl Game {
             env: Environment {
                 snakes: vec![],
                 apples: vec![],
-                // no portals in the minimal wasm build
                 portals: vec![],
+                alt_portals: vec![
+                    alt::Portal::cell(HexPoint { h: 4, v: 4 }, HexPoint { h: 12, v: 4 }),
+                    alt::Portal::cell(HexPoint { h: 12, v: 4 }, HexPoint { h: 4, v: 4 }),
+                ],
                 gtx: GameContext::new(
                     // updated immediately after creation
                     HexPoint { h: 0, v: 0 },
@@ -93,6 +98,7 @@ impl Game {
             grid_mesh: None,
             border_mesh: None,
             portal_mesh: None,
+            alt_portal_mesh: None,
             snake_render: None,
             snake_material: None,
             apple_mesh: None,
@@ -137,11 +143,16 @@ impl Game {
                 .portals
                 .iter_mut()
                 .for_each(move |portal| portal.update(board_dim));
+            self.env
+                .alt_portals
+                .iter_mut()
+                .for_each(move |portal| portal.update(board_dim));
 
             // invalidate
             self.grid_mesh = None;
             self.border_mesh = None;
             self.portal_mesh = None;
+            self.alt_portal_mesh = None;
             self.apple_mesh = None;
             self.snake_render = None;
             self.distance_grid_mesh = None;
@@ -377,6 +388,10 @@ impl Screen for Game {
             self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, &mut stats)?);
         }
 
+        if self.alt_portal_mesh.is_none() {
+            self.alt_portal_mesh = Some(rendering::alt_portal_mesh(&mut env.alt_portals, &env.gtx, &mut stats)?);
+        }
+
         if self.snake_render.is_none() || playing {
             self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, &mut stats)?);
         }
@@ -405,7 +420,8 @@ impl Screen for Game {
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
             self.player_path_mesh =
-                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats).transpose()?;
+                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats)
+                    .transpose()?;
         }
 
         if env.gtx.prefs.display_stats {
@@ -423,7 +439,12 @@ impl Screen for Game {
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
         let before_snake = [&self.distance_grid_mesh, &self.grid_mesh, &self.player_path_mesh];
-        let after_snake = [&self.apple_mesh, &self.border_mesh, &self.portal_mesh];
+        let after_snake = [
+            &self.apple_mesh,
+            &self.alt_portal_mesh,
+            &self.border_mesh,
+            &self.portal_mesh,
+        ];
 
         let has_snake = self
             .snake_render

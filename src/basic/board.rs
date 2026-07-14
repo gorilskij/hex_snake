@@ -1,18 +1,24 @@
 use rand::distributions::uniform::SampleRange;
 use rand::Rng;
 
+use crate::app::portal::alt;
 use crate::apple::Apple;
 use crate::basic::{HexDim, HexPoint};
 use crate::snake::Snake;
 
-pub fn get_occupied_cells(snakes: &[Snake], apples: &[Apple]) -> Vec<HexPoint> {
-    // upper bound
+pub fn get_occupied_cells(snakes: &[Snake], apples: &[Apple], alt_portals: &[alt::Portal]) -> Vec<HexPoint> {
+    // upper bound excluding portals
     let max_occupied_cells = snakes.iter().map(|snake| snake.body.visible_len()).sum::<usize>() + apples.len();
-    let mut occupied_cells = Vec::with_capacity(max_occupied_cells);
+    let mut occupied_cells = Vec::with_capacity(max_occupied_cells + 20); // assume 20 for portals
+
     occupied_cells.extend(apples.iter().map(|apple| apple.pos));
     for snake in snakes {
         occupied_cells.extend(snake.body.segments.iter().map(|hex| hex.pos));
     }
+    for portal in alt_portals {
+        occupied_cells.extend_from_slice(&portal.dead_cells);
+    }
+
     occupied_cells.sort_unstable();
     occupied_cells.dedup();
     occupied_cells

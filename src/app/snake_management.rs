@@ -215,7 +215,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
         const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
 
         // cells that are actually taken (snake bodies + apples)
-        let occupied_cells = get_occupied_cells(&env.snakes, &env.apples);
+        let occupied_cells = get_occupied_cells(&env.snakes, &env.apples, &env.alt_portals);
 
         // additionally avoid spawning too close to player snake heads, but only
         // as a preference: on a board small enough that the neighborhood wraps
@@ -292,7 +292,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
                 _ => (),
             }
 
-            snake.advance_cell(&env.portals, &env.gtx);
+            snake.advance_cell(&env.portals, &env.alt_portals, &env.gtx);
         }
 
         if !snake.dir_updated {

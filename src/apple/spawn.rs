@@ -146,7 +146,8 @@ pub fn spawn_apples<Rng: rand::Rng>(env: &mut Environment<Rng>) {
             break;
         }
 
-        let occupied_cells = occupied_cells.get_or_insert_with(|| get_occupied_cells(&env.snakes, &env.apples));
+        let occupied_cells =
+            occupied_cells.get_or_insert_with(|| get_occupied_cells(&env.snakes, &env.apples, &env.alt_portals));
 
         let new_apple = match &mut env.gtx.apple_spawn_policy {
             SpawnPolicy::None => panic!("shouldn't be spawning with SpawnPolicy::None"),

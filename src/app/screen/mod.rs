@@ -1,12 +1,12 @@
+use anyhow::{Context, Result};
 pub use game::Game;
 use macroquad::input::KeyCode;
 use rand::rngs::ThreadRng;
 
 use crate::app::game_context::GameContext;
-use crate::app::portal::Portal;
+use crate::app::portal::{alt, Portal};
 pub use crate::app::prefs::Prefs;
 use crate::apple::Apple;
-use anyhow::{Context, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
 
@@ -41,6 +41,7 @@ pub struct Environment<Rng = ThreadRng> {
     // TODO: specialized Vec for that
     pub apples: Vec<Apple>,
     pub portals: Vec<Portal>,
+    pub alt_portals: Vec<alt::Portal>,
     pub gtx: GameContext,
     pub rng: Rng,
 }

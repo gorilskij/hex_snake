@@ -1,40 +1,33 @@
 use std::fmt::{Debug, Formatter};
 
+use super::Behavior;
 use crate::basic::{Dir, HexDim, HexPoint};
-
-pub mod alt;
 
 // TODO: support negative indices for portals to make them
 //       stick to the right or bottom edge
-
-#[derive(Copy, Clone, Debug)]
-pub enum Behavior {
-    Die,
-    TeleportTo(HexPoint, Dir),
-    WrapAround,
-    PassThrough,
-    Nothing,
-    Unreachable,
-}
 
 /// An edge is uniquely identified by the two
 /// hexagons it touches.
 #[derive(Debug)]
 pub struct Edge {
-    pub a: HexPoint,
-    pub b: HexPoint,
-    pub behavior_ab: Behavior, // when passing from a to b
-    pub behavior_ba: Behavior, // when passing from b to a
+    pub from: HexPoint,
+    pub to: HexPoint,
+    pub behavior: Behavior,
 }
 
 type GetEdges = Box<dyn Fn(HexDim) -> Vec<Edge>>;
+type GetDeadCells = Box<dyn Fn(HexDim) -> Vec<HexPoint>>;
 
 // TODO: make portal template
 pub struct Portal {
     // the board dimension that current edges are adapted to
     pub board_dim: HexDim,
+
     pub get_edges: GetEdges,
     pub edges: Vec<Edge>,
+
+    pub get_dead_cells: GetDeadCells,
+    pub dead_cells: Vec<HexDim>,
 }
 
 impl Debug for Portal {
@@ -46,98 +39,111 @@ impl Debug for Portal {
 impl Portal {
     // TODO: template instead of some random dim
     //       this is very hacky
-    pub fn new(get_edges: GetEdges) -> Self {
+    pub fn new(get_edges: GetEdges, get_dead_cells: GetDeadCells) -> Self {
         let board_dim = HexDim { h: 10, v: 10 };
         let edges = get_edges(board_dim);
-        Self { board_dim, edges, get_edges }
+        let dead_cells = get_dead_cells(board_dim);
+        Self {
+            board_dim,
+            get_edges,
+            edges,
+            get_dead_cells,
+            dead_cells,
+        }
     }
 
     pub fn update(&mut self, board_dim: HexDim) {
         if board_dim != self.board_dim {
             self.board_dim = board_dim;
-            self.edges = (self.get_edges)(board_dim)
+            self.edges = (self.get_edges)(board_dim);
+            self.dead_cells = (self.get_dead_cells)(board_dim);
         }
     }
 
     pub fn check(&self, from: HexPoint, to: HexPoint) -> Option<Behavior> {
         // assert_ne!(from, to);
         for edge in &self.edges {
-            if edge.a == from && edge.b == to {
-                return Some(edge.behavior_ab);
-            } else if edge.b == from && edge.a == to {
-                return Some(edge.behavior_ba);
+            if edge.from == from && edge.to == to {
+                return Some(edge.behavior);
             }
         }
         None
     }
 
     pub fn cell(pos: HexPoint, dest: HexPoint) -> Self {
-        Self::new(Box::new(move |_| {
-            Dir::iter()
-                .map(|dir| Edge {
-                    a: pos - dir,
-                    b: pos,
-                    behavior_ab: Behavior::TeleportTo(dest + dir, dir),
-                    behavior_ba: Behavior::Nothing,
-                })
-                .collect()
-        }))
+        Self::new(
+            Box::new(move |_| {
+                Dir::iter()
+                    .map(|dir| Edge {
+                        from: pos - dir,
+                        to: pos,
+                        behavior: Behavior::TeleportTo(dest + dir, dir),
+                    })
+                    .collect()
+            }),
+            Box::new(move |_| vec![pos]),
+        )
     }
 
     pub fn cells_inverse(pos1: HexPoint, pos2: HexPoint) -> Vec<Self> {
         // TODO: make sure the positions don't touch the edges of the board
 
         vec![
-            Portal::new(Box::new(move |_| {
-                Dir::iter()
-                    .map(move |dir| Edge {
-                        a: pos1 + dir,
-                        b: pos1,
-                        behavior_ab: Behavior::TeleportTo(pos2 + dir, dir),
-                        behavior_ba: Behavior::Nothing,
-                    })
-                    .collect()
-            })),
-            Portal::new(Box::new(move |_| {
-                Dir::iter()
-                    .map(move |dir| Edge {
-                        a: pos2 + dir,
-                        b: pos2,
-                        behavior_ab: Behavior::TeleportTo(pos1 + dir, dir),
-                        behavior_ba: Behavior::Nothing,
-                    })
-                    .collect()
-            })),
+            Portal::new(
+                Box::new(move |_| {
+                    Dir::iter()
+                        .map(move |dir| Edge {
+                            from: pos1 + dir,
+                            to: pos1,
+                            behavior: Behavior::TeleportTo(pos2 + dir, dir),
+                        })
+                        .collect()
+                }),
+                Box::new(move |_| vec![pos1]),
+            ),
+            Portal::new(
+                Box::new(move |_| {
+                    Dir::iter()
+                        .map(move |dir| Edge {
+                            from: pos2 + dir,
+                            to: pos2,
+                            behavior: Behavior::TeleportTo(pos1 + dir, dir),
+                        })
+                        .collect()
+                }),
+                Box::new(move |_| vec![pos2]),
+            ),
         ]
     }
 
     pub fn sun_cell() -> Self {
-        Portal::new(Box::new(|board_dim| {
-            let center = board_dim / 2;
+        Portal::new(
+            Box::new(|board_dim| {
+                let center = board_dim / 2;
 
-            Dir::iter()
-                .flat_map(|dir| {
-                    let outer = center.find_border(dir, board_dim);
+                Dir::iter()
+                    .flat_map(|dir| {
+                        let outer = center.find_border(dir, board_dim);
 
-                    [
-                        Edge {
-                            a: center + dir,
-                            b: center,
-                            behavior_ab: Behavior::TeleportTo(outer, -dir),
-                            behavior_ba: Behavior::Nothing,
-                            // TODO: constructor that checks validity of Unreachable
-                            //       and validity of a and b points
-                        },
-                        Edge {
-                            a: outer,
-                            b: outer + dir,
-                            behavior_ab: Behavior::TeleportTo(center + dir, dir),
-                            behavior_ba: Behavior::Unreachable,
-                        },
-                    ]
-                })
-                .collect()
-        }))
+                        [
+                            Edge {
+                                from: center + dir,
+                                to: center,
+                                behavior: Behavior::TeleportTo(outer, -dir),
+                                // TODO: constructor that checks validity of Unreachable
+                                //       and validity of a and b points
+                            },
+                            Edge {
+                                from: outer,
+                                to: outer + dir,
+                                behavior: Behavior::TeleportTo(center + dir, dir),
+                            },
+                        ]
+                    })
+                    .collect()
+            }),
+            Box::new(|board_dim| vec![board_dim / 2]),
+        )
         // vec![
         //     // top
         //     Edge {
