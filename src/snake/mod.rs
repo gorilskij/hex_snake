@@ -105,11 +105,20 @@ impl Body {
     }
 }
 
+/// A temporary speed multiplier from eating a speed-boost apple
+#[derive(Copy, Clone, Debug)]
+pub struct SpeedBoost {
+    /// The snake's speed before the boost, restored when the boost expires
+    pub base_speed: f32,
+    pub remaining: Duration,
+}
+
 pub struct Snake {
     pub snake_type: Type,
     pub eat_mechanics: EatMechanics,
     /// Speed is measured in cells/s
     pub speed: f32,
+    pub speed_boost: Option<SpeedBoost>,
 
     pub body: Body,
     pub state: State,
@@ -212,10 +221,36 @@ impl Snake {
         }
     }
 
+    /// Apply a temporary speed boost; if one is already active, refresh its
+    /// duration instead of compounding the multiplier
+    pub fn boost_speed(&mut self, factor: f32, duration: Duration) {
+        match &mut self.speed_boost {
+            Some(boost) => boost.remaining = duration,
+            None => {
+                self.speed_boost = Some(SpeedBoost {
+                    base_speed: self.speed,
+                    remaining: duration,
+                });
+                self.speed *= factor;
+            }
+        }
+    }
+
     /// Return value indicates whether a call to advance_cell should be made
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         if self.state == State::Crashed {
             return false;
+        }
+
+        // tick down an active speed boost
+        if let Some(boost) = &mut self.speed_boost {
+            match boost.remaining.checked_sub(elapsed) {
+                Some(remaining) => boost.remaining = remaining,
+                None => {
+                    self.speed = boost.base_speed;
+                    self.speed_boost = None;
+                }
+            }
         }
 
         self.body.segment_fraction += self.speed * elapsed.as_secs_f32();

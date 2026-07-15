@@ -153,6 +153,7 @@ impl Builder {
             speed: self
                 .speed
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,
+            speed_boost: None,
             body,
             state: State::Living,
             dir_updated: false,

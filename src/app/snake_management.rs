@@ -9,7 +9,7 @@ use rand::distributions::uniform::SampleRange;
 use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, random_free_spot};
-use crate::basic::{Dir, HexPoint};
+use crate::basic::{Dir, Food, HexPoint};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, SegmentType, State};
@@ -90,21 +90,30 @@ pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
     collisions
 }
 
-// TODO: maybe replace Environment with GameContext
-/// Returns `(spawn_snakes, game_over)` where
-///  - `spawn_snakes` describes the new snakes to spawn
-///    (competitors, killers, etc.)
-///  - `game_over` tells whether a snake crashed and ended the game
+/// What happened as a result of this update's collisions, for the game layer
+/// to act on (spawning snakes, scoring, notifications)
 #[must_use]
-pub fn handle_collisions<Rng: rand::Rng>(
-    env: &mut Environment<Rng>,
-    collisions: &[Collision],
-) -> (Vec<SnakeBuilder>, bool) {
+#[derive(Default)]
+pub struct CollisionOutcome {
+    /// New snakes to spawn (competitors, killers, etc.)
+    pub spawn_snakes: Vec<SnakeBuilder>,
+    /// Whether a snake crashed and ended the game
+    pub game_over: bool,
+    /// Food value of each apple eaten by a player snake (fed to the combo
+    /// system, one entry per apple)
+    pub player_eaten: Vec<Food>,
+    /// Whether a player snake picked up a speed boost
+    pub player_boosted: bool,
+    /// How many frenzy apples were eaten (each bursts extra food apples)
+    pub frenzies: usize,
+}
+
+// TODO: maybe replace Environment with GameContext
+pub fn handle_collisions<Rng: rand::Rng>(env: &mut Environment<Rng>, collisions: &[Collision]) -> CollisionOutcome {
     let board_width = env.gtx.board_dim.h;
 
-    let mut spawn_snakes = vec![];
+    let mut outcome = CollisionOutcome::default();
     let mut to_remove = vec![];
-    let mut game_over = false;
     for collision in collisions.iter().copied() {
         use EatBehavior::*;
         let snakes = &mut env.snakes;
@@ -119,9 +128,23 @@ pub fn handle_collisions<Rng: rand::Rng>(
                         snakes[snake_index].body.segments[0].segment_type = SegmentType::Eaten {
                             original_food: *food,
                             food_left: *food,
+                        };
+                        if snakes[snake_index].snake_type == snake::Type::Player {
+                            outcome.player_eaten.push(*food);
                         }
                     }
-                    SpawnSnake(seed) => spawn_snakes.push((**seed).clone()),
+                    SpeedBoost => {
+                        /// How much faster and for how long a speed-boost apple makes a snake
+                        const BOOST_FACTOR: f32 = 1.6;
+                        const BOOST_DURATION: Duration = Duration::from_secs(8);
+
+                        snakes[snake_index].boost_speed(BOOST_FACTOR, BOOST_DURATION);
+                        if snakes[snake_index].snake_type == snake::Type::Player {
+                            outcome.player_boosted = true;
+                        }
+                    }
+                    Frenzy => outcome.frenzies += 1,
+                    SpawnSnake(seed) => outcome.spawn_snakes.push((**seed).clone()),
                     SpawnRain => {
                         let seed = SnakeBuilder::default()
                             .snake_type(snake::Type::Rain)
@@ -131,7 +154,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                             .dir(Dir::D);
 
                         for h in (0..board_width).step_by(5) {
-                            spawn_snakes.push(
+                            outcome.spawn_snakes.push(
                                 seed.clone()
                                     .pos(HexPoint { h, v: 0 })
                                     .len((3..10).sample_single(&mut env.rng))
@@ -164,7 +187,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                     }
                     Crash => {
                         snakes[snake1_index].crash();
-                        game_over = true;
+                        outcome.game_over = true;
                     }
                     Die => snakes[snake1_index].die(),
                     PassUnder => {
@@ -185,7 +208,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
                     Cut => snakes[snake_index].cut_at(snake_segment_index),
                     Crash => {
                         snakes[snake_index].crash();
-                        game_over = true;
+                        outcome.game_over = true;
                     }
                     Die => snakes[snake_index].die(),
                     PassUnder => {
@@ -204,7 +227,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
 
     env.remove_apples(to_remove);
 
-    (spawn_snakes, game_over)
+    outcome
 }
 
 pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) -> Result<()> {

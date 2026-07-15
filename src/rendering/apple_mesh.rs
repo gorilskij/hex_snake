@@ -20,10 +20,15 @@ pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration, 
 
     for apple in apples {
         use crate::apple::Type::*;
+        let time = elapsed_total.as_millis() as f64 / 1000.;
+        // pulsing lightness for power apples
+        let pulse = 0.35 + 0.15 * (time * std::f64::consts::TAU).sin();
         let color = match apple.apple_type {
             Food(_) => gtx.palette.apple_color,
+            SpeedBoost => HSL { h: 45., s: 1., l: pulse }.to_color(),
+            Frenzy => HSL { h: 310., s: 1., l: pulse }.to_color(),
             SpawnSnake(_) | SpawnRain => {
-                let hue = 360. * (elapsed_total.as_millis() as f64 / 1000. % 1.);
+                let hue = 360. * (time % 1.);
                 let hsl = HSL { h: hue, s: 1., l: 0.3 };
                 hsl.to_color()
             }

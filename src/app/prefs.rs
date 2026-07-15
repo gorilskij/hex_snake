@@ -27,6 +27,8 @@ pub struct Prefs {
     pub prob_spawn_competitor: f64,
     pub prob_spawn_killer: f64,
     pub prob_spawn_rain: f64,
+    pub prob_spawn_speed_boost: f64,
+    pub prob_spawn_frenzy: f64,
 
     pub draw_style: rendering::Style,
     // pub draw_ai_debug_artifacts: bool,
@@ -50,6 +52,8 @@ impl Default for Prefs {
             prob_spawn_competitor: 0.025,
             prob_spawn_killer: 0.015,
             prob_spawn_rain: 0.002,
+            prob_spawn_speed_boost: 0.04,
+            prob_spawn_frenzy: 0.02,
 
             draw_style: rendering::Style::Smooth,
             // draw_ai_debug_artifacts: false,

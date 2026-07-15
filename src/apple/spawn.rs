@@ -101,6 +101,8 @@ fn generate_apple_type(prefs: &Prefs, palette: &app::Palette, rng: &mut impl Rng
             prefs.prob_spawn_competitor,
             prefs.prob_spawn_killer,
             prefs.prob_spawn_rain,
+            prefs.prob_spawn_speed_boost,
+            prefs.prob_spawn_frenzy,
             0.0,
         ];
         weights[weights.len() - 1] = 1.0 - weights.iter().sum::<f64>();
@@ -122,10 +124,35 @@ fn generate_apple_type(prefs: &Prefs, palette: &app::Palette, rng: &mut impl Rng
                     .speed(1.),
             )),
             2 => apple::Type::SpawnRain,
+            3 => apple::Type::SpeedBoost,
+            4 => apple::Type::Frenzy,
             _ => apple::Type::Food(prefs.apple_food),
         }
     } else {
         apple::Type::Food(prefs.apple_food)
+    }
+}
+
+/// Burst-spawn `count` plain food apples at random free spots, on top of
+/// whatever the spawn policy maintains (used by the frenzy apple). Extra
+/// apples above the policy's count simply persist until eaten.
+pub fn spawn_extra_apples<Rng: rand::Rng>(env: &mut Environment<Rng>, count: usize) {
+    let mut occupied_cells = get_occupied_cells(&env.snakes, &env.apples, &env.alt_portals);
+
+    for _ in 0..count {
+        let Some(pos) = random_free_spot(&occupied_cells, env.gtx.board_dim, &mut env.rng) else {
+            break;
+        };
+
+        match occupied_cells.binary_search(&pos) {
+            Ok(_) => unreachable!("random_free_spot returned an occupied cell"),
+            Err(idx) => occupied_cells.insert(idx, pos),
+        }
+
+        env.apples.push(Apple {
+            pos,
+            apple_type: apple::Type::Food(env.gtx.prefs.apple_food),
+        });
     }
 }
 

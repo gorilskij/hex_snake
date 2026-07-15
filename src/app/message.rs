@@ -15,6 +15,8 @@ pub enum MessageID {
     Notification,
     /// Stats about the game
     Stats,
+    /// Persistent score and combo display
+    Score,
 }
 
 pub enum Position {

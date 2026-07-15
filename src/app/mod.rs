@@ -13,3 +13,4 @@ mod prefs;
 pub(crate) mod screen;
 mod snake_management;
 pub mod stats;
+pub(crate) mod wormhole;

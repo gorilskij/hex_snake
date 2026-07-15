@@ -16,13 +16,13 @@ use crate::app::game_context::GameContext;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
-use crate::app::portal::alt;
 use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::{Environment, Screen};
 use crate::app::snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes};
 use crate::app::stats::Stats;
-use crate::apple::spawn::{spawn_apples, SpawnPolicy};
+use crate::app::wormhole::Wormholes;
+use crate::apple::spawn::{spawn_apples, spawn_extra_apples, SpawnPolicy};
 use crate::apple::{self, Apple};
 use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
 use crate::rendering;
@@ -42,6 +42,17 @@ pub struct Game {
 
     seeds: Vec<SnakeBuilder>,
     animated_apples: bool,
+
+    /// Dynamic wormhole pairs that open and collapse over time
+    wormholes: Wormholes,
+
+    /// Game-clock time (only advances while playing)
+    game_time: Duration,
+    score: u32,
+    /// Score multiplier, grows when apples are eaten in quick succession
+    combo: u32,
+    /// Game-clock time the player last ate an apple, for the combo window
+    last_eaten_at: Option<Duration>,
 
     distance_grid: DistanceGrid,
 
@@ -69,10 +80,8 @@ impl Game {
                 snakes: vec![],
                 apples: vec![],
                 portals: vec![],
-                alt_portals: vec![
-                    alt::Portal::cell(HexPoint { h: 4, v: 4 }, HexPoint { h: 12, v: 4 }),
-                    alt::Portal::cell(HexPoint { h: 12, v: 4 }, HexPoint { h: 4, v: 4 }),
-                ],
+                // populated by the wormhole system
+                alt_portals: vec![],
                 gtx: GameContext::new(
                     // updated immediately after creation
                     HexPoint { h: 0, v: 0 },
@@ -90,6 +99,13 @@ impl Game {
 
             seeds,
             animated_apples: false,
+
+            wormholes: Wormholes::new(),
+
+            game_time: Duration::ZERO,
+            score: 0,
+            combo: 1,
+            last_eaten_at: None,
 
             distance_grid: DistanceGrid::new(),
 
@@ -143,10 +159,10 @@ impl Game {
                 .portals
                 .iter_mut()
                 .for_each(move |portal| portal.update(board_dim));
-            self.env
-                .alt_portals
-                .iter_mut()
-                .for_each(move |portal| portal.update(board_dim));
+
+            // wormhole positions may be invalid on the new board; collapse
+            // them all, they reopen on the next update
+            self.wormholes.clear(&mut self.env);
 
             // invalidate
             self.grid_mesh = None;
@@ -163,6 +179,14 @@ impl Game {
 
     // TODO: R as a restart shortcut but only in debug mode
     fn restart(&mut self) {
+        self.wormholes.clear(&mut self.env);
+        self.alt_portal_mesh = None;
+
+        self.game_time = Duration::ZERO;
+        self.score = 0;
+        self.combo = 1;
+        self.last_eaten_at = None;
+
         let env = &mut self.env;
 
         env.snakes.clear();
@@ -256,16 +280,55 @@ impl Game {
         }
 
         let collisions = find_collisions(env);
-        let (seeds, game_over) = handle_collisions(env, &collisions);
+        let outcome = handle_collisions(env, &collisions);
         self.apple_mesh = None;
 
-        if game_over {
+        if outcome.game_over {
             self.fps_control.game_over()
         }
 
-        spawn_snakes(&mut self.env, seeds).context("Game::advance_snakes")?;
+        for food in &outcome.player_eaten {
+            self.register_eaten(*food);
+        }
+
+        if outcome.player_boosted {
+            self.display_notification("Speed boost!");
+        }
+
+        if outcome.frenzies > 0 {
+            /// How many extra food apples each frenzy apple bursts into
+            const FRENZY_APPLES: usize = 10;
+
+            spawn_extra_apples(&mut self.env, outcome.frenzies * FRENZY_APPLES);
+            self.display_notification("Frenzy!");
+        }
+
+        spawn_snakes(&mut self.env, outcome.spawn_snakes).context("Game::advance_snakes")?;
 
         Ok(new_cells_occupied)
+    }
+
+    /// The time window within which apples must be eaten to keep the combo
+    /// multiplier alive
+    const COMBO_WINDOW: Duration = Duration::from_secs(3);
+    const MAX_COMBO: u32 = 8;
+
+    /// Whether the combo multiplier is currently active (i.e. the last apple
+    /// was eaten recently enough)
+    fn combo_alive(&self) -> bool {
+        self.last_eaten_at
+            .is_some_and(|at| self.game_time - at <= Self::COMBO_WINDOW)
+    }
+
+    /// Update score and combo for one eaten apple
+    fn register_eaten(&mut self, food: Food) {
+        self.combo = if self.combo_alive() {
+            (self.combo + 1).min(Self::MAX_COMBO)
+        } else {
+            1
+        };
+        self.last_eaten_at = Some(self.game_time);
+        self.score += food * self.combo;
     }
 }
 
@@ -342,6 +405,36 @@ impl Game {
         );
     }
 
+    /// Show the score (and an active combo multiplier) in the top-right
+    /// corner, below the notification slot
+    fn update_score_message(&mut self) {
+        let combo_active = self.combo_alive() && self.combo > 1;
+
+        let (text, color) = if combo_active {
+            (
+                format!("{} x{}", self.score, self.combo),
+                // gold while a combo is running
+                Color::from_rgba(255, 200, 60, 255),
+            )
+        } else {
+            (self.score.to_string(), crate::color::WHITE)
+        };
+
+        self.messages.insert(
+            MessageID::Score,
+            Message {
+                text,
+                position: message::Position::TopRight,
+                h_margin: Message::DEFAULT_MARGIN,
+                // sit below the notification message
+                v_margin: Message::DEFAULT_MARGIN + 50.,
+                font_size: Message::DEFAULT_FONT_SIZE,
+                color,
+                disappear: None,
+            },
+        );
+    }
+
     fn first_player_snake_idx(&self) -> Option<usize> {
         self.env
             .snakes
@@ -353,6 +446,12 @@ impl Game {
 impl Screen for Game {
     fn update(&mut self) -> Result<()> {
         if let Some(elapsed) = self.fps_control.update() {
+            self.game_time += elapsed;
+
+            if self.wormholes.update(&mut self.env, elapsed) {
+                self.alt_portal_mesh = None;
+            }
+
             if self.advance_snakes(elapsed).context("Game::update")? {
                 self.spawn_apples();
             }
@@ -367,6 +466,8 @@ impl Screen for Game {
         if self.env.gtx.prefs.display_fps {
             self.update_fps_message();
         }
+
+        self.update_score_message();
 
         let env = &mut self.env;
         let mut stats = Stats::default();
@@ -395,6 +496,8 @@ impl Screen for Game {
         if self.snake_render.is_none() || playing {
             self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, &mut stats)?);
         }
+
+        self.animated_apples = env.apples.iter().any(|apple| apple.apple_type.is_animated());
 
         if env.apples.is_empty() {
             self.apple_mesh = None;
