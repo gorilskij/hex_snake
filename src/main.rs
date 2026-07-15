@@ -67,8 +67,7 @@ fn window_conf() -> Conf {
 fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
     let eat_mechanics = EatMechanics::new(
         enum_map! {
-            // any payload works — keying ignores the fields
-            SegmentType::Eaten { original_food: 0, food_left: 0 } => EatBehavior::PassOver,
+            SegmentType::Eaten { .. } => EatBehavior::PassOver,
             _ => EatBehavior::Crash,
         },
         enum_map! {
@@ -84,7 +83,7 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
         .eat_mechanics(eat_mechanics)
         .palette(snake::PaletteTemplate::rainbow(true))
         .controller(snake_control::Template::Keyboard { control_setup, knowledge })
-        .speed(7.)
+        .speed(1.)
         .autopilot(pathfinder::Template::WithBackup {
             main: Box::new(pathfinder::Template::WeightedBFS),
             backup: Box::new(pathfinder::Template::SpaceFilling),

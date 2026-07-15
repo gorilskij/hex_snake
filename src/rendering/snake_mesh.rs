@@ -3,6 +3,8 @@ use macroquad::color::Color;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
+use crate::rendering;
+use crate::rendering::segments::cap::build_round_caps;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
 use crate::snake::palette::{build_snake_lut, SegmentStyle};
 use crate::snake::{Body, Segment, SegmentType, Snake};
@@ -117,7 +119,7 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
         let lut = PaletteLut::new(&lut_colors);
 
         // Per-segment descriptions (head → tail).
-        let descs: Vec<SegmentDescription> = body
+        let mut descs: Vec<SegmentDescription> = body
             .segments
             .iter()
             .enumerate()
@@ -146,11 +148,25 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
             }
         }
 
-        // Shaded segments. Draw tail → head so the head paints on top.
-        let segments = descs.iter().rev().map(|desc| {
-            stats.polygons += 1;
-            desc.build_shaded(num_segments, lut_size)
-        });
+        // Round end caps (smooth style): truncate the body ribbon by one cap
+        // radius at each end and fill with half-circle caps.
+        let (tail_cap, head_cap) = if gtx.prefs.draw_style == rendering::Style::Smooth && !descs.is_empty() {
+            let caps = build_round_caps(&mut descs, num_segments, lut_size);
+            stats.polygons += (caps.0.is_some() as usize) + (caps.1.is_some() as usize);
+            caps
+        } else {
+            (None, None)
+        };
+
+        // Shaded segments. Draw tail → head so the head paints on top; the
+        // caps keep that order (tail cap under, head cap over).
+        let segments = tail_cap
+            .into_iter()
+            .chain(descs.iter().rev().map(|desc| {
+                stats.polygons += 1;
+                desc.build_shaded(num_segments, lut_size)
+            }))
+            .chain(head_cap);
         let mut mesh = Mesh::combine(segments);
         mesh.set_texture(lut.texture());
         shaded.push((mesh, lut));

@@ -10,7 +10,8 @@
 //! is simply the pivot, reused across cross-sections with different `frac` — a
 //! true single point, no hole, no seam.
 //!
-//! The round-head cap is intentionally not handled here (to be revisited).
+//! Round end caps (see `cap.rs`) reuse this module's geometry: a cap is just
+//! more cross-sections with shrinking width, sampled via [`cross_section_at`].
 
 use std::f32::consts::{PI, TAU};
 
@@ -56,16 +57,27 @@ fn straight_cross_sections(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<
     ]
 }
 
-/// Arc cross-sections for a turn, or `None` if the turn is too shallow to curve
-/// (caller falls back to a straight box).
-fn curved_cross_sections(
-    description: &SegmentDescription,
-    mut turn_fraction: f32,
-    fraction: SegmentFraction,
-) -> Option<Vec<CrossSection>> {
-    // a blunt turn is equivalent to half a sharp turn
-    if let TurnType::Blunt(_) = description.turn.turn_type() {
-        turn_fraction /= 2.;
+/// The geometry of a turn's arc in default orientation (counterclockwise; the
+/// clockwise mirror is applied by the board transform).
+pub struct ArcParams {
+    pub pivot: Point,
+    /// A complete sharp turn has `inner_radius == 0` (the inner edge is the
+    /// pivot point).
+    pub inner_radius: f32,
+    pub outer_radius: f32,
+    /// Angle swept around the pivot from fraction 0 to fraction 1.
+    pub total_angle: f32,
+}
+
+/// Compute the arc parameters of a segment's turn, or `None` if the segment is
+/// straight or the turn is too shallow to curve (drawn as a straight box).
+pub fn arc_params(description: &SegmentDescription) -> Option<ArcParams> {
+    let mut turn_fraction = description.turn.fraction;
+    match description.turn.turn_type() {
+        TurnType::Straight => return None,
+        // a blunt turn is equivalent to half a sharp turn
+        TurnType::Blunt(_) => turn_fraction /= 2.,
+        TurnType::Sharp(_) => {}
     }
 
     let CellDim { side, sin, cos } = description.cell_dim;
@@ -78,9 +90,6 @@ fn curved_cross_sections(
     }
     let pivot = Point { x: side + cos + pivot_dist, y: 0. };
 
-    // A complete sharp turn has inner_radius == 0 (the inner edge is the pivot
-    // point). That is fine here: the ribbon reuses the pivot as the inner point
-    // of every cross-section, each with its own frac.
     let inner_radius = pivot.x - side - cos;
     let outer_radius = pivot.x - cos;
 
@@ -97,6 +106,61 @@ fn curved_cross_sections(
             TAU / 2. - (intersection_point.y / (intersection_point.x - pivot.x)).atan()
         }
     };
+
+    Some(ArcParams {
+        pivot,
+        inner_radius,
+        outer_radius,
+        total_angle,
+    })
+}
+
+/// Path length of a full (fraction 0 to 1) traversal of this segment's cell,
+/// measured along the body's centerline.
+pub fn full_path_length(description: &SegmentDescription) -> f32 {
+    match arc_params(description) {
+        Some(arc) => (arc.inner_radius + arc.outer_radius) / 2. * arc.total_angle,
+        None => description.cell_dim.height(),
+    }
+}
+
+/// The `(inner, outer)` cross-section line at a given fraction of this segment,
+/// in default orientation (same space as [`segment_cross_sections`]).
+pub fn cross_section_at(description: &SegmentDescription, frac: f32) -> (Point, Point) {
+    match arc_params(description) {
+        Some(arc) => {
+            // angle around the pivot is PI at fraction 0, decreasing to
+            // PI - total_angle at fraction 1
+            let theta = PI - frac * arc.total_angle;
+            let (s, c) = theta.sin_cos();
+            (
+                Point {
+                    x: arc.pivot.x + arc.inner_radius * c,
+                    y: arc.inner_radius * s,
+                },
+                Point {
+                    x: arc.pivot.x + arc.outer_radius * c,
+                    y: arc.outer_radius * s,
+                },
+            )
+        }
+        None => {
+            let CellDim { side, cos, .. } = description.cell_dim;
+            let y = frac * description.cell_dim.height();
+            (Point { x: cos, y }, Point { x: cos + side, y })
+        }
+    }
+}
+
+/// Arc cross-sections for a turn, or `None` if the turn is too shallow to curve
+/// (caller falls back to a straight box).
+fn curved_cross_sections(description: &SegmentDescription, fraction: SegmentFraction) -> Option<Vec<CrossSection>> {
+    let ArcParams {
+        pivot,
+        inner_radius,
+        outer_radius,
+        total_angle,
+    } = arc_params(description)?;
 
     // Sample the arc from fraction.start to fraction.end. Angle around the pivot
     // is PI at fraction 0, decreasing to PI - total_angle at fraction 1.
@@ -129,7 +193,7 @@ pub fn segment_cross_sections(description: &SegmentDescription) -> (Vec<CrossSec
         TurnType::Straight => (straight_cross_sections(description.cell_dim, description.fraction), false),
         TurnType::Blunt(dir) | TurnType::Sharp(dir) => {
             let cw = dir == TurnDirection::Clockwise;
-            match curved_cross_sections(description, description.turn.fraction, description.fraction) {
+            match curved_cross_sections(description, description.fraction) {
                 Some(sections) => (sections, cw),
                 // fell back to a symmetric box: no flip needed
                 None => (straight_cross_sections(description.cell_dim, description.fraction), false),
