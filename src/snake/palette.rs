@@ -338,7 +338,7 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
 /// Correct an integer snake length to an f64 length
 /// that accounts for fractional segments, eaten segments
 /// and growing
-fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
+fn correct_len(len: usize, body: &Body, segment_fraction: f64) -> f64 {
     let len = len as f64;
     if let SegmentType::Eaten { original_food, food_left } = body.segments.back().unwrap().segment_type {
         // Correct for eaten segment at the tail and
@@ -348,14 +348,14 @@ fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
 
         // The actual visual length of the eaten segment
         //  at the tail of the snake
-        let eaten_segment_frac = (food_left as f64 + 1. - frame_fraction) / (original_food + 1) as f64;
+        let eaten_segment_frac = (food_left as f64 + 1. - segment_fraction) / (original_food + 1) as f64;
 
-        len - 1. + eaten_segment_frac + frame_fraction
+        len - 1. + eaten_segment_frac + segment_fraction
     } else if body.grow > 0 {
         // If growth is happening for a reason other
         //  than eating (such as at the beginning of
         //  the game), correct only for the head
-        len + frame_fraction
+        len + segment_fraction
     } else {
         // If the snake isn't growing, the head and
         //  tail corrections cancel out
