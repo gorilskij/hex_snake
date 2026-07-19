@@ -1,9 +1,12 @@
-use crate::gfx::Context;
+use macroquad::window::{screen_height, screen_width};
 
 use crate::basic::{CellDim, HexDim, Point};
 
-pub fn calculate_offset(ctx: &Context, board_dim: HexDim, cell_dim: CellDim) -> Point {
-    let window_dim: Point = ctx.gfx.window().inner_size().into();
+pub fn calculate_offset(board_dim: HexDim, cell_dim: CellDim) -> Point {
+    let window_dim = Point {
+        x: screen_width(),
+        y: screen_height(),
+    };
     let CellDim { side, sin, cos } = cell_dim;
 
     let board_cartesian_dim = Point {
@@ -13,8 +16,11 @@ pub fn calculate_offset(ctx: &Context, board_dim: HexDim, cell_dim: CellDim) -> 
     (window_dim - board_cartesian_dim) / 2.
 }
 
-pub fn calculate_board_dim(ctx: &Context, cell_dim: CellDim) -> HexDim {
-    let window_dim: Point = ctx.gfx.window().inner_size().into();
+pub fn calculate_board_dim(cell_dim: CellDim) -> HexDim {
+    let window_dim = Point {
+        x: screen_width(),
+        y: screen_height(),
+    };
     let CellDim { side, sin, cos } = cell_dim;
 
     HexDim {

@@ -221,7 +221,7 @@ impl DebugScenario {
                     // .controller(snake_control::Template::AStar {
                     //     passthrough_knowledge: PassthroughKnowledge::always(false),
                     // })
-                    .controller(snake_control::Template::Algorithm(pathfinder::Template::WeightedBFS))
+                    .controller(snake_control::Template::AppleSeeker(pathfinder::Template::WeightedBFS))
             })
             .collect();
 

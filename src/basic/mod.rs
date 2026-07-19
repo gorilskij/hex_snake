@@ -2,14 +2,12 @@ use std::f32::consts::TAU;
 
 pub use cell_dim::CellDim;
 pub use dir::Dir;
-pub use dir12::Dir12;
 pub use hex_point::{HexDim, HexPoint};
 pub use point::Point;
 
 pub mod board;
 mod cell_dim;
 mod dir;
-mod dir12;
 mod hex_point;
 mod point;
 
@@ -22,9 +20,6 @@ pub enum Side {
     Left,
     Right,
 }
-
-/// (graphics frame number, frame fraction)
-pub type FrameStamp = (usize, f32);
 
 /// Absolute difference between two angles (in radians)
 pub fn angle_distance(angle1: f32, angle2: f32) -> f32 {

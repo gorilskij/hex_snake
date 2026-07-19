@@ -134,8 +134,8 @@ impl Builder {
             segments: cells,
             missing_front: 0,
             dir,
+            segment_fraction: 0.0,
             turn_start: None,
-            dir_grace: false,
             grow: self
                 .len
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `len`"))?,
@@ -155,6 +155,7 @@ impl Builder {
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,
             body,
             state: State::Living,
+            dir_updated: false,
             controller: self
                 .controller
                 .as_ref()
@@ -166,7 +167,7 @@ impl Builder {
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `palette`"))?
                 .into(),
             autopilot: self.autopilot.clone().map(|template| {
-                let controller_template = snake_control::Template::Algorithm(template);
+                let controller_template = snake_control::Template::AppleSeeker(template);
                 controller_template.into_controller(dir)
             }),
             autopilot_control: self.autopilot_control,

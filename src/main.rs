@@ -1,7 +1,5 @@
 #![feature(stmt_expr_attributes)]
-#![feature(try_blocks)]
 #![feature(exhaustive_patterns)]
-#![feature(if_let_guard)]
 #![deny(unused_must_use)]
 
 #[macro_use]
@@ -10,15 +8,15 @@ extern crate derive_more;
 extern crate lazy_static;
 extern crate core;
 
+use enum_map_lite::enum_map;
 use macroquad::input::{get_keys_pressed, get_keys_released};
 use macroquad::window::{next_frame, screen_height, screen_width, Conf};
 
 use crate::app::keyboard_control::ControlSetup;
-use crate::app::screen::Game;
+use crate::app::screen::{Game, Screen};
 use crate::app::Palette;
+use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Side};
-use crate::gfx::event::EventHandler;
-use crate::gfx::input::keyboard::{KeyCode, KeyInput};
 use crate::keyboard_layout::Layout;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
 use crate::snake::SegmentType;
@@ -30,13 +28,11 @@ mod support;
 mod basic;
 mod app;
 mod color;
-mod gfx;
 mod keyboard_layout;
 mod snake;
 mod view;
 #[macro_use]
 mod apple;
-mod error;
 mod rendering;
 pub mod snake_control;
 
@@ -70,17 +66,13 @@ fn window_conf() -> Conf {
 /// `App::new` used to construct).
 fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
     let eat_mechanics = EatMechanics::new(
-        by_segment_type! {
-            SegmentType::DISCR_EATEN => EatBehavior::PassOver,
+        enum_map! {
+            SegmentType::Eaten { .. } => EatBehavior::PassOver,
             _ => EatBehavior::Crash,
         },
-        by_snake_type! {
-            snake::Type::Rain => by_segment_type! {
-                _ => EatBehavior::PassUnder,
-            },
-            _ => by_segment_type! {
-                _ => EatBehavior::Crash,
-            },
+        enum_map! {
+            snake::Type::Rain => enum_map! { _ => EatBehavior::PassUnder },
+            _ => enum_map! { _ => EatBehavior::Crash },
         },
     );
 
@@ -91,7 +83,7 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
         .eat_mechanics(eat_mechanics)
         .palette(snake::PaletteTemplate::rainbow(true))
         .controller(snake_control::Template::Keyboard { control_setup, knowledge })
-        .speed(1.)
+        .speed(5.)
         .autopilot(pathfinder::Template::WithBackup {
             main: Box::new(pathfinder::Template::WeightedBFS),
             backup: Box::new(pathfinder::Template::SpaceFilling),
@@ -100,8 +92,6 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut ctx = gfx::Context::new();
-
     let control_setup = ControlSetup {
         // web delivers physical (qwerty-position) key codes, so use the qwerty
         // bindings directly: ul=J u=K ur=L dl=M d=Comma dr=Period
@@ -113,14 +103,7 @@ async fn main() {
     let cell_dim = CellDim::from(50.);
     let seeds = vec![player_seed(control_setup)];
 
-    let mut game = Game::new(
-        cell_dim,
-        7.,
-        seeds,
-        Palette::dark(),
-        crate::apple::spawn::SpawnPolicy::Random { apple_count: 5 },
-        &ctx,
-    );
+    let mut game = Game::new(cell_dim, seeds, Palette::dark(), SpawnPolicy::Random { apple_count: 5 });
 
     let mut last_size = (screen_width(), screen_height());
 
@@ -128,22 +111,18 @@ async fn main() {
         let size = (screen_width(), screen_height());
         if size != last_size {
             last_size = size;
-            let _ = game.resize_event(&mut ctx, size.0, size.1);
+            let _ = game.resize_event(size.0, size.1);
         }
 
-        for k in get_keys_pressed() {
-            if let Some(keycode) = KeyCode::from_macroquad(k) {
-                let _ = game.key_down_event(&mut ctx, KeyInput { keycode: Some(keycode) }, false);
-            }
+        for key in get_keys_pressed() {
+            let _ = game.key_down_event(key);
         }
-        for k in get_keys_released() {
-            if let Some(keycode) = KeyCode::from_macroquad(k) {
-                let _ = game.key_up_event(&mut ctx, KeyInput { keycode: Some(keycode) });
-            }
+        for key in get_keys_released() {
+            let _ = game.key_up_event(key);
         }
 
-        let _ = game.update(&mut ctx);
-        if let Err(e) = game.draw(&mut ctx) {
+        let _ = game.update();
+        if let Err(e) = game.draw() {
             eprintln!("{e:?}");
         }
 

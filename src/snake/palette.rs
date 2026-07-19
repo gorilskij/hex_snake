@@ -1,10 +1,10 @@
-use crate::gfx::graphics;
 use hsl::HSL;
+use macroquad::color::Color;
 
 use crate::basic::HexPoint;
+use crate::color::lerp;
 use crate::color::oklab::OkLab;
 use crate::color::to_color::ToColor;
-use crate::color::Color;
 use crate::snake::{Body, SegmentType};
 
 macro_rules! gray {
@@ -12,19 +12,19 @@ macro_rules! gray {
         gray!($lightness, 1.)
     };
     ($lightness:expr, $opacity:expr) => {
-        crate::color::Color(crate::gfx::graphics::Color {
+        ::macroquad::color::Color {
             r: $lightness,
             g: $lightness,
             b: $lightness,
             a: $opacity,
-        })
+        }
     };
 }
 
 lazy_static! {
-    static ref DEFAULT_EATEN_COLOR: Color = Color::from_rgb(0, 255, 128);
-    static ref DEFAULT_CRASHED_COLOR: Color = Color::from_rgb(255, 0, 128);
-    // static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgb(245, 192, 64);
+    static ref DEFAULT_EATEN_COLOR: Color = Color::from_rgba(0, 255, 128, 255);
+    static ref DEFAULT_CRASHED_COLOR: Color = Color::from_rgba(255, 0, 128, 255);
+    // static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgba(245, 192, 64, 255);
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -39,14 +39,8 @@ pub enum EatenColor {
 // }
 
 fn invert_rgb(color: Color) -> Color {
-    Color(graphics::Color {
-        r: 1. - color.r,
-        g: 1. - color.g,
-        b: 1. - color.b,
-        a: color.a,
-    })
+    Color::new(1. - color.r, 1. - color.g, 1. - color.b, color.a)
 }
-
 
 #[derive(Copy, Clone, Debug)]
 pub enum PaletteTemplate {
@@ -92,8 +86,8 @@ pub enum PaletteTemplate {
 impl PaletteTemplate {
     pub fn solid_white_red() -> Self {
         Self::Solid {
-            color: Color::WHITE,
-            eaten: Color::RED,
+            color: crate::color::WHITE,
+            eaten: crate::color::RED,
         }
     }
 
@@ -164,15 +158,15 @@ impl PaletteTemplate {
 
     pub fn alternating_white() -> Self {
         Self::AlternatingFixed {
-            color1: Color::WHITE,
-            color2: Color::TRANSPARENT,
+            color1: crate::color::WHITE,
+            color2: Color::new(0., 0., 0., 0.),
         }
     }
 
     pub fn zebra() -> Self {
         Self::Alternating {
-            color1: Color::WHITE,
-            color2: Color::TRANSPARENT,
+            color1: crate::color::WHITE,
+            color2: Color::new(0., 0., 0., 0.),
         }
     }
 }
@@ -211,7 +205,7 @@ impl SegmentStyle {
         match *self {
             SegmentStyle::Solid(color) => Box::new(move |_| color),
             SegmentStyle::RGBGradient { start_color, end_color } => {
-                Box::new(move |f| f * start_color + (1. - f) * end_color)
+                Box::new(move |f| lerp(end_color, start_color, f as f32))
             }
             SegmentStyle::HSLGradient { start_hue, end_hue, lightness } => Box::new(move |f| {
                 HSL {
@@ -228,12 +222,49 @@ impl SegmentStyle {
     }
 }
 
+/// Texels per segment in the snake color LUT. Each segment gets its **own**
+/// fixed-size slot, so segment boundaries always fall on exact texel edges,
+/// independent of the total snake length. That is what keeps color boundaries
+/// stable as the snake grows (a shared whole-body LUT re-normalized by the total
+/// count, so boundaries drifted → edge wobble). 64 is dense enough that the
+/// within-segment gradient is smooth under linear filtering.
+pub const LUT_TEXELS_PER_SEGMENT: usize = 64;
+
+/// Cap on total LUT width (WebGL1-safe). For very long snakes the per-segment
+/// count is reduced so `num_segments * per_seg` stays under this.
+const LUT_MAX_TEXELS: usize = 8192;
+
+/// Texels per segment for a snake of `num_segments`, reduced from
+/// [`LUT_TEXELS_PER_SEGMENT`] only if needed to stay under [`LUT_MAX_TEXELS`].
+pub fn lut_texels_per_segment(num_segments: usize) -> usize {
+    (LUT_MAX_TEXELS / num_segments.max(1)).clamp(8, LUT_TEXELS_PER_SEGMENT)
+}
+
+/// Build the snake color LUT from its per-segment styles (head → tail). Each
+/// segment fills its own contiguous slot of `lut_texels_per_segment` texels, so
+/// segment `i` owns texels `[i*K, (i+1)*K)` — boundaries are texel-aligned and
+/// independent of the total length.
+///
+/// Within a slot, texel offset `k` maps to head→tail: `k = 0` is the head-side
+/// (frac = 1) and `k = K-1` the tail-side (frac → 0). `color_at_fraction(f)`
+/// gives the head-side color at `f = 1`. Geometry sets each vertex's
+/// `uv.x = (seg_idx + (1 - frac)) / num_segments` to index this same LUT.
+pub fn build_snake_lut(styles: &[SegmentStyle]) -> Vec<Color> {
+    let num = styles.len().max(1);
+    let per_seg = lut_texels_per_segment(num);
+    let mut lut = Vec::with_capacity(num * per_seg);
+    for style in styles {
+        let color_at = style.color_at_fraction();
+        for k in 0..per_seg {
+            let frac = 1.0 - (k as f64 + 0.5) / per_seg as f64; // head-side → tail-side
+            lut.push(color_at(frac));
+        }
+    }
+    lut
+}
+
 pub trait Palette: Send + Sync {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a>;
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a>;
     // TODO: refactor as
     //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_fraction: f32) -> Color;
     //  this avoids unnecessary work for hex palette and is called exactly as many times as needed
@@ -340,11 +371,7 @@ pub struct Solid {
 }
 
 impl Palette for Solid {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        _frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         Box::new(body.segments.iter().map(|segment| {
@@ -366,22 +393,18 @@ pub struct RGBGradient {
 }
 
 impl Palette for RGBGradient {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, frame_fraction as f64);
+        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
-                let r = (i + body.missing_front) as f64 + frame_fraction as f64;
-                let start_color = self.head_color + (self.tail_color - self.head_color) * r / logical_len;
-                let end_color = self.head_color + (self.tail_color - self.head_color) * (r + 1.) / logical_len;
+                let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+                let start_color = lerp(self.head_color, self.tail_color, (r / logical_len) as f32);
+                let end_color = lerp(self.head_color, self.tail_color, ((r + 1.) / logical_len) as f32);
 
                 match segment.segment_type {
                     Normal | BlackHole { .. } => SegmentStyle::RGBGradient { start_color, end_color },
@@ -405,20 +428,16 @@ pub struct HSLGradient {
 }
 
 impl Palette for HSLGradient {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, frame_fraction as f64);
+        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
-                let r = (i + body.missing_front) as f64 + frame_fraction as f64;
+                let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
                 let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
 
@@ -461,18 +480,13 @@ pub struct OkLabGradient {
 }
 
 impl Palette for OkLabGradient {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
-        let frame_fraction = frame_fraction as f64;
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, frame_fraction);
+        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
-            let r = (i + body.missing_front) as f64 + frame_fraction;
+            let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
             match segment.segment_type {
@@ -504,11 +518,7 @@ pub struct AlternatingFixed {
 }
 
 impl Palette for AlternatingFixed {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        _frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         let head = Some(body.segments[0].pos);
@@ -546,16 +556,12 @@ pub struct Alternating {
 }
 
 impl Palette for Alternating {
-    fn segment_styles<'a>(
-        &'a mut self,
-        body: &'a Body,
-        frame_fraction: f32,
-    ) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
+    fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             // How far along the snake we currently are (in units of segments)
-            let r = (i + body.missing_front) as f64 + frame_fraction as f64;
+            let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
 
             match segment.segment_type {
                 Normal | BlackHole { .. } => {
@@ -571,8 +577,8 @@ impl Palette for Alternating {
                     let ratio1_start = (r.cos() + 1.) / 2.;
                     let ratio1_end = ((r + 1.).cos() + 1.) / 2.;
 
-                    let start_color = ratio1_start * self.color1 + (1. - ratio1_start) * self.color2;
-                    let end_color = ratio1_end * self.color1 + (1. - ratio1_end) * self.color2;
+                    let start_color = lerp(self.color2, self.color1, ratio1_start as f32);
+                    let end_color = lerp(self.color2, self.color1, ratio1_end as f32);
 
                     SegmentStyle::RGBGradient { start_color, end_color }
                 }

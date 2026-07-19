@@ -1,15 +1,13 @@
 use std::collections::{HashSet, VecDeque};
-use std::mem;
-use std::mem::Discriminant;
+use std::time::Duration;
 
-use crate::gfx::Context;
+use enum_map_lite::Enum;
 pub use palette::{Palette, PaletteTemplate};
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};
 use crate::apple::Apple;
-use crate::basic::{Dir, FrameStamp, Frames, HexDim, HexPoint};
+use crate::basic::{Dir, Frames, HexDim, HexPoint};
 use crate::snake::eat_mechanics::{EatMechanics, Knowledge};
 use crate::snake_control;
 use crate::snake_control::{pathfinder, Controller};
@@ -26,7 +24,7 @@ pub enum State {
     Crashed,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Enum)]
 pub enum Type {
     Player,
     Simulated,
@@ -35,27 +33,13 @@ pub enum Type {
     Rain,
 }
 
-// NOTE: if variants are added, the code should be checked for
-//       usages of Discriminant<SegmentType>, match statements
-//       using this type should be extended accordingly
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Enum)]
 pub enum SegmentType {
     Normal,
     Eaten { original_food: u32, food_left: u32 },
     Crashed,
     // does not advance, sucks the rest of the snake in
     BlackHole { just_created: bool },
-}
-
-impl SegmentType {
-    pub fn discriminant(&self) -> Discriminant<Self> {
-        mem::discriminant(self)
-    }
-
-    pub const DISCR_NORMAL: Discriminant<Self> = mem::discriminant(&Self::Normal);
-    pub const DISCR_EATEN: Discriminant<Self> = mem::discriminant(&Self::Eaten { original_food: 0, food_left: 0 });
-    pub const DISCR_CRASHED: Discriminant<Self> = mem::discriminant(&Self::Crashed);
-    pub const DISCR_BLACK_HOLE: Discriminant<Self> = mem::discriminant(&Self::BlackHole { just_created: false });
 }
 
 pub type ZIndex = i32;
@@ -77,6 +61,8 @@ pub struct SearchTrace {
     pub current_path: Vec<HexPoint>,
 }
 
+type SegmentFraction = f32;
+
 pub struct Body {
     pub segments: VecDeque<Segment>,
 
@@ -89,17 +75,16 @@ pub struct Body {
     /// Direction the snake is currently going
     pub dir: Dir,
 
+    /// The fraction of advancement through the current
+    /// segment
+    pub segment_fraction: SegmentFraction,
+
     /// When a snake changes direction halfway through
     /// a segment appearing, the transition needs to be
-    /// done smoothly, this indicates at which frame and
-    /// frame fraction the transition was started
-    pub turn_start: Option<FrameStamp>,
+    /// done smoothly, this indicates at which segment
+    /// fraction the transition was started
+    pub turn_start: Option<SegmentFraction>,
 
-    /// When `Snake::update_dir` is called from a draw method
-    /// (this is done to show the snake turning as soon
-    /// as possible), dir_grace prevents a repeat call
-    /// arising from a subsequent call to `Snake::advance`
-    pub dir_grace: bool,
     pub grow: usize,
     /// For snakes that move using a search algorithm, this
     /// field remembers which cells were searched and which
@@ -123,10 +108,15 @@ impl Body {
 pub struct Snake {
     pub snake_type: Type,
     pub eat_mechanics: EatMechanics,
+    /// Speed is measured in cells/s
     pub speed: f32,
 
     pub body: Body,
     pub state: State,
+    /// Indicates whether the controller already set a new direction
+    /// within this cell. Direction changes can happen at most once
+    /// per cell.
+    pub dir_updated: bool,
 
     pub controller: Box<dyn Controller + Send + Sync>,
     pub palette: Box<dyn Palette + Send + Sync>,
@@ -184,31 +174,24 @@ impl Snake {
         out
     }
 
-    pub fn update_dir(
-        &mut self,
-        other_snakes: impl Snakes,
-        apples: &[Apple],
-        gtx: &GameContext,
-        ftx: &FpsContext,
-        ctx: &Context,
-    ) {
-        if self.body.dir_grace || self.state != State::Living {
+    pub fn update_dir(&mut self, other_snakes: impl Snakes, apples: &[Apple], gtx: &GameContext) {
+        if self.state != State::Living {
+            // to avoid calling this function again
+            self.dir_updated = true;
             return;
         }
 
         // advance controller
         let knowledge = Knowledge::accurate(&self.eat_mechanics);
-        let controller_dir =
-            self.controller
-                .next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx, ctx);
-
-        // advance autopilot
-        let autopilot_dir = self.autopilot.as_mut().map(|autopilot| {
-            autopilot.next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx, ftx, ctx)
-        });
+        let controller_dir = self
+            .controller
+            .next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx);
 
         let new_dir = if self.autopilot_control {
-            autopilot_dir.expect("autopilot_control == true with missing autopilot")
+            self.autopilot
+                .as_mut()
+                .map(|autopilot| autopilot.next_dir(&mut self.body, Some(&knowledge), &other_snakes, apples, gtx))
+                .expect("autopilot_control == true with missing autopilot")
         } else {
             controller_dir
         };
@@ -220,30 +203,39 @@ impl Snake {
                     self.body.dir, dir
                 );
             }
-            Some(dir) if dir == self.body.dir => {
-                // if the controller returns Some with the same direction,
-                // this does not lead to a turn but it does prevent the snake
-                // from calling next_dir until the next cell
-                self.body.dir_grace = true;
-            }
             Some(dir) => {
+                self.dir_updated = true;
                 self.body.dir = dir;
-                self.body.dir_grace = true;
-                self.body.turn_start = Some(ftx.last_graphics_update);
+                self.body.turn_start = Some(self.body.segment_fraction);
             }
             _ => {}
         }
     }
 
-    pub fn advance(
-        &mut self,
-        other_snakes: impl Snakes,
-        apples: &[Apple],
-        portals: &[Portal],
-        gtx: &GameContext,
-        ftx: &FpsContext,
-        ctx: &Context,
-    ) {
+    /// Return value indicates whether a call to advance_cell should be made
+    pub fn advance(&mut self, elapsed: Duration) -> bool {
+        if self.state == State::Crashed {
+            return false;
+        }
+
+        self.body.segment_fraction += self.speed * elapsed.as_secs_f32();
+
+        let mut cell_boundary_crossed = false;
+
+        if self.body.segment_fraction >= 1.0 {
+            // TODO: might need to do multiple calls to advance_cell at high speeds
+            assert!(self.body.segment_fraction < 2.0);
+
+            self.body.segment_fraction -= 1.0;
+            self.dir_updated = false;
+
+            cell_boundary_crossed = true;
+        }
+
+        cell_boundary_crossed
+    }
+
+    pub fn advance_cell(&mut self, portals: &[Portal], gtx: &GameContext) {
         let last_idx = self.body.visible_len() - 1;
         if let SegmentType::Eaten { food_left, .. } = &mut self.body.segments[last_idx].segment_type {
             if *food_left == 0 {
@@ -257,10 +249,8 @@ impl Snake {
         match &mut self.state {
             State::Dying => self.body.missing_front += 1,
             State::Living => {
-                self.update_dir(other_snakes, apples, gtx, ftx, ctx);
-
                 // create new head for snake
-                let mut dir = self.body.dir;
+                let dir = self.body.dir;
 
                 let head_pos = self.head().pos;
                 let new_head_pos_raw = head_pos.translate(dir, 1);
@@ -299,10 +289,9 @@ impl Snake {
                 self.body.segments[0].going_to = Some(dir);
                 self.body.segments.push_front(new_head);
             }
-            State::Crashed => panic!("called advance() on a crashed snake"),
+            State::Crashed => panic!("called advance_cell() on a crashed snake"),
         }
 
-        self.body.dir_grace = false;
         self.body.turn_start = None;
 
         if self.body.grow > 0 {

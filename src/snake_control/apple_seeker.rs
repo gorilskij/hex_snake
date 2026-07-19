@@ -1,6 +1,3 @@
-use crate::gfx::Context;
-
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::Dir;
@@ -10,14 +7,15 @@ use crate::snake_control::pathfinder::{Path, PathFinder};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
-// TODO: rename to something more descriptive like apple seeker
-pub struct Algorithm {
+/// Seeks apples by pathfinding to the nearest one (using the wrapped
+/// [`PathFinder`] strategy) and following the resulting path.
+pub struct AppleSeeker {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
     // implicitly, the target is always the last cell in the path
     pub path: Option<Path>,
 }
 
-impl Algorithm {
+impl AppleSeeker {
     fn recalculate_path(
         &mut self,
         body: &Body,
@@ -40,9 +38,11 @@ impl Algorithm {
                 // recalculate if we're not following the path
                 let head = body.segments[0].pos;
                 if head == path[0] {
-                } else if head == path[1] {
+                } else if path.len() >= 2 && head == path[1] {
                     path.pop_front();
                 } else {
+                    // strayed off the path (or the path is too short to
+                    // still be following it) -> recalculate
                     println!("recalculate: not following path");
                     break 'arm true;
                 }
@@ -70,7 +70,7 @@ impl Algorithm {
     }
 }
 
-impl Controller for Algorithm {
+impl Controller for AppleSeeker {
     fn next_dir(
         &mut self,
         body: &mut Body,
@@ -78,8 +78,6 @@ impl Controller for Algorithm {
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
-        _ftx: &FpsContext,
-        _ctx: &Context,
     ) -> Option<Dir> {
         self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
 

@@ -18,6 +18,5 @@ impl Shape for WideHexagon {
             Point { x: cos, y: sin * 2. },
             Point { x: 0., y: sin },
         ]
-        .into()
     }
 }

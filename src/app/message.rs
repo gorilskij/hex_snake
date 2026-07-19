@@ -1,13 +1,10 @@
 use std::time::Duration;
 
-use macroquad::camera::set_default_camera;
+use macroquad::color::Color;
 use macroquad::text::{draw_text, measure_text};
 use macroquad::window::screen_width;
 
-use crate::color::Color;
-use crate::gfx::graphics::Canvas;
-use crate::gfx::time::Instant;
-use crate::gfx::Context;
+use crate::support::time::Instant;
 
 /// Finite number of possible messages
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
@@ -62,31 +59,28 @@ pub struct MessageDrawable {
 }
 
 impl MessageDrawable {
-    pub fn draw(&self, _canvas: &mut Canvas) {
-        // text lives in screen space, not the board-offset camera
-        set_default_camera();
-        let color = *self.color;
-        draw_text(&self.text, self.x, self.y, self.font_size as f32, color.into());
+    /// Draws the message text. The caller must have set the **default (screen-
+    /// space) camera** (`set_default_camera`) beforehand — text lives in
+    /// screen space, not the board-offset camera.
+    pub fn draw(&self) {
+        let color = self.color;
+        draw_text(&self.text, self.x, self.y, self.font_size as f32, color);
     }
 }
 
 impl Message {
     /// A return value of None signifies that the message has reached its end of
     /// life and should be removed.
-    pub fn get_drawable(&self, _ctx: &Context) -> Option<MessageDrawable> {
+    pub fn get_drawable(&self) -> Option<MessageDrawable> {
         let screen_w = screen_width();
 
         // fade out
         let mut color = self.color;
         if let Some(deadline) = self.disappear {
-            match deadline.checked_duration_since(Instant::now()) {
-                None => return None, // Message has reached its end of life
-                Some(time_left) => {
-                    let millis = time_left.as_millis();
-                    if millis < 200 {
-                        color.a = millis as f32 / 200.;
-                    }
-                }
+            let time_left = deadline.checked_duration_since(Instant::now())?;
+            let millis = time_left.as_millis();
+            if millis < 200 {
+                color.a = millis as f32 / 200.;
             }
         }
 

@@ -16,6 +16,12 @@ impl From<Point2D<f32>> for Point {
     }
 }
 
+impl From<(f32, f32)> for Point {
+    fn from((x, y): (f32, f32)) -> Self {
+        Self { x, y }
+    }
+}
+
 impl From<Point> for Point2D<f32> {
     fn from(Point { x, y }: Point) -> Self {
         Point2D { x, y, _unit: PhantomData }

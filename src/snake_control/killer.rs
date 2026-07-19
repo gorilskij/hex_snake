@@ -1,8 +1,5 @@
 use std::f32::consts::TAU;
 
-use crate::gfx::Context;
-
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{angle_distance, CellDim, Dir, HexDim, HexPoint};
@@ -78,8 +75,6 @@ impl Controller for Killer {
         other_snakes: &dyn Snakes,
         _apples: &[Apple],
         gtx: &GameContext,
-        _ftx: &FpsContext,
-        _ctx: &Context,
     ) -> Option<Dir> {
         let player_snake = other_snakes
             .iter()

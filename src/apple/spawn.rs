@@ -1,3 +1,6 @@
+use std::iter;
+
+use rand::distributions::{Distribution, WeightedIndex};
 use rand::Rng;
 
 use crate::app::screen::{Environment, Prefs};
@@ -91,71 +94,35 @@ impl SpawnPolicy {
     }
 }
 
-macro_rules! float_sum {
-    () => { 0. };
-    ($x:expr) => { $x };
-    ($x:expr, $( $rest:tt )*) => { $x + float_sum!($( $rest )*) };
-}
-
-// TODO: include a sum-to-<1 check
-// randomly choose one of a number of options with a given probability each
-// and with a catch-all option
-macro_rules! choose {
-    ($rand:ident ;; $( $probs:expr ),* ;; $prob:expr => $then:expr, $( $rest:tt )*) => {
-        if $rand < float_sum!($( $probs ),*, $prob) {
-            $then
-        } else {
-            choose!($rand ;; $( $probs ),*, $prob ;; $( $rest )*)
-        }
-    };
-    ($_rand:ident ;; $( $_probs:expr ),* ;; $otherwise:expr $( , )?) => {
-        {
-            $otherwise
-        }
-    };
-    (let $rand:ident: f64 <- $rng:expr; $( $tokens:tt )*) => {
-        {
-            let $rand = $rng.gen::<f64>();
-            choose!($rand ;; 0. ;; $( $tokens )*)
-        }
-    };
-}
-
 // TODO: add a snake spawn policy
-// TODO: factor ai snake palettes out into game palette
 fn generate_apple_type(prefs: &Prefs, palette: &app::Palette, rng: &mut impl Rng) -> apple::Type {
     if prefs.special_apples {
-        choose! {
-            let rand: f64 <- rng;
-            prefs.prob_spawn_competitor => {
-                // apple::Type::SpawnSnake(Box::new(snake::Builder::default()
-                //         .snake_type(snake::Type::Competitor { life: Some(200) })
-                //         .eat_mechanics(EatMechanics::always(EatBehavior::Die))
-                //         .palette(snake::PaletteTemplate::pastel_rainbow(true))
-                //         .controller(snake_control::Template::AStar { passthrough_knowledge: PassthroughKnowledge::always(false) })
-                //         .speed(1.)
-                // ))
-                apple::Type::SpawnSnake(Box::new(SnakeBuilder::default()
+        let mut weights = [
+            prefs.prob_spawn_competitor,
+            prefs.prob_spawn_killer,
+            prefs.prob_spawn_rain,
+            0.0,
+        ];
+        weights[weights.len() - 1] = 1.0 - weights.iter().sum::<f64>();
+        match WeightedIndex::new(weights).unwrap().sample(rng) {
+            0 => apple::Type::SpawnSnake(Box::new(
+                SnakeBuilder::default()
                     .snake_type(snake::Type::Competitor { life: Some(200) })
                     .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                     .palette(palette.palette_competitor)
-                    .controller(snake_control::Template::Algorithm(pathfinder::Template::WeightedBFS))
-                    .speed(1.)
-                ))
-            },
-            prefs.prob_spawn_killer => {
-                apple::Type::SpawnSnake(Box::new(SnakeBuilder::default()
+                    .controller(snake_control::Template::AppleSeeker(pathfinder::Template::WeightedBFS))
+                    .speed(1.),
+            )),
+            1 => apple::Type::SpawnSnake(Box::new(
+                SnakeBuilder::default()
                     .snake_type(snake::Type::Killer { life: Some(200) })
                     .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                     .palette(palette.palette_killer)
                     .controller(snake_control::Template::Killer)
-                    .speed(1.)
-                ))
-            },
-            prefs.prob_spawn_rain => {
-                apple::Type::SpawnRain
-            },
-            apple::Type::Food(prefs.apple_food),
+                    .speed(1.),
+            )),
+            2 => apple::Type::SpawnRain,
+            _ => apple::Type::Food(prefs.apple_food),
         }
     } else {
         apple::Type::Food(prefs.apple_food)

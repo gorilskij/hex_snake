@@ -1,4 +1,4 @@
-use crate::gfx::graphics::Color;
+use macroquad::color::Color;
 
 use crate::snake;
 
@@ -38,10 +38,10 @@ impl Palette {
             grid_dot_radius: 2.,
             border_thickness: 3.,
 
-            background_color: Color::BLACK,
+            background_color: crate::color::BLACK,
             grid_color: gray!(0.25),
-            grid_dot_color: Color::WHITE,
-            border_color: Color::WHITE,
+            grid_dot_color: crate::color::WHITE,
+            border_color: crate::color::WHITE,
             apple_color: gray!(0.45),
 
             palette_competitor: snake::PaletteTemplate::pastel_rainbow(true),

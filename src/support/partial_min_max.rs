@@ -5,7 +5,6 @@ use itertools::MinMaxResult::MinMax;
 
 // the partial functions return None in case of a failed comparison
 
-// TODO: return on first None
 pub trait PartialMinMax
 where
     Self: Iterator + Sized,
@@ -60,14 +59,13 @@ where
         B: PartialOrd,
     {
         let mut mapped = self.map(|x| (f(&x), x));
-        let first = mapped.next();
+        let first = mapped.next()?;
         mapped
-            .fold(first, |ox, (fy, y)| {
-                let (fx, x) = ox?;
-                match fx.partial_cmp(&fy)? {
-                    Ordering::Less | Ordering::Equal => Some((fx, x)),
-                    Ordering::Greater => Some((fy, y)),
-                }
+            .try_fold(first, |(fx, x), (fy, y)| {
+                Some(match fx.partial_cmp(&fy)? {
+                    Ordering::Less | Ordering::Equal => (fx, x),
+                    Ordering::Greater => (fy, y),
+                })
             })
             .map(|(_, x)| x)
     }

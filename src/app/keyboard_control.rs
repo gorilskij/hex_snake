@@ -1,4 +1,4 @@
-use crate::gfx::input::keyboard::KeyCode::{self, *};
+use macroquad::input::KeyCode::{self, *};
 
 use crate::basic::Side;
 use crate::keyboard_layout::{Layout, LayoutConverter};

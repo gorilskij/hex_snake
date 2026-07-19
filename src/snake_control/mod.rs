@@ -1,21 +1,18 @@
-use crate::gfx::input::keyboard::KeyCode;
-use crate::gfx::Context;
 use itertools::{repeat_n, Itertools};
+use macroquad::input::KeyCode;
 pub use programmed::Move;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::ControlSetup;
 use crate::apple::Apple;
-use crate::basic::{Dir, Dir12, Side};
+use crate::basic::{Dir, Side};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::pathfinder::Path;
 use crate::view::snakes::Snakes;
 
-mod algorithm;
+mod apple_seeker;
 mod keyboard;
-mod keyboard_clock;
 mod killer;
 mod mouse;
 pub mod pathfinder;
@@ -29,11 +26,10 @@ pub enum Template {
         control_setup: ControlSetup,
         knowledge: Knowledge,
     },
-    KeyboardClock,
     Mouse,
     Programmed(Vec<Move>),
     Killer,
-    Algorithm(pathfinder::Template),
+    AppleSeeker(pathfinder::Template),
     Rain,
 }
 
@@ -48,8 +44,6 @@ pub trait Controller {
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
-        ftx: &FpsContext,
-        ctx: &Context,
     ) -> Option<Dir>;
 
     // only implemented for autopilot-like controllers
@@ -163,9 +157,8 @@ impl Template {
     // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         // use crate::snake_control::a_star::AStar;
-        use algorithm::Algorithm;
+        use apple_seeker::AppleSeeker;
         use keyboard::Keyboard;
-        use keyboard_clock::KeyboardClock;
         use killer::Killer;
         use mouse::Mouse;
         use programmed::Programmed;
@@ -175,11 +168,6 @@ impl Template {
             Template::Keyboard { control_setup, knowledge } => {
                 Box::new(Keyboard::new(control_setup, start_dir, knowledge))
             }
-            Template::KeyboardClock => Box::new(KeyboardClock {
-                dir: Dir12::Single(start_dir),
-                alternation: false,
-                next_dir: None,
-            }),
             Template::Mouse => Box::new(Mouse),
             Template::Programmed(move_sequence) => Box::new(Programmed {
                 move_sequence,
@@ -188,7 +176,7 @@ impl Template {
                 wait: 0,
             }),
             Template::Killer => Box::new(Killer),
-            Template::Algorithm(template) => Box::new(Algorithm {
+            Template::AppleSeeker(template) => Box::new(AppleSeeker {
                 pathfinder: template.into_pathfinder(start_dir),
                 path: None,
             }),

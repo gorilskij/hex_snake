@@ -1,84 +1,90 @@
-use crate::gfx::graphics::{DrawMode, MeshBuilder};
-
-use crate::error::{Error, ErrorConversion, Result};
+use crate::basic::{Dir, Point};
 use crate::rendering;
-use crate::rendering::segments::descriptions::{Polygon, RoundHeadDescription, SegmentDescription};
-use crate::rendering::segments::hexagon_segments::HexagonSegments;
-use crate::rendering::segments::smooth_segments::SmoothSegments;
+use crate::rendering::segments::descriptions::{SegmentDescription, TurnDirection, TurnType};
+use crate::rendering::segments::hexagon_segments::hexagon_outline;
+use crate::rendering::segments::smooth_segments::segment_cross_sections;
+use crate::support::mesh::{build_shaded_polygon, build_shaded_ribbon, Mesh};
 
 impl SegmentDescription {
-    /// Render the segment into a list of drawable subsegments
-    /// each represented as a list of points and a color,
-    /// `snake_len` is used to calculate how many subsegments
-    /// there should be (longer snakes have lower subsegment
-    /// resolution)
-    pub fn render(&self, color_resolution: usize, turn_fraction: f32) -> Box<dyn Iterator<Item = Polygon> + '_> {
-        // TODO: pass prefs or some fragment of it instead of random arguments
-        match self.draw_style {
-            rendering::Style::Hexagon => HexagonSegments::render_segment(self, 0.0, RoundHeadDescription::Gone, 0),
-            rendering::Style::Smooth => {
-                let round_head = self.fraction.round_head_description(self.prev_fraction, self.cell_dim);
-                SmoothSegments::render_segment(self, turn_fraction, round_head, color_resolution)
+    /// Whether this segment's default-orientation geometry must be mirrored
+    /// horizontally when placed on the board (arcs are generated
+    /// counterclockwise; clockwise turns are their mirror image). Mirroring a
+    /// straight box is harmless (it is symmetric about the cell axis).
+    pub fn is_flipped(&self) -> bool {
+        matches!(
+            self.turn.turn_type(),
+            TurnType::Blunt(TurnDirection::Clockwise) | TurnType::Sharp(TurnDirection::Clockwise)
+        )
+    }
+
+    /// The flip/rotate/translate that places default-orientation points on the
+    /// board (mirrors the old `ShapePoints` transform chain).
+    pub fn board_transform(&self) -> impl Fn(Point) -> Point {
+        let flip = self.is_flipped();
+        let center = self.cell_dim.center();
+        let rotation_angle = Dir::U.clockwise_angle_to(self.turn.coming_from);
+        let dest = self.destination;
+
+        move |mut p: Point| {
+            if flip {
+                p.x = 2. * center.x - p.x;
             }
+            if rotation_angle != 0. {
+                p = p.rotate_clockwise(center, rotation_angle);
+            }
+            p + dest
         }
     }
 
-    /// Returns number of polygons built
-    pub fn build(self, builder: &mut MeshBuilder, color_resolution: usize) -> Result<usize> {
-        let mut polygons = 0;
-        let turn_fraction = self.turn.fraction;
-        self.render(color_resolution, turn_fraction)
-            .try_for_each(|Polygon { points, color }| {
-                if points.len() >= 3 {
-                    polygons += 1;
-                    builder.polygon(DrawMode::fill(), &points, *color).map(|_| ())
-                } else {
-                    // TODO: re-enable (and switch to log levels)
-                    // eprintln!("warning: SegmentDescription::render returned a Vec with < 3 points");
-                    Ok(())
-                }
-            })
-            .map_err(Error::from)
-            .with_trace_step("SegmentDescription::build")?;
-        Ok(polygons)
+    /// Maps a segment-local fraction to the global body coordinate `uv.x`.
+    /// Body coordinate runs head→tail. The head-side of a segment is at
+    /// frac == 1, so its head→tail offset is (1 - frac); the global coordinate
+    /// is seg_idx + that.
+    pub fn u_of(&self, num_segments: usize) -> impl Fn(f32) -> f32 {
+        let seg_idx = self.segment_idx as f32;
+        let num = num_segments.max(1) as f32;
+        move |frac: f32| (seg_idx + (1.0 - frac)) / num
     }
-}
 
-// TODO: just have render_segment, the straight/curved distinction can be made by smooth_segments internally
-// TODO: rework documentation (switched to subsegments)
-/// The `render_default_*` functions are without position or rotation,
-/// they assume a default orientation and the transformation is performed
-/// afterwards
-pub trait SegmentRenderer {
-    // /// Render a straight segment in the default orientation,
-    // /// coming from above (U) and going down (D)
-    // fn render_default_straight_segment(
-    //     description: &SegmentDescription,
-    //     fraction: SegmentFraction,
-    //     round_head: RoundHeadDescription,
-    // ) -> Vec<Point>;
-    //
-    // /// Render a curved segment in the default orientation,
-    // /// a blunt segment coming from above (U) and going down-right (Dr)
-    // /// or a sharp segment coming from above (U) and going up-right (Ur)
-    // ///
-    // /// `turn` describes how far along the segment is on its turn,
-    // /// a value of 0 means the segment is straight, a value of 1 means
-    // /// the turn is complete
-    // fn render_default_curved_segment(
-    //     description: &SegmentDescription,
-    //     turn_fraction: f32,
-    //     fraction: SegmentFraction,
-    //     round_head: RoundHeadDescription,
-    // ) -> Vec<Point>;
+    /// This segment's `(lo, hi)` uv range in the palette LUT, inset by half a
+    /// texel so the shader's clamp keeps linear filtering from bleeding into
+    /// the neighbor segment.
+    pub fn seg_bounds(&self, num_segments: usize, lut_size: usize) -> (f32, f32) {
+        let seg_idx = self.segment_idx as f32;
+        let num = num_segments.max(1) as f32;
+        // half a texel, in uv units
+        let half_texel = 0.5 / lut_size.max(1) as f32;
+        (seg_idx / num + half_texel, (seg_idx + 1.0) / num - half_texel)
+    }
 
-    /// Render a segment, rotate it and reflect it to match the desired
-    /// coming-from and going-to directions, and translate it to match
-    /// the desired position
-    fn render_segment(
-        description: &SegmentDescription,
-        turn_fraction: f32,
-        round_head: RoundHeadDescription,
-        color_resolution: usize,
-    ) -> Box<dyn Iterator<Item = Polygon> + '_>;
+    /// Tessellate this segment into a single shaded [`Mesh`]. Each vertex carries
+    /// `uv.x` = position along the whole body (so the snake shader can sample the
+    /// palette LUT) and `uv.y` = across width. `num_segments` is the snake's
+    /// segment count (normalizes the body coordinate into `[0, 1]`); `lut_size`
+    /// is the LUT texture width (used to inset this segment's clamp bounds by
+    /// half a texel).
+    ///
+    /// Replaces the old subsegment approach: instead of many flat-colored
+    /// slices, the segment is one polygon and color is per-pixel on the GPU.
+    pub fn build_shaded(&self, num_segments: usize, lut_size: usize) -> Mesh {
+        match self.draw_style {
+            rendering::Style::Hexagon => {
+                let seg_idx = self.segment_idx as f32;
+                let num = num_segments.max(1) as f32;
+                let points = hexagon_outline(self);
+                // one flat color per hexagon: sample the segment's midpoint
+                let u = (seg_idx + 0.5) / num;
+                build_shaded_polygon(&points, move |_| (u, 0.5), |p| p)
+            }
+            rendering::Style::Smooth => {
+                let (cross_sections, _cw) = segment_cross_sections(self);
+                build_shaded_ribbon(
+                    &cross_sections,
+                    self.seg_bounds(num_segments, lut_size),
+                    self.u_of(num_segments),
+                    self.board_transform(),
+                )
+            }
+        }
+    }
 }

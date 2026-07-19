@@ -2,17 +2,15 @@ use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 
-use crate::gfx::graphics::{DrawMode, Mesh, MeshBuilder};
-use crate::gfx::Context;
 use itertools::Itertools;
+use macroquad::color::Color;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::color::Color;
-use crate::error::Result;
+use crate::color::lerp;
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Snake;
+use crate::support::mesh::{build_polygon, DrawMode, Mesh};
 use crate::view::snakes::Snakes;
 
 type Distance = f32;
@@ -117,22 +115,16 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
     .collect()
 }
 
-fn generate_mesh(
-    mut iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
-    gtx: &GameContext,
-    ftx: &FpsContext,
-    ctx: &Context,
-) -> Result<Mesh> {
+fn generate_mesh(iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>, gtx: &GameContext) -> Mesh {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
     let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
 
-    let mut builder = MeshBuilder::new();
-    iter.try_for_each(|(pos, dist_a, dist_b)| {
+    let parts = iter.map(|(pos, dist_a, dist_b)| {
         const ALPHA: f32 = 0.3;
-        const CLOSEST_COLOR: Color = Color::from_rgb(51, 204, 51).with_alpha(ALPHA);
-        const MIDWAY_COLOR: Color = Color::from_rgb(255, 255, 0).with_alpha(ALPHA);
-        const FARTHEST_COLOR: Color = Color::from_rgb(204, 0, 0).with_alpha(ALPHA);
+        const CLOSEST_COLOR: Color = Color::from_rgba(51, 204, 51, 255).with_alpha(ALPHA);
+        const MIDWAY_COLOR: Color = Color::from_rgba(255, 255, 0, 255).with_alpha(ALPHA);
+        const FARTHEST_COLOR: Color = Color::from_rgba(204, 0, 0, 255).with_alpha(ALPHA);
 
         let calculate_color = |dist: Distance| -> Color {
             let mut ratio = dist as f64 / max_dist;
@@ -141,26 +133,28 @@ fn generate_mesh(
             }
             if ratio < 0.5 {
                 let ratio = ratio * 2.0;
-                (1. - ratio) * CLOSEST_COLOR + ratio * MIDWAY_COLOR
+                lerp(CLOSEST_COLOR, MIDWAY_COLOR, ratio as f32)
             } else {
                 let ratio = ratio * 2.0 - 1.0;
-                (1. - ratio) * MIDWAY_COLOR + ratio * FARTHEST_COLOR
+                lerp(MIDWAY_COLOR, FARTHEST_COLOR, ratio as f32)
             }
         };
 
         let color_a = calculate_color(dist_a);
         let color_b = match dist_b {
-            None => Color::BLACK,
+            None => crate::color::BLACK,
             Some(d) => calculate_color(d),
         };
 
-        let frame_frac = ftx.last_graphics_update.1;
-        let color = (1.0 - frame_frac) as f64 * color_a + frame_frac as f64 * color_b;
+        // TODO: think about it
+        // let frame_frac = ftx.last_graphics_update.1;
+        // let color = lerp(color_a, color_b, frame_frac);
+        let color = color_a;
 
         let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
-        builder.polygon(DrawMode::fill(), &hexagon, *color).map(|_| ())
-    })?;
-    Ok(Mesh::from_data(ctx, builder.build()))
+        build_polygon(DrawMode::fill(), &hexagon, color)
+    });
+    Mesh::combine(parts)
 }
 
 pub struct DistanceGrid {
@@ -179,33 +173,21 @@ impl DistanceGrid {
     }
 
     // TODO: move to rendering module
-    pub fn mesh(
-        &mut self,
-        player_snake: &Snake,
-        other_snakes: impl Snakes,
-        ctx: &Context,
-        gtx: &GameContext,
-        ftx: &FpsContext,
-    ) -> Result<Mesh> {
-        if self.current.is_none() || ftx.game_frame_num > self.last_update {
-            self.last_update = ftx.game_frame_num;
-            self.last = mem::replace(
-                &mut self.current,
-                Some(find_distances(player_snake, other_snakes, gtx.board_dim)),
-            );
-        }
+    pub fn mesh(&mut self, player_snake: &Snake, other_snakes: impl Snakes, gtx: &GameContext) -> Mesh {
+        // TODO: think about it
+        // if self.current.is_none() || ftx.game_frame_num > self.last_update {
+        //     self.last_update = ftx.game_frame_num;
+        //     self.last = self
+        //         .current
+        //         .replace(find_distances(player_snake, other_snakes, gtx.board_dim));
+        // }
 
         match &self.current {
             None => unreachable!(),
             Some(current) => match &self.last {
                 None => {
                     // TODO: this is a terrible hack, rewrite this
-                    generate_mesh(
-                        current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))),
-                        gtx,
-                        ftx,
-                        ctx,
-                    )
+                    generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), gtx)
                 }
                 Some(last) => {
                     // let frame_frac = gtx.frame_stamp.1;
@@ -213,7 +195,7 @@ impl DistanceGrid {
                         let dist_b = current.get(pos).copied();
                         (*pos, dist_a, dist_b)
                     });
-                    generate_mesh(iter, gtx, ftx, ctx)
+                    generate_mesh(iter, gtx)
                 }
             },
         }

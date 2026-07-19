@@ -1,8 +1,7 @@
 use std::f32::consts::TAU;
 
-use crate::gfx::Context;
+use macroquad::input::mouse_position;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
@@ -21,10 +20,8 @@ impl Controller for Mouse {
         _: &dyn Snakes,
         _: &[Apple],
         gtx: &GameContext,
-        _ftx: &FpsContext,
-        ctx: &Context,
     ) -> Option<Dir> {
-        let mouse_position: Point = ctx.mouse.position().into();
+        let mouse_position = Point::from(mouse_position());
         let target = HexPoint::from_cartesian(mouse_position, gtx.cell_dim);
 
         let current = body.segments[0].pos;

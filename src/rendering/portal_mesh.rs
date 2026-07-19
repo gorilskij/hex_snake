@@ -1,12 +1,10 @@
-use crate::gfx::graphics::{Mesh, MeshBuilder};
-use crate::gfx::Context;
-
 use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};
 use crate::app::stats::Stats;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
-use crate::color::Color;
-use crate::error::{ErrorConversion, Result};
+use macroquad::color::Color;
+use anyhow::Result;
+use crate::support::mesh::{build_line, Mesh};
 use crate::rendering::shape::ShapePoints;
 
 pub fn render_hexagon_edge(dir: Dir, CellDim { side, sin, cos }: CellDim) -> ShapePoints {
@@ -28,13 +26,10 @@ pub fn render_hexagon_edge(dir: Dir, CellDim { side, sin, cos }: CellDim) -> Sha
 
 // TODO: make a build_full_edge function for when the half edges are the same
 //       to avoid double drawing
-fn build_half_edge(from: HexPoint, to: HexPoint, color: Color, gtx: &GameContext, builder: &mut MeshBuilder) -> Result {
-    println!("from {:?}", from);
-    println!("to {:?}", to);
+fn build_half_edge(from: HexPoint, to: HexPoint, color: Color, gtx: &GameContext) -> Mesh {
     let dir = from
         .dir_to(to)
         .unwrap_or_else(|| panic!("invalid inputs: from {:?} to {:?}", from, to));
-    println!("dir: {:?}, color: {:?}", dir, color);
     let mut points = render_hexagon_edge(dir, gtx.cell_dim);
 
     let center = gtx.cell_dim.center();
@@ -45,38 +40,33 @@ fn build_half_edge(from: HexPoint, to: HexPoint, color: Color, gtx: &GameContext
 
     points = points.translate(location);
 
-    builder.line(&points, gtx.palette.border_thickness * 2.0, *color)?;
-    Ok(())
+    build_line(&points, gtx.palette.border_thickness * 2.0, color)
 }
 
 // TODO: make this part of palette
 fn behavior_color(behavior: Behavior) -> Color {
     match behavior {
-        Behavior::Die => Color::RED,
-        Behavior::TeleportTo(_, _) => Color::from_rgb(50, 105, 168),
-        Behavior::WrapAround => Color::WHITE,
-        Behavior::PassThrough => Color::GREEN,
-        Behavior::Nothing | Behavior::Unreachable => Color::TRANSPARENT,
+        Behavior::Die => crate::color::RED,
+        Behavior::TeleportTo(_, _) => Color::from_rgba(50, 105, 168, 255),
+        Behavior::WrapAround => crate::color::WHITE,
+        Behavior::PassThrough => crate::color::GREEN,
+        Behavior::Nothing | Behavior::Unreachable => Color::new(0., 0., 0., 0.),
     }
 }
 
 // TODO: update stats
-pub fn portal_mesh(portals: &mut [Portal], gtx: &GameContext, ctx: &Context, stats: &mut Stats) -> Result<Mesh> {
-    let builder = &mut MeshBuilder::new();
+pub fn portal_mesh(portals: &mut [Portal], gtx: &GameContext, _stats: &mut Stats) -> Result<Mesh> {
+    let mut parts: Vec<Mesh> = vec![];
 
-    let res: Result<_> = try {
-        for portal in portals {
-            for edge in &portal.edges {
-                let color_ab = behavior_color(edge.behavior_ab);
-                build_half_edge(edge.a, edge.b, color_ab, gtx, builder)?;
+    for portal in portals {
+        for edge in &portal.edges {
+            let color_ab = behavior_color(edge.behavior_ab);
+            parts.push(build_half_edge(edge.a, edge.b, color_ab, gtx));
 
-                let color_ba = behavior_color(edge.behavior_ba);
-                build_half_edge(edge.b, edge.a, color_ba, gtx, builder)?;
-            }
+            let color_ba = behavior_color(edge.behavior_ba);
+            parts.push(build_half_edge(edge.b, edge.a, color_ba, gtx));
         }
+    }
 
-        Mesh::from_data(ctx, builder.build())
-    };
-
-    res.with_trace_step("apple_mesh")
+    Ok(Mesh::combine(parts))
 }

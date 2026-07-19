@@ -5,6 +5,7 @@ authors = ["gorilskij <43991400@users.noreply.github.com>"]
 edition = "2021"
 
 [dependencies]
+anyhow = "1"
 macroquad = "0.4"
 lyon_geom = "~1.0"
 lyon_path = "1.0"
@@ -23,6 +24,7 @@ ezing = "~0.2"
 static_assertions = "~1.1"
 enum-rotate = "0.1.0"
 num-traits = "0.2.18"
+enum-map-lite = "0.2.0"
 
 [profile.release]
 debug = true

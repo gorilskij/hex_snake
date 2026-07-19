@@ -1,9 +1,7 @@
 use std::collections::VecDeque;
 
-use crate::gfx::input::keyboard::KeyCode;
-use crate::gfx::Context;
+use macroquad::input::KeyCode;
 
-use crate::app::fps_control::FpsContext;
 use crate::app::game_context::GameContext;
 use crate::app::keyboard_control::Controls;
 use crate::apple::Apple;
@@ -56,10 +54,8 @@ impl Controller for Keyboard {
         _: &dyn Snakes,
         _: &[Apple],
         _: &GameContext,
-        ftx: &FpsContext,
-        _: &Context,
     ) -> Option<Dir> {
-        if self.deferred || ftx.last_graphics_update.1 < Self::LAST_ACTIONABLE_THRESHOLD {
+        if self.deferred || body.segment_fraction < Self::LAST_ACTIONABLE_THRESHOLD {
             self.deferred = false;
             if let Some(dir) = self.control_queue.pop_front() {
                 self.dir = dir;
