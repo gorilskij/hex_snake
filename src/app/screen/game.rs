@@ -19,7 +19,9 @@ use crate::app::palette::Palette;
 use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::{Environment, Screen};
-use crate::app::snake_management::{advance_snakes, find_collisions, handle_collisions, spawn_snakes};
+use crate::app::snake_management::{
+    advance_snakes, find_collisions, handle_collisions, spawn_snakes, update_snake_dirs,
+};
 use crate::app::stats::Stats;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::{self, Apple};
@@ -345,6 +347,12 @@ impl Screen for Game {
             if self.advance_snakes(elapsed).context("Game::update")? {
                 self.spawn_apples();
             }
+
+            // Poll controllers only once the frame's world state is final
+            // (collisions handled, eaten apples removed, new apples spawned):
+            // a decision is locked in for the rest of the cell, so deciding
+            // against a stale world made the autopilot overshoot apples.
+            update_snake_dirs(&mut self.env);
         }
 
         Ok(())

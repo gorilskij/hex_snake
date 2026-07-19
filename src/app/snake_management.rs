@@ -272,9 +272,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
     let mut new_cell_occupied = false;
 
     let mut remove_snakes = vec![];
-    for snake_idx in 0..snakes.len() {
-        let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
-
+    for (snake_idx, snake) in snakes.iter_mut().enumerate() {
         // advance the snake
         if snake.advance(elapsed) {
             // block is entered if the snake crossed a cell boundary
@@ -295,10 +293,6 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
             snake.advance_cell(&env.portals, &env.gtx);
         }
 
-        if !snake.dir_updated {
-            snake.update_dir(other_snakes, &env.apples, &env.gtx);
-        }
-
         // remove snake if it ran out of body
         if snake.body.visible_len() == 0 {
             remove_snakes.push(snake_idx);
@@ -311,4 +305,23 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
     });
 
     new_cell_occupied
+}
+
+/// Poll the controller of every snake that hasn't yet committed a direction
+/// for its current cell.
+///
+/// This must run **after** [`handle_collisions`], not as part of
+/// [`advance_snakes`]: a controller's decision is locked in for the rest of
+/// the cell, so it has to see the post-collision world. Deciding between the
+/// movement and the collision pass meant the apple seeker was consulted while
+/// standing on an apple that had not been removed yet — it kept targeting it,
+/// maintained course, and overshot before recalculating a cell too late.
+pub fn update_snake_dirs(env: &mut Environment) {
+    let snakes = &mut env.snakes;
+    for snake_idx in 0..snakes.len() {
+        let (snake, other_snakes) = OtherSnakes::split_snakes(snakes, snake_idx);
+        if !snake.dir_updated {
+            snake.update_dir(other_snakes, &env.apples, &env.gtx);
+        }
+    }
 }

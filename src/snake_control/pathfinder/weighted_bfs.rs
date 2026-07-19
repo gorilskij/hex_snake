@@ -98,6 +98,13 @@ impl PathFinder for WeightedBFS {
 
                     Dir::iter()
                         .filter_scan(rc, move |rc, dir| {
+                            // the first step cannot reverse the snake's current
+                            // direction (a 180° turn is impossible), even if the
+                            // cell behind the head is passable
+                            if rc.parent.is_none() && dir == -rc.dir {
+                                return None;
+                            }
+
                             let (new_pos, teleported) = pos.explicit_wrapping_translate(dir, 1, gtx.board_dim);
 
                             if off_limits.contains(&new_pos) {
