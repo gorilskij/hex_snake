@@ -84,14 +84,9 @@ pub struct Body {
     /// **The conserved quantity.** The snake's true length in cells, a float.
     /// It only ever changes by explicit, capped growth in [`Snake::advance`] —
     /// never as a drifting difference of two accumulators. The tail position
-    /// (`tail_fraction`, and which segments exist) is *derived* from it:
+    /// ([`Body::tail_fraction`], and which segments exist) is *derived* from it:
     /// `length == (visible_len - 1) + head_fraction - tail_fraction`.
     pub length: f32,
-
-    /// Derived cache of the tail's recede out of its trailing cell (0..1),
-    /// recomputed from `length` each frame. The last segment is `disappearing`
-    /// by this much; it is popped once the tail fully recedes past it.
-    pub tail_fraction: SegmentFraction,
 
     /// When a snake changes direction halfway through
     /// a segment appearing, the transition needs to be
@@ -120,6 +115,19 @@ impl Body {
     /// is inside a black hole when the snake is dying
     pub fn logical_len(&self) -> usize {
         self.segments.len() + self.missing_front
+    }
+
+    /// How far the tail has receded out of its trailing cell (0..1). Purely
+    /// derived from [`Self::length`] (the conserved quantity), so it can never
+    /// go stale; the last segment is `disappearing` by this much.
+    ///
+    /// Values `>= 1` mean the trailing segment is spent and should be popped —
+    /// `advance` does that, so outside of it the result is always in `0..1`.
+    /// Values `< 0` mean `length` exceeds the material actually on the board,
+    /// which happens while `grow` is pending; the tail is drawn solid then, so
+    /// the value is unused.
+    pub fn tail_fraction(&self) -> f32 {
+        (self.visible_len() as f32 - 1.0) + self.head_fraction - self.length
     }
 }
 
@@ -288,16 +296,9 @@ impl Snake {
             // A living snake pushes one head segment this frame (in advance_cell)
             // when it crosses a boundary; count it now so the tail stays
             // continuous across that push.
-            let pending_push = cell_boundary_crossed as usize;
-            loop {
-                let vlen = self.body.visible_len() + pending_push;
-                let tf = (vlen as f32 - 1.0) + self.body.head_fraction - self.body.length;
-                if tf >= 1.0 && self.body.visible_len() > 1 {
-                    self.body.segments.pop_back();
-                } else {
-                    self.body.tail_fraction = tf.clamp(0.0, 1.0);
-                    break;
-                }
+            let pending_push = cell_boundary_crossed as usize as f32;
+            while self.body.tail_fraction() + pending_push >= 1.0 && self.body.visible_len() > 1 {
+                self.body.segments.pop_back();
             }
         }
 
@@ -370,8 +371,7 @@ impl Snake {
         let _ = self.body.segments.drain(segment_index..);
 
         // reset length to the freshly-cut body (tail at the start of the new
-        // last segment), keeping length the source of truth
-        self.body.tail_fraction = 0.0;
+        // last segment, i.e. tail_fraction == 0), keeping length the source of truth
         self.body.length = (self.body.visible_len() as f32 - 1.0) + self.body.head_fraction;
 
         // ensure a length of at least 2 to avoid weird animation,

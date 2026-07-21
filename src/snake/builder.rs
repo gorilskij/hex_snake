@@ -139,9 +139,11 @@ impl Builder {
             missing_front: 0,
             dir,
             head_fraction: 0.0,
-            // starts as a single segment; `grow` lengthens it to `len` cells
-            length: 1.0,
-            tail_fraction: 0.0,
+            // nothing has emerged yet: the head tip sits at the start of its
+            // cell, so there is zero material behind it. `grow` then pays out
+            // `len` cells of material at exactly the head's rate, which keeps
+            // `tail_fraction == head_fraction` (invariant satisfied throughout).
+            length: 0.0,
             turn_start: None,
             grow: len as f32,
             search_trace: None,

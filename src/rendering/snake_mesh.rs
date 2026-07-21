@@ -47,10 +47,10 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
                 SegmentFraction::appearing(body.head_fraction)
             }
         }
-        // tail — recedes by the independent tail_fraction (which already moves
+        // tail — recedes by the derived tail_fraction (which already moves
         // slowly through an eaten segment); frozen (full) while grow is pending
         i if i == body.visible_len() - 1 && body.grow == 0.0 => {
-            SegmentFraction::disappearing(body.tail_fraction)
+            SegmentFraction::disappearing(body.tail_fraction())
         }
         // body
         _ => SegmentFraction::solid(),
