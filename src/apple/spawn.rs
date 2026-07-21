@@ -122,10 +122,10 @@ fn generate_apple_type(prefs: &Prefs, palette: &app::Palette, rng: &mut impl Rng
                     .speed(1.),
             )),
             2 => apple::Type::SpawnRain,
-            _ => apple::Type::Food(prefs.apple_food),
+            _ => apple::Type::Eat(prefs.apple_food),
         }
     } else {
-        apple::Type::Food(prefs.apple_food)
+        apple::Type::Eat(prefs.apple_food)
     }
 }
 

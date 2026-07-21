@@ -35,26 +35,22 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
                 if body.visible_len() == 1 {
                     // also tail
                     SegmentFraction {
-                        start: partial_min(body.segment_fraction, 0.5).unwrap(),
+                        start: partial_min(body.head_fraction, 0.5).unwrap(),
                         end: 0.5,
                     }
                 } else if body.missing_front > 0 {
                     SegmentFraction::appearing(0.5)
                 } else {
-                    SegmentFraction::appearing(partial_min(body.segment_fraction, 0.5).unwrap())
+                    SegmentFraction::appearing(partial_min(body.head_fraction, 0.5).unwrap())
                 }
             } else {
-                SegmentFraction::appearing(body.segment_fraction)
+                SegmentFraction::appearing(body.head_fraction)
             }
         }
-        // tail
-        i if i == body.visible_len() - 1 && body.grow == 0 => {
-            if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
-                let frac = ((original_food - food_left) as f32 + body.segment_fraction) / (original_food + 1) as f32;
-                SegmentFraction::disappearing(frac)
-            } else {
-                SegmentFraction::disappearing(body.segment_fraction)
-            }
+        // tail — recedes by the independent tail_fraction (which already moves
+        // slowly through an eaten segment); frozen (full) while grow is pending
+        i if i == body.visible_len() - 1 && body.grow == 0.0 => {
+            SegmentFraction::disappearing(body.tail_fraction)
         }
         // body
         _ => SegmentFraction::solid(),
@@ -69,7 +65,7 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
                 if max.abs() < f32::EPSILON {
                     1.
                 } else {
-                    let covered = body.segment_fraction - start_fraction;
+                    let covered = body.head_fraction - start_fraction;
                     let linear = covered / max;
                     ezing::sine_inout(linear)
                 }
@@ -133,7 +129,7 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
                 let SegmentFraction { start, end } = desc.fraction;
                 let real_cell_dim = if (start - end).abs() < f32::EPSILON {
                     // snake has died, animate black hole out
-                    let animation_fraction = body.segment_fraction - 0.5;
+                    let animation_fraction = body.head_fraction - 0.5;
                     gtx.cell_dim * (1. - animation_fraction)
                 } else {
                     gtx.cell_dim

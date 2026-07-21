@@ -20,12 +20,12 @@ use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::{Environment, Screen};
 use crate::app::snake_management::{
-    advance_snakes, find_collisions, handle_collisions, spawn_snakes, update_snake_dirs,
+    advance_snakes, find_collisions, handle_apple_collisions, handle_snake_collisions, spawn_snakes, update_snake_dirs,
 };
 use crate::app::stats::Stats;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::{self, Apple};
-use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
@@ -247,7 +247,8 @@ impl Game {
         }
 
         let collisions = find_collisions(env);
-        let (seeds, game_over) = handle_collisions(env, &collisions);
+        let game_over = handle_snake_collisions(env, &collisions);
+        let seeds = handle_apple_collisions(env, &collisions);
         self.apple_mesh = None;
 
         if game_over {
@@ -413,7 +414,8 @@ impl Screen for Game {
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
             self.player_path_mesh =
-                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats).transpose()?;
+                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats)
+                    .transpose()?;
         }
 
         if env.gtx.prefs.display_stats {
@@ -594,10 +596,10 @@ impl Screen for Game {
                     // replace special apples with normal apples
                     let apple_food = prefs.apple_food;
                     self.env.apples.iter_mut().for_each(|apple| {
-                        if !matches!(apple.apple_type, apple::Type::Food(_)) {
+                        if !matches!(apple.apple_type, apple::Type::Eat(_)) {
                             *apple = Apple {
                                 pos: apple.pos,
-                                apple_type: apple::Type::Food(apple_food),
+                                apple_type: apple::Type::Eat(apple_food),
                             }
                         }
                     });
@@ -607,11 +609,11 @@ impl Screen for Game {
                 self.display_notification(text);
             }
             k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
-                let new_food = idx as Food + 1;
+                let new_food = idx as f32 + 1.0;
                 prefs.apple_food = new_food;
                 // change existing apples
                 for apple in &mut self.env.apples {
-                    if let apple::Type::Food(food) = &mut apple.apple_type {
+                    if let apple::Type::Eat(food) = &mut apple.apple_type {
                         *food = new_food;
                     }
                 }

@@ -55,7 +55,7 @@ impl Controller for Keyboard {
         _: &[Apple],
         _: &GameContext,
     ) -> Option<Dir> {
-        if self.deferred || body.segment_fraction < Self::LAST_ACTIONABLE_THRESHOLD {
+        if self.deferred || body.head_fraction < Self::LAST_ACTIONABLE_THRESHOLD {
             self.deferred = false;
             if let Some(dir) = self.control_queue.pop_front() {
                 self.dir = dir;

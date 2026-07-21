@@ -335,32 +335,12 @@ fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
     }
 }
 
-/// Correct an integer snake length to an f64 length
-/// that accounts for fractional segments, eaten segments
-/// and growing
-fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
-    let len = len as f64;
-    if let SegmentType::Eaten { original_food, food_left } = body.segments.back().unwrap().segment_type {
-        // Correct for eaten segment at the tail and
-        //  fractional segment at the head (the eaten
-        //  segment reduces in size more slowly than
-        //  the head segment grows)
-
-        // The actual visual length of the eaten segment
-        //  at the tail of the snake
-        let eaten_segment_frac = (food_left as f64 + 1. - frame_fraction) / (original_food + 1) as f64;
-
-        len - 1. + eaten_segment_frac + frame_fraction
-    } else if body.grow > 0 {
-        // If growth is happening for a reason other
-        //  than eating (such as at the beginning of
-        //  the game), correct only for the head
-        len + frame_fraction
-    } else {
-        // If the snake isn't growing, the head and
-        //  tail corrections cancel out
-        len
-    }
+/// The snake's true float length, used to normalize the head→tail gradient.
+/// This is simply the conserved `body.length` (plus the part swallowed by a
+/// black hole while dying). Because it is the stored, conserved quantity, the
+/// gradient scale is smooth and does not jitter as the tail moves.
+fn correct_len(_len: usize, body: &Body, _frame_fraction: f64) -> f64 {
+    body.length as f64 + body.missing_front as f64
 }
 
 // The palettes...
@@ -397,12 +377,12 @@ impl Palette for RGBGradient {
         use SegmentType::*;
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
+        let logical_len = correct_len(logical_len, body, body.head_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
-                let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+                let r = (i + body.missing_front) as f64 + body.head_fraction as f64;
                 let start_color = lerp(self.head_color, self.tail_color, (r / logical_len) as f32);
                 let end_color = lerp(self.head_color, self.tail_color, ((r + 1.) / logical_len) as f32);
 
@@ -432,12 +412,12 @@ impl Palette for HSLGradient {
         use SegmentType::*;
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
+        let logical_len = correct_len(logical_len, body, body.head_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
-                let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+                let r = (i + body.missing_front) as f64 + body.head_fraction as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
                 let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
 
@@ -484,9 +464,9 @@ impl Palette for OkLabGradient {
         use SegmentType::*;
 
         let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
+        let logical_len = correct_len(logical_len, body, body.head_fraction as f64);
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
-            let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+            let r = (i + body.missing_front) as f64 + body.head_fraction as f64;
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
             match segment.segment_type {
@@ -561,7 +541,7 @@ impl Palette for Alternating {
 
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             // How far along the snake we currently are (in units of segments)
-            let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+            let r = (i + body.missing_front) as f64 + body.head_fraction as f64;
 
             match segment.segment_type {
                 Normal | BlackHole { .. } => {

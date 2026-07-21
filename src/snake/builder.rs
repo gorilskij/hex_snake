@@ -130,15 +130,20 @@ impl Builder {
         let mut cells = VecDeque::new();
         cells.push_back(head);
 
+        let len = self
+            .len
+            .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `len`"))?;
+
         let body = Body {
             segments: cells,
             missing_front: 0,
             dir,
-            segment_fraction: 0.0,
+            head_fraction: 0.0,
+            // starts as a single segment; `grow` lengthens it to `len` cells
+            length: 1.0,
+            tail_fraction: 0.0,
             turn_start: None,
-            grow: self
-                .len
-                .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `len`"))?,
+            grow: len as f32,
             search_trace: None,
         };
 

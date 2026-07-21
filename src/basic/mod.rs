@@ -12,7 +12,6 @@ mod hex_point;
 mod point;
 
 pub type Frames = u64;
-pub type Food = u32;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[allow(dead_code)]

@@ -1,4 +1,4 @@
-use crate::basic::{Food, HexPoint};
+use crate::basic::HexPoint;
 use crate::snake::builder::Builder as SnakeBuilder;
 
 #[macro_use]
@@ -6,18 +6,21 @@ pub mod spawn;
 
 #[derive(Debug, Clone)]
 pub enum Type {
-    Food(Food),
+    Eat(f32),
+    Shrink(f32),
     SpawnSnake(Box<SnakeBuilder>),
     SpawnRain,
 }
 
 impl Type {
     pub fn is_animated(&self) -> bool {
-        match self {
-            Type::Food(_) => false,
-            Type::SpawnSnake(_) => true,
-            Type::SpawnRain => true,
-        }
+        // TODO: a) check if this is still relevant, b) make this dependent on palette
+        true
+        // match self {
+        //     Type::Grow(_) => false,
+        //     Type::SpawnSnake(_) => true,
+        //     Type::SpawnRain => true,
+        // }
     }
 }
 
