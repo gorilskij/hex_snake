@@ -78,7 +78,7 @@ pub fn build_round_caps(
     // a head inside a black hole or crashed into an obstacle keeps its flat face
     let round_head = !matches!(
         descs[0].segment_type,
-        SegmentType::BlackHole { .. } | SegmentType::Crashed
+        SegmentType::BlackHole | SegmentType::Crashed
     );
 
     // Never consume more than the whole body: while the snake is very short

@@ -41,7 +41,7 @@ pub enum SegmentType {
     Eaten { original_food: f32, food_left: f32 },
     Crashed,
     // does not advance, sucks the rest of the snake in
-    BlackHole { just_created: bool },
+    BlackHole,
 }
 
 pub type ZIndex = i32;
@@ -65,14 +65,12 @@ pub struct SearchTrace {
 
 type SegmentFraction = f32;
 
+/// How far into its cell the head sinks before the black hole holds it there.
+/// Half a cell puts the head tip at the cell's centre, where the hole is drawn.
+const HOLE_DEPTH: f32 = 0.5;
+
 pub struct Body {
     pub segments: VecDeque<Segment>,
-
-    /// When a snake is being destroyed from the front
-    /// (when it's falling into a black hole), this is
-    /// used to indicate how many segments are missing
-    /// off the front (how many are in the black hole)
-    pub missing_front: usize,
 
     /// Direction the snake is currently going
     pub dir: Dir,
@@ -82,11 +80,23 @@ pub struct Body {
     pub head_fraction: SegmentFraction,
 
     /// **The conserved quantity.** The snake's true length in cells, a float.
-    /// It only ever changes by explicit, capped growth in [`Snake::advance`] —
-    /// never as a drifting difference of two accumulators. The tail position
-    /// ([`Body::tail_fraction`], and which segments exist) is *derived* from it:
-    /// `length == (visible_len - 1) + head_fraction - tail_fraction`.
+    /// A snake *is* this long from the moment it is created until it is gone;
+    /// being born and dying do not change it, they only change how much of it
+    /// is on the board (see [`Body::on_board`]). It changes only by explicit,
+    /// capped growth in [`Snake::advance`] — never as a drifting difference of
+    /// two accumulators.
     pub length: f32,
+
+    /// How much material has come out of the birth hole, in cells. Chases
+    /// `length` at exactly the head's speed, so until the snake is all the way
+    /// out its tail stays pinned at the hole. Doubles as the regrowth animation
+    /// after a cut: raise `length` and the difference emerges smoothly.
+    pub emerged: f32,
+
+    /// How much material has gone into the black hole, in cells. Grows at the
+    /// head's speed once the head has sunk into the hole, until nothing is
+    /// left. Never affects `length`.
+    pub swallowed: f32,
 
     /// When a snake changes direction halfway through
     /// a segment appearing, the transition needs to be
@@ -94,11 +104,6 @@ pub struct Body {
     /// fraction the transition was started
     pub turn_start: Option<SegmentFraction>,
 
-    /// Pending whole-cell growth from a source other than digestion (initial
-    /// length, cut regrowth), in cells. While positive it freezes the tail
-    /// (length grows at the head's rate) until paid off. Digestion grows
-    /// `length` directly and does not use this.
-    pub grow: f32,
     /// For snakes that move using a search algorithm, this
     /// field remembers which cells were searched and which
     /// path is being followed, sored here to be drawn
@@ -111,23 +116,20 @@ impl Body {
         self.segments.len()
     }
 
-    /// The full logical length of the snake, including the part that
-    /// is inside a black hole when the snake is dying
-    pub fn logical_len(&self) -> usize {
-        self.segments.len() + self.missing_front
+    /// How much of the snake is actually on the board, in cells: everything
+    /// that has left the birth hole and not yet entered the black hole. The two
+    /// holes are independent, so a snake can be emerging from one while
+    /// disappearing into the other.
+    pub fn on_board(&self) -> f32 {
+        (self.emerged - self.swallowed).max(0.0)
     }
 
     /// How far the tail has receded out of its trailing cell (0..1). Purely
-    /// derived from [`Self::length`] (the conserved quantity), so it can never
-    /// go stale; the last segment is `disappearing` by this much.
-    ///
-    /// Values `>= 1` mean the trailing segment is spent and should be popped —
-    /// `advance` does that, so outside of it the result is always in `0..1`.
-    /// Values `< 0` mean `length` exceeds the material actually on the board,
-    /// which happens while `grow` is pending; the tail is drawn solid then, so
-    /// the value is unused.
+    /// derived, so it can never go stale; the last segment is `disappearing` by
+    /// this much. Values `>= 1` mean the trailing segment is spent and should be
+    /// popped — `advance` does that, so elsewhere the result is always in `0..1`.
     pub fn tail_fraction(&self) -> f32 {
-        (self.visible_len() as f32 - 1.0) + self.head_fraction - self.length
+        (self.visible_len() as f32 - 1.0) + self.head_fraction - self.on_board()
     }
 }
 
@@ -244,35 +246,45 @@ impl Snake {
             return false;
         }
 
+        // Every frame, `delta` cells of material flow forward along the body.
         let delta = self.speed * elapsed.as_secs_f32();
 
-        // Head: advance into the leading cell; a new head segment is pushed at
-        // the boundary (in advance_cell for a living snake).
-        self.body.head_fraction += delta;
+        // Front end: either the head advances into the next cell, or — once it
+        // has sunk into a black hole — it stays put and the material flowing
+        // past it is swallowed instead.
         let mut cell_boundary_crossed = false;
-        if self.body.head_fraction >= 1.0 {
-            // TODO: might need to do multiple calls to advance_cell at high speeds
-            assert!(self.body.head_fraction < 2.0);
-            self.body.head_fraction -= 1.0;
-            self.dir_updated = false;
-            cell_boundary_crossed = true;
+        match self.state {
+            State::Dying => {
+                let sink = (HOLE_DEPTH - self.body.head_fraction).clamp(0.0, delta);
+                self.body.head_fraction += sink;
+                self.body.swallowed += delta - sink;
+            }
+            State::Living => {
+                self.body.head_fraction += delta;
+                if self.body.head_fraction >= 1.0 {
+                    // TODO: might need to do multiple calls to advance_cell at high speeds
+                    assert!(self.body.head_fraction < 2.0);
+                    self.body.head_fraction -= 1.0;
+                    self.dir_updated = false;
+                    cell_boundary_crossed = true;
+                }
+            }
+            State::Crashed => unreachable!("returned above"),
         }
 
-        // Grow `length` (the conserved quantity) by explicit, capped amounts.
-        // The head moves at full speed; all growth is the tail *lagging*, i.e.
-        // length increasing. Nothing here subtracts accumulators, so length
-        // cannot drift.
-        if self.body.grow > 0.0 {
-            // Pending whole-cell growth (initial length, cut regrowth): the
-            // tail is frozen — length grows at the head's rate until paid off.
-            let step = delta.min(self.body.grow);
-            self.body.length += step;
-            self.body.grow -= step;
-        } else if self.state == State::Living {
-            // Digestion: while the tail segment is eaten, the tail crosses it at
-            // 1/(food+1) speed, so length grows at food/(food+1) of the head's
-            // rate — and lags by exactly `food` once fully crossed. Capped at
-            // `food_left` so the total is exactly `food`, drift-free.
+        // Back end: material leaves the birth hole at the head's speed until
+        // the whole snake is out. Must come before growth, so that growth
+        // applied this frame is seen as "not yet emerged" and animates.
+        self.body.emerged = (self.body.emerged + delta).min(self.body.length);
+
+        // Digestion: while the tail segment is eaten, the tail crosses it at
+        // 1/(food+1) speed, so length grows at food/(food+1) of the head's rate
+        // — and lags by exactly `food` once fully crossed. Capped at
+        // `food_left` so the total is exactly `food`, drift-free. Only a snake
+        // that is all the way out has a tail free to move at all. A dying snake
+        // keeps digesting — the material is still flowing — which does buy it a
+        // little time before the hole finishes it.
+        if self.body.emerged >= self.body.length {
             if let Some(SegmentType::Eaten { original_food, food_left }) =
                 self.body.segments.back().map(|s| s.segment_type)
             {
@@ -288,18 +300,13 @@ impl Snake {
             }
         }
 
-        // Derive the tail from `length` (never accumulated):
-        //   length == (visible_len - 1) + head_fraction - tail_fraction
-        // Living snakes pop from the tail here; dying/crashed snakes keep their
-        // discrete black-hole shrink in advance_cell, so leave them alone.
-        if self.state == State::Living {
-            // A living snake pushes one head segment this frame (in advance_cell)
-            // when it crosses a boundary; count it now so the tail stays
-            // continuous across that push.
-            let pending_push = cell_boundary_crossed as usize as f32;
-            while self.body.tail_fraction() + pending_push >= 1.0 && self.body.visible_len() > 1 {
-                self.body.segments.pop_back();
-            }
+        // Drop trailing segments the tail has fully receded past. A living
+        // snake pushes one head segment this frame (in advance_cell) when it
+        // crosses a boundary; count it now so the tail stays continuous across
+        // that push.
+        let pending_push = cell_boundary_crossed as usize as f32;
+        while self.body.tail_fraction() + pending_push >= 1.0 && self.body.visible_len() > 1 {
+            self.body.segments.pop_back();
         }
 
         cell_boundary_crossed
@@ -307,16 +314,9 @@ impl Snake {
 
     pub fn advance_cell(&mut self, portals: &[Portal], gtx: &GameContext) {
         match &mut self.state {
-            State::Dying => {
-                // a dying snake shrinks from the front (sucked into the black
-                // hole) and from the tail (discrete pop per cell — the derived
-                // tail in advance() is for living snakes only). Keep `length` in
-                // step with the popped tail so the gradient stays sensible.
-                self.body.missing_front += 1;
-                if self.body.segments.pop_back().is_some() {
-                    self.body.length = (self.body.length - 1.0).max(0.0);
-                }
-            }
+            // a dying snake's head is pinned in the hole, so it never reaches a
+            // cell boundary and advance() never reports one
+            State::Dying => panic!("called advance_cell() on a dying snake"),
             State::Living => {
                 // create new head for snake
                 let dir = self.body.dir;
@@ -370,13 +370,13 @@ impl Snake {
     pub fn cut_at(&mut self, segment_index: usize) {
         let _ = self.body.segments.drain(segment_index..);
 
-        // reset length to the freshly-cut body (tail at the start of the new
-        // last segment, i.e. tail_fraction == 0), keeping length the source of truth
-        self.body.length = (self.body.visible_len() as f32 - 1.0) + self.body.head_fraction;
+        // the cut leaves the tail flush with the start of the new last segment
+        // (tail_fraction == 0); everything that is there is, by definition, out
+        self.body.emerged = self.body.swallowed + (self.body.visible_len() as f32 - 1.0) + self.body.head_fraction;
 
-        // ensure a length of at least 2 to avoid weird animation,
-        // otherwise, stop any previous growth
-        self.body.grow = (2.0 - self.body.visible_len() as f32).max(0.0);
+        // ensure a length of at least 2 to avoid weird animation, otherwise
+        // stop any previous growth. The shortfall regrows by emerging.
+        self.body.length = self.body.emerged.max(2.0);
     }
 
     pub fn crash(&mut self) {
@@ -389,7 +389,7 @@ impl Snake {
     pub fn die(&mut self) {
         if !matches!(self.state, State::Dying) {
             self.state = State::Dying;
-            self.body.segments[0].segment_type = SegmentType::BlackHole { just_created: true };
+            self.body.segments[0].segment_type = SegmentType::BlackHole;
         }
     }
 }

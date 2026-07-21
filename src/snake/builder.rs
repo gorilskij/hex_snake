@@ -136,16 +136,14 @@ impl Builder {
 
         let body = Body {
             segments: cells,
-            missing_front: 0,
             dir,
             head_fraction: 0.0,
-            // nothing has emerged yet: the head tip sits at the start of its
-            // cell, so there is zero material behind it. `grow` then pays out
-            // `len` cells of material at exactly the head's rate, which keeps
-            // `tail_fraction == head_fraction` (invariant satisfied throughout).
-            length: 0.0,
+            // the snake is `len` long from the start; none of it is out of the
+            // birth hole yet, so it emerges over the first `len` cells travelled
+            length: len as f32,
+            emerged: 0.0,
+            swallowed: 0.0,
             turn_start: None,
-            grow: len as f32,
             search_trace: None,
         };
 

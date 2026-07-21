@@ -81,7 +81,7 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
     snake::builder::Builder::default()
         .snake_type(snake::Type::Player)
         .eat_mechanics(eat_mechanics)
-        .palette(snake::PaletteTemplate::rainbow(true))
+        .palette(snake::PaletteTemplate::rainbow())
         .controller(snake_control::Template::Keyboard { control_setup, knowledge })
         .speed(5.)
         .autopilot(pathfinder::Template::WithBackup {

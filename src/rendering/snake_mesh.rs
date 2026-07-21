@@ -10,7 +10,7 @@ use crate::snake::palette::{build_snake_lut, SegmentStyle};
 use crate::snake::{Body, Segment, SegmentType, Snake};
 use crate::support::material::PaletteLut;
 use crate::support::mesh::{build_circle, DrawMode, Mesh};
-use crate::support::partial_min_max::partial_min;
+
 
 /// Drawable output for all snakes: one shaded mesh + palette LUT per snake, plus
 /// an optional plain (default-material) mesh for black-hole circles.
@@ -27,33 +27,16 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 
     let location = segment.pos.to_cartesian(gtx.cell_dim);
 
-    let fraction = match segment_idx {
-        // head
-        0 => {
-            if let SegmentType::BlackHole { .. } = segment.segment_type {
-                // never exceed 0.5 into a black hole, stay there once you get there
-                if body.visible_len() == 1 {
-                    // also tail
-                    SegmentFraction {
-                        start: partial_min(body.head_fraction, 0.5).unwrap(),
-                        end: 0.5,
-                    }
-                } else if body.missing_front > 0 {
-                    SegmentFraction::appearing(0.5)
-                } else {
-                    SegmentFraction::appearing(partial_min(body.head_fraction, 0.5).unwrap())
-                }
-            } else {
-                SegmentFraction::appearing(body.head_fraction)
-            }
-        }
-        // tail — recedes by the derived tail_fraction (which already moves
-        // slowly through an eaten segment); frozen (full) while grow is pending
-        i if i == body.visible_len() - 1 && body.grow == 0.0 => {
-            SegmentFraction::disappearing(body.tail_fraction())
-        }
-        // body
-        _ => SegmentFraction::solid(),
+    // The body spans from the tail's recede to the head's progress; a snake
+    // down to a single segment is both at once. Both ends are pinned by the
+    // model when they are in a hole, so nothing needs clamping here.
+    let fraction = SegmentFraction {
+        start: if segment_idx == body.visible_len() - 1 {
+            body.tail_fraction()
+        } else {
+            0.
+        },
+        end: if segment_idx == 0 { body.head_fraction } else { 1. },
     };
 
     let turn_fraction = if segment_idx == 0 {
@@ -124,7 +107,7 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
 
         // Black-hole circles (default material), drawn separately.
         for desc in &descs {
-            if let SegmentType::BlackHole { .. } = desc.segment_type {
+            if let SegmentType::BlackHole = desc.segment_type {
                 let destination = desc.destination + gtx.cell_dim.center();
                 let SegmentFraction { start, end } = desc.fraction;
                 let real_cell_dim = if (start - end).abs() < f32::EPSILON {

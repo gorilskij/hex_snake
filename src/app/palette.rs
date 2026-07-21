@@ -44,10 +44,10 @@ impl Palette {
             border_color: crate::color::WHITE,
             apple_color: gray!(0.45),
 
-            palette_competitor: snake::PaletteTemplate::pastel_rainbow(true),
-            palette_killer: snake::PaletteTemplate::dark_blue_to_red(false),
-            // palette_killer: snake::PaletteTemplate::dark_rainbow(true),
-            palette_rain: snake::PaletteTemplate::gray_gradient(0.5, false),
+            palette_competitor: snake::PaletteTemplate::pastel_rainbow(),
+            palette_killer: snake::PaletteTemplate::dark_blue_to_red(),
+            // palette_killer: snake::PaletteTemplate::dark_rainbow(),
+            palette_rain: snake::PaletteTemplate::gray_gradient(0.5),
         }
     }
 }
