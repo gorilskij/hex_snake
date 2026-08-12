@@ -317,7 +317,7 @@ impl Palette for Solid {
 
         Box::new(body.segments.iter().map(|segment| {
             let color = match segment.segment_type {
-                Normal | BlackHole => self.color,
+                Normal => self.color,
                 Eaten { .. } => self.eaten,
                 Crashed => *DEFAULT_CRASHED_COLOR,
             };
@@ -348,7 +348,7 @@ impl Palette for RGBGradient {
                 let end_color = lerp(self.head_color, self.tail_color, ((r + 1.) / logical_len) as f32);
 
                 match segment.segment_type {
-                    Normal | BlackHole => SegmentStyle::RGBGradient { start_color, end_color },
+                    Normal => SegmentStyle::RGBGradient { start_color, end_color },
                     Eaten { .. } => SegmentStyle::RGBGradient {
                         start_color: invert_rgb(start_color),
                         end_color: invert_rgb(end_color),
@@ -383,7 +383,7 @@ impl Palette for HSLGradient {
                 let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
 
                 match segment.segment_type {
-                    Normal | BlackHole => SegmentStyle::HSLGradient {
+                    Normal => SegmentStyle::HSLGradient {
                         start_hue,
                         end_hue,
                         lightness: self.lightness,
@@ -431,7 +431,7 @@ impl Palette for OkLabGradient {
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
             match segment.segment_type {
-                Normal | BlackHole => SegmentStyle::OkLabGradient {
+                Normal => SegmentStyle::OkLabGradient {
                     start_hue,
                     end_hue,
                     lightness: self.lightness,
@@ -470,7 +470,7 @@ impl Palette for AlternatingFixed {
         let expected_mod = !self.iteration as usize;
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             let color = match segment.segment_type {
-                Normal | BlackHole => {
+                Normal => {
                     if i % 2 == expected_mod {
                         self.color1
                     } else {
@@ -505,7 +505,7 @@ impl Palette for Alternating {
             let r = i as f64 + body.swallowed as f64 + body.head_fraction as f64;
 
             match segment.segment_type {
-                Normal | BlackHole => {
+                Normal => {
                     // Check whether there is a minimum or maximum within this segment
                     use std::f64::consts::PI;
                     if r % PI <= PI && r % PI + 1. >= PI {

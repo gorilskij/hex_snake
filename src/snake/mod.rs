@@ -40,8 +40,6 @@ pub enum SegmentType {
     // growth still to be delivered, so total growth is capped at exactly food
     Eaten { original_food: f32, food_left: f32 },
     Crashed,
-    // does not advance, sucks the rest of the snake in
-    BlackHole,
 }
 
 pub type ZIndex = i32;
@@ -250,7 +248,7 @@ impl Snake {
         let delta = self.speed * elapsed.as_secs_f32();
 
         // Front end: either the head advances into the next cell, or — once it
-        // has sunk into a black hole — it stays put and the material flowing
+        // has sunk into the death hole — it stays put and the material flowing
         // past it is swallowed instead.
         let mut cell_boundary_crossed = false;
         match self.state {
@@ -389,7 +387,6 @@ impl Snake {
     pub fn die(&mut self) {
         if !matches!(self.state, State::Dying) {
             self.state = State::Dying;
-            self.body.segments[0].segment_type = SegmentType::BlackHole;
         }
     }
 }

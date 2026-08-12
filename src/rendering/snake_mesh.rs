@@ -1,5 +1,4 @@
 use anyhow::Result;
-use macroquad::color::Color;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
@@ -7,18 +6,16 @@ use crate::rendering;
 use crate::rendering::segments::cap::build_round_caps;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
 use crate::snake::palette::{build_snake_lut, SegmentStyle};
-use crate::snake::{Body, Segment, SegmentType, Snake};
+use crate::snake::{Body, Segment, Snake};
 use crate::support::material::PaletteLut;
-use crate::support::mesh::{build_circle, DrawMode, Mesh};
+use crate::support::mesh::Mesh;
 
 
-/// Drawable output for all snakes: one shaded mesh + palette LUT per snake, plus
-/// an optional plain (default-material) mesh for black-hole circles.
+/// Drawable output for all snakes: one shaded mesh + palette LUT per snake.
 pub struct SnakeRender {
     /// One entry per snake: the segment mesh (with its LUT baked in as texture)
     /// and the LUT itself (kept alive so the texture isn't freed).
     pub shaded: Vec<(Mesh, PaletteLut)>,
-    pub black_holes: Option<Mesh>,
 }
 
 fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: &GameContext) -> SegmentDescription {
@@ -76,15 +73,10 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 
 /// Build the drawable meshes for every snake. Each snake becomes one polygon per
 /// segment (no color subdivision); color is applied per-pixel by the snake
-/// shader sampling that snake's palette LUT. Black-hole circles are collected
-/// separately and drawn on the default material.
+/// shader sampling that snake's palette LUT.
 pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) -> Result<SnakeRender> {
     stats.redrawing_snakes = true;
 
-    // TODO (easy): factor out into palette
-    let black_hole_color = Color::from_rgba(1, 36, 92, 255);
-
-    let mut black_hole_parts: Vec<Mesh> = vec![];
     let mut shaded = Vec::with_capacity(snakes.len());
 
     for snake in snakes.iter_mut() {
@@ -104,28 +96,6 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
             .enumerate()
             .map(|(segment_idx, segment)| segment_description(segment, segment_idx, body, gtx))
             .collect();
-
-        // Black-hole circles (default material), drawn separately.
-        for desc in &descs {
-            if let SegmentType::BlackHole = desc.segment_type {
-                let destination = desc.destination + gtx.cell_dim.center();
-                let SegmentFraction { start, end } = desc.fraction;
-                let real_cell_dim = if (start - end).abs() < f32::EPSILON {
-                    // snake has died, animate black hole out
-                    let animation_fraction = body.head_fraction - 0.5;
-                    gtx.cell_dim * (1. - animation_fraction)
-                } else {
-                    gtx.cell_dim
-                };
-                black_hole_parts.push(build_circle(
-                    DrawMode::fill(),
-                    destination,
-                    real_cell_dim.side,
-                    black_hole_color,
-                ));
-                stats.polygons += 1;
-            }
-        }
 
         // Round end caps (smooth style): truncate the body ribbon by one cap
         // radius at each end and fill with half-circle caps.
@@ -151,7 +121,5 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
         shaded.push((mesh, lut));
     }
 
-    let black_holes = (!black_hole_parts.is_empty()).then(|| Mesh::combine(black_hole_parts));
-
-    Ok(SnakeRender { shaded, black_holes })
+    Ok(SnakeRender { shaded })
 }

@@ -438,7 +438,7 @@ impl Screen for Game {
         let has_snake = self
             .snake_render
             .as_ref()
-            .is_some_and(|r| !r.shaded.is_empty() || r.black_holes.is_some());
+            .is_some_and(|r| !r.shaded.is_empty());
         let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
@@ -457,9 +457,6 @@ impl Screen for Game {
                 let material = self.snake_material.as_ref().unwrap();
                 for (mesh, _lut) in &render.shaded {
                     mesh.draw_shaded(material);
-                }
-                if let Some(black_holes) = &render.black_holes {
-                    black_holes.draw();
                 }
             }
 

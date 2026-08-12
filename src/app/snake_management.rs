@@ -310,7 +310,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
             snake.advance_cell(&env.portals, &env.gtx);
         }
 
-        // remove the snake once the black hole has swallowed all of it (a snake
+        // remove the snake once the death hole has swallowed all of it (a snake
         // that hasn't emerged yet is also `on_board == 0`, hence the state check)
         if snake.state == State::Dying && snake.body.on_board() <= 0.0 {
             remove_snakes.push(snake_idx);
