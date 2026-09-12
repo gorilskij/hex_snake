@@ -58,6 +58,10 @@ fn window_conf() -> Conf {
         window_width: 1200,
         window_height: 900,
         high_dpi: true,
+        // without MSAA every polygon edge snaps to whole pixels, so a slowly
+        // moving curved edge crawls instead of sliding — very visible on the
+        // snake's round head/tail caps
+        sample_count: 4,
         ..Default::default()
     }
 }

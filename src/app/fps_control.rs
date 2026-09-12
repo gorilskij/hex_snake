@@ -88,6 +88,15 @@ pub enum State {
     GameOver,
 }
 
+/// Smoothing factor for the frame-duration average: each frame contributes this
+/// much of itself. Lower is smoother but slower to follow a real rate change.
+const PACE_SMOOTHING: f64 = 0.1;
+
+/// Longest hitch (relative to the running average) that still advances the
+/// world. A frame longer than this is a real stall — window drag, a breakpoint —
+/// and the world advances by this much instead of teleporting.
+const MAX_PACE_RATIO: f64 = 4.;
+
 // combines fps with game state management
 pub struct FpsControl {
     game_state: State,
@@ -95,6 +104,10 @@ pub struct FpsControl {
     start: Instant,
 
     last_update: Instant,
+
+    /// Running average of recent frame durations — the duration the world
+    /// actually advances by. See [`FpsControl::pace`].
+    paced: Option<Duration>,
 
     graphics_frame_num: usize,
     elapsed_total: Duration,
@@ -111,6 +124,8 @@ impl FpsControl {
 
             last_update: now,
 
+            paced: None,
+
             graphics_frame_num: 0,
             elapsed_total: Duration::ZERO,
             measured_graphics_fps: FpsCounter::new(60.),
@@ -122,8 +137,41 @@ impl FpsControl {
             let new_update = Instant::now();
             let elapsed = new_update - self.last_update;
             self.last_update = new_update;
-            elapsed
+            self.pace(elapsed)
         })
+    }
+
+    /// Smooth a raw frame duration into the one the world advances by.
+    ///
+    /// Frames are presented on the display's fixed cadence, but the wall-clock
+    /// gap we measure between `update` calls jitters around it by a few percent
+    /// — scheduling noise, not real elapsed time. Advancing the world by that
+    /// noisy measurement makes everything move at a slightly wrong speed every
+    /// frame: invisible on the snake's uniform body, but clearly visible on the
+    /// head and tail tips, which are the only features the eye can track.
+    ///
+    /// A running average removes the noise while still following a genuine rate
+    /// change (a different monitor, vsync off). It is unbiased, so simulated
+    /// time tracks wall time; a dropped frame is absorbed over the next few
+    /// frames rather than lurching.
+    ///
+    /// Deliberately *not* snapping to whole refresh periods: the period has to
+    /// be estimated from the same jittery samples, so the snap target wobbles,
+    /// and frames near 1.5x round up into an advance that never happened. Both
+    /// measured worse than doing nothing.
+    fn pace(&mut self, raw: Duration) -> Duration {
+        let Some(avg) = self.paced else {
+            // first frame: nothing to average against yet
+            self.paced = Some(raw);
+            return raw;
+        };
+
+        // a real stall must not poison the average (or teleport the snake)
+        let capped = raw.min(avg.mul_f64(MAX_PACE_RATIO));
+
+        let smoothed = avg.mul_f64(1. - PACE_SMOOTHING) + capped.mul_f64(PACE_SMOOTHING);
+        self.paced = Some(smoothed);
+        smoothed
     }
 
     // call in draw()
