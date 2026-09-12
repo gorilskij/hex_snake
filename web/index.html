@@ -11,6 +11,23 @@
 </head>
 <body>
     <canvas id="glcanvas" tabindex="1"></canvas>
+    <script>
+        // Render in Display P3 where supported. The native macOS build shows the
+        // game's colors as display-native (P3) values; a canvas defaults to sRGB,
+        // which the browser color-manages into noticeably duller colors on
+        // wide-gamut screens. Set on the context as it is created (before the
+        // bundle draws anything); browsers without support just skip it.
+        (function () {
+            const getContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function (...args) {
+                const context = getContext.apply(this, args);
+                if (context && "drawingBufferColorSpace" in context) {
+                    context.drawingBufferColorSpace = "display-p3";
+                }
+                return context;
+            };
+        })();
+    </script>
     <script src="mq_js_bundle.js"></script>
     <script>
         // Keep the canvas focused so keyboard events reach the game.
