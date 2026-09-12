@@ -1,26 +1,29 @@
-//! Hints at the board's edges about what lies on the other side: every edge of
-//! a border cell that wraps around the board shows a subtle gradient in its
-//! cell, colored by what would happen to the player on crossing it (see
-//! [`Outcome`]). Hints ease in, out, and between colors in real time.
+//! Hints at the board's edges about what lies on the other side: every side of
+//! a border cell that wraps around the board shows what would happen to the
+//! player on crossing it (see [`Outcome`]), in one of two styles — recoloring
+//! its stretch of the border ([`HintStyle::Border`]), or a gradient fading from
+//! it into the cell ([`HintStyle::Gradient`]). Hints ease in, out, and between
+//! colors in real time.
 
 use std::collections::HashMap;
 
 use macroquad::color::Color;
 
+use crate::app::prefs::HintStyle;
 use crate::app::screen::Environment;
 use crate::app::snake_management::{outcome_at, Outcome};
 use crate::basic::{Dir, HexDim, HexPoint, Point};
 use crate::color::lerp;
 use crate::rendering::shape::{Hexagon, Shape};
-use crate::support::mesh::{build_colored_polygon, Mesh};
+use crate::support::mesh::{build_colored_polygon, build_polygon, DrawMode, Mesh};
 use crate::support::time::Instant;
 
 /// Roughly how long (s) a hint takes to settle after what's behind it changes.
 const FADE_TIME: f32 = 0.1;
 
-/// How far a hint reaches into its cell, as a fraction of the way from the
-/// edge to the cell's center.
-const DEPTH: f32 = 0.5;
+/// How far a gradient hint reaches into its cell, as a fraction of the way from
+/// the edge to the cell's center.
+const GRADIENT_DEPTH: f32 = 0.5;
 
 pub struct BorderHints {
     /// The displayed color of every edge whose hint is (still) visible.
@@ -42,22 +45,31 @@ impl BorderHints {
     }
 
     /// Ease every hint towards what the player would currently run into across
-    /// its edge, and build the mesh.
-    pub fn mesh(&mut self, env: &Environment, player_idx: usize) -> Mesh {
+    /// its edge, and build the mesh in the given style.
+    pub fn mesh(&mut self, env: &Environment, player_idx: usize, style: HintStyle) -> Mesh {
+        let palette = &env.gtx.palette;
+        let hint_colors = match style {
+            HintStyle::Border => palette.border_hint_colors,
+            HintStyle::Gradient => palette.gradient_hint_colors,
+            HintStyle::None => {
+                self.clear();
+                return Mesh::empty();
+            }
+        };
+
         let now = Instant::now();
         let elapsed = self.last_update.map_or(0., |last| (now - last).as_secs_f32());
         self.last_update = Some(now);
         // exponential approach, ~95% of the way there after FADE_TIME
         let step = 1. - (-3. * elapsed / FADE_TIME).exp();
 
-        let palette = &env.gtx.palette;
         let targets: HashMap<(HexPoint, Dir), Color> = wrap_edges(env.gtx.board_dim)
             .filter_map(|(pos, dir, destination)| {
                 let color = match outcome_at(env, player_idx, destination)? {
-                    Outcome::Apple => palette.hint_apple_color,
-                    Outcome::Pass => palette.hint_pass_color,
-                    Outcome::Cut => palette.hint_cut_color,
-                    Outcome::Crash => palette.hint_crash_color,
+                    Outcome::Apple => hint_colors.apple,
+                    Outcome::Pass => hint_colors.pass,
+                    Outcome::Cut => hint_colors.cut,
+                    Outcome::Crash => hint_colors.crash,
                 };
                 Some(((pos, dir), color))
             })
@@ -74,21 +86,61 @@ impl BorderHints {
         });
 
         let cell_dim = env.gtx.cell_dim;
-        // corners clockwise from the top-left: edge i (corner i to i + 1) faces Dir i
+        let board_dim = env.gtx.board_dim;
+        let half_width = palette.border_thickness / 2.;
+        // corners clockwise from the top-left: side i (corner i to i + 1) faces Dir i
         let corners = Hexagon::raw_points(cell_dim);
         let center = Hexagon::center(cell_dim);
+
         Mesh::combine(self.colors.iter().map(|(&(pos, dir), &color)| {
             let origin = pos.to_cartesian(cell_dim);
-            let start = corners[dir as usize];
-            let end = corners[(dir as usize + 1) % 6];
-            let inward = |corner: Point| corner + (center - corner) * DEPTH;
-            let clear = Color { a: 0., ..color };
-            build_colored_polygon(&[
-                (origin + start, color),
-                (origin + end, color),
-                (origin + inward(end), clear),
-                (origin + inward(start), clear),
-            ])
+            let corner = |i: usize| origin + corners[i % 6];
+            let side = dir as usize;
+            let (start, end) = (corner(side), corner(side + 1));
+
+            match style {
+                HintStyle::Border => {
+                    // A band the border's width, centered on the side like the
+                    // border itself, with each end cut along the line halving the
+                    // corner the border turns at, so it meets the next stretch of
+                    // border (hinted or not) exactly. If the cell's other side at
+                    // that corner is on the border too, the border turns around
+                    // this cell and the cut points at its center; otherwise it
+                    // turns onto the neighboring cell and the cut runs along the
+                    // side between the two.
+                    let on_border = |side: usize| !board_dim.contains(pos.translate(Dir::from(side as u8), 1));
+                    let cut = |vertex: Point, other_side: usize, other_corner: Point| {
+                        if on_border(other_side) {
+                            origin + center - vertex
+                        } else {
+                            other_corner - vertex
+                        }
+                    };
+
+                    let along = (end - start) / (end - start).magnitude();
+                    let normal = Point { x: -along.y, y: along.x };
+                    // the points on a cut (through `vertex`) half a width to either side
+                    let cut_ends = |vertex: Point, cut: Point| {
+                        let reach = cut * (half_width / (cut.x * normal.x + cut.y * normal.y));
+                        (vertex + reach, vertex - reach)
+                    };
+
+                    let (start_left, start_right) = cut_ends(start, cut(start, side + 5, corner(side + 5)));
+                    let (end_left, end_right) = cut_ends(end, cut(end, side + 1, corner(side + 2)));
+                    build_polygon(DrawMode::Fill, &[start_left, end_left, end_right, start_right], color)
+                }
+                HintStyle::Gradient => {
+                    let inward = |corner: Point| corner + (origin + center - corner) * GRADIENT_DEPTH;
+                    let clear = Color { a: 0., ..color };
+                    build_colored_polygon(&[
+                        (start, color),
+                        (end, color),
+                        (inward(end), clear),
+                        (inward(start), clear),
+                    ])
+                }
+                HintStyle::None => unreachable!("returned above"),
+            }
         }))
     }
 }
