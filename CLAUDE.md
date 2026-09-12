@@ -239,6 +239,12 @@ passable** by construction; not every passable segment is marked.
   (see TODO).
 - **getrandom on wasm:** use the `custom` feature only; NOT `js`/`web-time`/
   `instant` (they pull wasm-bindgen, which clashes with macroquad's JS loader).
+- **Web colors looked duller than native** on a Mac: the native OpenGL view is
+  untagged, so macOS shows its values as display-native (Display P3), while a
+  WebGL canvas defaults to sRGB and gets color-managed down. `web/index.html`
+  wraps `getContext` to set `drawingBufferColorSpace = "display-p3"` (where
+  supported), matching native. Raw texture/vertex data isn't converted, so
+  nothing else needs to change.
 
 ## TODOs / not yet done
 
