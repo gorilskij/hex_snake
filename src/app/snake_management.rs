@@ -40,54 +40,101 @@ pub enum Collision {
 pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
     let mut collisions = vec![];
 
-    // check whether snake1 collided with an apple or with snake2
-    'outer: for (snake1_index, snake1) in env
+    for (snake1_index, snake1) in env
         .snakes
         .iter()
         .enumerate()
         .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying))
     {
-        for (apple_index, apple) in env.apples.iter().enumerate() {
-            if snake1.head().pos == apple.pos {
-                collisions.push(Collision::Apple {
-                    snake_index: snake1_index,
-                    apple_index,
-                });
-                // snakes and apples cannot overlap
-                continue 'outer;
-            }
+        let pos = snake1.head().pos;
+
+        // snakes and apples cannot overlap
+        if let Some(apple_index) = env.apples.iter().position(|apple| apple.pos == pos) {
+            collisions.push(Collision::Apple {
+                snake_index: snake1_index,
+                apple_index,
+            });
+            continue;
         }
 
-        for (snake2_index, other) in env.snakes.iter().enumerate() {
-            let mut iter = other.body.segments.iter().enumerate();
-
-            // ignore head-head collision with itself
-            if snake1_index == snake2_index {
-                let _ = iter.next();
-            }
-
-            for (segment_idx, segment) in iter {
-                if snake1.head().pos == segment.pos {
-                    if snake1_index == snake2_index {
-                        collisions.push(Collision::Itself {
-                            snake_index: snake1_index,
-                            snake_segment_index: segment_idx,
-                        })
-                    } else {
-                        collisions.push(Collision::Snake {
-                            snake1_index,
-                            snake2_index,
-                            snake2_segment_index: segment_idx,
-                        });
-                    }
-
-                    continue 'outer;
+        // several segments can share a cell (one snake passing over another):
+        // the worst of them is what happens
+        let worst = segments_at(env, snake1_index, pos).max_by_key(|&(_, _, outcome)| outcome);
+        if let Some((snake2_index, segment_idx, _)) = worst {
+            collisions.push(if snake2_index == snake1_index {
+                Collision::Itself {
+                    snake_index: snake1_index,
+                    snake_segment_index: segment_idx,
                 }
-            }
+            } else {
+                Collision::Snake {
+                    snake1_index,
+                    snake2_index,
+                    snake2_segment_index: segment_idx,
+                }
+            });
         }
     }
 
     collisions
+}
+
+/// What would happen to a snake whose head entered a cell, in increasing order
+/// of severity.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum Outcome {
+    Apple,
+    Pass,
+    Cut,
+    Crash,
+}
+
+/// What would happen to `snake_index` if its head entered `pos` right now, or
+/// `None` if nothing is there. Decided exactly as [`find_collisions`] decides
+/// an actual collision.
+pub fn outcome_at<Rng>(env: &Environment<Rng>, snake_index: usize, pos: HexPoint) -> Option<Outcome> {
+    if env.apples.iter().any(|apple| apple.pos == pos) {
+        return Some(Outcome::Apple);
+    }
+    segments_at(env, snake_index, pos).map(|(_, _, outcome)| outcome).max()
+}
+
+/// Every segment at `pos` that `snake_index`'s head would run into there, as
+/// `(snake index, segment index, outcome)`.
+fn segments_at<Rng>(
+    env: &Environment<Rng>,
+    snake_index: usize,
+    pos: HexPoint,
+) -> impl Iterator<Item = (usize, usize, Outcome)> + '_ {
+    use EatBehavior::*;
+
+    let snake = &env.snakes[snake_index];
+    env.snakes.iter().enumerate().flat_map(move |(other_index, other)| {
+        let itself = other_index == snake_index;
+        other
+            .body
+            .segments
+            .iter()
+            .enumerate()
+            // a snake's head never collides with itself
+            .skip(itself as usize)
+            .filter(move |(_, segment)| segment.pos == pos)
+            .map(move |(segment_index, segment)| {
+                let behavior = if itself {
+                    snake.eat_mechanics.eat_self(segment.segment_type)
+                } else {
+                    snake.eat_mechanics.eat_other(other.snake_type, segment.segment_type)
+                };
+                let outcome = match behavior {
+                    Crash | Die => Outcome::Crash,
+                    // cutting another snake at its head kills both
+                    Cut if !itself && segment_index == 0 => Outcome::Crash,
+                    Cut => Outcome::Cut,
+                    PassUnder | PassOver => Outcome::Pass,
+                };
+                (other_index, segment_index, outcome)
+            })
+    })
 }
 
 /// Apply the effect of every apple collision and remove the eaten apples.

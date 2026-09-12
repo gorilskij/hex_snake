@@ -323,6 +323,18 @@ impl HexPoint {
         })
     }
 
+    /// The cell a single step out of the board in `dir` wraps around to, or
+    /// `None` if the step stays on the board (or can't be wrapped).
+    #[must_use]
+    pub fn wrap_destination(self, dir: Dir, board_dim: HexDim) -> Option<Self> {
+        let translated = self.translate(dir, 1);
+        if board_dim.contains(translated) {
+            None
+        } else {
+            translated.wrap_around(board_dim, dir.axis())
+        }
+    }
+
     // tells you if it teleported or not
     #[must_use]
     pub fn explicit_wrapping_translate(self, dir: Dir, dist: usize, board_dim: HexDim) -> (Self, bool) {

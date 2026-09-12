@@ -69,7 +69,9 @@ macroquad's `KeyCode` passed straight through, then `next_frame().await`.
     `prefs.rs` (`Prefs`; default draw_style = Smooth, grid+border on),
     `stats.rs`, `message.rs` (macroquad text overlay), `palette.rs` (board/bg
     colors, distinct from snake palette), `snake_management.rs` (advance, spawn,
-    collisions), `distance_grid.rs`, `portal/`, `board_dim.rs`.
+    collisions, `outcome_at`), `border_hints.rs` (gradients on wrap-around edges
+    hinting what the player would hit on the other side), `distance_grid.rs`,
+    `portal/`, `board_dim.rs`.
   - `screen/{start_screen,snake_control_creator_screen,debug_scenario}.rs` — **out
     of the module tree** (not compiled); page chrome to be done in HTML/JS later.
 - **`snake/`** — snake model. `mod.rs` (`Snake`, `Body`, `Segment`,
@@ -141,8 +143,9 @@ z-order onto a `Canvas`:
    flushes the GPU batch, so per-mesh sets were the bulk of the frame's cost.)
 3. Snakes are special — drawn through a shader (below).
 
-Draw order (default material, split around the snake): distance_grid, grid,
-player_path → **snake (shaded)** → apple, border, portal → message text.
+Draw order (default material, split around the snake): distance_grid,
+border_hints, grid, player_path → **snake (shaded)** → apple, border, portal →
+message text.
 
 ### Snake coloring (shader-based)
 

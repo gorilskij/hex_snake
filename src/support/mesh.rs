@@ -70,6 +70,20 @@ pub fn build_polyline(mode: DrawMode, points: &[Point], color: impl Into<MqColor
     build_line(points, width, color)
 }
 
+/// Build a convex polygon with a color per vertex, interpolated across it.
+pub fn build_colored_polygon(points: &[(Point, MqColor)]) -> Mesh {
+    if points.len() < 3 {
+        return Mesh::empty();
+    }
+    let vertices = points
+        .iter()
+        .map(|&(p, color)| Vertex::new(p.x, p.y, 0., 0., 0., color))
+        .collect();
+    // a fan around the first vertex
+    let indices = (1..points.len() as u16 - 1).flat_map(|i| [0, i, i + 1]).collect();
+    Mesh::raw(vertices, indices)
+}
+
 /// Build a filled polygon whose color comes from a shader (via a palette LUT)
 /// rather than a flat vertex color. `default_points` are the polygon outline in
 /// the segment's *default orientation*; `uv_of` maps each tessellated vertex

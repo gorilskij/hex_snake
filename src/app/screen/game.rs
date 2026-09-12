@@ -10,6 +10,7 @@ use macroquad::material::Material;
 use macroquad::window::clear_background;
 use rand::prelude::*;
 
+use crate::app::border_hints::BorderHints;
 use crate::app::distance_grid::DistanceGrid;
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
@@ -45,6 +46,7 @@ pub struct Game {
     animated_apples: bool,
 
     distance_grid: DistanceGrid,
+    border_hints: BorderHints,
 
     messages: HashMap<MessageID, Message>,
 
@@ -89,6 +91,7 @@ impl Game {
             animated_apples: false,
 
             distance_grid: DistanceGrid::new(),
+            border_hints: BorderHints::new(),
 
             messages: HashMap::new(),
 
@@ -148,6 +151,7 @@ impl Game {
             self.snake_render = None;
             self.distance_grid_mesh = None;
             self.distance_grid.invalidate();
+            self.border_hints.clear();
             self.player_path_mesh = None;
         }
     }
@@ -421,6 +425,9 @@ impl Screen for Game {
         let player_idx = self.first_player_snake_idx().expect("no player snake");
         let env = &mut self.env;
 
+        // rebuilt every frame: hints fade in real time, even while paused
+        let border_hint_mesh = Some(self.border_hints.mesh(env, player_idx));
+
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
         if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
@@ -448,7 +455,13 @@ impl Screen for Game {
 
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
-        let before_snake = [&self.distance_grid_mesh, &self.grid_mesh, &self.player_path_mesh];
+        // Border hints go under the grid (and border), so its lines stay untinted.
+        let before_snake = [
+            &self.distance_grid_mesh,
+            &border_hint_mesh,
+            &self.grid_mesh,
+            &self.player_path_mesh,
+        ];
         let after_snake = [&self.apple_mesh, &self.border_mesh, &self.portal_mesh];
 
         let has_snake = self
