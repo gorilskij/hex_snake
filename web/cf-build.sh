@@ -20,7 +20,11 @@ fi
 
 # rust-toolchain.toml pins the nightly channel + wasm target; cargo installs
 # both on this first invocation.
-cargo build --release --target wasm32-unknown-unknown
+#
+# The release profile keeps debuginfo (for native profiling), which balloons the
+# wasm past Pages' 25 MiB per-file limit (~25 MiB vs ~1 MiB without), so drop
+# it for the deployed build only.
+CARGO_PROFILE_RELEASE_DEBUG=false cargo build --release --target wasm32-unknown-unknown
 cp target/wasm32-unknown-unknown/release/hex_snake.wasm web/hex_snake.wasm
 
 echo "built web/hex_snake.wasm ($(du -h web/hex_snake.wasm | cut -f1))"
