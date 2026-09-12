@@ -92,10 +92,10 @@ pub enum State {
 /// much of itself. Lower is smoother but slower to follow a real rate change.
 const PACE_SMOOTHING: f64 = 0.1;
 
-/// Longest hitch (relative to the running average) that still advances the
-/// world. A frame longer than this is a real stall — window drag, a breakpoint —
-/// and the world advances by this much instead of teleporting.
-const MAX_PACE_RATIO: f64 = 4.;
+/// Longest frame that still advances the world in full. A longer one is a stall
+/// (window drag, breakpoint, suspended tab): the world advances by this much, so
+/// it looks paused for the rest of it rather than teleporting.
+const MAX_FRAME: Duration = Duration::from_millis(100);
 
 /// The global speed multipliers stepped through with [`FpsControl::faster`] and
 /// [`FpsControl::slower`] (a debugging aid).
@@ -173,16 +173,22 @@ impl FpsControl {
     /// and frames near 1.5x round up into an advance that never happened. Both
     /// measured worse than doing nothing.
     fn pace(&mut self, raw: Duration) -> Duration {
-        let Some(avg) = self.paced else {
-            // first frame: nothing to average against yet
+        // a stall advances the world by a bounded amount and is kept out of the
+        // average, which would otherwise speed up the frames after it
+        if raw > MAX_FRAME {
+            return MAX_FRAME;
+        }
+
+        // Seed the average from the first frame with a measurable duration: the
+        // clock can be coarse (whole milliseconds on the web), so an early frame
+        // can read as zero, and averaging up from zero would start the game in
+        // slow motion.
+        let Some(avg) = self.paced.filter(|avg| !avg.is_zero()) else {
             self.paced = Some(raw);
             return raw;
         };
 
-        // a real stall must not poison the average (or teleport the snake)
-        let capped = raw.min(avg.mul_f64(MAX_PACE_RATIO));
-
-        let smoothed = avg.mul_f64(1. - PACE_SMOOTHING) + capped.mul_f64(PACE_SMOOTHING);
+        let smoothed = avg.mul_f64(1. - PACE_SMOOTHING) + raw.mul_f64(PACE_SMOOTHING);
         self.paced = Some(smoothed);
         smoothed
     }
