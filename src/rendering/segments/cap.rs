@@ -75,11 +75,8 @@ pub fn build_round_caps(
         .map(|(desc, len)| (desc.fraction.end - desc.fraction.start).max(0.) * len)
         .sum();
 
-    // a head inside a black hole or crashed into an obstacle keeps its flat face
-    let round_head = !matches!(
-        descs[0].segment_type,
-        SegmentType::BlackHole { .. } | SegmentType::Crashed
-    );
+    // a head crashed into an obstacle keeps its flat face
+    let round_head = !matches!(descs[0].segment_type, SegmentType::Crashed);
 
     // Never consume more than the whole body: while the snake is very short
     // (e.g. just spawning) the caps shrink to half-ellipses that meet in the
@@ -198,6 +195,7 @@ fn build_cap(
         build_shaded_ribbon(
             &sections,
             desc.seg_bounds(num_segments, lut_size),
+            1.,
             desc.u_of(num_segments),
             desc.board_transform(),
         )

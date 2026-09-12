@@ -1,24 +1,22 @@
 use anyhow::Result;
-use macroquad::color::Color;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
+use crate::apple::Apple;
 use crate::rendering;
 use crate::rendering::segments::cap::build_round_caps;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
+use crate::rendering::segments::marks::{build_marks, Joins};
 use crate::snake::palette::{build_snake_lut, SegmentStyle};
-use crate::snake::{Body, Segment, SegmentType, Snake};
+use crate::snake::{Body, Segment, Snake};
 use crate::support::material::PaletteLut;
-use crate::support::mesh::{build_circle, DrawMode, Mesh};
-use crate::support::partial_min_max::partial_min;
+use crate::support::mesh::Mesh;
 
-/// Drawable output for all snakes: one shaded mesh + palette LUT per snake, plus
-/// an optional plain (default-material) mesh for black-hole circles.
+/// Drawable output for all snakes: one shaded mesh + palette LUT per snake.
 pub struct SnakeRender {
     /// One entry per snake: the segment mesh (with its LUT baked in as texture)
     /// and the LUT itself (kept alive so the texture isn't freed).
     pub shaded: Vec<(Mesh, PaletteLut)>,
-    pub black_holes: Option<Mesh>,
 }
 
 fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: &GameContext) -> SegmentDescription {
@@ -27,37 +25,16 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 
     let location = segment.pos.to_cartesian(gtx.cell_dim);
 
-    let fraction = match segment_idx {
-        // head
-        0 => {
-            if let SegmentType::BlackHole { .. } = segment.segment_type {
-                // never exceed 0.5 into a black hole, stay there once you get there
-                if body.visible_len() == 1 {
-                    // also tail
-                    SegmentFraction {
-                        start: partial_min(body.segment_fraction, 0.5).unwrap(),
-                        end: 0.5,
-                    }
-                } else if body.missing_front > 0 {
-                    SegmentFraction::appearing(0.5)
-                } else {
-                    SegmentFraction::appearing(partial_min(body.segment_fraction, 0.5).unwrap())
-                }
-            } else {
-                SegmentFraction::appearing(body.segment_fraction)
-            }
-        }
-        // tail
-        i if i == body.visible_len() - 1 && body.grow == 0 => {
-            if let SegmentType::Eaten { original_food, food_left } = segment.segment_type {
-                let frac = ((original_food - food_left) as f32 + body.segment_fraction) / (original_food + 1) as f32;
-                SegmentFraction::disappearing(frac)
-            } else {
-                SegmentFraction::disappearing(body.segment_fraction)
-            }
-        }
-        // body
-        _ => SegmentFraction::solid(),
+    // The body spans from the tail's recede to the head's progress; a snake
+    // down to a single segment is both at once. Both ends are pinned by the
+    // model when they are in a hole, so nothing needs clamping here.
+    let fraction = SegmentFraction {
+        start: if segment_idx == body.visible_len() - 1 {
+            body.tail_fraction()
+        } else {
+            0.
+        },
+        end: if segment_idx == 0 { body.head_fraction } else { 1. },
     };
 
     let turn_fraction = if segment_idx == 0 {
@@ -69,7 +46,7 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
                 if max.abs() < f32::EPSILON {
                     1.
                 } else {
-                    let covered = body.segment_fraction - start_fraction;
+                    let covered = body.head_fraction - start_fraction;
                     let linear = covered / max;
                     ezing::sine_inout(linear)
                 }
@@ -97,15 +74,10 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 
 /// Build the drawable meshes for every snake. Each snake becomes one polygon per
 /// segment (no color subdivision); color is applied per-pixel by the snake
-/// shader sampling that snake's palette LUT. Black-hole circles are collected
-/// separately and drawn on the default material.
-pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) -> Result<SnakeRender> {
+/// shader sampling that snake's palette LUT.
+pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext, stats: &mut Stats) -> Result<SnakeRender> {
     stats.redrawing_snakes = true;
 
-    // TODO (easy): factor out into palette
-    let black_hole_color = Color::from_rgba(1, 36, 92, 255);
-
-    let mut black_hole_parts: Vec<Mesh> = vec![];
     let mut shaded = Vec::with_capacity(snakes.len());
 
     for snake in snakes.iter_mut() {
@@ -126,28 +98,6 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
             .map(|(segment_idx, segment)| segment_description(segment, segment_idx, body, gtx))
             .collect();
 
-        // Black-hole circles (default material), drawn separately.
-        for desc in &descs {
-            if let SegmentType::BlackHole { .. } = desc.segment_type {
-                let destination = desc.destination + gtx.cell_dim.center();
-                let SegmentFraction { start, end } = desc.fraction;
-                let real_cell_dim = if (start - end).abs() < f32::EPSILON {
-                    // snake has died, animate black hole out
-                    let animation_fraction = body.segment_fraction - 0.5;
-                    gtx.cell_dim * (1. - animation_fraction)
-                } else {
-                    gtx.cell_dim
-                };
-                black_hole_parts.push(build_circle(
-                    DrawMode::fill(),
-                    destination,
-                    real_cell_dim.side,
-                    black_hole_color,
-                ));
-                stats.polygons += 1;
-            }
-        }
-
         // Round end caps (smooth style): truncate the body ribbon by one cap
         // radius at each end and fill with half-circle caps.
         let (tail_cap, head_cap) = if gtx.prefs.draw_style == rendering::Style::Smooth && !descs.is_empty() {
@@ -158,13 +108,34 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
             (None, None)
         };
 
+        // Which segments carry passability marks (head → tail), and whether the
+        // head's marks already join the next head segment's.
+        let eat_mechanics = snake.eat_mechanics;
+        let marked: Vec<bool> = body
+            .segments
+            .iter()
+            .map(|segment| eat_mechanics.is_marked(segment.segment_type))
+            .collect();
+        let next_marked = snake
+            .upcoming_eaten_segment(apples, gtx)
+            .is_some_and(|segment_type| eat_mechanics.is_marked(segment_type));
+
         // Shaded segments. Draw tail → head so the head paints on top; the
-        // caps keep that order (tail cap under, head cap over).
+        // caps keep that order (tail cap under, head cap over). A segment's
+        // marks go directly on top of it.
         let segments = tail_cap
             .into_iter()
-            .chain(descs.iter().rev().map(|desc| {
-                stats.polygons += 1;
-                desc.build_shaded(num_segments, lut_size)
+            .chain(descs.iter().rev().flat_map(|desc| {
+                let idx = desc.segment_idx;
+                let marks = marked[idx].then(|| {
+                    let joins = Joins {
+                        tail: marked.get(idx + 1) == Some(&true),
+                        head: if idx == 0 { next_marked } else { marked[idx - 1] },
+                    };
+                    build_marks(desc, joins, num_segments, lut_size)
+                });
+                stats.polygons += 1 + marks.is_some() as usize;
+                std::iter::once(desc.build_shaded(num_segments, lut_size)).chain(marks)
             }))
             .chain(head_cap);
         let mut mesh = Mesh::combine(segments);
@@ -172,7 +143,5 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
         shaded.push((mesh, lut));
     }
 
-    let black_holes = (!black_hole_parts.is_empty()).then(|| Mesh::combine(black_hole_parts));
-
-    Ok(SnakeRender { shaded, black_holes })
+    Ok(SnakeRender { shaded })
 }

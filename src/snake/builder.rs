@@ -130,15 +130,20 @@ impl Builder {
         let mut cells = VecDeque::new();
         cells.push_back(head);
 
+        let len = self
+            .len
+            .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `len`"))?;
+
         let body = Body {
             segments: cells,
-            missing_front: 0,
             dir,
-            segment_fraction: 0.0,
+            head_fraction: 0.0,
+            // the snake is `len` long from the start; none of it is out of the
+            // birth hole yet, so it emerges over the first `len` cells travelled
+            length: len as f32,
+            emerged: 0.0,
+            swallowed: 0.0,
             turn_start: None,
-            grow: self
-                .len
-                .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `len`"))?,
             search_trace: None,
         };
 

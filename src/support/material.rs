@@ -25,13 +25,16 @@ attribute vec2 texcoord;
 attribute vec4 normal;
 varying vec2 uv;
 varying vec2 seg_bounds;
+varying float brightness;
 uniform mat4 Model;
 uniform mat4 Projection;
 void main() {
     gl_Position = Projection * Model * vec4(position, 1);
     uv = texcoord;
-    // normal.xy carries this segment's [lo, hi] uv range (see push_shaded_ribbon)
+    // normal.xy carries this segment's [lo, hi] uv range and normal.z the
+    // brightness multiplier (see build_shaded_ribbon)
     seg_bounds = normal.xy;
+    brightness = normal.z;
 }"#;
 
 // Samples the palette LUT by uv.x ("distance along body"). The LUT is a
@@ -44,14 +47,19 @@ void main() {
 // segment boundary: each segment samples only its own LUT slot, so hard color
 // steps land exactly on the geometry seam while gradients within a segment stay
 // smooth.
+//
+// The color is then scaled by the vertex's brightness (1 for the body itself;
+// less for darker details drawn over it, like passability marks).
 const FRAGMENT: &str = r#"#version 100
 precision highp float;
 varying vec2 uv;
 varying vec2 seg_bounds;
+varying float brightness;
 uniform sampler2D Texture;
 void main() {
     float u = clamp(uv.x, seg_bounds.x, seg_bounds.y);
-    gl_FragColor = texture2D(Texture, vec2(u, 0.5));
+    vec4 color = texture2D(Texture, vec2(u, 0.5));
+    gl_FragColor = vec4(color.rgb * brightness, color.a);
 }"#;
 
 pub fn snake_material() -> Result<Material> {

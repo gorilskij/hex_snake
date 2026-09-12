@@ -74,13 +74,14 @@ impl SegmentDescription {
                 let points = hexagon_outline(self);
                 // one flat color per hexagon: sample the segment's midpoint
                 let u = (seg_idx + 0.5) / num;
-                build_shaded_polygon(&points, move |_| (u, 0.5), |p| p)
+                build_shaded_polygon(&points, 1., move |_| (u, 0.5), |p| p)
             }
             rendering::Style::Smooth => {
                 let (cross_sections, _cw) = segment_cross_sections(self);
                 build_shaded_ribbon(
                     &cross_sections,
                     self.seg_bounds(num_segments, lut_size),
+                    1.,
                     self.u_of(num_segments),
                     self.board_transform(),
                 )

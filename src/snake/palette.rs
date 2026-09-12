@@ -52,22 +52,18 @@ pub enum PaletteTemplate {
         head: Color,
         tail: Color,
         eaten: EatenColor,
-        // keeps track of the longest length achieved so far and uses that as the tail color
-        persistent: bool,
     },
     HSLGradient {
         head_hue: f64,
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
-        persistent: bool,
     },
     OkLabGradient {
         head_hue: f64,
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
-        persistent: bool,
     },
     /// Segments are fixed to the board
     AlternatingFixed {
@@ -91,26 +87,24 @@ impl PaletteTemplate {
         }
     }
 
-    pub fn rgb_gradient(head: Color, tail: Color, eaten: Option<Color>, persistent: bool) -> Self {
+    pub fn rgb_gradient(head: Color, tail: Color, eaten: Option<Color>) -> Self {
         Self::RGBGradient {
             head,
             tail,
             eaten: EatenColor::Fixed(eaten.unwrap_or(*DEFAULT_EATEN_COLOR)),
-            persistent,
         }
     }
 
-    pub fn gray_gradient(opacity: f32, persistent: bool) -> Self {
-        Self::rgb_gradient(gray!(0.72, opacity), gray!(0.25, opacity), None, persistent)
+    pub fn gray_gradient(opacity: f32) -> Self {
+        Self::rgb_gradient(gray!(0.72, opacity), gray!(0.25, opacity), None)
     }
 
-    pub fn hsl_gradient(head_hue: f64, tail_hue: f64, lightness: f64, eaten_lightness: f64, persistent: bool) -> Self {
+    pub fn hsl_gradient(head_hue: f64, tail_hue: f64, lightness: f64, eaten_lightness: f64) -> Self {
         Self::HSLGradient {
             head_hue,
             tail_hue,
             lightness,
             eaten_lightness,
-            persistent,
         }
     }
 
@@ -119,14 +113,12 @@ impl PaletteTemplate {
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
-        persistent: bool,
     ) -> Self {
         Self::OkLabGradient {
             head_hue,
             tail_hue,
             lightness,
             eaten_lightness,
-            persistent,
         }
     }
 
@@ -136,24 +128,24 @@ impl PaletteTemplate {
     // green -> red (yellows are very ugly in oklab)
     const OKLAB_RAINBOW: (f64, f64) = (147.3, 428.);
 
-    pub fn rainbow(persistent: bool) -> Self {
-        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.4, 0.7, persistent)
+    pub fn rainbow() -> Self {
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.4, 0.7)
     }
 
-    pub fn pastel_rainbow(persistent: bool) -> Self {
-        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.75, 0.7, persistent)
+    pub fn pastel_rainbow() -> Self {
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.75, 0.7)
     }
 
-    pub fn dark_rainbow(persistent: bool) -> Self {
-        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.2, 0.2, persistent)
+    pub fn dark_rainbow() -> Self {
+        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.2, 0.2)
     }
 
-    pub fn green_to_red(persistent: bool) -> Self {
-        Self::oklab_gradient(Self::OKLAB_RAINBOW.0, Self::OKLAB_RAINBOW.1, 0.6, 0.7, persistent)
+    pub fn green_to_red() -> Self {
+        Self::oklab_gradient(Self::OKLAB_RAINBOW.0, Self::OKLAB_RAINBOW.1, 0.6, 0.7)
     }
 
-    pub fn dark_blue_to_red(persistent: bool) -> Self {
-        Self::oklab_gradient(250., Self::OKLAB_RAINBOW.1, 0.3, 0.3, persistent)
+    pub fn dark_blue_to_red() -> Self {
+        Self::oklab_gradient(250., Self::OKLAB_RAINBOW.1, 0.3, 0.3)
     }
 
     pub fn alternating_white() -> Self {
@@ -274,37 +266,32 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
     fn from(template: PaletteTemplate) -> Self {
         match template {
             PaletteTemplate::Solid { color, eaten } => Box::new(Solid { color, eaten }),
-            PaletteTemplate::RGBGradient { head, tail, eaten, persistent } => Box::new(RGBGradient {
+            PaletteTemplate::RGBGradient { head, tail, eaten } => Box::new(RGBGradient {
                 head_color: head,
                 tail_color: tail,
                 eaten,
-                max_len: persistent.then_some(0),
             }),
             PaletteTemplate::HSLGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
-                persistent,
             } => Box::new(HSLGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
-                max_len: persistent.then_some(0),
             }),
             PaletteTemplate::OkLabGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
-                persistent,
             } => Box::new(OkLabGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
-                max_len: persistent.then_some(0),
             }),
             PaletteTemplate::AlternatingFixed { color1, color2 } => Box::new(AlternatingFixed {
                 color1,
@@ -314,52 +301,6 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
             }),
             PaletteTemplate::Alternating { color1, color2 } => Box::new(Alternating { color1, color2 }),
         }
-    }
-}
-
-// if max_len is None, use body.len(), otherwise, update max_len
-//  to be the maximum of itself and body.len() and use that,
-//  this is used to implement persistency
-// TODO: implement variable resolution asking the palette how
-//  much it needs, persistent rainbows don't need high
-//  resolutions even in short snakes
-fn and_update_max_len(max_len: &mut Option<usize>, body_len: usize) -> usize {
-    match max_len {
-        Some(len) => {
-            if body_len > *len {
-                *len = body_len;
-            }
-            *len
-        }
-        None => body_len,
-    }
-}
-
-/// Correct an integer snake length to an f64 length
-/// that accounts for fractional segments, eaten segments
-/// and growing
-fn correct_len(len: usize, body: &Body, frame_fraction: f64) -> f64 {
-    let len = len as f64;
-    if let SegmentType::Eaten { original_food, food_left } = body.segments.back().unwrap().segment_type {
-        // Correct for eaten segment at the tail and
-        //  fractional segment at the head (the eaten
-        //  segment reduces in size more slowly than
-        //  the head segment grows)
-
-        // The actual visual length of the eaten segment
-        //  at the tail of the snake
-        let eaten_segment_frac = (food_left as f64 + 1. - frame_fraction) / (original_food + 1) as f64;
-
-        len - 1. + eaten_segment_frac + frame_fraction
-    } else if body.grow > 0 {
-        // If growth is happening for a reason other
-        //  than eating (such as at the beginning of
-        //  the game), correct only for the head
-        len + frame_fraction
-    } else {
-        // If the snake isn't growing, the head and
-        //  tail corrections cancel out
-        len
     }
 }
 
@@ -376,7 +317,7 @@ impl Palette for Solid {
 
         Box::new(body.segments.iter().map(|segment| {
             let color = match segment.segment_type {
-                Normal | BlackHole { .. } => self.color,
+                Normal => self.color,
                 Eaten { .. } => self.eaten,
                 Crashed => *DEFAULT_CRASHED_COLOR,
             };
@@ -389,25 +330,25 @@ pub struct RGBGradient {
     head_color: Color,
     tail_color: Color,
     eaten: EatenColor,
-    max_len: Option<usize>,
 }
 
 impl Palette for RGBGradient {
     fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
-        let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
+        // normalize the gradient by the snake's true (conserved) length, so it
+        // always runs head tip to tail tip and the scale never jitters
+        let logical_len = body.length as f64;
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
-                let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+                let r = i as f64 + body.swallowed as f64 + body.head_fraction as f64;
                 let start_color = lerp(self.head_color, self.tail_color, (r / logical_len) as f32);
                 let end_color = lerp(self.head_color, self.tail_color, ((r + 1.) / logical_len) as f32);
 
                 match segment.segment_type {
-                    Normal | BlackHole { .. } => SegmentStyle::RGBGradient { start_color, end_color },
+                    Normal => SegmentStyle::RGBGradient { start_color, end_color },
                     Eaten { .. } => SegmentStyle::RGBGradient {
                         start_color: invert_rgb(start_color),
                         end_color: invert_rgb(end_color),
@@ -424,25 +365,25 @@ pub struct HSLGradient {
     tail_hue: f64,
     lightness: f64,
     eaten_lightness: f64,
-    max_len: Option<usize>, // optional feature
 }
 
 impl Palette for HSLGradient {
     fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
-        let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
+        // normalize the gradient by the snake's true (conserved) length, so it
+        // always runs head tip to tail tip and the scale never jitters
+        let logical_len = body.length as f64;
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
                 SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
             } else {
-                let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+                let r = i as f64 + body.swallowed as f64 + body.head_fraction as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
                 let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
 
                 match segment.segment_type {
-                    Normal | BlackHole { .. } => SegmentStyle::HSLGradient {
+                    Normal => SegmentStyle::HSLGradient {
                         start_hue,
                         end_hue,
                         lightness: self.lightness,
@@ -476,21 +417,21 @@ pub struct OkLabGradient {
     tail_hue: f64,
     lightness: f64,
     eaten_lightness: f64,
-    max_len: Option<usize>,
 }
 
 impl Palette for OkLabGradient {
     fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a> {
         use SegmentType::*;
 
-        let logical_len = and_update_max_len(&mut self.max_len, body.logical_len());
-        let logical_len = correct_len(logical_len, body, body.segment_fraction as f64);
+        // normalize the gradient by the snake's true (conserved) length, so it
+        // always runs head tip to tail tip and the scale never jitters
+        let logical_len = body.length as f64;
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
-            let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+            let r = i as f64 + body.swallowed as f64 + body.head_fraction as f64;
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
             match segment.segment_type {
-                Normal | BlackHole { .. } => SegmentStyle::OkLabGradient {
+                Normal => SegmentStyle::OkLabGradient {
                     start_hue,
                     end_hue,
                     lightness: self.lightness,
@@ -529,7 +470,7 @@ impl Palette for AlternatingFixed {
         let expected_mod = !self.iteration as usize;
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             let color = match segment.segment_type {
-                Normal | BlackHole { .. } => {
+                Normal => {
                     if i % 2 == expected_mod {
                         self.color1
                     } else {
@@ -561,10 +502,10 @@ impl Palette for Alternating {
 
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             // How far along the snake we currently are (in units of segments)
-            let r = (i + body.missing_front) as f64 + body.segment_fraction as f64;
+            let r = i as f64 + body.swallowed as f64 + body.head_fraction as f64;
 
             match segment.segment_type {
-                Normal | BlackHole { .. } => {
+                Normal => {
                     // Check whether there is a minimum or maximum within this segment
                     use std::f64::consts::PI;
                     if r % PI <= PI && r % PI + 1. >= PI {

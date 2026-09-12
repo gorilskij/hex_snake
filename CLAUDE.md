@@ -5,8 +5,11 @@ board, smooth animated rendering. Runs **natively and in the browser (wasm)** on
 single backend: **macroquad**.
 
 > History: originally built on **ggez**. The `wasm` branch ported it to macroquad
-> (native + web, no cfg split). The current `shaders` branch reworks snake
-> coloring to run on the GPU (see [Snake coloring](#snake-coloring-shader-based)).
+> (native + web, no cfg split); the ggez-compat `gfx/` shim has since been
+> dissolved into direct macroquad calls + `support/`. Snake coloring was moved to
+> the GPU (see [Snake coloring](#snake-coloring-shader-based)), and the snake was
+> reworked into a float-length model (see [Snake length model](#snake-length-model-snakemodrs)).
+> Current work (`game-modes` branch) is game modes and new apple types.
 
 ## Build / run / test
 
@@ -29,76 +32,119 @@ Requires nightly for: `stmt_expr_attributes`, `try_blocks`,
 
 ## Entry point & main loop
 
-`src/main.rs` — `#[macroquad::main]` async loop. Constructs a `Game` directly
-(bypassing the old `App`/`Screen` machinery), polls resize + `get_keys_pressed/
-released`, maps macroquad keycodes → `gfx::input::keyboard::KeyCode`, calls
-`update`/`draw`, `next_frame().await`.
+`src/main.rs` — `#[macroquad::main]` async loop. Constructs a `Game` directly,
+polls resize + `get_keys_pressed/released`, and drives the `Screen` trait
+(`app/screen/mod.rs`): `update`/`draw`/`key_down_event`/`resize_event` with
+macroquad's `KeyCode` passed straight through, then `next_frame().await`.
 
 - Web delivers physical (qwerty-position) keycodes, so the player uses
   `Layout::Qwerty` (ul=J u=K ur=L dl=M d=Comma dr=Period).
 - `register_custom_getrandom!` backs `rand`/`thread_rng` with macroquad's PRNG on
   wasm (native uses the OS backend).
-- Contains a `SPIKE` flag + spike draw calls — **temporary** shader-validation
-  scaffolding, remove during cleanup (see TODOs).
 
 ## Module map
 
-- **`gfx/`** — thin compatibility layer mimicking the small `ggez` API surface the
-  game uses, backed by macroquad. Porting a file was mostly repointing
-  `use ggez::…` → `use crate::gfx::…`.
-  - `graphics.rs` — `Color`, `MeshBuilder`, `Mesh`, `Canvas`, `DrawParam`,
-    lyon-based tessellation, the board `Camera2D`. **The core of the gfx layer.**
-  - `material.rs` — custom GLSL shader (`SnakeMaterial`) + palette LUT texture
-    (`PaletteLut`) for snake coloring. (shaders branch)
-  - `input.rs` (keyboard/mouse), `event.rs` (`EventHandler` trait), `time.rs`
-    (`Instant` over `macroquad::time::get_time()` — std `Instant` panics on wasm),
-    `mod.rs` (`Context`, `GameError`/`GameResult`).
+- **`support/`** — what used to be a `gfx/` ggez-compat layer, now dissolved: the
+  game calls macroquad directly (`macroquad::color::Color`, `Material`,
+  `clear_background`, cameras), and the few helpers that remain live here.
+  - `mesh.rs` — **the core of rendering**: `Mesh`, `MeshBuilder` (lyon fill/
+    stroke → chunked macroquad meshes), `DrawMode`, `build_circle`, and
+    `set_board_camera` (the board-offset `Camera2D`). `mesh.draw()` /
+    `mesh.draw_shaded(material)` replace the old `Canvas`.
+  - `material.rs` — custom GLSL shader (`SnakeMaterial` via `snake_material()`) +
+    palette LUT texture (`PaletteLut`) for snake coloring.
+  - `time.rs` — `Instant` over `macroquad::time::get_time()` (std `Instant`
+    panics on wasm). Also `partial_min_max` (NaN-safe), `flip`, `filter_scan`.
+  - (The `Screen` trait — the old `EventHandler` — now lives in
+    `app/screen/mod.rs`; `Game` implements it.)
 - **`app/`** — game orchestration.
   - `screen/game.rs` — **the `Game` struct**: owns the world (`Environment`),
     `FpsControl`, cached meshes, and the `draw`/`update` event handlers. This is
     where rendering is assembled and drawn.
   - `screen/mod.rs` — `Environment<Rng>` (snakes, apples, portals, `GameContext`).
-  - `fps_control.rs` — game-frame accumulation, `frame_fraction`, `can_update`.
+  - `fps_control.rs` — play/pause/game-over state, the world's per-frame
+    time step (smoothed frame duration × global debug speed multiplier, stepped
+    with `[` / `]`; `Game::update` splits fast frames into ticks of ≤ half a cell).
   - `game_context.rs` (`GameContext`: cell_dim, board_dim, prefs, palette),
     `prefs.rs` (`Prefs`; default draw_style = Smooth, grid+border on),
     `stats.rs`, `message.rs` (macroquad text overlay), `palette.rs` (board/bg
     colors, distinct from snake palette), `snake_management.rs` (advance, spawn,
-    collisions), `distance_grid.rs`, `portal/`, `board_dim.rs`.
+    collisions, `outcome_at`), `border_hints.rs` (gradients on wrap-around edges
+    hinting what the player would hit on the other side), `distance_grid.rs`,
+    `portal/`, `board_dim.rs`.
   - `screen/{start_screen,snake_control_creator_screen,debug_scenario}.rs` — **out
     of the module tree** (not compiled); page chrome to be done in HTML/JS later.
 - **`snake/`** — snake model. `mod.rs` (`Snake`, `Body`, `Segment`,
-  `SegmentType`), `builder.rs`, `eat_mechanics.rs`, **`palette.rs`** (snake
-  coloring: `Palette` trait, `SegmentStyle`, gradient/solid/alternating palettes,
-  `build_snake_lut`).
+  `SegmentType`; the float-length model — see [Snake length model](#snake-length-model-snakemodrs)),
+  `builder.rs`, `eat_mechanics.rs`, **`palette.rs`** (snake coloring: `Palette`
+  trait, `SegmentStyle`, gradient/solid/alternating palettes, `build_snake_lut`).
 - **`snake_control/`** — controllers: `keyboard`, AI `algorithm`/`killer`/`rain`/
   `programmed`, and `pathfinder/` (weighted BFS, space-filling, with-backup).
 - **`rendering/`** — turns the world into meshes (see next section).
 - **`basic/`** — `Point` (f32 x/y, cartesian), `HexPoint` (hex grid coord),
   `Dir`/`Dir12` (hex directions), `CellDim` (side/sin/cos, `height()`, `center()`),
   `board.rs`.
-- **`color/`** — `Color` newtype over `gfx::graphics::Color` with arithmetic ops;
-  `oklab.rs`, `to_color.rs` (HSL→Color).
+- **`color/`** — `Color` newtype over `macroquad::color::Color` with arithmetic
+  ops; `oklab.rs`, `to_color.rs` (HSL→Color).
 - **`view/`** — `OtherSnakes`/`Snakes` borrowing helpers (`split_snakes`).
-- **`support/`** — `partial_min_max` (NaN-safe), `flip`, `invert`, etc.
 - **`basic/`, `error.rs`, `keyboard_layout.rs`** — misc.
 - **Out of tree (not compiled):** `button/`, `support/text_layout.rs`. Still on
   disk with stale `ggez` references; harmless.
+
+## Snake length model (`snake/mod.rs`)
+
+Conceptually a snake is a **float-length ribbon of material** flowing along its
+trail at `speed` cells/s. `Body.segments` (a `VecDeque`) is just the stored
+polyline for drawing/collision — the snake's length is **not** the segment
+count. Head and tail are independent; nothing pins them to cell boundaries.
+
+- **`length`** — *the conserved quantity*, the true length in cells (a float).
+  Changed only by explicit, capped growth (digestion; `grow`/`shrink` later) —
+  never as a drifting difference of accumulators. Birth and death do **not**
+  touch it; they only change how much of it is on the board.
+- **`head_fraction`** — the head's progress into its leading cell (0..1). A new
+  head segment is pushed at each boundary crossing (in `advance_cell`).
+- **`emerged` / `swallowed`** — the two **holes**, each measured in cells of
+  material. *Birth:* material leaves the birth hole at head speed (`emerged`
+  chases `length`), so the tail stays pinned at the hole until the snake is all
+  the way out. *Death* (`state == Dying`, set by `die()`): the head pins at
+  `HOLE_DEPTH` into its cell and the material flowing past drains into the death
+  hole (`swallowed` grows). `on_board() = emerged − swallowed`. The holes are
+  independent — a snake can emerge from one while vanishing into another.
+- **The tail is derived, never stored:** `tail_fraction() = (visible_len − 1) +
+  head_fraction − on_board()`; trailing segments pop once it passes 1. So the
+  tail position cannot drift (only `length` is stored, and only additively).
+- **Digestion:** an `Eaten { original_food, food_left }` tail segment is crossed
+  at `1/(food+1)` speed, growing `length` by exactly `food` (capped by
+  `food_left`, drift-free). Dying snakes keep digesting.
+
+`advance(elapsed)` runs head-move → emerge → digest → pop-tail and returns
+whether a cell boundary was crossed (→ caller invokes `advance_cell`). A dying
+head never reaches a boundary, so `advance_cell` panics for `Dying`. A snake is
+removed once `state == Dying && on_board() <= 0`.
+
+> The old **black-hole graphic** (blue circle + a `SegmentType::BlackHole`
+> marker) was **removed**; death now just recedes via this model with no visual.
+> Proper birth/death **hole graphics** (hole opening/closing, snake fading to
+> black) are to be reimplemented — keep the concept in mind.
 
 ## Rendering pipeline
 
 `Game::draw` (`app/screen/game.rs`) lazily builds cached meshes and draws them in
 z-order onto a `Canvas`:
 
-1. Each `rendering::*_mesh` fn builds a `gfx::graphics::Mesh` (grid, border,
+1. Each `rendering::*_mesh` fn builds a `support::mesh::Mesh` (grid, border,
    apples, portals, distance grid, player path) via `MeshBuilder` (lyon fill/
    stroke → chunked macroquad meshes; chunks kept under macroquad's per-draw
    10000-vert / 5000-index clamp).
-2. `Canvas::draw` sets a board-offset `Camera2D` (pixel coords, **y-down**;
-   `zoom.y` must be positive) then `draw_mesh` per chunk on the default material.
+2. `set_board_camera` sets a board-offset `Camera2D` once (pixel coords,
+   **y-down**; `zoom.y` must be positive), then `mesh.draw()` per mesh on the
+   default material. (One camera set for all board meshes — each `set_camera`
+   flushes the GPU batch, so per-mesh sets were the bulk of the frame's cost.)
 3. Snakes are special — drawn through a shader (below).
 
-Draw order (default material, split around the snake): distance_grid, grid,
-player_path → **snake (shaded)** + black-hole circles → apple, border, portal →
+Draw order (default material, split around the snake): distance_grid,
+border_hints, grid, player_path → **snake (shaded)** → apple, border, portal →
 message text.
 
 ### Snake coloring (shader-based)
@@ -122,24 +168,58 @@ That's **gone**. Now:
   - Hexagon draw style (`hexagon_segments::hexagon_outline`) is a flat hexagon
     with constant `uv.x` (via `push_shaded_polygon`).
 - **Color** (`snake/palette.rs`): per snake per frame, `build_snake_lut` samples
-  the existing `Palette`/`SegmentStyle` color function into a fixed **2048-texel
-  1-D LUT** (`SNAKE_LUT_SIZE`). This reuses all the existing HSL/OkLab/gradient
-  math; the LUT *is* the whole-body gradient.
+  the existing `Palette`/`SegmentStyle` color functions into a LUT where each
+  segment owns a fixed slot of `lut_texels_per_segment` texels (so segment
+  boundaries sit on texel edges regardless of length). This reuses all the
+  existing HSL/OkLab/gradient math; the LUT *is* the whole-body gradient.
 - **Draw** (`rendering/snake_mesh.rs` → `SnakeRender`): one shaded `Mesh` + one
   `PaletteLut` per snake (LUT baked as the mesh's `texture`). `game.rs` compiles
-  the `SnakeMaterial` lazily and calls `Canvas::draw_shaded` per snake. The
-  fragment shader samples the LUT by `uv.x` (linear filtered → smooth gradients;
-  dense enough that hard segment boundaries stay ~sharp). `uv.y` is currently
+  the `SnakeMaterial` (`snake_material()`) lazily and calls `mesh.draw_shaded` per
+  snake. The fragment shader samples the LUT by `uv.x`, clamped to the segment's
+  own slot (`normal.xy`), and scales it by a per-vertex brightness (`normal.z`;
+  1 for the body, lower for details like passability marks) (linear filtered →
+  smooth gradients; hard segment boundaries stay sharp). `uv.y` is currently
   unused (reserved for across-width shading).
 
-Key files: `gfx/material.rs`, `snake/palette.rs` (`build_snake_lut`),
+Key files: `support/material.rs`, `snake/palette.rs` (`build_snake_lut`),
 `rendering/snake_mesh.rs`, `rendering/segments/{smooth_segments/mod,point_factory,
-hexagon_segments}.rs`, `rendering/segments/descriptions.rs` (`SegmentDescription`,
-`SegmentFraction`, turn types).
+hexagon_segments}.rs`, `rendering/segments/cap.rs` (round head/tail caps),
+`rendering/segments/descriptions.rs` (`SegmentDescription`, `SegmentFraction`,
+turn types).
+
+### Round end caps (`rendering/segments/cap.rs`)
+
+Smooth-style snakes get half-circle caps on both ends. `build_round_caps`
+truncates the body ribbon by one cap radius (measured **along the body path**, so
+caps straddle cell boundaries and bend around turns) and fills the gap with a
+half-circle profile (`dist = radius·sin φ`, half-width `∝ cos φ`). A head
+`Crashed` into an obstacle keeps its flat face; the radius shrinks for very short
+snakes so the two caps don't overlap.
+
+### Passability marks (`rendering/segments/marks.rs`)
+
+Eaten segments a snake can pass through get marks in a **darker shade of the
+segment's own color** (same LUT lookup, `BRIGHTNESS` = 0.8), so the player can
+tell them from look-alikes they'd crash into (e.g. other snakes' eaten segments). Smooth style: two lines inset from the
+edges with round ends, following the edges' curvature (arcs on turns, inner
+shorter; a sharp turn's inner line is a dot). Where the neighboring segment is
+marked too, the line runs flat to the shared edge, so consecutive marked
+segments show one continuous line. The head segment joins ahead as soon as the
+next segment is known to be eaten (`Snake::upcoming_eaten_segment`: direction
+locked in + `Eat` apple in the next cell) — for now an instant jump, hidden
+because lines are cut to the segment's drawn fraction (which stops where the
+head cap begins); easing is still to be designed. Hexagon style: a small
+hexagon in the middle. Dimensions are the `const`s at the top of the file (tuned
+by eye).
+
+Whether a segment is marked: `EatMechanics::is_marked(segment_type)` =
+`mark_passable` flag (opt-in via `.mark_passable()`; only the player sets it) **and**
+the snake's own behavior against that segment type is inert. So **marked ⇒
+passable** by construction; not every passable segment is marked.
 
 ## Gotchas (each cost real time)
 
-- **std `Instant::now()` panics on wasm** → `gfx::time::Instant` over macroquad's
+- **std `Instant::now()` panics on wasm** → `support::time::Instant` over macroquad's
   clock; `fps_control` uses it.
 - **macroquad clamps each `draw_mesh`** to 10000 verts / 5000 indices, silently
   dropping overflow. `Mesh::from_data` chunks under that.
@@ -161,19 +241,21 @@ hexagon_segments}.rs`, `rendering/segments/descriptions.rs` (`SegmentDescription
 
 ## TODOs / not yet done
 
-- **Round head** — the snake front is currently flat (the old rounded cap was
-  entangled with subsegmentation and removed). To be reimplemented as proper
-  single-polygon geometry.
-- **Cleanup:** remove the `SPIKE` scaffolding in `main.rs` and the spike helpers
-  in `gfx/material.rs`; drop `push_shaded_polygon` if hexagon style is retired;
-  remove now-stale `Polygon`/`RoundHeadDescription` in
-  `rendering/segments/descriptions.rs`.
+- **Birth/death hole graphics** — the model exists (see [Snake length model](#snake-length-model-snakemodrs));
+  the old black-hole circle was removed and nothing is drawn in its place yet.
+  Reimplement as a hole opening/closing at the pinned end with the snake fading
+  to black as it enters/leaves. Collision graphics (a crash effect) are a
+  similar localized effect and want a shared approach.
+- **Grow / shrink animation** — apples that change `length` should animate the
+  change (eased) rather than snapping. Sketched as a single signed pending pool
+  released into `length` over several frames; growth is capped at head speed (the
+  tail can't reverse), shrink is capped by a max tail speed + a floor.
 - **Perf:** LUT texture is recreated every frame per snake — switch to in-place
   `Texture2D::update` when size is unchanged. Consider a single draw call for all
   snakes via a LUT atlas + per-vertex snake index.
-- **Cross-snake z-ordering:** shaded snakes are drawn per-snake in sequence, so the
-  old global z-index/black-hole interleaving across *different* snakes is not
-  preserved (fine for the single-player game; revisit for multi-snake).
+- **Cross-snake z-ordering:** shaded snakes are drawn per-snake in sequence, so
+  the old global z-index interleaving across *different* snakes is not preserved
+  (fine for the single-player game; revisit for multi-snake).
 - **`uv.y` (across-width)** is emitted but unused — hook for tube/curvature
   shading later.
 - **Deferred features from the wasm port:** FPS/stats overlay, on-canvas buttons,

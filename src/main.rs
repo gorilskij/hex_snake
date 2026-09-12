@@ -58,6 +58,10 @@ fn window_conf() -> Conf {
         window_width: 1200,
         window_height: 900,
         high_dpi: true,
+        // without MSAA every polygon edge snaps to whole pixels, so a slowly
+        // moving curved edge crawls instead of sliding — very visible on the
+        // snake's round head/tail caps
+        sample_count: 4,
         ..Default::default()
     }
 }
@@ -74,14 +78,15 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
             snake::Type::Rain => enum_map! { _ => EatBehavior::PassUnder },
             _ => enum_map! { _ => EatBehavior::Crash },
         },
-    );
+    )
+    .mark_passable();
 
     let knowledge = Knowledge::accurate(&eat_mechanics);
 
     snake::builder::Builder::default()
         .snake_type(snake::Type::Player)
         .eat_mechanics(eat_mechanics)
-        .palette(snake::PaletteTemplate::rainbow(true))
+        .palette(snake::PaletteTemplate::rainbow())
         .controller(snake_control::Template::Keyboard { control_setup, knowledge })
         .speed(5.)
         .autopilot(pathfinder::Template::WithBackup {

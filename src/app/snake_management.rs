@@ -40,107 +40,173 @@ pub enum Collision {
 pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
     let mut collisions = vec![];
 
-    // check whether snake1 collided with an apple or with snake2
-    'outer: for (snake1_index, snake1) in env
+    for (snake1_index, snake1) in env
         .snakes
         .iter()
         .enumerate()
         .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying))
     {
-        for (apple_index, apple) in env.apples.iter().enumerate() {
-            if snake1.head().pos == apple.pos {
-                collisions.push(Collision::Apple {
-                    snake_index: snake1_index,
-                    apple_index,
-                });
-                // snakes and apples cannot overlap
-                continue 'outer;
-            }
+        let pos = snake1.head().pos;
+
+        // snakes and apples cannot overlap
+        if let Some(apple_index) = env.apples.iter().position(|apple| apple.pos == pos) {
+            collisions.push(Collision::Apple {
+                snake_index: snake1_index,
+                apple_index,
+            });
+            continue;
         }
 
-        for (snake2_index, other) in env.snakes.iter().enumerate() {
-            let mut iter = other.body.segments.iter().enumerate();
-
-            // ignore head-head collision with itself
-            if snake1_index == snake2_index {
-                let _ = iter.next();
-            }
-
-            for (segment_idx, segment) in iter {
-                if snake1.head().pos == segment.pos {
-                    if snake1_index == snake2_index {
-                        collisions.push(Collision::Itself {
-                            snake_index: snake1_index,
-                            snake_segment_index: segment_idx,
-                        })
-                    } else {
-                        collisions.push(Collision::Snake {
-                            snake1_index,
-                            snake2_index,
-                            snake2_segment_index: segment_idx,
-                        });
-                    }
-
-                    continue 'outer;
+        // several segments can share a cell (one snake passing over another):
+        // the worst of them is what happens
+        let worst = segments_at(env, snake1_index, pos).max_by_key(|&(_, _, outcome)| outcome);
+        if let Some((snake2_index, segment_idx, _)) = worst {
+            collisions.push(if snake2_index == snake1_index {
+                Collision::Itself {
+                    snake_index: snake1_index,
+                    snake_segment_index: segment_idx,
                 }
-            }
+            } else {
+                Collision::Snake {
+                    snake1_index,
+                    snake2_index,
+                    snake2_segment_index: segment_idx,
+                }
+            });
         }
     }
 
     collisions
 }
 
-// TODO: maybe replace Environment with GameContext
-/// Returns `(spawn_snakes, game_over)` where
-///  - `spawn_snakes` describes the new snakes to spawn
-///    (competitors, killers, etc.)
-///  - `game_over` tells whether a snake crashed and ended the game
+/// What would happen to a snake whose head entered a cell, in increasing order
+/// of severity.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum Outcome {
+    Apple,
+    Pass,
+    Cut,
+    Crash,
+}
+
+/// What would happen to `snake_index` if its head entered `pos` right now, or
+/// `None` if nothing is there. Decided exactly as [`find_collisions`] decides
+/// an actual collision.
+pub fn outcome_at<Rng>(env: &Environment<Rng>, snake_index: usize, pos: HexPoint) -> Option<Outcome> {
+    if env.apples.iter().any(|apple| apple.pos == pos) {
+        return Some(Outcome::Apple);
+    }
+    segments_at(env, snake_index, pos).map(|(_, _, outcome)| outcome).max()
+}
+
+/// Every segment at `pos` that `snake_index`'s head would run into there, as
+/// `(snake index, segment index, outcome)`.
+fn segments_at<Rng>(
+    env: &Environment<Rng>,
+    snake_index: usize,
+    pos: HexPoint,
+) -> impl Iterator<Item = (usize, usize, Outcome)> + '_ {
+    use EatBehavior::*;
+
+    let snake = &env.snakes[snake_index];
+    env.snakes.iter().enumerate().flat_map(move |(other_index, other)| {
+        let itself = other_index == snake_index;
+        other
+            .body
+            .segments
+            .iter()
+            .enumerate()
+            // a snake's head never collides with itself
+            .skip(itself as usize)
+            .filter(move |(_, segment)| segment.pos == pos)
+            .map(move |(segment_index, segment)| {
+                let behavior = if itself {
+                    snake.eat_mechanics.eat_self(segment.segment_type)
+                } else {
+                    snake.eat_mechanics.eat_other(other.snake_type, segment.segment_type)
+                };
+                let outcome = match behavior {
+                    Crash | Die => Outcome::Crash,
+                    // cutting another snake at its head kills both
+                    Cut if !itself && segment_index == 0 => Outcome::Crash,
+                    Cut => Outcome::Cut,
+                    PassUnder | PassOver => Outcome::Pass,
+                };
+                (other_index, segment_index, outcome)
+            })
+    })
+}
+
+/// Apply the effect of every apple collision and remove the eaten apples.
+/// Returns the snakes to spawn (from spawn-snake / rain apples).
+///
+/// Each snake head collides with at most one thing per [`find_collisions`],
+/// so apple and snake collisions concern disjoint snakes — this pass and
+/// [`handle_snake_collisions`] are independent and may run in either order.
 #[must_use]
-pub fn handle_collisions<Rng: rand::Rng>(
+pub fn handle_apple_collisions<Rng: rand::Rng>(
     env: &mut Environment<Rng>,
     collisions: &[Collision],
-) -> (Vec<SnakeBuilder>, bool) {
+) -> Vec<SnakeBuilder> {
     let board_width = env.gtx.board_dim.h;
 
     let mut spawn_snakes = vec![];
     let mut to_remove = vec![];
-    let mut game_over = false;
     for collision in collisions.iter().copied() {
-        use EatBehavior::*;
-        let snakes = &mut env.snakes;
+        let Collision::Apple { snake_index, apple_index } = collision else {
+            continue;
+        };
 
-        match collision {
-            Collision::Apple { snake_index, apple_index } => {
-                to_remove.push(apple_index);
+        to_remove.push(apple_index);
 
-                use crate::apple::Type::*;
-                match &env.apples[apple_index].apple_type {
-                    Food(food) => {
-                        snakes[snake_index].body.segments[0].segment_type = SegmentType::Eaten {
-                            original_food: *food,
-                            food_left: *food,
-                        }
-                    }
-                    SpawnSnake(seed) => spawn_snakes.push((**seed).clone()),
-                    SpawnRain => {
-                        let seed = SnakeBuilder::default()
-                            .snake_type(snake::Type::Rain)
-                            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
-                            .palette(env.gtx.palette.palette_rain)
-                            .controller(snake_control::Template::Rain)
-                            .dir(Dir::D);
-
-                        for h in (0..board_width).step_by(5) {
-                            spawn_snakes.push(
-                                seed.clone()
-                                    .pos(HexPoint { h, v: 0 })
-                                    .len((3..10).sample_single(&mut env.rng))
-                                    .speed((0.2..1.5).sample_single(&mut env.rng)),
-                            );
-                        }
-                    }
+        use crate::apple::Type::*;
+        match &env.apples[apple_index].apple_type {
+            Eat(food) => {
+                env.snakes[snake_index].body.segments[0].segment_type = SegmentType::Eaten {
+                    original_food: *food,
+                    food_left: *food,
                 }
             }
+            Shrink(amount) => {
+                /////////////////////////////////////////////////////////////////////
+            }
+            SpawnSnake(seed) => spawn_snakes.push((**seed).clone()),
+            SpawnRain => {
+                let seed = SnakeBuilder::default()
+                    .snake_type(snake::Type::Rain)
+                    .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+                    .palette(env.gtx.palette.palette_rain)
+                    .controller(snake_control::Template::Rain)
+                    .dir(Dir::D);
+
+                for h in (0..board_width).step_by(5) {
+                    spawn_snakes.push(
+                        seed.clone()
+                            .pos(HexPoint { h, v: 0 })
+                            .len((3..10).sample_single(&mut env.rng))
+                            .speed((0.2..1.5).sample_single(&mut env.rng)),
+                    );
+                }
+            }
+        }
+    }
+
+    env.remove_apples(to_remove);
+
+    spawn_snakes
+}
+
+/// Resolve every snake-snake and self collision via the snakes' eat mechanics.
+/// Returns whether a snake crashed and ended the game.
+#[must_use]
+pub fn handle_snake_collisions<Rng>(env: &mut Environment<Rng>, collisions: &[Collision]) -> bool {
+    use EatBehavior::*;
+
+    let snakes = &mut env.snakes;
+    let mut game_over = false;
+    for collision in collisions.iter().copied() {
+        match collision {
+            Collision::Apple { .. } => {}
             Collision::Snake {
                 snake1_index,
                 snake2_index,
@@ -202,9 +268,7 @@ pub fn handle_collisions<Rng: rand::Rng>(
         }
     }
 
-    env.remove_apples(to_remove);
-
-    (spawn_snakes, game_over)
+    game_over
 }
 
 pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) -> Result<()> {
@@ -293,8 +357,9 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
             snake.advance_cell(&env.portals, &env.gtx);
         }
 
-        // remove snake if it ran out of body
-        if snake.body.visible_len() == 0 {
+        // remove the snake once the death hole has swallowed all of it (a snake
+        // that hasn't emerged yet is also `on_board == 0`, hence the state check)
+        if snake.state == State::Dying && snake.body.on_board() <= 0.0 {
             remove_snakes.push(snake_idx);
         }
     }
@@ -310,7 +375,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
 /// Poll the controller of every snake that hasn't yet committed a direction
 /// for its current cell.
 ///
-/// This must run **after** [`handle_collisions`], not as part of
+/// This must run **after** the collision handlers, not as part of
 /// [`advance_snakes`]: a controller's decision is locked in for the rest of
 /// the cell, so it has to see the post-collision world. Deciding between the
 /// movement and the collision pass meant the apple seeker was consulted while

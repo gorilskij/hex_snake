@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use enum_rotate::EnumRotate;
 
-use crate::basic::Food;
 use crate::rendering;
 
 #[derive(Copy, Clone, EnumRotate)]
@@ -22,7 +21,7 @@ pub struct Prefs {
     pub display_stats: bool,
     pub message_duration: Duration,
 
-    pub apple_food: Food,
+    pub apple_food: f32,
     pub special_apples: bool,
     pub prob_spawn_competitor: f64,
     pub prob_spawn_killer: f64,
@@ -45,7 +44,7 @@ impl Default for Prefs {
             display_stats: false,
             message_duration: Duration::from_secs(2),
 
-            apple_food: 1,
+            apple_food: 1.,
             special_apples: true,
             prob_spawn_competitor: 0.025,
             prob_spawn_killer: 0.015,
@@ -60,7 +59,7 @@ impl Default for Prefs {
 
 // builder
 impl Prefs {
-    pub fn apple_food(mut self, food: Food) -> Self {
+    pub fn apple_food(mut self, food: f32) -> Self {
         self.apple_food = food;
         self
     }

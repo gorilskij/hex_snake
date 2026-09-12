@@ -25,6 +25,13 @@ pub struct Palette {
     pub border_color: Color,
     pub apple_color: Color,
 
+    /// Border hints (strongest, at the edge): what the player would run into
+    /// across a wrap-around edge
+    pub hint_crash_color: Color,
+    pub hint_cut_color: Color,
+    pub hint_pass_color: Color,
+    pub hint_apple_color: Color,
+
     pub palette_competitor: snake::PaletteTemplate,
     pub palette_killer: snake::PaletteTemplate,
     pub palette_rain: snake::PaletteTemplate,
@@ -44,10 +51,15 @@ impl Palette {
             border_color: crate::color::WHITE,
             apple_color: gray!(0.45),
 
-            palette_competitor: snake::PaletteTemplate::pastel_rainbow(true),
-            palette_killer: snake::PaletteTemplate::dark_blue_to_red(false),
-            // palette_killer: snake::PaletteTemplate::dark_rainbow(true),
-            palette_rain: snake::PaletteTemplate::gray_gradient(0.5, false),
+            hint_crash_color: Color::new(1., 0.1, 0.1, 0.4),
+            hint_cut_color: Color::new(0.2, 0.4, 1., 0.4),
+            hint_pass_color: Color::new(1., 0.85, 0.1, 0.4),
+            hint_apple_color: Color::new(0.2, 0.9, 0.3, 0.4),
+
+            palette_competitor: snake::PaletteTemplate::pastel_rainbow(),
+            palette_killer: snake::PaletteTemplate::dark_blue_to_red(),
+            // palette_killer: snake::PaletteTemplate::dark_rainbow(),
+            palette_rain: snake::PaletteTemplate::gray_gradient(0.5),
         }
     }
 }

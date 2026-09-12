@@ -21,7 +21,8 @@ pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration, 
     for apple in apples {
         use crate::apple::Type::*;
         let color = match apple.apple_type {
-            Food(_) => gtx.palette.apple_color,
+            Eat(_) => gtx.palette.apple_color,
+            Shrink(_) => gtx.palette.apple_color, // TODO: change
             SpawnSnake(_) | SpawnRain => {
                 let hue = 360. * (elapsed_total.as_millis() as f64 / 1000. % 1.);
                 let hsl = HSL { h: hue, s: 1., l: 0.3 };

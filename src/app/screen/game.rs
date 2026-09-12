@@ -10,6 +10,7 @@ use macroquad::material::Material;
 use macroquad::window::clear_background;
 use rand::prelude::*;
 
+use crate::app::border_hints::BorderHints;
 use crate::app::distance_grid::DistanceGrid;
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
@@ -20,12 +21,12 @@ use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::{Environment, Screen};
 use crate::app::snake_management::{
-    advance_snakes, find_collisions, handle_collisions, spawn_snakes, update_snake_dirs,
+    advance_snakes, find_collisions, handle_apple_collisions, handle_snake_collisions, spawn_snakes, update_snake_dirs,
 };
 use crate::app::stats::Stats;
 use crate::apple::spawn::{spawn_apples, SpawnPolicy};
 use crate::apple::{self, Apple};
-use crate::basic::{CellDim, Dir, Food, HexDim, HexPoint, Point};
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
@@ -45,6 +46,7 @@ pub struct Game {
     animated_apples: bool,
 
     distance_grid: DistanceGrid,
+    border_hints: BorderHints,
 
     messages: HashMap<MessageID, Message>,
 
@@ -89,6 +91,7 @@ impl Game {
             animated_apples: false,
 
             distance_grid: DistanceGrid::new(),
+            border_hints: BorderHints::new(),
 
             messages: HashMap::new(),
 
@@ -148,6 +151,7 @@ impl Game {
             self.snake_render = None;
             self.distance_grid_mesh = None;
             self.distance_grid.invalidate();
+            self.border_hints.clear();
             self.player_path_mesh = None;
         }
     }
@@ -220,7 +224,8 @@ impl Game {
         self.spawn_apples();
     }
 
-    // TODO: this doesn't work if a snake advances multiple cells per update call
+    /// Advance the world by one tick, which must be short enough that no snake
+    /// crosses more than one cell boundary (see [`Screen::update`]).
     /// Return value indicates whether any snake has advanced through a cell boundary
     fn advance_snakes(&mut self, elapsed: Duration) -> Result<bool> {
         let env = &mut self.env;
@@ -247,7 +252,8 @@ impl Game {
         }
 
         let collisions = find_collisions(env);
-        let (seeds, game_over) = handle_collisions(env, &collisions);
+        let game_over = handle_snake_collisions(env, &collisions);
+        let seeds = handle_apple_collisions(env, &collisions);
         self.apple_mesh = None;
 
         if game_over {
@@ -343,16 +349,31 @@ impl Game {
 
 impl Screen for Game {
     fn update(&mut self) -> Result<()> {
-        if let Some(elapsed) = self.fps_control.update() {
-            if self.advance_snakes(elapsed).context("Game::update")? {
-                self.spawn_apples();
-            }
+        /// Most cells the fastest snake may travel in one tick, so no snake
+        /// crosses more than one cell boundary per tick.
+        const MAX_TICK_CELLS: f32 = 0.5;
 
-            // Poll controllers only once the frame's world state is final
-            // (collisions handled, eaten apples removed, new apples spawned):
-            // a decision is locked in for the rest of the cell, so deciding
-            // against a stale world made the autopilot overshoot apples.
-            update_snake_dirs(&mut self.env);
+        if let Some(elapsed) = self.fps_control.update() {
+            // at high speeds a frame covers many cells: split it into ticks
+            let fastest = self.env.snakes.iter().map(|snake| snake.speed).fold(0., f32::max);
+            let ticks = (elapsed.as_secs_f32() * fastest / MAX_TICK_CELLS).ceil().max(1.) as u32;
+            let tick = elapsed / ticks;
+
+            for _ in 0..ticks {
+                if self.fps_control.state() != fps_control::State::Playing {
+                    break;
+                }
+
+                if self.advance_snakes(tick).context("Game::update")? {
+                    self.spawn_apples();
+                }
+
+                // Poll controllers only once the tick's world state is final
+                // (collisions handled, eaten apples removed, new apples spawned):
+                // a decision is locked in for the rest of the cell, so deciding
+                // against a stale world made the autopilot overshoot apples.
+                update_snake_dirs(&mut self.env);
+            }
         }
 
         Ok(())
@@ -386,7 +407,7 @@ impl Screen for Game {
         }
 
         if self.snake_render.is_none() || playing {
-            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, &mut stats)?);
+            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.apples, &env.gtx, &mut stats)?);
         }
 
         if env.apples.is_empty() {
@@ -404,6 +425,9 @@ impl Screen for Game {
         let player_idx = self.first_player_snake_idx().expect("no player snake");
         let env = &mut self.env;
 
+        // rebuilt every frame: hints fade in real time, even while paused
+        let border_hint_mesh = Some(self.border_hints.mesh(env, player_idx));
+
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
         if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
@@ -413,7 +437,8 @@ impl Screen for Game {
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
             self.player_path_mesh =
-                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats).transpose()?;
+                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats)
+                    .transpose()?;
         }
 
         if env.gtx.prefs.display_stats {
@@ -430,13 +455,19 @@ impl Screen for Game {
 
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
-        let before_snake = [&self.distance_grid_mesh, &self.grid_mesh, &self.player_path_mesh];
+        // Border hints go under the grid (and border), so its lines stay untinted.
+        let before_snake = [
+            &self.distance_grid_mesh,
+            &border_hint_mesh,
+            &self.grid_mesh,
+            &self.player_path_mesh,
+        ];
         let after_snake = [&self.apple_mesh, &self.border_mesh, &self.portal_mesh];
 
         let has_snake = self
             .snake_render
             .as_ref()
-            .is_some_and(|r| !r.shaded.is_empty() || r.black_holes.is_some());
+            .is_some_and(|r| !r.shaded.is_empty());
         let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
@@ -455,9 +486,6 @@ impl Screen for Game {
                 let material = self.snake_material.as_ref().unwrap();
                 for (mesh, _lut) in &render.shaded {
                     mesh.draw_shaded(material);
-                }
-                if let Some(black_holes) = &render.black_holes {
-                    black_holes.draw();
                 }
             }
 
@@ -594,10 +622,10 @@ impl Screen for Game {
                     // replace special apples with normal apples
                     let apple_food = prefs.apple_food;
                     self.env.apples.iter_mut().for_each(|apple| {
-                        if !matches!(apple.apple_type, apple::Type::Food(_)) {
+                        if !matches!(apple.apple_type, apple::Type::Eat(_)) {
                             *apple = Apple {
                                 pos: apple.pos,
-                                apple_type: apple::Type::Food(apple_food),
+                                apple_type: apple::Type::Eat(apple_food),
                             }
                         }
                     });
@@ -607,11 +635,11 @@ impl Screen for Game {
                 self.display_notification(text);
             }
             k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
-                let new_food = idx as Food + 1;
+                let new_food = idx as f32 + 1.0;
                 prefs.apple_food = new_food;
                 // change existing apples
                 for apple in &mut self.env.apples {
-                    if let apple::Type::Food(food) = &mut apple.apple_type {
+                    if let apple::Type::Eat(food) = &mut apple.apple_type {
                         *food = new_food;
                     }
                 }
@@ -624,6 +652,14 @@ impl Screen for Game {
                 self.env.gtx.cell_dim = CellDim::from(new_side_length);
                 self.update_dim();
                 self.display_notification(format!("Cell side: {new_side_length}"));
+            }
+            k @ LeftBracket | k @ RightBracket => {
+                let speed = if k == LeftBracket {
+                    self.fps_control.slower()
+                } else {
+                    self.fps_control.faster()
+                };
+                self.display_notification(format!("Speed: {speed}x"));
             }
             k => {
                 if self.fps_control.state() == fps_control::State::Playing {

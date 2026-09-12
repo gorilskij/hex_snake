@@ -5,3 +5,4 @@
 **/.DS_Store
 *.svg
 /web/hex_snake.wasm
+/profiling
