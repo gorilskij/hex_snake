@@ -62,7 +62,9 @@ macroquad's `KeyCode` passed straight through, then `next_frame().await`.
     `FpsControl`, cached meshes, and the `draw`/`update` event handlers. This is
     where rendering is assembled and drawn.
   - `screen/mod.rs` — `Environment<Rng>` (snakes, apples, portals, `GameContext`).
-  - `fps_control.rs` — game-frame accumulation, `frame_fraction`, `can_update`.
+  - `fps_control.rs` — play/pause/game-over state, the world's per-frame
+    time step (smoothed frame duration × global debug speed multiplier, stepped
+    with `[` / `]`; `Game::update` splits fast frames into ticks of ≤ half a cell).
   - `game_context.rs` (`GameContext`: cell_dim, board_dim, prefs, palette),
     `prefs.rs` (`Prefs`; default draw_style = Smooth, grid+border on),
     `stats.rs`, `message.rs` (macroquad text overlay), `palette.rs` (board/bg
@@ -163,15 +165,17 @@ That's **gone**. Now:
   - Hexagon draw style (`hexagon_segments::hexagon_outline`) is a flat hexagon
     with constant `uv.x` (via `push_shaded_polygon`).
 - **Color** (`snake/palette.rs`): per snake per frame, `build_snake_lut` samples
-  the existing `Palette`/`SegmentStyle` color function into a fixed **2048-texel
-  1-D LUT** (`SNAKE_LUT_SIZE`). This reuses all the existing HSL/OkLab/gradient
-  math; the LUT *is* the whole-body gradient.
+  the existing `Palette`/`SegmentStyle` color functions into a LUT where each
+  segment owns a fixed slot of `lut_texels_per_segment` texels (so segment
+  boundaries sit on texel edges regardless of length). This reuses all the
+  existing HSL/OkLab/gradient math; the LUT *is* the whole-body gradient.
 - **Draw** (`rendering/snake_mesh.rs` → `SnakeRender`): one shaded `Mesh` + one
   `PaletteLut` per snake (LUT baked as the mesh's `texture`). `game.rs` compiles
   the `SnakeMaterial` (`snake_material()`) lazily and calls `mesh.draw_shaded` per
-  snake. The
-  fragment shader samples the LUT by `uv.x` (linear filtered → smooth gradients;
-  dense enough that hard segment boundaries stay ~sharp). `uv.y` is currently
+  snake. The fragment shader samples the LUT by `uv.x`, clamped to the segment's
+  own slot (`normal.xy`), and scales it by a per-vertex brightness (`normal.z`;
+  1 for the body, lower for details like passability marks) (linear filtered →
+  smooth gradients; hard segment boundaries stay sharp). `uv.y` is currently
   unused (reserved for across-width shading).
 
 Key files: `support/material.rs`, `snake/palette.rs` (`build_snake_lut`),
@@ -188,6 +192,27 @@ caps straddle cell boundaries and bend around turns) and fills the gap with a
 half-circle profile (`dist = radius·sin φ`, half-width `∝ cos φ`). A head
 `Crashed` into an obstacle keeps its flat face; the radius shrinks for very short
 snakes so the two caps don't overlap.
+
+### Passability marks (`rendering/segments/marks.rs`)
+
+Eaten segments a snake can pass through get marks in a **darker shade of the
+segment's own color** (same LUT lookup, `BRIGHTNESS` = 0.8), so the player can
+tell them from look-alikes they'd crash into (e.g. other snakes' eaten segments). Smooth style: two lines inset from the
+edges with round ends, following the edges' curvature (arcs on turns, inner
+shorter; a sharp turn's inner line is a dot). Where the neighboring segment is
+marked too, the line runs flat to the shared edge, so consecutive marked
+segments show one continuous line. The head segment joins ahead as soon as the
+next segment is known to be eaten (`Snake::upcoming_eaten_segment`: direction
+locked in + `Eat` apple in the next cell) — for now an instant jump, hidden
+because lines are cut to the segment's drawn fraction (which stops where the
+head cap begins); easing is still to be designed. Hexagon style: a small
+hexagon in the middle. Dimensions are the `const`s at the top of the file (tuned
+by eye).
+
+Whether a segment is marked: `EatMechanics::is_marked(segment_type)` =
+`mark_passable` flag (opt-in via `.mark_passable()`; only the player sets it) **and**
+the snake's own behavior against that segment type is inert. So **marked ⇒
+passable** by construction; not every passable segment is marked.
 
 ## Gotchas (each cost real time)
 

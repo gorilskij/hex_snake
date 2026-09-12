@@ -78,7 +78,8 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
             snake::Type::Rain => enum_map! { _ => EatBehavior::PassUnder },
             _ => enum_map! { _ => EatBehavior::Crash },
         },
-    );
+    )
+    .mark_passable();
 
     let knowledge = Knowledge::accurate(&eat_mechanics);
 

@@ -97,6 +97,12 @@ const PACE_SMOOTHING: f64 = 0.1;
 /// and the world advances by this much instead of teleporting.
 const MAX_PACE_RATIO: f64 = 4.;
 
+/// The global speed multipliers stepped through with [`FpsControl::faster`] and
+/// [`FpsControl::slower`] (a debugging aid).
+const SPEEDS: [f64; 23] = [
+    0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1., 1.5, 2., 3., 5., 10., 15., 20., 30., 50., 100., 200., 500., 1000.,
+];
+
 // combines fps with game state management
 pub struct FpsControl {
     game_state: State,
@@ -106,8 +112,12 @@ pub struct FpsControl {
     last_update: Instant,
 
     /// Running average of recent frame durations — the duration the world
-    /// actually advances by. See [`FpsControl::pace`].
+    /// actually advances by (before the speed multiplier). See
+    /// [`FpsControl::pace`].
     paced: Option<Duration>,
+
+    /// Index into [`SPEEDS`] of the current global speed multiplier.
+    speed_idx: usize,
 
     graphics_frame_num: usize,
     elapsed_total: Duration,
@@ -126,18 +136,21 @@ impl FpsControl {
 
             paced: None,
 
+            speed_idx: SPEEDS.iter().position(|&speed| speed == 1.).unwrap(),
+
             graphics_frame_num: 0,
             elapsed_total: Duration::ZERO,
             measured_graphics_fps: FpsCounter::new(60.),
         }
     }
 
+    /// The duration the world should advance by this frame, if it is playing.
     pub fn update(&mut self) -> Option<Duration> {
         (self.game_state == State::Playing).then(|| {
             let new_update = Instant::now();
             let elapsed = new_update - self.last_update;
             self.last_update = new_update;
-            self.pace(elapsed)
+            self.pace(elapsed).mul_f64(self.speed())
         })
     }
 
@@ -172,6 +185,23 @@ impl FpsControl {
         let smoothed = avg.mul_f64(1. - PACE_SMOOTHING) + capped.mul_f64(PACE_SMOOTHING);
         self.paced = Some(smoothed);
         smoothed
+    }
+
+    /// The global speed multiplier applied to the world's time.
+    pub fn speed(&self) -> f64 {
+        SPEEDS[self.speed_idx]
+    }
+
+    /// Step the global speed multiplier up, returning the new one.
+    pub fn faster(&mut self) -> f64 {
+        self.speed_idx = (self.speed_idx + 1).min(SPEEDS.len() - 1);
+        self.speed()
+    }
+
+    /// Step the global speed multiplier down, returning the new one.
+    pub fn slower(&mut self) -> f64 {
+        self.speed_idx = self.speed_idx.saturating_sub(1);
+        self.speed()
     }
 
     // call in draw()

@@ -220,7 +220,8 @@ impl Game {
         self.spawn_apples();
     }
 
-    // TODO: this doesn't work if a snake advances multiple cells per update call
+    /// Advance the world by one tick, which must be short enough that no snake
+    /// crosses more than one cell boundary (see [`Screen::update`]).
     /// Return value indicates whether any snake has advanced through a cell boundary
     fn advance_snakes(&mut self, elapsed: Duration) -> Result<bool> {
         let env = &mut self.env;
@@ -344,16 +345,31 @@ impl Game {
 
 impl Screen for Game {
     fn update(&mut self) -> Result<()> {
-        if let Some(elapsed) = self.fps_control.update() {
-            if self.advance_snakes(elapsed).context("Game::update")? {
-                self.spawn_apples();
-            }
+        /// Most cells the fastest snake may travel in one tick, so no snake
+        /// crosses more than one cell boundary per tick.
+        const MAX_TICK_CELLS: f32 = 0.5;
 
-            // Poll controllers only once the frame's world state is final
-            // (collisions handled, eaten apples removed, new apples spawned):
-            // a decision is locked in for the rest of the cell, so deciding
-            // against a stale world made the autopilot overshoot apples.
-            update_snake_dirs(&mut self.env);
+        if let Some(elapsed) = self.fps_control.update() {
+            // at high speeds a frame covers many cells: split it into ticks
+            let fastest = self.env.snakes.iter().map(|snake| snake.speed).fold(0., f32::max);
+            let ticks = (elapsed.as_secs_f32() * fastest / MAX_TICK_CELLS).ceil().max(1.) as u32;
+            let tick = elapsed / ticks;
+
+            for _ in 0..ticks {
+                if self.fps_control.state() != fps_control::State::Playing {
+                    break;
+                }
+
+                if self.advance_snakes(tick).context("Game::update")? {
+                    self.spawn_apples();
+                }
+
+                // Poll controllers only once the tick's world state is final
+                // (collisions handled, eaten apples removed, new apples spawned):
+                // a decision is locked in for the rest of the cell, so deciding
+                // against a stale world made the autopilot overshoot apples.
+                update_snake_dirs(&mut self.env);
+            }
         }
 
         Ok(())
@@ -387,7 +403,7 @@ impl Screen for Game {
         }
 
         if self.snake_render.is_none() || playing {
-            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.gtx, &mut stats)?);
+            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.apples, &env.gtx, &mut stats)?);
         }
 
         if env.apples.is_empty() {
@@ -623,6 +639,14 @@ impl Screen for Game {
                 self.env.gtx.cell_dim = CellDim::from(new_side_length);
                 self.update_dim();
                 self.display_notification(format!("Cell side: {new_side_length}"));
+            }
+            k @ LeftBracket | k @ RightBracket => {
+                let speed = if k == LeftBracket {
+                    self.fps_control.slower()
+                } else {
+                    self.fps_control.faster()
+                };
+                self.display_notification(format!("Speed: {speed}x"));
             }
             k => {
                 if self.fps_control.state() == fps_control::State::Playing {

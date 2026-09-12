@@ -195,6 +195,7 @@ fn build_cap(
         build_shaded_ribbon(
             &sections,
             desc.seg_bounds(num_segments, lut_size),
+            1.,
             desc.u_of(num_segments),
             desc.board_transform(),
         )

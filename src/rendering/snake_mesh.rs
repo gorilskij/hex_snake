@@ -2,14 +2,15 @@ use anyhow::Result;
 
 use crate::app::game_context::GameContext;
 use crate::app::stats::Stats;
+use crate::apple::Apple;
 use crate::rendering;
 use crate::rendering::segments::cap::build_round_caps;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
+use crate::rendering::segments::marks::{build_marks, Joins};
 use crate::snake::palette::{build_snake_lut, SegmentStyle};
 use crate::snake::{Body, Segment, Snake};
 use crate::support::material::PaletteLut;
 use crate::support::mesh::Mesh;
-
 
 /// Drawable output for all snakes: one shaded mesh + palette LUT per snake.
 pub struct SnakeRender {
@@ -74,7 +75,7 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 /// Build the drawable meshes for every snake. Each snake becomes one polygon per
 /// segment (no color subdivision); color is applied per-pixel by the snake
 /// shader sampling that snake's palette LUT.
-pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) -> Result<SnakeRender> {
+pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext, stats: &mut Stats) -> Result<SnakeRender> {
     stats.redrawing_snakes = true;
 
     let mut shaded = Vec::with_capacity(snakes.len());
@@ -107,13 +108,34 @@ pub fn snake_mesh(snakes: &mut [Snake], gtx: &GameContext, stats: &mut Stats) ->
             (None, None)
         };
 
+        // Which segments carry passability marks (head → tail), and whether the
+        // head's marks already join the next head segment's.
+        let eat_mechanics = snake.eat_mechanics;
+        let marked: Vec<bool> = body
+            .segments
+            .iter()
+            .map(|segment| eat_mechanics.is_marked(segment.segment_type))
+            .collect();
+        let next_marked = snake
+            .upcoming_eaten_segment(apples, gtx)
+            .is_some_and(|segment_type| eat_mechanics.is_marked(segment_type));
+
         // Shaded segments. Draw tail → head so the head paints on top; the
-        // caps keep that order (tail cap under, head cap over).
+        // caps keep that order (tail cap under, head cap over). A segment's
+        // marks go directly on top of it.
         let segments = tail_cap
             .into_iter()
-            .chain(descs.iter().rev().map(|desc| {
-                stats.polygons += 1;
-                desc.build_shaded(num_segments, lut_size)
+            .chain(descs.iter().rev().flat_map(|desc| {
+                let idx = desc.segment_idx;
+                let marks = marked[idx].then(|| {
+                    let joins = Joins {
+                        tail: marked.get(idx + 1) == Some(&true),
+                        head: if idx == 0 { next_marked } else { marked[idx - 1] },
+                    };
+                    build_marks(desc, joins, num_segments, lut_size)
+                });
+                stats.polygons += 1 + marks.is_some() as usize;
+                std::iter::once(desc.build_shaded(num_segments, lut_size)).chain(marks)
             }))
             .chain(head_cap);
         let mut mesh = Mesh::combine(segments);

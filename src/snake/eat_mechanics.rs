@@ -29,11 +29,24 @@ pub type BySnakeType = EnumMap<snake::Type, BySegmentType>;
 pub struct EatMechanics {
     eat_self: BySegmentType,
     eat_other: BySnakeType,
+    /// See [`EatMechanics::is_marked`].
+    mark_passable: bool,
 }
 
 impl EatMechanics {
     pub fn new(eat_self: BySegmentType, eat_other: BySnakeType) -> Self {
-        Self { eat_self, eat_other }
+        Self {
+            eat_self,
+            eat_other,
+            mark_passable: false,
+        }
+    }
+
+    /// Mark the snake's own segments that it can pass through, to tell them
+    /// apart from look-alikes it can't (e.g. other snakes' eaten segments).
+    pub fn mark_passable(mut self) -> Self {
+        self.mark_passable = true;
+        self
     }
 
     pub fn eat_self(&self, segment_type: SegmentType) -> EatBehavior {
@@ -44,10 +57,18 @@ impl EatMechanics {
         self.eat_other[snake_type][segment_type]
     }
 
+    /// Whether the snake's own segment of this type is drawn with a mark. A
+    /// marked segment can always be passed through; not every one that can be
+    /// passed through is marked.
+    pub fn is_marked(&self, segment_type: SegmentType) -> bool {
+        self.mark_passable && self.eat_self(segment_type).is_inert()
+    }
+
     pub fn always(behavior: EatBehavior) -> Self {
         Self {
             eat_self: enum_map! { _ => behavior },
             eat_other: enum_map! { _ => enum_map! { _ => behavior } },
+            mark_passable: false,
         }
     }
 }

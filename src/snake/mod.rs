@@ -156,6 +156,26 @@ impl Snake {
         &self.body.segments[0]
     }
 
+    /// The eaten segment the snake is already known to grow next, if any: its
+    /// direction into the next cell is locked in and an `Eat` apple lies there.
+    /// (Portals are not accounted for.)
+    pub fn upcoming_eaten_segment(&self, apples: &[Apple], gtx: &GameContext) -> Option<SegmentType> {
+        if self.state != State::Living || !self.dir_updated {
+            return None;
+        }
+        let next_pos = self.head().pos.wrapping_translate(self.body.dir, 1, gtx.board_dim);
+        apples
+            .iter()
+            .find(|apple| apple.pos == next_pos)
+            .and_then(|apple| match apple.apple_type {
+                crate::apple::Type::Eat(food) => Some(SegmentType::Eaten {
+                    original_food: food,
+                    food_left: food,
+                }),
+                _ => None,
+            })
+    }
+
     // similar to reachable(..), much more efficient, only works in the plane,
     // doesn't account for the snake itself
     // pub fn head_neighborhood(&self, radius: usize, board_dim: HexDim) -> Vec<HexPoint> {

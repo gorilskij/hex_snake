@@ -76,8 +76,8 @@ pub fn build_polyline(mode: DrawMode, points: &[Point], color: impl Into<MqColor
 /// (still in default orientation) to its `(u, v)` texture coords, and
 /// `transform` places the vertex on the board. Computing uv before the transform
 /// keeps it in body space (rotation/translation invariant); the vertex color is
-/// unused by the snake shader, so it is left white.
-pub fn build_shaded_polygon<U, T>(default_points: &[Point], uv_of: U, transform: T) -> Mesh
+/// unused by the snake shader, so it is left white. `brightness` scales the sampled color.
+pub fn build_shaded_polygon<U, T>(default_points: &[Point], brightness: f32, uv_of: U, transform: T) -> Mesh
 where
     U: Fn(Point) -> (f32, f32),
     T: Fn(Point) -> Point,
@@ -88,13 +88,14 @@ where
     }
     let white = MqColor::new(1., 1., 1., 1.);
     // seg_bounds (0,1) → the shader's clamp is a no-op (flat color per poly)
+    let bounds = vec4(0., 1., brightness, 0.);
     let vertices = positions
         .into_iter()
         .map(|p| {
             let (u, v) = uv_of(p);
             let tp = transform(p);
             let mut vert = Vertex::new(tp.x, tp.y, 0., u, v, white);
-            vert.normal = vec4(0., 1., 0., 0.);
+            vert.normal = bounds;
             vert
         })
         .collect();
@@ -111,10 +112,12 @@ where
 ///
 /// `seg_bounds` is this segment's `(lo, hi)` uv range; it is passed to every
 /// vertex (in `normal.xy`) so the shader can clamp the LUT lookup to it, keeping
-/// color boundaries on the geometry seam instead of a texel.
+/// color boundaries on the geometry seam instead of a texel. `brightness`
+/// (passed in `normal.z`) scales the sampled color.
 pub fn build_shaded_ribbon<U, T>(
     cross_sections: &[(Point, Point, f32)],
     seg_bounds: (f32, f32),
+    brightness: f32,
     u_of: U,
     transform: T,
 ) -> Mesh
@@ -126,7 +129,7 @@ where
         return Mesh::empty();
     }
     let white = MqColor::new(1., 1., 1., 1.);
-    let bounds = vec4(seg_bounds.0, seg_bounds.1, 0., 0.);
+    let bounds = vec4(seg_bounds.0, seg_bounds.1, brightness, 0.);
     let mut vertices = Vec::with_capacity(cross_sections.len() * 2);
     for &(inner, outer, frac) in cross_sections {
         let u = u_of(frac);
