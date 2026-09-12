@@ -11,11 +11,23 @@ pub enum DrawGrid {
     None,
 }
 
+/// How wrap-around edges hint at what lies on the other side (see
+/// `app::border_hints`).
+#[derive(Copy, Clone, Eq, PartialEq, EnumRotate)]
+pub enum HintStyle {
+    /// Recolor the edge's stretch of the border
+    Border,
+    /// A gradient fading from the edge into its cell
+    Gradient,
+    None,
+}
+
 pub struct Prefs {
     pub draw_grid: DrawGrid,
     pub draw_border: bool,
     pub draw_distance_grid: bool,
     pub draw_player_path: bool,
+    pub hint_style: HintStyle,
 
     pub display_fps: bool,
     pub display_stats: bool,
@@ -39,6 +51,7 @@ impl Default for Prefs {
             draw_border: true,
             draw_distance_grid: false,
             draw_player_path: false,
+            hint_style: HintStyle::Border,
 
             display_fps: false,
             display_stats: false,

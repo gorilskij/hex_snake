@@ -17,7 +17,7 @@ use crate::app::game_context::GameContext;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
-use crate::app::prefs::{DrawGrid, Prefs};
+use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::{Environment, Screen};
 use crate::app::snake_management::{
@@ -426,7 +426,14 @@ impl Screen for Game {
         let env = &mut self.env;
 
         // rebuilt every frame: hints fade in real time, even while paused
-        let border_hint_mesh = Some(self.border_hints.mesh(env, player_idx));
+        let hint_style = env.gtx.prefs.hint_style;
+        let hint_mesh = Some(self.border_hints.mesh(env, player_idx, hint_style));
+        // gradients go under the grid (so its lines stay untinted), recolored
+        // border stretches right on top of the border
+        let (gradient_hint_mesh, border_hint_mesh) = match hint_style {
+            HintStyle::Gradient => (hint_mesh, None),
+            HintStyle::Border | HintStyle::None => (None, hint_mesh),
+        };
 
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
@@ -455,14 +462,18 @@ impl Screen for Game {
 
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
-        // Border hints go under the grid (and border), so its lines stay untinted.
         let before_snake = [
             &self.distance_grid_mesh,
-            &border_hint_mesh,
+            &gradient_hint_mesh,
             &self.grid_mesh,
             &self.player_path_mesh,
         ];
-        let after_snake = [&self.apple_mesh, &self.border_mesh, &self.portal_mesh];
+        let after_snake = [
+            &self.apple_mesh,
+            &self.border_mesh,
+            &border_hint_mesh,
+            &self.portal_mesh,
+        ];
 
         let has_snake = self
             .snake_render
@@ -544,6 +555,16 @@ impl Screen for Game {
                     DrawGrid::None => "Grid off",
                 };
                 self.grid_mesh = None;
+                self.display_notification(text);
+            }
+            H => {
+                let text = match prefs.hint_style.rotate_next() {
+                    HintStyle::Border => "Border hints",
+                    HintStyle::Gradient => "Gradient hints",
+                    HintStyle::None => "Hints off",
+                };
+                // start the new style fresh rather than fading from the old one's colors
+                self.border_hints.clear();
                 self.display_notification(text);
             }
             D => {
