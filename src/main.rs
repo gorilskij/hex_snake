@@ -97,6 +97,12 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    // macroquad's PRNG starts from a fixed state, and on wasm it's also what
+    // backs `thread_rng` (see `macroquad_getrandom`), so every page load would
+    // replay the same apples. Seed it from the wall clock (`get_time` counts
+    // from startup, so it wouldn't vary).
+    macroquad::rand::srand(macroquad::miniquad::date::now().to_bits());
+
     let control_setup = ControlSetup {
         // web delivers physical (qwerty-position) key codes, so use the qwerty
         // bindings directly: ul=J u=K ur=L dl=M d=Comma dr=Period
