@@ -96,4 +96,10 @@ impl Knowledge {
     pub fn can_pass_through_self(&self, seg: &Segment) -> bool {
         self.0.eat_self(seg.segment_type).is_inert()
     }
+
+    /// Checks whether the snake can safely pass through a given segment
+    /// belonging to a snake of type `snake_type`
+    pub fn can_pass_through_other(&self, snake_type: snake::Type, seg: &Segment) -> bool {
+        self.0.eat_other(snake_type, seg.segment_type).is_inert()
+    }
 }

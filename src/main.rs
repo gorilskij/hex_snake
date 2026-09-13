@@ -90,7 +90,10 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
         .controller(snake_control::Template::Keyboard { control_setup, knowledge })
         .speed(5.)
         .autopilot(pathfinder::Template::WithBackup {
-            main: Box::new(pathfinder::Template::WeightedBFS),
+            main: Box::new(pathfinder::Template::WeightedBFS(pathfinder::Weights {
+                teleport: 0,
+                ..Default::default()
+            })),
             backup: Box::new(pathfinder::Template::SpaceFilling),
         })
 }

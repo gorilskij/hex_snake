@@ -80,7 +80,11 @@ macroquad's `KeyCode` passed straight through, then `next_frame().await`.
   `builder.rs`, `eat_mechanics.rs`, **`palette.rs`** (snake coloring: `Palette`
   trait, `SegmentStyle`, gradient/solid/alternating palettes, `build_snake_lut`).
 - **`snake_control/`** — controllers: `keyboard`, AI `algorithm`/`killer`/`rain`/
-  `programmed`, and `pathfinder/` (weighted BFS, space-filling, with-backup).
+  `programmed`, and `pathfinder/`: cheapest-path search (`WeightedBFS`, costs
+  in a `Weights` struct — step, blunt/sharp turn, teleport, pass-through), a
+  space-filling survival fallback, with-backup, and `Obstacles` (occupied cells
+  judged by the snake's `eat_self` for its own segments, `eat_other` for other
+  snakes').
 - **`rendering/`** — turns the world into meshes (see next section).
 - **`basic/`** — `Point` (f32 x/y, cartesian), `HexPoint` (hex grid coord),
   `Dir`/`Dir12` (hex directions), `CellDim` (side/sin/cos, `height()`, `center()`),
