@@ -34,6 +34,7 @@ pub struct Palette {
     pub grid_dot_color: Color,
     pub border_color: Color,
     pub apple_color: Color,
+    pub bad_apple_color: Color,
 
     /// Hints recoloring stretches of the border
     pub border_hint_colors: HintColors,
@@ -58,6 +59,8 @@ impl Palette {
             grid_dot_color: crate::color::WHITE,
             border_color: crate::color::WHITE,
             apple_color: gray!(0.45),
+            // vomit green
+            bad_apple_color: Color::new(0.55, 0.62, 0.1, 1.),
 
             border_hint_colors: HintColors {
                 crash: Color::new(0.72, 0.16, 0.16, 1.),

@@ -76,7 +76,6 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 /// segment (no color subdivision); color is applied per-pixel by the snake
 /// shader sampling that snake's palette LUT.
 pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext, stats: &mut Stats) -> Result<SnakeRender> {
-    stats.redrawing_snakes = true;
 
     let mut shaded = Vec::with_capacity(snakes.len());
 

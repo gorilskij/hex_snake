@@ -1,18 +1,20 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
+use std::collections::HashSet;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use rand::distributions::uniform::SampleRange;
 
+use crate::app::game_mode::{hunger, GameMode};
 use crate::app::portal;
 use crate::app::screen::Environment;
-use crate::basic::board::{get_occupied_cells, random_free_spot};
+use crate::basic::board::{get_occupied_cells, occupied_or_near_players, random_free_spot};
 use crate::basic::{Dir, HexPoint};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
-use crate::snake::{self, SegmentType, State};
+use crate::snake::{self, LengthChange, SegmentType, State};
 use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
 
@@ -44,7 +46,7 @@ pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
         .snakes
         .iter()
         .enumerate()
-        .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying))
+        .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying | State::Starved))
     {
         let pos = snake1.head().pos;
 
@@ -167,9 +169,14 @@ pub fn handle_apple_collisions<Rng: rand::Rng>(
                     food_left: *food,
                 }
             }
-            Shrink(amount) => {
-                /////////////////////////////////////////////////////////////////////
-            }
+            Grow(amount) => env.snakes[snake_index]
+                .body
+                .length_changes
+                .push(LengthChange::new(*amount, hunger::GROW_DURATION)),
+            Shrink(amount) => env.snakes[snake_index]
+                .body
+                .length_changes
+                .push(LengthChange::new(-*amount, hunger::SHRINK_DURATION)),
             SpawnSnake(seed) => spawn_snakes.push((**seed).clone()),
             SpawnRain => {
                 let seed = SnakeBuilder::default()
@@ -275,9 +282,6 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
     let board_dim = env.gtx.board_dim;
 
     for mut snake_builder in snake_builders {
-        // avoid spawning too close to player snake heads
-        const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
-
         // cells that are actually taken (snake bodies + apples)
         let occupied_cells = get_occupied_cells(&env.snakes, &env.apples);
 
@@ -285,13 +289,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
         // as a preference: on a board small enough that the neighborhood wraps
         // around and covers everything, fall back to plain occupancy so we can
         // still spawn wherever there is real free space
-        let mut preferred_free = occupied_cells.clone();
-        for snake in env.snakes.iter().filter(|s| s.snake_type == snake::Type::Player) {
-            let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, board_dim);
-            preferred_free.extend_from_slice(&neighborhood);
-        }
-        preferred_free.sort_unstable();
-        preferred_free.dedup();
+        let preferred_free = occupied_or_near_players(&env.snakes, &env.apples, board_dim);
 
         match snake_builder.pos {
             Some(pos) => {
@@ -338,7 +336,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
     let mut remove_snakes = vec![];
     for (snake_idx, snake) in snakes.iter_mut().enumerate() {
         // advance the snake
-        if snake.advance(elapsed) {
+        if snake.advance(elapsed, env.gtx.board_dim) {
             // block is entered if the snake crossed a cell boundary
             new_cell_occupied = true;
 
@@ -355,6 +353,19 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
             }
 
             snake.advance_cell(&env.portals, &env.gtx);
+        }
+
+        // hunger mode: a snake shrunk down to the minimum has starved, which ends
+        // the game for the player; other snakes just die
+        if env.gtx.mode == GameMode::Hunger
+            && snake.state == State::Living
+            && snake.body.length <= hunger::MIN_LENGTH
+        {
+            if snake.snake_type == snake::Type::Player {
+                snake.starve();
+            } else {
+                snake.die();
+            }
         }
 
         // remove the snake once the death hole has swallowed all of it (a snake
@@ -389,4 +400,36 @@ pub fn update_snake_dirs(env: &mut Environment) {
             snake.update_dir(other_snakes, &env.apples, &env.gtx);
         }
     }
+}
+
+/// Only heads eat apples: an apple that a tail has grown over (hunger mode)
+/// moves somewhere else.
+pub fn relocate_covered_apples<Rng: rand::Rng>(env: &mut Environment<Rng>) {
+    let covered: HashSet<HexPoint> = env
+        .snakes
+        .iter()
+        .flat_map(|snake| snake.body.segments.iter().skip(1))
+        .map(|segment| segment.pos)
+        .collect();
+    if !env.apples.iter().any(|apple| covered.contains(&apple.pos)) {
+        return;
+    }
+
+    let mut occupied = get_occupied_cells(&env.snakes, &env.apples);
+    let mut no_room = vec![];
+    for (apple_index, apple) in env.apples.iter_mut().enumerate() {
+        if !covered.contains(&apple.pos) {
+            continue;
+        }
+        match random_free_spot(&occupied, env.gtx.board_dim, &mut env.rng) {
+            Some(pos) => {
+                apple.pos = pos;
+                if let Err(idx) = occupied.binary_search(&pos) {
+                    occupied.insert(idx, pos);
+                }
+            }
+            None => no_room.push(apple_index),
+        }
+    }
+    env.remove_apples(no_room);
 }

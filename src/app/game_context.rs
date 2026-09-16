@@ -1,4 +1,5 @@
 use crate::app;
+use crate::app::game_mode::GameMode;
 use crate::app::prefs::Prefs;
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, HexDim};
@@ -15,6 +16,8 @@ pub struct GameContext {
     pub prefs: Prefs,
     /// How many apples are spawned and when
     pub apple_spawn_policy: SpawnPolicy,
+    /// The rules the game is played by
+    pub mode: GameMode,
 }
 
 impl GameContext {
@@ -24,6 +27,7 @@ impl GameContext {
         palette: app::Palette,
         prefs: Prefs,
         apple_spawn_policy: SpawnPolicy,
+        mode: GameMode,
     ) -> Self {
         Self {
             board_dim,
@@ -31,6 +35,7 @@ impl GameContext {
             palette,
             prefs,
             apple_spawn_policy,
+            mode,
         }
     }
 }

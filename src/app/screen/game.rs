@@ -14,6 +14,7 @@ use crate::app::border_hints::BorderHints;
 use crate::app::distance_grid::DistanceGrid;
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
+use crate::app::game_mode::GameMode;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
@@ -21,11 +22,12 @@ use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::{Environment, Screen};
 use crate::app::snake_management::{
-    advance_snakes, find_collisions, handle_apple_collisions, handle_snake_collisions, spawn_snakes, update_snake_dirs,
+    advance_snakes, find_collisions, handle_apple_collisions, handle_snake_collisions, relocate_covered_apples,
+    spawn_snakes, update_snake_dirs,
 };
 use crate::app::stats::Stats;
-use crate::apple::spawn::{spawn_apples, SpawnPolicy};
-use crate::apple::{self, Apple};
+use crate::apple::spawn::{expire_apples, food_apple, spawn_apples, spawn_bad_apples, SpawnPolicy};
+use crate::apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
@@ -63,7 +65,13 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(cell_dim: CellDim, seeds: Vec<SnakeBuilder>, palette: Palette, apple_spawn_policy: SpawnPolicy) -> Self {
+    pub fn new(
+        cell_dim: CellDim,
+        seeds: Vec<SnakeBuilder>,
+        palette: Palette,
+        apple_spawn_policy: SpawnPolicy,
+        mode: GameMode,
+    ) -> Self {
         assert!(!seeds.is_empty(), "No players specified");
 
         let mut this = Self {
@@ -79,6 +87,7 @@ impl Game {
                     palette,
                     Prefs::default(),
                     apple_spawn_policy,
+                    mode,
                 ),
                 rng: thread_rng(),
             },
@@ -254,9 +263,13 @@ impl Game {
         let collisions = find_collisions(env);
         let game_over = handle_snake_collisions(env, &collisions);
         let seeds = handle_apple_collisions(env, &collisions);
+        relocate_covered_apples(env);
+        expire_apples(env, elapsed);
+        spawn_bad_apples(env, elapsed);
+        let starved = env.snakes.iter().any(|snake| snake.state == snake::State::Starved);
         self.apple_mesh = None;
 
-        if game_over {
+        if game_over || starved {
             self.fps_control.game_over()
         }
 
@@ -449,6 +462,7 @@ impl Screen for Game {
         }
 
         if env.gtx.prefs.display_stats {
+            stats.player_length = Some(player_snake.body.length);
             let message = stats.get_stats_message();
             self.messages.insert(MessageID::Stats, message);
         }
@@ -641,13 +655,10 @@ impl Screen for Game {
                     "Special apples enabled"
                 } else {
                     // replace special apples with normal apples
-                    let apple_food = prefs.apple_food;
+                    let food = food_apple(&self.env.gtx);
                     self.env.apples.iter_mut().for_each(|apple| {
-                        if !matches!(apple.apple_type, apple::Type::Eat(_)) {
-                            *apple = Apple {
-                                pos: apple.pos,
-                                apple_type: apple::Type::Eat(apple_food),
-                            }
+                        if matches!(apple.apple_type, apple::Type::SpawnSnake(_) | apple::Type::SpawnRain) {
+                            apple.apple_type = food.clone();
                         }
                     });
                     self.apple_mesh = None;

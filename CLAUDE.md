@@ -9,7 +9,8 @@ single backend: **macroquad**.
 > dissolved into direct macroquad calls + `support/`. Snake coloring was moved to
 > the GPU (see [Snake coloring](#snake-coloring-shader-based)), and the snake was
 > reworked into a float-length model (see [Snake length model](#snake-length-model-snakemodrs)).
-> Current work (`game-modes` branch) is game modes and new apple types.
+> Current work (on `master`) is game modes and new apple types: Hunger mode
+> (`app/game_mode.rs`) is implemented and is currently the default.
 
 ## Build / run / test
 
@@ -65,9 +66,12 @@ macroquad's `KeyCode` passed straight through, then `next_frame().await`.
   - `fps_control.rs` — play/pause/game-over state, the world's per-frame
     time step (smoothed frame duration × global debug speed multiplier, stepped
     with `[` / `]`; `Game::update` splits fast frames into ticks of ≤ half a cell).
-  - `game_context.rs` (`GameContext`: cell_dim, board_dim, prefs, palette),
+  - `game_context.rs` (`GameContext`: cell_dim, board_dim, prefs, palette, mode),
+    `game_mode.rs` (`GameMode` — Classic / Hunger — and the `hunger` tuning
+    constants; `main.rs`'s `GAME_MODE` picks one, no selection UI yet),
     `prefs.rs` (`Prefs`; default draw_style = Smooth, grid+border on),
-    `stats.rs`, `message.rs` (macroquad text overlay), `palette.rs` (board/bg
+    `stats.rs` (the `S` overlay: polygons built this frame + the player's exact
+    `length`), `message.rs` (macroquad text overlay), `palette.rs` (board/bg
     colors, distinct from snake palette), `snake_management.rs` (advance, spawn,
     collisions, `outcome_at`), `border_hints.rs` (marks wrap-around edges by what the
     player would hit on the other side: recolored border stretches, or gradients
@@ -104,7 +108,7 @@ polyline for drawing/collision — the snake's length is **not** the segment
 count. Head and tail are independent; nothing pins them to cell boundaries.
 
 - **`length`** — *the conserved quantity*, the true length in cells (a float).
-  Changed only by explicit, capped growth (digestion; `grow`/`shrink` later) —
+  Changed only by digestion and length changes (see below) —
   never as a drifting difference of accumulators. Birth and death do **not**
   touch it; they only change how much of it is on the board.
 - **`head_fraction`** — the head's progress into its leading cell (0..1). A new
@@ -122,8 +126,19 @@ count. Head and tail are independent; nothing pins them to cell boundaries.
 - **Digestion:** an `Eaten { original_food, food_left }` tail segment is crossed
   at `1/(food+1)` speed, growing `length` by exactly `food` (capped by
   `food_left`, drift-free). Dying snakes keep digesting.
+- **Length changes (hunger mode):** `Grow`/`Shrink` apples push a `LengthChange`
+  (an amount eased out over a duration) and apple-eating snakes have a constant
+  `starvation` rate. Once the snake is all the way out, `Body::change_length`
+  moves `emerged` along with `length`, so the tail moves directly: growth faster
+  than the head pushes the tail *backwards*, and `advance` grows new segments
+  behind the last one, straight on along its `coming_from`. At
+  `hunger::MIN_LENGTH` the player becomes `State::Starved` (frozen like a crash,
+  game over); other snakes `die()`. Apples a tail grows over are moved elsewhere
+  (`relocate_covered_apples`); bad apples expire (`Apple::time_left`) and don't
+  count towards the apple limit.
 
-`advance(elapsed)` runs head-move → emerge → digest → pop-tail and returns
+`advance(elapsed, board_dim)` runs head-move → emerge → length changes → digest →
+pop-tail (or grow it backwards) and returns
 whether a cell boundary was crossed (→ caller invokes `advance_cell`). A dying
 head never reaches a boundary, so `advance_cell` panics for `Dying`. A snake is
 removed once `state == Dying && on_board() <= 0`.
@@ -257,10 +272,9 @@ passable** by construction; not every passable segment is marked.
   Reimplement as a hole opening/closing at the pinned end with the snake fading
   to black as it enters/leaves. Collision graphics (a crash effect) are a
   similar localized effect and want a shared approach.
-- **Grow / shrink animation** — apples that change `length` should animate the
-  change (eased) rather than snapping. Sketched as a single signed pending pool
-  released into `length` over several frames; growth is capped at head speed (the
-  tail can't reverse), shrink is capped by a max tail speed + a floor.
+- **Hunger mode follow-ups** — starving has no animation yet (the game just
+  freezes at `hunger::MIN_LENGTH`, `State::Starved`); a backing-up tail only goes
+  straight (no obstacle avoidance).
 - **Perf:** LUT texture is recreated every frame per snake — switch to in-place
   `Texture2D::update` when size is unchanged. Consider a single draw call for all
   snakes via a LUT atlas + per-vertex snake index.
@@ -269,8 +283,12 @@ passable** by construction; not every passable segment is marked.
   (fine for the single-player game; revisit for multi-snake).
 - **`uv.y` (across-width)** is emitted but unused — hook for tube/curvature
   shading later.
-- **Deferred features from the wasm port:** FPS/stats overlay, on-canvas buttons,
-  start screen, and the non-Game screens (to be HTML/JS page chrome).
+- **Deferred features from the wasm port:** on-canvas buttons, start screen, and
+  the non-Game screens (to be HTML/JS page chrome).
+- **Bad (shrink) apples, follow-ups:** the autopilot targets every apple
+  (`view/targets.rs`) — it should only seek good apples and avoid bad ones; border
+  hints report every apple as `Outcome::Apple` (green) — bad apples need their own
+  outcome/color.
 
 ## Deploy (separate, in progress)
 
@@ -278,3 +296,12 @@ Meant to be served at `games.gorilskij.com/hexsnake` behind a Cloudflare Worker
 reverse-proxy (each game its own Pages project; the Astro site is the landing).
 See `web/cf-build.sh` (Cloudflare Pages build: installs Rust, release-builds,
 stages wasm) and the `pub-website`/`test-website` branches.
+
+- **Branch flow:** work → `master` → merge into `test-website` (builds the
+  test.gorilskij.com version) → merge into `pub-website` (builds the
+  gorilskij.com version). Pages project `hex-snake`: production branch
+  `pub-website`, previews only for `test-website`; pushes to any other branch are
+  recorded as skipped deployments.
+- **Pages rejects files over 25 MiB.** The release profile keeps debuginfo (for
+  native profiling), so `cf-build.sh` builds with `CARGO_PROFILE_RELEASE_DEBUG=false`
+  (~1 MiB wasm instead of ~25 MiB).

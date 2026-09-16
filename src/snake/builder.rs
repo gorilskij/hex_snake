@@ -22,6 +22,8 @@ pub struct Builder {
     pub dir: Option<Dir>,
     pub len: Option<usize>,
     pub speed: Option<f32>,
+    /// How fast the snake shrinks on its own, in cells/s (hunger mode)
+    pub starvation: f32,
 
     pub palette: Option<PaletteTemplate>,
     pub controller: Option<snake_control::Template>,
@@ -101,6 +103,13 @@ impl Builder {
         self
     }
 
+    #[inline(always)]
+    #[must_use]
+    pub fn starvation(mut self, value: f32) -> Self {
+        self.starvation = value;
+        self
+    }
+
     pub fn build(&self) -> Result<Snake, BuilderError> {
         let pos = self
             .pos
@@ -143,6 +152,7 @@ impl Builder {
             length: len as f32,
             emerged: 0.0,
             swallowed: 0.0,
+            length_changes: vec![],
             turn_start: None,
             search_trace: None,
         };
@@ -158,6 +168,7 @@ impl Builder {
             speed: self
                 .speed
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "missing field `speed`"))?,
+            starvation: self.starvation,
             body,
             state: State::Living,
             dir_updated: false,
