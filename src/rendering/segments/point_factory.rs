@@ -36,6 +36,28 @@ impl SegmentDescription {
         }
     }
 
+    /// The inverse of [`board_transform`](Self::board_transform): takes a board
+    /// point into this segment's default orientation. All three steps are
+    /// isometries, so distances are the same in either space — which lets a
+    /// distance query run against the default-orientation geometry directly.
+    pub fn inverse_board_transform(&self) -> impl Fn(Point) -> Point {
+        let flip = self.is_flipped();
+        let center = self.cell_dim.center();
+        let rotation_angle = Dir::U.clockwise_angle_to(self.turn.coming_from);
+        let dest = self.destination;
+
+        move |q: Point| {
+            let mut p = q - dest;
+            if rotation_angle != 0. {
+                p = p.rotate_counterclockwise(center, rotation_angle);
+            }
+            if flip {
+                p.x = 2. * center.x - p.x;
+            }
+            p
+        }
+    }
+
     /// Maps a segment-local fraction to the global body coordinate `uv.x`.
     /// Body coordinate runs head→tail. The head-side of a segment is at
     /// frac == 1, so its head→tail offset is (1 - frac); the global coordinate

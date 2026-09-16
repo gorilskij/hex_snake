@@ -12,9 +12,11 @@ use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, occupied_or_near_players, random_free_spot};
 use crate::basic::{Dir, HexPoint};
+use crate::rendering;
+use crate::rendering::segments::centerline::Centerline;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
-use crate::snake::{self, LengthChange, SegmentType, State};
+use crate::snake::{self, LengthChange, SegmentType, Snake, State};
 use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
 
@@ -39,46 +41,94 @@ pub enum Collision {
     Portal(portal::Behavior),
 }
 
+/// Apples are eaten by whichever cell the head is in, and snakes collide by
+/// whatever the draw style says. The two are decided independently, so a head
+/// can reach an apple and hit something in the same tick.
 pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
     let mut collisions = vec![];
 
-    for (snake1_index, snake1) in env
-        .snakes
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying | State::Starved))
-    {
-        let pos = snake1.head().pos;
-
-        // snakes and apples cannot overlap
-        if let Some(apple_index) = env.apples.iter().position(|apple| apple.pos == pos) {
-            collisions.push(Collision::Apple {
-                snake_index: snake1_index,
-                apple_index,
-            });
-            continue;
-        }
-
-        // several segments can share a cell (one snake passing over another):
-        // the worst of them is what happens
-        let worst = segments_at(env, snake1_index, pos).max_by_key(|&(_, _, outcome)| outcome);
-        if let Some((snake2_index, segment_idx, _)) = worst {
-            collisions.push(if snake2_index == snake1_index {
-                Collision::Itself {
-                    snake_index: snake1_index,
-                    snake_segment_index: segment_idx,
-                }
-            } else {
-                Collision::Snake {
-                    snake1_index,
-                    snake2_index,
-                    snake2_segment_index: segment_idx,
-                }
-            });
+    for (snake_index, snake) in living_snakes(env) {
+        if let Some(apple_index) = env.apples.iter().position(|apple| apple.pos == snake.head().pos) {
+            collisions.push(Collision::Apple { snake_index, apple_index });
         }
     }
 
+    match env.gtx.prefs.draw_style {
+        // hexagon segments fill their whole cell, so there cells *are* the shape
+        rendering::Style::Hexagon => cell_snake_collisions(env, &mut collisions),
+        rendering::Style::Smooth => drawn_snake_collisions(env, &mut collisions),
+    }
+
     collisions
+}
+
+fn living_snakes<'a, Rng>(env: &'a Environment<Rng>) -> impl Iterator<Item = (usize, &'a Snake)> + 'a {
+    env.snakes
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying | State::Starved))
+}
+
+fn collision(snake1_index: usize, snake2_index: usize, snake2_segment_index: usize) -> Collision {
+    if snake1_index == snake2_index {
+        Collision::Itself {
+            snake_index: snake1_index,
+            snake_segment_index: snake2_segment_index,
+        }
+    } else {
+        Collision::Snake {
+            snake1_index,
+            snake2_index,
+            snake2_segment_index,
+        }
+    }
+}
+
+/// A head collides with whatever shares its cell.
+fn cell_snake_collisions<Rng>(env: &Environment<Rng>, collisions: &mut Vec<Collision>) {
+    for (snake1_index, snake1) in living_snakes(env) {
+        // several segments can share a cell (one snake passing over another):
+        // the worst of them is what happens
+        let worst = segments_at(env, snake1_index, snake1.head().pos).max_by_key(|&(_, _, outcome)| outcome);
+        if let Some((snake2_index, segment_idx, _)) = worst {
+            collisions.push(collision(snake1_index, snake2_index, segment_idx));
+        }
+    }
+}
+
+/// The head's cell still decides *what* it runs into and what that does — a
+/// head only ever interacts with what shares its cell, exactly as before. All
+/// geometry adds is a veto: candidates whose drawn flesh the head does not
+/// actually reach are dropped, so a head no longer crashes into a tail that has
+/// already receded out of the way.
+///
+/// A snake is the `side/2` neighborhood of its centerline (see [`Centerline`]),
+/// so the head's cap touches a segment when it comes within the sum of the two
+/// half-widths of that segment's centerline.
+fn drawn_snake_collisions<Rng>(env: &Environment<Rng>, collisions: &mut Vec<Collision>) {
+    let centerlines: Vec<Centerline> = env
+        .snakes
+        .iter()
+        .map(|snake| Centerline::of(&snake.body, &env.gtx))
+        .collect();
+
+    for (snake1_index, snake1) in living_snakes(env) {
+        let head = &centerlines[snake1_index];
+        let Some(probe) = head.head_base() else { continue };
+
+        let worst = segments_at(env, snake1_index, snake1.head().pos)
+            .filter(|&(snake2_index, segment_index, _)| {
+                let other = &centerlines[snake2_index];
+                other
+                    .distance_to(segment_index, probe)
+                    .is_some_and(|distance| distance <= head.cap_radius + other.half_width)
+            })
+            .max_by_key(|&(_, _, outcome)| outcome);
+
+        if let Some((snake2_index, segment_index, _)) = worst {
+            collisions.push(collision(snake1_index, snake2_index, segment_index));
+        }
+    }
 }
 
 /// What would happen to a snake whose head entered a cell, in increasing order
@@ -108,8 +158,6 @@ fn segments_at<Rng>(
     snake_index: usize,
     pos: HexPoint,
 ) -> impl Iterator<Item = (usize, usize, Outcome)> + '_ {
-    use EatBehavior::*;
-
     let snake = &env.snakes[snake_index];
     env.snakes.iter().enumerate().flat_map(move |(other_index, other)| {
         let itself = other_index == snake_index;
@@ -122,21 +170,35 @@ fn segments_at<Rng>(
             .skip(itself as usize)
             .filter(move |(_, segment)| segment.pos == pos)
             .map(move |(segment_index, segment)| {
-                let behavior = if itself {
-                    snake.eat_mechanics.eat_self(segment.segment_type)
-                } else {
-                    snake.eat_mechanics.eat_other(other.snake_type, segment.segment_type)
-                };
-                let outcome = match behavior {
-                    Crash | Die => Outcome::Crash,
-                    // cutting another snake at its head kills both
-                    Cut if !itself && segment_index == 0 => Outcome::Crash,
-                    Cut => Outcome::Cut,
-                    PassUnder | PassOver => Outcome::Pass,
-                };
+                let outcome = outcome_for(snake, other, itself, segment_index, segment.segment_type);
                 (other_index, segment_index, outcome)
             })
     })
+}
+
+/// What happens to `snake` when its head runs into segment `segment_index` of
+/// `other`.
+fn outcome_for(
+    snake: &Snake,
+    other: &Snake,
+    itself: bool,
+    segment_index: usize,
+    segment_type: SegmentType,
+) -> Outcome {
+    use EatBehavior::*;
+
+    let behavior = if itself {
+        snake.eat_mechanics.eat_self(segment_type)
+    } else {
+        snake.eat_mechanics.eat_other(other.snake_type, segment_type)
+    };
+    match behavior {
+        Crash | Die => Outcome::Crash,
+        // cutting another snake at its head kills both
+        Cut if !itself && segment_index == 0 => Outcome::Crash,
+        Cut => Outcome::Cut,
+        PassUnder | PassOver => Outcome::Pass,
+    }
 }
 
 /// Apply the effect of every apple collision and remove the eaten apples.
