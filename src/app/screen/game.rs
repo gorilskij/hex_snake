@@ -445,7 +445,7 @@ impl Screen for Game {
         // border stretches right on top of the border
         let (gradient_hint_mesh, border_hint_mesh) = match hint_style {
             HintStyle::Gradient => (hint_mesh, None),
-            HintStyle::Border | HintStyle::None => (None, hint_mesh),
+            HintStyle::Border | HintStyle::Teleport | HintStyle::None => (None, hint_mesh),
         };
 
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
@@ -575,6 +575,7 @@ impl Screen for Game {
                 let text = match prefs.hint_style.rotate_next() {
                     HintStyle::Border => "Border hints",
                     HintStyle::Gradient => "Gradient hints",
+                    HintStyle::Teleport => "Teleport hints",
                     HintStyle::None => "Hints off",
                 };
                 // start the new style fresh rather than fading from the old one's colors

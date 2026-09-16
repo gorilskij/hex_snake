@@ -74,9 +74,12 @@ macroquad's `KeyCode` passed straight through, then `next_frame().await`.
     `length`), `message.rs` (macroquad text overlay), `palette.rs` (board/bg
     colors, distinct from snake palette), `snake_management.rs` (advance, spawn,
     collisions — see [Collision](#collision-appsnake_managementrs) — and
-    `outcome_at`), `border_hints.rs` (marks wrap-around edges by what the
-    player would hit on the other side: recolored border stretches, or gradients
-    into the cell — `HintStyle`, `H` cycles border/gradient/off), `distance_grid.rs`,
+    `outcome_at`), `border_hints.rs` (marks wrap-around edges —
+    by what the player would hit on the other side, as recolored border
+    stretches or gradients into the cell; or by where the head would come out,
+    recoloring both ends of each wrap it could reach (one per direction) and
+    growing a triangle inwards from the arrival end as it closes.
+    `HintStyle`, `H` cycles border/gradient/teleport/off), `distance_grid.rs`,
     `portal/`, `board_dim.rs`.
   - `screen/{start_screen,snake_control_creator_screen,debug_scenario}.rs` — **out
     of the module tree** (not compiled); page chrome to be done in HTML/JS later.
