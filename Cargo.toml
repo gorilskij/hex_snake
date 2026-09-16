@@ -1,5 +1,5 @@
 [package]
-name = "hex_snake"
+name = "hex-snake"
 version = "0.1.0"
 authors = ["gorilskij <43991400@users.noreply.github.com>"]
 edition = "2021"
@@ -28,4 +28,3 @@ enum-map-lite = "0.2.0"
 
 [profile.release]
 debug = true
-opt-level = 2
