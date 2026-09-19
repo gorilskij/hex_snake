@@ -459,7 +459,7 @@ impl Screen for StartScreen {
         // only the options that are preferences: the others belong to a game
         let options: Vec<_> = Toggle::PREFS
             .iter()
-            .map(|&toggle| (toggle, toggle.label(&self.prefs)))
+            .map(|&toggle| vec![(toggle, toggle.label(&self.prefs))])
             .collect();
         self.menu.draw(&options, false, &mut self.prefs);
 

@@ -354,15 +354,14 @@ impl Game {
             crate::color::WHITE
         };
 
-        self.messages.insert(
-            MessageID::Fps,
-            Message::default(
-                format!("fps: {graphics_fps:.2}"),
-                message::Position::TopLeft,
-                color,
-                None,
-            ),
+        let mut message = Message::default(
+            format!("fps: {graphics_fps:.2}"),
+            message::Position::TopLeft,
+            color,
+            None,
         );
+        message.background = true;
+        self.messages.insert(MessageID::Fps, message);
     }
 
     fn first_player_snake_idx(&self) -> Option<usize> {
@@ -374,17 +373,16 @@ impl Game {
 }
 
 impl Game {
-    /// The options menu's toggles, top to bottom (special apples and the
-    /// distance grid are debug keys)
-    const MENU: [Toggle; 8] = [
-        Toggle::DrawStyle,
-        Toggle::Grid,
-        Toggle::Border,
-        Toggle::Hints,
-        Toggle::Autopilot,
-        Toggle::PlayerPath,
-        Toggle::Stats,
-        Toggle::Fps,
+    /// The options menu's toggles, a line at a time, top to bottom (special
+    /// apples and the distance grid are debug keys)
+    const MENU: &[&[Toggle]] = &[
+        &[Toggle::DrawStyle],
+        &[Toggle::Grid],
+        &[Toggle::Border],
+        &[Toggle::Hints],
+        &[Toggle::Autopilot, Toggle::PlayerPath],
+        &[Toggle::Stats],
+        &[Toggle::Fps],
     ];
 
     /// Open the options menu, pausing the game
@@ -418,9 +416,9 @@ impl Game {
 
     /// Draw the open menu over the game and act on a click
     fn draw_menu(&mut self) {
-        let options: Vec<_> = Self::MENU
+        let options: Vec<Vec<_>> = Self::MENU
             .iter()
-            .map(|&toggle| (toggle, self.toggle_label(toggle)))
+            .map(|line| line.iter().map(|&toggle| (toggle, self.toggle_label(toggle))).collect())
             .collect();
         if let Some(event) = self.menu.draw(&options, true, &mut self.env.gtx.prefs) {
             self.on_menu_event(event);

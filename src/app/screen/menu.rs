@@ -229,10 +229,11 @@ impl Menu {
     }
 
     /// Draw the open menu screen and act on a click. `options` are the
-    /// options menu's toggles with their labels, top to bottom; `in_game`
+    /// options menu's toggles with their labels, a line (of one or more) at a
+    /// time, top to bottom; `in_game`
     /// adds Restart and Main menu below them. The caller must have set the
     /// default (screen-space) camera.
-    pub fn draw(&mut self, options: &[(Toggle, String)], in_game: bool, prefs: &mut Prefs) -> Option<MenuEvent> {
+    pub fn draw(&mut self, options: &[Vec<(Toggle, String)>], in_game: bool, prefs: &mut Prefs) -> Option<MenuEvent> {
         match self {
             Menu::Closed => {}
             Menu::Options { scroll } => {
@@ -247,9 +248,9 @@ impl Menu {
                 entries.push((Entry::Controls, "Controls".to_string()));
                 lines.push(Line::Buttons(vec!["Controls".to_string()]));
                 lines.push(Line::Gap);
-                for (toggle, label) in options {
-                    entries.push((Entry::Toggle(*toggle), label.clone()));
-                    lines.push(Line::Buttons(vec![label.clone()]));
+                for line in options {
+                    entries.extend(line.iter().map(|(toggle, label)| (Entry::Toggle(*toggle), label.clone())));
+                    lines.push(Line::Buttons(line.iter().map(|(_, label)| label.clone()).collect()));
                 }
 
                 match options_menu::draw(&lines, scroll).map(|i| entries[i].0) {
