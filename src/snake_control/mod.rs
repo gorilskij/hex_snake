@@ -62,6 +62,16 @@ pub trait Controller {
 
     fn key_pressed(&mut self, _key: KeyCode) {}
 
+    /// For controllers that follow a repeating schedule: how many cells into
+    /// the current cycle they are.
+    fn schedule_position(&self) -> Option<usize> {
+        None
+    }
+
+    /// Jump to `position` cells into the schedule (wrapped to one cycle), as
+    /// if the controller had been stepped that many times from the start.
+    fn set_schedule_position(&mut self, _position: usize) {}
+
     // TODO: deprecate
     fn knowledge(&self) -> Option<&Knowledge> {
         None
@@ -169,12 +179,7 @@ impl Template {
                 Box::new(Keyboard::new(control_setup, start_dir, knowledge))
             }
             Template::Mouse => Box::new(Mouse),
-            Template::Programmed(move_sequence) => Box::new(Programmed {
-                move_sequence,
-                dir: start_dir,
-                next_move_idx: 0,
-                wait: 0,
-            }),
+            Template::Programmed(move_sequence) => Box::new(Programmed::new(move_sequence, start_dir)),
             Template::Killer => Box::new(Killer),
             Template::AppleSeeker(template) => Box::new(AppleSeeker {
                 pathfinder: template.into_pathfinder(start_dir),

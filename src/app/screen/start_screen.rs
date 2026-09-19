@@ -27,7 +27,7 @@ use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape, ShapePoints, TriangleArrowLeft, WideHexagon};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
-use crate::snake::{self, PaletteTemplate};
+use crate::snake::{self, PaletteTemplate, Snake};
 use crate::snake_control::Template;
 use crate::support::material::snake_material;
 use crate::support::mesh::set_board_camera;
@@ -172,6 +172,32 @@ impl SnakeDemo {
         self.env.snakes[0].palette = self.palette().into();
     }
 
+    fn snake(&self) -> &Snake {
+        &self.env.snakes[0]
+    }
+
+    fn snake_mut(&mut self) -> &mut Snake {
+        &mut self.env.snakes[0]
+    }
+
+    /// Put this demo's snake `offset` cells ahead of `leader`'s in its move
+    /// schedule. Only the schedule moves: the snake's body stays where it is.
+    fn sync_schedule(&mut self, leader: &SnakeDemo, offset: usize) {
+        let position = leader.snake().controller.schedule_position().unwrap_or(0);
+        self.snake_mut().controller.set_schedule_position(position + offset);
+    }
+
+    /// Take over `leader`'s progress through its current cell and its speed.
+    /// Called before both advance by the same time, so they cross cell
+    /// boundaries on the same frame and can't drift apart, whatever paths
+    /// their schedules trace.
+    fn follow(&mut self, leader: &SnakeDemo) {
+        let (head_fraction, speed) = (leader.snake().body.head_fraction, leader.snake().speed);
+        let snake = self.snake_mut();
+        snake.body.head_fraction = head_fraction;
+        snake.speed = speed;
+    }
+
     fn update(&mut self, elapsed: Duration) {
         advance_snakes(&mut self.env, elapsed);
         update_snake_dirs(&mut self.env);
@@ -245,10 +271,16 @@ impl StartScreen {
             .map(|text| button(&players_shape, text))
             .collect();
 
-        let demos = seeds
+        let mut demos: Vec<SnakeDemo> = seeds
             .iter()
             .map(|_| SnakeDemo::new(CellDim::from(20.), Point::zero(), palette.clone()))
             .collect();
+        // all demos run the same schedule in step
+        if let Some((leader, followers)) = demos.split_first_mut() {
+            for follower in followers {
+                follower.sync_schedule(leader, 0);
+            }
+        }
 
         show_mouse(true);
 
@@ -316,9 +348,16 @@ impl Screen for StartScreen {
     fn update(&mut self) -> Result<()> {
         // capped so a stalled frame doesn't send the snakes flying
         let elapsed = Duration::from_secs_f32(get_frame_time().min(0.1));
-        let players = self.players();
-        for demo in &mut self.demos[..players] {
-            demo.update(elapsed);
+
+        // Hidden demos keep moving too, so a player's demo is already in step
+        // when it appears. The first demo leads; the others follow its timing.
+        let (leader, followers) = self.demos.split_first_mut().expect("at least one demo");
+        for follower in followers.iter_mut() {
+            follower.follow(leader);
+        }
+        leader.update(elapsed);
+        for follower in followers {
+            follower.update(elapsed);
         }
         Ok(())
     }
