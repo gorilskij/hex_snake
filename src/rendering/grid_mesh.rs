@@ -9,7 +9,8 @@ use crate::support::mesh::{build_circle, build_line, build_polyline, DrawMode, M
 // TODO: add option to exclude border from grid mesh
 //  when border is drawn separately
 pub fn grid_mesh(gtx: &GameContext) -> Result<Mesh> {
-    let CellDim { side, sin, cos } = gtx.cell_dim;
+    let CellDim { side, cos, .. } = gtx.cell_dim;
+    let (width, height) = (gtx.cell_dim.width(), gtx.cell_dim.height());
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
     // two kinds of alternating vertical lines
@@ -18,11 +19,11 @@ pub fn grid_mesh(gtx: &GameContext) -> Result<Mesh> {
     let mut vline_b = Vec::with_capacity(cap); // lines that start from the top with \
 
     #[rustfmt::skip]
-    for dv in (0..=board_v).map(|v| v as f32 * 2. * sin) {
+    for dv in (0..=board_v).map(|v| v as f32 * height) {
         vline_a.push(Point { x: cos, y: dv });
-        vline_a.push(Point { x: 0., y: dv + sin });
+        vline_a.push(Point { x: 0., y: dv + height / 2. });
         vline_b.push(Point { x: cos + side, y: dv });
-        vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
+        vline_b.push(Point { x: width, y: dv + height / 2. });
     }
 
     let mut parts: Vec<Mesh> = vec![];
@@ -45,7 +46,7 @@ pub fn grid_mesh(gtx: &GameContext) -> Result<Mesh> {
         let dh = h as f32 * 2. * (side + cos);
 
         for v in 0..=board_v {
-            let dv = v as f32 * 2. * sin;
+            let dv = v as f32 * height;
 
             // line between a and b
             parts.push(build_line(
@@ -61,8 +62,8 @@ pub fn grid_mesh(gtx: &GameContext) -> Result<Mesh> {
             if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
                 parts.push(build_line(
                     #[rustfmt::skip] &[
-                        Point { x: 2. * cos + side + dh, y: sin + dv },
-                        Point { x: 2. * cos + 2. * side + dh, y: sin + dv },
+                        Point { x: width + dh, y: height / 2. + dv },
+                        Point { x: width + side + dh, y: height / 2. + dv },
                     ],
                     gtx.palette.grid_thickness,
                     color,
@@ -83,7 +84,8 @@ pub fn grid_mesh(gtx: &GameContext) -> Result<Mesh> {
 }
 
 pub fn grid_dot_mesh(gtx: &GameContext) -> Result<Mesh> {
-    let CellDim { side, sin, cos } = gtx.cell_dim;
+    let CellDim { side, cos, .. } = gtx.cell_dim;
+    let (width, height) = (gtx.cell_dim.width(), gtx.cell_dim.height());
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
     let draw_mode = DrawMode::fill();
@@ -97,20 +99,17 @@ pub fn grid_dot_mesh(gtx: &GameContext) -> Result<Mesh> {
         let dh = h as f32 * 2. * (side + cos);
 
         for v in 0..=board_v {
-            let dv = v as f32 * 2. * sin;
+            let dv = v as f32 * height;
 
             circle(Point { x: cos + dh, y: dv });
             circle(Point { x: cos + side + dh, y: dv });
 
             // line between b and a
             if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
+                circle(Point { x: width + dh, y: height / 2. + dv });
                 circle(Point {
-                    x: 2. * cos + side + dh,
-                    y: sin + dv,
-                });
-                circle(Point {
-                    x: 2. * cos + 2. * side + dh,
-                    y: sin + dv,
+                    x: width + side + dh,
+                    y: height / 2. + dv,
                 });
             }
         }
@@ -119,7 +118,8 @@ pub fn grid_dot_mesh(gtx: &GameContext) -> Result<Mesh> {
 }
 
 pub fn border_mesh(gtx: &GameContext) -> Result<Mesh> {
-    let CellDim { side, sin, cos } = gtx.cell_dim;
+    let CellDim { side, cos, .. } = gtx.cell_dim;
+    let (width, height) = (gtx.cell_dim.width(), gtx.cell_dim.height());
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
     // two kinds of alternating vertical lines
@@ -128,11 +128,11 @@ pub fn border_mesh(gtx: &GameContext) -> Result<Mesh> {
     let mut vline_b = Vec::with_capacity(cap); // lines that start from the top with \
 
     #[rustfmt::skip]
-    for dv in (0..=board_v).map(|v| v as f32 * 2. * sin) {
+    for dv in (0..=board_v).map(|v| v as f32 * height) {
         vline_a.push(Point { x: cos, y: dv });
-        vline_a.push(Point { x: 0., y: dv + sin });
+        vline_a.push(Point { x: 0., y: dv + height / 2. });
         vline_b.push(Point { x: cos + side, y: dv });
-        vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
+        vline_b.push(Point { x: width, y: dv + height / 2. });
     }
 
     let mut parts: Vec<Mesh> = vec![];
@@ -160,10 +160,10 @@ pub fn border_mesh(gtx: &GameContext) -> Result<Mesh> {
         let dh = 2. * (side + cos) * h as f32;
         hline.push(Point { x: dh + cos, y: 0. });
         hline.push(Point { x: dh + side + cos, y: 0. });
-        hline.push(Point { x: dh + side + 2. * cos, y: sin });
+        hline.push(Point { x: dh + width, y: height / 2. });
         hline.push(Point {
-            x: dh + 2. * side + 2. * cos,
-            y: sin,
+            x: dh + width + side,
+            y: height / 2.,
         });
     }
     if board_h.is_odd() {
@@ -177,7 +177,7 @@ pub fn border_mesh(gtx: &GameContext) -> Result<Mesh> {
 
     // bottom border
     // shift hline
-    let offset = board_v as f32 * 2. * sin;
+    let offset = board_v as f32 * height;
     hline.iter_mut().for_each(|p| p.y += offset);
     parts.push(build_polyline(draw_mode, &hline, color));
 

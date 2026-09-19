@@ -15,15 +15,16 @@ const PLAYER_HEAD_NO_SPAWN_RADIUS: usize = 7;
 /// cells either side of the wrap are a whole board apart in board coordinates
 /// but one step apart on the board.
 pub fn cartesian_step(dir: Dir, cell_dim: CellDim) -> Point {
-    let CellDim { side, sin, cos } = cell_dim;
+    let CellDim { side, cos, .. } = cell_dim;
+    let h = cell_dim.height();
     let dx = side + cos;
     match dir {
-        Dir::U => Point { x: 0., y: -2. * sin },
-        Dir::D => Point { x: 0., y: 2. * sin },
-        Dir::Ur => Point { x: dx, y: -sin },
-        Dir::Ul => Point { x: -dx, y: -sin },
-        Dir::Dr => Point { x: dx, y: sin },
-        Dir::Dl => Point { x: -dx, y: sin },
+        Dir::U => Point { x: 0., y: -h },
+        Dir::D => Point { x: 0., y: h },
+        Dir::Ur => Point { x: dx, y: -h / 2. },
+        Dir::Ul => Point { x: -dx, y: -h / 2. },
+        Dir::Dr => Point { x: dx, y: h / 2. },
+        Dir::Dl => Point { x: -dx, y: h / 2. },
     }
 }
 

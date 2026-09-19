@@ -18,18 +18,6 @@ pub enum Type {
     SpawnRain,
 }
 
-impl Type {
-    pub fn is_animated(&self) -> bool {
-        // TODO: a) check if this is still relevant, b) make this dependent on palette
-        true
-        // match self {
-        //     Type::Grow(_) => false,
-        //     Type::SpawnSnake(_) => true,
-        //     Type::SpawnRain => true,
-        // }
-    }
-}
-
 #[derive(Clone)]
 pub struct Apple {
     pub pos: HexPoint,

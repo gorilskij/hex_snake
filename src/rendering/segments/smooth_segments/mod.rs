@@ -86,7 +86,7 @@ pub fn arc_params(description: &SegmentDescription) -> Option<ArcParams> {
         TurnType::Sharp(_) => {}
     }
 
-    let CellDim { side, sin, cos } = description.cell_dim;
+    let CellDim { side, cos, .. } = description.cell_dim;
 
     // distance of the pivot from where it is for a sharp turn
     let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
@@ -103,8 +103,8 @@ pub fn arc_params(description: &SegmentDescription) -> Option<ArcParams> {
     let total_angle = if (turn_fraction - 1.).abs() < f32::EPSILON {
         TAU / 3.
     } else {
-        let p0 = Point { x: cos + side / 2., y: sin };
-        let r0 = ((side / 2.).powi(2) + sin.powi(2)).sqrt();
+        let p0 = description.cell_dim.center();
+        let r0 = (side / 2.).hypot(description.cell_dim.height() / 2.);
         let intersection_point = upper_intersection_point(p0, r0, pivot, outer_radius);
         if intersection_point.x <= pivot.x {
             (intersection_point.y / (pivot.x - intersection_point.x)).atan()

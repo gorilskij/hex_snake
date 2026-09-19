@@ -343,7 +343,6 @@ impl Snake {
             State::Living => {
                 self.body.head_fraction += delta;
                 if self.body.head_fraction >= 1.0 {
-                    // TODO: might need to do multiple calls to advance_cell at high speeds
                     assert!(self.body.head_fraction < 2.0);
                     self.body.head_fraction -= 1.0;
                     self.dir_updated = false;

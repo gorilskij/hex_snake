@@ -21,7 +21,6 @@ pub fn player_path_mesh(
     stats: &mut Stats,
 ) -> Option<Result<Mesh>> {
     let autopilot = player_snake.autopilot.as_mut()?;
-    // TODO: this conversion is too expensive
     let knowledge = Knowledge::accurate(&player_snake.eat_mechanics);
     let path = autopilot.get_path(&player_snake.body, Some(&knowledge), &other_snakes, apples, gtx)?;
 

@@ -27,9 +27,8 @@ fn rough_direction(
     board_dim: HexDim,
 ) -> Option<Dir> {
     // dy is scaled to convert from 'hex' coordinates to approximate cartesian coordinates
-    let CellDim { sin, .. } = CellDim::from(1.);
     let dx = (to.h - from.h) as f32;
-    let dy = -(to.v - from.v) as f32 / (2. * sin);
+    let dy = -(to.v - from.v) as f32 / CellDim::from(1.).height();
     let angle = (dy.atan2(dx) + TAU) % TAU;
 
     let head_pos = body.segments[0].pos;

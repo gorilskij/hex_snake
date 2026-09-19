@@ -30,12 +30,11 @@ impl From<f32> for CellDim {
 impl CellDim {
     pub const fn center(self) -> Point {
         Point {
-            x: self.cos + self.side / 2.,
-            y: self.sin,
+            x: self.width() / 2.,
+            y: self.height() / 2.,
         }
     }
 
-    // TODO: replace manual calculations with these functions everywhere
     /// The difference between the minimum x value and the maximum x value in the hexagon
     #[inline(always)]
     pub const fn width(self) -> f32 {

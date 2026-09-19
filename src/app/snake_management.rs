@@ -25,7 +25,6 @@ pub enum Collision {
         snake_index: usize,
         apple_index: usize,
     },
-    // TODO: implement separate head-head collision mechanism
     // head of snake1 collided with head or body of snake2
     Snake {
         snake1_index: usize,

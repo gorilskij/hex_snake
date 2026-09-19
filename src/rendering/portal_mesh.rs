@@ -8,19 +8,18 @@ use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::rendering::shape::ShapePoints;
 use crate::support::mesh::{build_line, Mesh};
 
-pub fn render_hexagon_edge(dir: Dir, CellDim { side, sin, cos }: CellDim) -> ShapePoints {
+pub fn render_hexagon_edge(dir: Dir, cell_dim: CellDim) -> ShapePoints {
+    let CellDim { side, cos, .. } = cell_dim;
+    let (w, h) = (cell_dim.width(), cell_dim.height());
     use Dir::*;
     let points = match dir {
         // counterclockwise order
-        D => vec![Point { x: cos + side, y: sin * 2. }, Point { x: cos, y: sin * 2. }],
-        Dr => vec![
-            Point { x: cos * 2. + side, y: sin },
-            Point { x: cos + side, y: sin * 2. },
-        ],
-        Ur => vec![Point { x: cos + side, y: 0. }, Point { x: cos * 2. + side, y: sin }],
+        D => vec![Point { x: cos + side, y: h }, Point { x: cos, y: h }],
+        Dr => vec![Point { x: w, y: h / 2. }, Point { x: cos + side, y: h }],
+        Ur => vec![Point { x: cos + side, y: 0. }, Point { x: w, y: h / 2. }],
         U => vec![Point { x: cos, y: 0. }, Point { x: cos + side, y: 0. }],
-        Ul => vec![Point { x: 0., y: sin }, Point { x: cos, y: 0. }],
-        Dl => vec![Point { x: cos, y: sin * 2. }, Point { x: 0., y: sin }],
+        Ul => vec![Point { x: 0., y: h / 2. }, Point { x: cos, y: 0. }],
+        Dl => vec![Point { x: cos, y: h }, Point { x: 0., y: h / 2. }],
     };
     ShapePoints::from(points)
 }

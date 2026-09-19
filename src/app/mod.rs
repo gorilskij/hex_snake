@@ -1,5 +1,3 @@
-// TODO: move this to rendering
-
 pub use palette::Palette;
 
 mod border_hints;

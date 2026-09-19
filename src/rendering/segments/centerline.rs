@@ -172,9 +172,8 @@ fn distance_to_centerline(desc: &SegmentDescription, fraction: SegmentFraction, 
             }
         }
         None => {
-            let CellDim { side, cos, .. } = desc.cell_dim;
             let height = desc.cell_dim.height();
-            let x = cos + side / 2.;
+            let x = desc.cell_dim.width() / 2.;
             let y = q.y.clamp(fraction.start * height, fraction.end * height);
             (q - Point { x, y }).magnitude()
         }

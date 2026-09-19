@@ -27,9 +27,8 @@ impl Controller for Mouse {
         let current = body.segments[0].pos;
 
         // actual cell_dim doesn't matter, scaling preserves angles
-        let CellDim { sin, .. } = CellDim::from(1.);
         let dx = (target.h - current.h) as f32;
-        let dy = -(target.v - current.v) as f32 / (2. * sin);
+        let dy = -(target.v - current.v) as f32 / CellDim::from(1.).height();
         let angle = (dy.atan2(dx) + TAU) % TAU;
         Dir::closest_to_angle(angle).into_iter().find(|dir| *dir != -body.dir)
     }
