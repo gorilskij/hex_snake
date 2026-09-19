@@ -115,7 +115,13 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
     .collect()
 }
 
-fn generate_mesh(iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>, gtx: &GameContext) -> Mesh {
+/// `fade` runs from 0 (show the first distance of each triple) to 1 (the
+/// second).
+fn generate_mesh(
+    iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
+    fade: f32,
+    gtx: &GameContext,
+) -> Mesh {
     // not actually max distance but a good estimate, anything
     // higher gets the same color
     let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
@@ -146,10 +152,7 @@ fn generate_mesh(iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance
             Some(d) => calculate_color(d),
         };
 
-        // TODO: think about it
-        // let frame_frac = ftx.last_graphics_update.1;
-        // let color = lerp(color_a, color_b, frame_frac);
-        let color = color_a;
+        let color = lerp(color_a, color_b, fade);
 
         let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
         build_polygon(DrawMode::fill(), &hexagon, color)
@@ -160,7 +163,8 @@ fn generate_mesh(iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance
 pub struct DistanceGrid {
     last: Option<GridData>,
     current: Option<GridData>,
-    last_update: usize, // frame
+    /// The cell `current` was measured from.
+    measured_from: Option<HexPoint>,
 }
 
 impl DistanceGrid {
@@ -168,36 +172,37 @@ impl DistanceGrid {
         Self {
             last: None,
             current: None,
-            last_update: 0,
+            measured_from: None,
         }
     }
 
     // TODO: move to rendering module
     pub fn mesh(&mut self, player_snake: &Snake, other_snakes: impl Snakes, gtx: &GameContext) -> Mesh {
-        // TODO: think about it
-        // if self.current.is_none() || ftx.game_frame_num > self.last_update {
-        //     self.last_update = ftx.game_frame_num;
-        //     self.last = self
-        //         .current
-        //         .replace(find_distances(player_snake, other_snakes, gtx.board_dim));
-        // }
+        // Distances are measured from the head's cell, so they only change when
+        // the head reaches a new one. In between, the colors fade from the
+        // previous map to the new one as the head crosses its cell.
+        let head = player_snake.head().pos;
+        if self.current.is_none() || self.measured_from != Some(head) {
+            self.measured_from = Some(head);
+            self.last = self
+                .current
+                .replace(find_distances(player_snake, other_snakes, gtx.board_dim));
+        }
+        let current = self.current.as_ref().expect("measured just above");
+        let fade = player_snake.body.head_fraction;
 
-        match &self.current {
-            None => unreachable!(),
-            Some(current) => match &self.last {
-                None => {
-                    // TODO: this is a terrible hack, rewrite this
-                    generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), gtx)
-                }
-                Some(last) => {
-                    // let frame_frac = gtx.frame_stamp.1;
-                    let iter = last.iter().map(|(pos, &dist_a)| {
-                        let dist_b = current.get(pos).copied();
-                        (*pos, dist_a, dist_b)
-                    });
-                    generate_mesh(iter, gtx)
-                }
-            },
+        match &self.last {
+            None => {
+                // TODO: this is a terrible hack, rewrite this
+                generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), fade, gtx)
+            }
+            Some(last) => {
+                let iter = last.iter().map(|(pos, &dist_a)| {
+                    let dist_b = current.get(pos).copied();
+                    (*pos, dist_a, dist_b)
+                });
+                generate_mesh(iter, fade, gtx)
+            }
         }
     }
 
