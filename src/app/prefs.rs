@@ -28,6 +28,9 @@ pub enum HintStyle {
     Border,
     /// A gradient fading from the edge into its cell
     Gradient,
+    /// Where the head would come out if it teleported: the exit edges thicken
+    /// and tint, the closer the head is to being able to use them
+    Teleport,
     None,
 }
 
@@ -106,6 +109,7 @@ mod names {
         match value {
             HintStyle::Border => "border",
             HintStyle::Gradient => "gradient",
+            HintStyle::Teleport => "teleport",
             HintStyle::None => "none",
         }
     }
@@ -114,6 +118,7 @@ mod names {
         match text {
             "border" => Some(HintStyle::Border),
             "gradient" => Some(HintStyle::Gradient),
+            "teleport" => Some(HintStyle::Teleport),
             "none" => Some(HintStyle::None),
             _ => None,
         }
