@@ -19,6 +19,16 @@ pub struct SnakeRender {
     pub shaded: Vec<(Mesh, PaletteLut)>,
 }
 
+/// Describe every segment of a body, head → tail. Shared with the collision
+/// centerline so both read the same geometry off the same `Body`.
+pub fn segment_descriptions(body: &Body, gtx: &GameContext) -> Vec<SegmentDescription> {
+    body.segments
+        .iter()
+        .enumerate()
+        .map(|(segment_idx, segment)| segment_description(segment, segment_idx, body, gtx))
+        .collect()
+}
+
 fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: &GameContext) -> SegmentDescription {
     let coming_from = segment.coming_from;
     let going_to = segment.going_to.unwrap_or(body.dir);
@@ -76,8 +86,6 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 /// segment (no color subdivision); color is applied per-pixel by the snake
 /// shader sampling that snake's palette LUT.
 pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext, stats: &mut Stats) -> Result<SnakeRender> {
-    stats.redrawing_snakes = true;
-
     let mut shaded = Vec::with_capacity(snakes.len());
 
     for snake in snakes.iter_mut() {
@@ -91,12 +99,7 @@ pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext, sta
         let lut = PaletteLut::new(&lut_colors);
 
         // Per-segment descriptions (head → tail).
-        let mut descs: Vec<SegmentDescription> = body
-            .segments
-            .iter()
-            .enumerate()
-            .map(|(segment_idx, segment)| segment_description(segment, segment_idx, body, gtx))
-            .collect();
+        let mut descs = segment_descriptions(body, gtx);
 
         // Round end caps (smooth style): truncate the body ribbon by one cap
         // radius at each end and fill with half-circle caps.

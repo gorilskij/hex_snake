@@ -1,19 +1,18 @@
 use std::collections::VecDeque;
 
-use macroquad::input::KeyCode;
-
 use crate::app::game_context::GameContext;
-use crate::app::keyboard_control::Controls;
+use crate::app::key::Key;
 use crate::apple::Apple;
-use crate::basic::Dir;
+use crate::basic::{Dir, Side};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
-use crate::ControlSetup;
 
 pub struct Keyboard {
-    controls: Controls,
+    /// Whose keys (see [`crate::app::prefs::Prefs::controls`]) this snake
+    /// answers to; `None` for the single player, whose side is a preference
+    side: Option<Side>,
     control_queue: VecDeque<Dir>,
     dir: Dir,
     // whether change of direction was deferred from the previous cell,
@@ -34,9 +33,9 @@ impl Keyboard {
     /// jumps of the snake head
     const LAST_ACTIONABLE_THRESHOLD: f32 = 0.85;
 
-    pub fn new(control_setup: ControlSetup, start_dir: Dir, knowledge: Knowledge) -> Self {
+    pub fn new(side: Option<Side>, start_dir: Dir, knowledge: Knowledge) -> Self {
         Self {
-            controls: control_setup.into(),
+            side,
             control_queue: VecDeque::with_capacity(Self::CTRL_QUEUE_LIMIT),
             dir: start_dir,
             deferred: false,
@@ -74,16 +73,11 @@ impl Controller for Keyboard {
         self.dir = dir;
     }
 
-    fn key_pressed(&mut self, key: KeyCode) {
-        use Dir::*;
-        let new_dir = match key {
-            k if k == self.controls.u => U,
-            k if k == self.controls.d => D,
-            k if k == self.controls.ul => Ul,
-            k if k == self.controls.ur => Ur,
-            k if k == self.controls.dl => Dl,
-            k if k == self.controls.dr => Dr,
-            _ => return,
+    fn key_pressed(&mut self, key: Key, gtx: &GameContext) {
+        // looked up on every press, so rebinding applies at once
+        let side = self.side.unwrap_or(gtx.prefs.single_player);
+        let Some(new_dir) = gtx.prefs.controls(side).dir_of(key) else {
+            return;
         };
 
         // deny 180deg and 360deg turns

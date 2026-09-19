@@ -6,3 +6,4 @@
 *.svg
 /web/hex_snake.wasm
 /profiling
+/.wrangler

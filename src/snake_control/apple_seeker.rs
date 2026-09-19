@@ -1,9 +1,9 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
-use crate::basic::Dir;
+use crate::basic::{Dir, HexDim};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
-use crate::snake_control::pathfinder::{Path, PathFinder};
+use crate::snake_control::pathfinder::{Obstacles, Path, PathFinder};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
@@ -11,8 +11,10 @@ use crate::view::snakes::Snakes;
 /// [`PathFinder`] strategy) and following the resulting path.
 pub struct AppleSeeker {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
-    // implicitly, the target is always the last cell in the path
-    pub path: Option<Path>,
+    // implicitly, the target is always the last cell in the path; paired with
+    // the board it was planned on, since steps across the edge only connect
+    // on a board of that size
+    pub path: Option<(Path, HexDim)>,
 }
 
 impl AppleSeeker {
@@ -26,15 +28,11 @@ impl AppleSeeker {
     ) {
         // recalculate the path if there is no target of if the last target isn't there anymore
         let recalculate_path = match &mut self.path {
-            None => {
-                println!("recalculate: no path");
-                true
-            }
-            Some(path) if path.is_empty() => {
-                println!("recalculate: path is empty");
-                true
-            }
-            Some(path) => 'arm: {
+            None => true,
+            Some((path, _)) if path.is_empty() => true,
+            // the board was resized
+            Some((_, board_dim)) if *board_dim != gtx.board_dim => true,
+            Some((path, _)) => 'arm: {
                 // recalculate if we're not following the path
                 let head = body.segments[0].pos;
                 if head == path[0] {
@@ -43,24 +41,35 @@ impl AppleSeeker {
                 } else {
                     // strayed off the path (or the path is too short to
                     // still be following it) -> recalculate
-                    println!("recalculate: not following path");
                     break 'arm true;
                 }
 
-                // recalculate if the target isn't there anymore
-                let target = *path.back().unwrap();
-                if apples.iter().any(|apple| apple.pos == target) {
-                    false
-                } else {
-                    println!("recalculate: target isn't there");
-                    true
+                // recalculate if the next step doesn't connect (e.g. the head
+                // was moved some other way)
+                if path.len() >= 2 && path[0].single_step_dir_to(path[1], gtx.board_dim).is_none() {
+                    break 'arm true;
                 }
+
+                // recalculate if something moved into the way (the head
+                // itself is path[0])
+                let obstacles = Obstacles::new(body, knowledge, other_snakes);
+                if path.iter().skip(1).any(|&pos| obstacles.blocks(pos)) {
+                    break 'arm true;
+                }
+
+                // recalculate if the target isn't there anymore (always, for
+                // a backup path that doesn't lead to an apple)
+                let target = *path.back().unwrap();
+                !apples.iter().any(|apple| apple.pos == target)
             }
         };
 
         if recalculate_path {
             // find the shortest path to any apple and lock in that apple as the target
-            self.path = self.pathfinder.get_path(&apples, body, knowledge, other_snakes, gtx);
+            self.path = self
+                .pathfinder
+                .get_path(&apples, body, knowledge, other_snakes, gtx)
+                .map(|path| (path, gtx.board_dim));
 
             if self.path.is_none() {
                 println!("failed to find path");
@@ -83,16 +92,15 @@ impl Controller for AppleSeeker {
 
         // TODO: detect and warn about excessive recalculation
         // WARNING: this can cause excessive recalculation
-        let path = self.path.as_mut()?;
+        let (path, _) = self.path.as_ref()?;
         if path.len() < 2 {
             // if the path has length 1, we're about to eat an apple, maintain course
             return Some(body.dir);
         }
 
-        let dir = path[0]
-            .dir_to(path[1])
-            .expect("failed to compute dir between path points");
-        Some(dir)
+        // not `dir_to`: across the board's edge that points the opposite way.
+        // A freshly (re)calculated path always connects.
+        path[0].single_step_dir_to(path[1], gtx.board_dim)
     }
 
     fn get_path(
@@ -104,7 +112,7 @@ impl Controller for AppleSeeker {
         gtx: &GameContext,
     ) -> Option<&Path> {
         self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
-        self.path.as_ref()
+        self.path.as_ref().map(|(path, _)| path)
     }
 
     fn reset(&mut self, _dir: Dir) {

@@ -27,22 +27,44 @@ pub enum Move {
     Wait(usize),
 }
 
+/// Plays a fixed sequence of moves on repeat, one step per cell.
 pub struct Programmed {
-    pub move_sequence: Vec<Move>,
-    pub dir: Dir,
-    pub next_move_idx: usize,
-    pub wait: usize,
+    move_sequence: Vec<Move>,
+    /// Direction before the sequence's first turn
+    start_dir: Dir,
+    dir: Dir,
+    next_move_idx: usize,
+    wait: usize,
+    /// Cells into the current cycle of the sequence
+    position: usize,
 }
 
-impl Controller for Programmed {
-    fn next_dir(
-        &mut self,
-        _: &mut Body,
-        _: Option<&Knowledge>,
-        _: &dyn Snakes,
-        _: &[Apple],
-        _: &GameContext,
-    ) -> Option<Dir> {
+impl Programmed {
+    pub fn new(move_sequence: Vec<Move>, start_dir: Dir) -> Self {
+        Self {
+            move_sequence,
+            start_dir,
+            dir: start_dir,
+            next_move_idx: 0,
+            wait: 0,
+            position: 0,
+        }
+    }
+
+    /// How many cells one cycle of the sequence takes: a turn is one cell, a
+    /// wait as many cells as it lasts.
+    fn cycle_len(&self) -> usize {
+        self.move_sequence
+            .iter()
+            .map(|m| match *m {
+                Move::Turn(_) => 1,
+                Move::Wait(wait) => wait,
+            })
+            .sum()
+    }
+
+    /// Advance the sequence by one cell
+    fn step(&mut self) -> Option<Dir> {
         if self.wait > 0 {
             self.wait -= 1;
         } else {
@@ -55,12 +77,83 @@ impl Controller for Programmed {
             self.next_move_idx %= self.move_sequence.len();
         }
 
+        self.position = (self.position + 1) % self.cycle_len();
         Some(self.dir)
+    }
+}
+
+impl Controller for Programmed {
+    fn next_dir(
+        &mut self,
+        _: &mut Body,
+        _: Option<&Knowledge>,
+        _: &dyn Snakes,
+        _: &[Apple],
+        _: &GameContext,
+    ) -> Option<Dir> {
+        self.step()
     }
 
     fn reset(&mut self, dir: Dir) {
-        self.dir = dir;
+        self.start_dir = dir;
+        self.set_schedule_position(0);
+    }
+
+    fn schedule_position(&self) -> Option<usize> {
+        Some(self.position)
+    }
+
+    /// Replays the sequence from its start, so the state is exactly what
+    /// `position` steps would have left behind (wrapped to one cycle).
+    fn set_schedule_position(&mut self, position: usize) {
+        self.dir = self.start_dir;
         self.next_move_idx = 0;
         self.wait = 0;
+        self.position = 0;
+        if self.move_sequence.is_empty() {
+            return;
+        }
+        for _ in 0..position % self.cycle_len() {
+            self.step();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use Dir::*;
+
+    fn pattern() -> Programmed {
+        Programmed::new(vec![Move::Turn(U), Move::Wait(2), Move::Turn(Ur), Move::Wait(3)], D)
+    }
+
+    #[test]
+    fn position_counts_cells_and_wraps() {
+        let mut p = pattern();
+        assert_eq!(p.cycle_len(), 7);
+        for i in 1..=10 {
+            p.step();
+            assert_eq!(p.schedule_position(), Some(i % 7));
+        }
+    }
+
+    #[test]
+    fn set_position_matches_stepping() {
+        for n in 0..20 {
+            let mut stepped = pattern();
+            let mut expected = vec![];
+            for _ in 0..n {
+                stepped.step();
+            }
+            for _ in 0..10 {
+                expected.push(stepped.step());
+            }
+
+            let mut jumped = pattern();
+            jumped.set_schedule_position(n);
+            let actual: Vec<_> = (0..10).map(|_| jumped.step()).collect();
+            assert_eq!(actual, expected, "after jumping to {n}");
+        }
     }
 }

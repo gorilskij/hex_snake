@@ -14,15 +14,13 @@ use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
 pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration, stats: &mut Stats) -> Result<Mesh> {
     assert!(!apples.is_empty(), "tried to draw a mesh with 0 apples");
 
-    stats.redrawing_apples = true;
-
     let mut parts: Vec<Mesh> = Vec::with_capacity(apples.len());
 
     for apple in apples {
         use crate::apple::Type::*;
         let color = match apple.apple_type {
-            Eat(_) => gtx.palette.apple_color,
-            Shrink(_) => gtx.palette.apple_color, // TODO: change
+            Eat(_) | Grow(_) => gtx.palette.apple_color,
+            Shrink(_) => gtx.palette.bad_apple_color,
             SpawnSnake(_) | SpawnRain => {
                 let hue = 360. * (elapsed_total.as_millis() as f64 / 1000. % 1.);
                 let hsl = HSL { h: hue, s: 1., l: 0.3 };

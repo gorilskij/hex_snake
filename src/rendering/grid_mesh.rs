@@ -1,89 +1,121 @@
+use anyhow::Result;
+use macroquad::color::Color;
 use num_integer::Integer;
 
 use crate::app::game_context::GameContext;
-use crate::basic::{CellDim, HexDim, Point};
-use anyhow::Result;
-use crate::support::mesh::{build_circle, build_line, build_polyline, DrawMode, Mesh};
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
+use crate::rendering::shape::{Hexagon, Shape};
+use crate::support::mesh::{build_circle, build_line, DrawMode, Mesh};
 
-// TODO: make this readable
-// TODO: add option to exclude border from grid mesh
-//  when border is drawn separately
+/// The grid over the whole board, one line per cell edge.
 pub fn grid_mesh(gtx: &GameContext) -> Result<Mesh> {
-    let CellDim { side, sin, cos } = gtx.cell_dim;
-    let HexDim { h: board_h, v: board_v } = gtx.board_dim;
+    let board_dim = gtx.board_dim;
+    Ok(region_grid_mesh(
+        board_cells(board_dim),
+        |pos| board_dim.contains(pos),
+        gtx.cell_dim,
+        gtx.palette.grid_thickness,
+        gtx.palette.grid_color,
+    ))
+}
 
-    // two kinds of alternating vertical lines
-    let cap = 2 * (board_v as usize + 1);
-    let mut vline_a = Vec::with_capacity(cap); // lines that start from the top with /
-    let mut vline_b = Vec::with_capacity(cap); // lines that start from the top with \
+/// The border around the whole board, one line per cell edge.
+pub fn border_mesh(gtx: &GameContext) -> Result<Mesh> {
+    let board_dim = gtx.board_dim;
+    Ok(region_border_mesh(
+        board_cells(board_dim),
+        |pos| board_dim.contains(pos),
+        gtx.cell_dim,
+        gtx.palette.border_thickness,
+        gtx.palette.border_color,
+    ))
+}
 
-    #[rustfmt::skip]
-    for dv in (0..=board_v).map(|v| v as f32 * 2. * sin) {
-        vline_a.push(Point { x: cos, y: dv });
-        vline_a.push(Point { x: 0., y: dv + sin });
-        vline_b.push(Point { x: cos + side, y: dv });
-        vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
+fn board_cells(board_dim: HexDim) -> impl Iterator<Item = HexPoint> {
+    (0..board_dim.h).flat_map(move |h| (0..board_dim.v).map(move |v| HexPoint { h, v }))
+}
+
+/// The grid over any set of cells (`cells`, all of which satisfy
+/// `contains`): every edge of every cell, each drawn once — an edge between
+/// two cells of the set belongs to the cell above it (whose edge faces `U`,
+/// `Ur` or `Dr`).
+pub fn region_grid_mesh(
+    cells: impl Iterator<Item = HexPoint>,
+    contains: impl Fn(HexPoint) -> bool,
+    cell_dim: CellDim,
+    thickness: f32,
+    color: Color,
+) -> Mesh {
+    edges_mesh(cells, cell_dim, thickness, color, |pos, dir| {
+        matches!(dir, Dir::U | Dir::Ur | Dir::Dr) || !contains(pos.translate(dir, 1))
+    })
+}
+
+/// The border around any set of cells (`cells`, all of which satisfy
+/// `contains`): the edges between a cell of the set and one outside it.
+pub fn region_border_mesh(
+    cells: impl Iterator<Item = HexPoint>,
+    contains: impl Fn(HexPoint) -> bool,
+    cell_dim: CellDim,
+    thickness: f32,
+    color: Color,
+) -> Mesh {
+    edges_mesh(cells, cell_dim, thickness, color, |pos, dir| {
+        !contains(pos.translate(dir, 1))
+    })
+}
+
+/// A dot on every corner of `cells`, each drawn once.
+pub fn region_dot_mesh(cells: impl Iterator<Item = HexPoint>, cell_dim: CellDim, radius: f32, color: Color) -> Mesh {
+    // neighbouring cells share corners; compare them to a fraction of a pixel
+    let mut seen = std::collections::HashSet::new();
+    let parts = cells.flat_map(|pos| {
+        let corners: Vec<Point> = Hexagon::new(cell_dim).translate(pos.to_cartesian(cell_dim)).into();
+        corners
+    });
+    let parts = parts
+        .filter(|p| seen.insert(((p.x * 16.).round() as i64, (p.y * 16.).round() as i64)))
+        .map(|p| build_circle(DrawMode::fill(), p, radius, color))
+        .collect::<Vec<_>>();
+    Mesh::combine(parts)
+}
+
+/// One line for each edge of `cells` that `draw(cell, dir)` picks. Lines have
+/// round ends, so edges meet cleanly at corners.
+fn edges_mesh(
+    cells: impl Iterator<Item = HexPoint>,
+    cell_dim: CellDim,
+    thickness: f32,
+    color: Color,
+    draw: impl Fn(HexPoint, Dir) -> bool,
+) -> Mesh {
+    let draw = &draw;
+    let parts = cells.flat_map(|pos| {
+        let corners: Vec<Point> = Hexagon::new(cell_dim).translate(pos.to_cartesian(cell_dim)).into();
+        Dir::iter().filter(move |&dir| draw(pos, dir)).map(move |dir| {
+            let (a, b) = edge(dir);
+            build_line(&[corners[a], corners[b]], thickness, color)
+        })
+    });
+    Mesh::combine(parts)
+}
+
+/// The corners (as indices into [`Hexagon`]'s points) of a cell's edge that
+/// faces `dir`
+fn edge(dir: Dir) -> (usize, usize) {
+    match dir {
+        Dir::U => (0, 1),
+        Dir::Ur => (1, 2),
+        Dir::Dr => (2, 3),
+        Dir::D => (3, 4),
+        Dir::Dl => (4, 5),
+        Dir::Ul => (5, 0),
     }
-
-    let mut parts: Vec<Mesh> = vec![];
-
-    let draw_mode = DrawMode::stroke(gtx.palette.grid_thickness);
-    let color = gtx.palette.grid_color;
-
-    for h in 0..(board_h + 1) / 2 {
-        if h == 0 {
-            parts.push(build_polyline(draw_mode, &vline_a[..vline_a.len() - 1], color));
-        } else {
-            parts.push(build_polyline(draw_mode, &vline_a, color));
-        }
-        if board_h.is_odd() && h == (board_h + 1) / 2 - 1 {
-            parts.push(build_polyline(draw_mode, &vline_b[..vline_b.len() - 1], color));
-        } else {
-            parts.push(build_polyline(draw_mode, &vline_b, color));
-        }
-
-        let dh = h as f32 * 2. * (side + cos);
-
-        for v in 0..=board_v {
-            let dv = v as f32 * 2. * sin;
-
-            // line between a and b
-            parts.push(build_line(
-                #[rustfmt::skip] &[
-                    Point { x: cos + dh, y: dv },
-                    Point { x: cos + side + dh, y: dv },
-                ],
-                gtx.palette.grid_thickness,
-                color,
-            ));
-
-            // line between b and a
-            if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
-                parts.push(build_line(
-                    #[rustfmt::skip] &[
-                        Point { x: 2. * cos + side + dh, y: sin + dv },
-                        Point { x: 2. * cos + 2. * side + dh, y: sin + dv },
-                    ],
-                    gtx.palette.grid_thickness,
-                    color,
-                ));
-            }
-        }
-
-        // shift the lines right by 2 cells
-        let offset = 2. * (side + cos);
-        vline_a.iter_mut().for_each(|a| a.x += offset);
-        vline_b.iter_mut().for_each(|b| b.x += offset);
-    }
-    if board_h.is_even() {
-        parts.push(build_polyline(draw_mode, &vline_a[1..], color));
-    }
-
-    Ok(Mesh::combine(parts))
 }
 
 pub fn grid_dot_mesh(gtx: &GameContext) -> Result<Mesh> {
-    let CellDim { side, sin, cos } = gtx.cell_dim;
+    let CellDim { side, cos, .. } = gtx.cell_dim;
+    let (width, height) = (gtx.cell_dim.width(), gtx.cell_dim.height());
     let HexDim { h: board_h, v: board_v } = gtx.board_dim;
 
     let draw_mode = DrawMode::fill();
@@ -97,89 +129,20 @@ pub fn grid_dot_mesh(gtx: &GameContext) -> Result<Mesh> {
         let dh = h as f32 * 2. * (side + cos);
 
         for v in 0..=board_v {
-            let dv = v as f32 * 2. * sin;
+            let dv = v as f32 * height;
 
             circle(Point { x: cos + dh, y: dv });
             circle(Point { x: cos + side + dh, y: dv });
 
             // line between b and a
             if !(board_h.is_odd() && h == (board_h + 1) / 2 - 1) {
+                circle(Point { x: width + dh, y: height / 2. + dv });
                 circle(Point {
-                    x: 2. * cos + side + dh,
-                    y: sin + dv,
-                });
-                circle(Point {
-                    x: 2. * cos + 2. * side + dh,
-                    y: sin + dv,
+                    x: width + side + dh,
+                    y: height / 2. + dv,
                 });
             }
         }
     }
-    Ok(Mesh::combine(parts))
-}
-
-pub fn border_mesh(gtx: &GameContext) -> Result<Mesh> {
-    let CellDim { side, sin, cos } = gtx.cell_dim;
-    let HexDim { h: board_h, v: board_v } = gtx.board_dim;
-
-    // two kinds of alternating vertical lines
-    let cap = 2 * (board_v as usize + 1);
-    let mut vline_a = Vec::with_capacity(cap); // lines that start from the top with /
-    let mut vline_b = Vec::with_capacity(cap); // lines that start from the top with \
-
-    #[rustfmt::skip]
-    for dv in (0..=board_v).map(|v| v as f32 * 2. * sin) {
-        vline_a.push(Point { x: cos, y: dv });
-        vline_a.push(Point { x: 0., y: dv + sin });
-        vline_b.push(Point { x: cos + side, y: dv });
-        vline_b.push(Point { x: 2. * cos + side, y: dv + sin });
-    }
-
-    let mut parts: Vec<Mesh> = vec![];
-
-    let draw_mode = DrawMode::stroke(gtx.palette.border_thickness);
-    let color = gtx.palette.border_color;
-
-    // left border
-    parts.push(build_polyline(draw_mode, &vline_a[..vline_a.len() - 1], color));
-
-    // right border
-    let single_offset = 2. * (side + cos);
-    if board_h.is_even() {
-        let offset = (board_h / 2) as f32 * single_offset;
-        vline_a.iter_mut().for_each(|a| a.x += offset);
-        parts.push(build_polyline(draw_mode, &vline_a[1..], color));
-    } else {
-        let offset = ((board_h - 1) / 2) as f32 * single_offset;
-        vline_b.iter_mut().for_each(|b| b.x += offset);
-        parts.push(build_polyline(draw_mode, &vline_b[..vline_b.len() - 1], color));
-    }
-
-    let mut hline = vec![];
-    for h in 0..board_h / 2 {
-        let dh = 2. * (side + cos) * h as f32;
-        hline.push(Point { x: dh + cos, y: 0. });
-        hline.push(Point { x: dh + side + cos, y: 0. });
-        hline.push(Point { x: dh + side + 2. * cos, y: sin });
-        hline.push(Point {
-            x: dh + 2. * side + 2. * cos,
-            y: sin,
-        });
-    }
-    if board_h.is_odd() {
-        let dh = 2. * (side + cos) * (board_h / 2) as f32;
-        hline.push(Point { x: dh + cos, y: 0. });
-        hline.push(Point { x: dh + side + cos, y: 0. });
-    }
-
-    // top border
-    parts.push(build_polyline(draw_mode, &hline, color));
-
-    // bottom border
-    // shift hline
-    let offset = board_v as f32 * 2. * sin;
-    hline.iter_mut().for_each(|p| p.y += offset);
-    parts.push(build_polyline(draw_mode, &hline, color));
-
     Ok(Mesh::combine(parts))
 }

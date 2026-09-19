@@ -12,11 +12,6 @@ mod hexagon;
 mod triangle_arrow;
 mod wide_hexagon;
 
-struct Line {
-    start: Point,
-    end: Point,
-}
-
 fn bounding_box_of(points: &[Point]) -> (Point, Point) {
     let (min_x, max_x) = points.iter().map(|p| p.x).partial_minmax_copy().unwrap_or((0., 0.));
     let (min_y, max_y) = points.iter().map(|p| p.y).partial_minmax_copy().unwrap_or((0., 0.));

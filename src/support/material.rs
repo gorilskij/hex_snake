@@ -10,13 +10,11 @@
 //! macOS defaults to OpenGL and the web target is WebGL, so a single GLSL-ES 100
 //! shader covers both — no Metal variant required.
 
+use anyhow::{Context, Result};
+use macroquad::color::Color;
 use macroquad::material::{load_material, Material, MaterialParams};
 use macroquad::miniquad::{BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource};
 use macroquad::texture::{FilterMode, Texture2D};
-
-use anyhow::{Context, Result};
-
-use macroquad::color::Color;
 
 const VERTEX: &str = r#"#version 100
 precision highp float;

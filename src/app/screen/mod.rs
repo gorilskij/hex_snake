@@ -1,17 +1,22 @@
+use anyhow::{Context, Result};
 pub use game::Game;
+pub use start_screen::StartScreen;
 use macroquad::input::KeyCode;
 use rand::rngs::ThreadRng;
 
 use crate::app::game_context::GameContext;
+use crate::app::key::Key;
 use crate::app::portal::Portal;
-pub use crate::app::prefs::Prefs;
 use crate::apple::Apple;
-use anyhow::{Context, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
 
 mod board_dim;
+mod controls_menu;
 mod game;
+mod menu;
+mod options_menu;
+mod start_screen;
 
 /// The interface every screen (the game, and eventually menus/settings/editor)
 /// implements so the main loop can drive it uniformly: per-frame `update`/`draw`
@@ -22,7 +27,7 @@ pub trait Screen {
 
     fn draw(&mut self) -> Result<()>;
 
-    fn key_down_event(&mut self, keycode: KeyCode) -> Result<()> {
+    fn key_down_event(&mut self, key: Key) -> Result<()> {
         Ok(())
     }
 
@@ -33,6 +38,25 @@ pub trait Screen {
     fn resize_event(&mut self, width: f32, height: f32) -> Result<()> {
         Ok(())
     }
+
+    /// Whether to switch screens (e.g. the start screen once the player
+    /// starts a game). Polled once per frame.
+    fn transition(&mut self) -> Option<Transition> {
+        None
+    }
+
+    /// Called when the screen above this one is closed and this one is shown
+    /// again.
+    fn resume(&mut self) {}
+}
+
+/// A change of screen. Screens form a stack: the game is opened over the start
+/// screen, and closing it goes back to the start screen as it was left.
+pub enum Transition {
+    /// Open a screen over this one
+    Push(Box<dyn Screen>),
+    /// Close this screen, going back to the one below
+    Pop,
 }
 
 pub struct Environment<Rng = ThreadRng> {

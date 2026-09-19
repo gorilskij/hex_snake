@@ -9,15 +9,15 @@ extern crate lazy_static;
 extern crate core;
 
 use enum_map_lite::enum_map;
-use macroquad::input::{get_keys_pressed, get_keys_released};
+use macroquad::input::get_keys_released;
 use macroquad::window::{next_frame, screen_height, screen_width, Conf};
 
-use crate::app::keyboard_control::ControlSetup;
-use crate::app::screen::{Game, Screen};
+use crate::app::game_mode::GameMode;
+use crate::app::key::KeyInput;
+use crate::app::screen::{Screen, StartScreen, Transition};
 use crate::app::Palette;
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Side};
-use crate::keyboard_layout::Layout;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
 use crate::snake::SegmentType;
 use crate::snake_control::pathfinder;
@@ -27,14 +27,17 @@ mod support;
 #[macro_use]
 mod basic;
 mod app;
+mod button;
 mod color;
-mod keyboard_layout;
 mod snake;
 mod view;
 #[macro_use]
 mod apple;
 mod rendering;
 pub mod snake_control;
+
+/// The rules the game is played by (there is no mode selection yet).
+const GAME_MODE: GameMode = GameMode::Classic;
 
 // On wasm32-unknown-unknown there is no default `getrandom` backend; supply one
 // backed by macroquad's PRNG so `rand`/`thread_rng` work without wasm-bindgen.
@@ -68,7 +71,7 @@ fn window_conf() -> Conf {
 
 /// Build a single keyboard-controlled player snake (mirrors the seed that
 /// `App::new` used to construct).
-fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
+fn player_seed(side: Side, mode: GameMode) -> snake::builder::Builder {
     let eat_mechanics = EatMechanics::new(
         enum_map! {
             SegmentType::Eaten { .. } => EatBehavior::PassOver,
@@ -87,10 +90,14 @@ fn player_seed(control_setup: ControlSetup) -> snake::builder::Builder {
         .snake_type(snake::Type::Player)
         .eat_mechanics(eat_mechanics)
         .palette(snake::PaletteTemplate::rainbow())
-        .controller(snake_control::Template::Keyboard { control_setup, knowledge })
+        .controller(snake_control::Template::Keyboard { side: Some(side), knowledge })
         .speed(5.)
+        .starvation(mode.starvation())
         .autopilot(pathfinder::Template::WithBackup {
-            main: Box::new(pathfinder::Template::WeightedBFS),
+            main: Box::new(pathfinder::Template::WeightedBFS(pathfinder::Weights {
+                teleport: 0,
+                ..Default::default()
+            })),
             backup: Box::new(pathfinder::Template::SpaceFilling),
         })
 }
@@ -103,38 +110,51 @@ async fn main() {
     // from startup, so it wouldn't vary).
     macroquad::rand::srand(macroquad::miniquad::date::now().to_bits());
 
-    let control_setup = ControlSetup {
-        // web delivers physical (qwerty-position) key codes, so use the qwerty
-        // bindings directly: ul=J u=K ur=L dl=M d=Comma dr=Period
-        layout: Layout::Qwerty,
-        keyboard_side: Side::Right,
-        hand: Side::Right,
-    };
-
     let cell_dim = CellDim::from(50.);
-    let seeds = vec![player_seed(control_setup)];
+    // one player per side of the keyboard, in screen order
+    let seeds = vec![player_seed(Side::Left, GAME_MODE), player_seed(Side::Right, GAME_MODE)];
 
-    let mut game = Game::new(cell_dim, seeds, Palette::dark(), SpawnPolicy::Random { apple_count: 5 });
+    let mut screens: Vec<Box<dyn Screen>> = vec![Box::new(StartScreen::new(
+        cell_dim,
+        seeds,
+        Palette::dark(),
+        SpawnPolicy::Random { apple_count: 3 },
+        GAME_MODE,
+    ))];
 
     let mut last_size = (screen_width(), screen_height());
+    let mut key_input = KeyInput::new();
 
     loop {
+        let screen = screens.last_mut().expect("there is always a screen");
+
         let size = (screen_width(), screen_height());
         if size != last_size {
             last_size = size;
-            let _ = game.resize_event(size.0, size.1);
+            let _ = screen.resize_event(size.0, size.1);
         }
 
-        for key in get_keys_pressed() {
-            let _ = game.key_down_event(key);
+        for key in key_input.poll() {
+            let _ = screen.key_down_event(key);
         }
         for key in get_keys_released() {
-            let _ = game.key_up_event(key);
+            let _ = screen.key_up_event(key);
         }
 
-        let _ = game.update();
-        if let Err(e) = game.draw() {
+        let _ = screen.update();
+        if let Err(e) = screen.draw() {
             eprintln!("{e:?}");
+        }
+        match screen.transition() {
+            Some(Transition::Push(next)) => screens.push(next),
+            // the bottom screen (the start screen) never closes
+            Some(Transition::Pop) if screens.len() > 1 => {
+                screens.pop();
+                if let Some(screen) = screens.last_mut() {
+                    screen.resume();
+                }
+            }
+            _ => {}
         }
 
         next_frame().await;

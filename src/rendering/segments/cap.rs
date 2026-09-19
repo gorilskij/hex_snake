@@ -66,23 +66,8 @@ pub fn build_round_caps(
     num_segments: usize,
     lut_size: usize,
 ) -> (Option<Mesh>, Option<Mesh>) {
-    let half_width = descs[0].cell_dim.side / 2.;
-
     let lens: Vec<f32> = descs.iter().map(full_path_length).collect();
-    let total: f32 = descs
-        .iter()
-        .zip(&lens)
-        .map(|(desc, len)| (desc.fraction.end - desc.fraction.start).max(0.) * len)
-        .sum();
-
-    // a head crashed into an obstacle keeps its flat face
-    let round_head = !matches!(descs[0].segment_type, SegmentType::Crashed);
-
-    // Never consume more than the whole body: while the snake is very short
-    // (e.g. just spawning) the caps shrink to half-ellipses that meet in the
-    // middle.
-    let n_caps = 1 + round_head as usize;
-    let radius = half_width.min(total / n_caps as f32);
+    let (radius, round_head) = cap_shape(descs, &lens);
     if radius <= f32::EPSILON {
         return (None, None);
     }
@@ -103,6 +88,52 @@ pub fn build_round_caps(
     };
 
     (tail_cap, head_cap)
+}
+
+/// The cap radius and whether the head is capped at all. Kept separate so the
+/// collision centerline can be shortened by exactly what the renderer removes.
+fn cap_shape(descs: &[SegmentDescription], lens: &[f32]) -> (f32, bool) {
+    let half_width = descs[0].cell_dim.side / 2.;
+
+    let total: f32 = descs
+        .iter()
+        .zip(lens)
+        .map(|(desc, len)| (desc.fraction.end - desc.fraction.start).max(0.) * len)
+        .sum();
+
+    // a head crashed into an obstacle keeps its flat face
+    let round_head = !matches!(descs[0].segment_type, SegmentType::Crashed);
+
+    // Never consume more than the whole body: while the snake is very short
+    // (e.g. just spawning) the caps shrink to half-ellipses that meet in the
+    // middle.
+    let n_caps = 1 + round_head as usize;
+    (half_width.min(total / n_caps as f32), round_head)
+}
+
+/// Shorten the body ribbon by one cap radius at each capped end exactly as
+/// [`build_round_caps`] does, without building the cap meshes. Returns the cap
+/// radius.
+///
+/// The drawn flesh reaches one radius past the *shortened* end (that is what
+/// the cap fills in), so this is the body a collision test must measure
+/// against.
+pub fn truncate_for_caps(descs: &mut [SegmentDescription]) -> f32 {
+    let lens: Vec<f32> = descs.iter().map(full_path_length).collect();
+    let (radius, round_head) = cap_shape(descs, &lens);
+    if radius <= f32::EPSILON {
+        return 0.;
+    }
+
+    // both caps' spans come from the untruncated body, as in `build_round_caps`
+    let head_spans = round_head.then(|| collect_spans(descs, &lens, End::Head, radius));
+    let tail_spans = collect_spans(descs, &lens, End::Tail, radius);
+    if let Some(spans) = &head_spans {
+        truncate(descs, &lens, spans, End::Head);
+    }
+    truncate(descs, &lens, &tail_spans, End::Tail);
+
+    radius
 }
 
 /// Walk segments away from the given end, splitting the first `radius` of
