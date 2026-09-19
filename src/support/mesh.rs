@@ -61,15 +61,6 @@ pub fn build_line(points: &[Point], width: f32, color: impl Into<MqColor>) -> Me
     Mesh::raw(vertices, indices)
 }
 
-/// Build an open polyline; `Stroke(w)` sets the width, `Fill` falls back to 1px.
-pub fn build_polyline(mode: DrawMode, points: &[Point], color: impl Into<MqColor>) -> Mesh {
-    let width = match mode {
-        DrawMode::Stroke(w) => w,
-        DrawMode::Fill => 1.,
-    };
-    build_line(points, width, color)
-}
-
 /// Build a convex polygon with a color per vertex, interpolated across it.
 pub fn build_colored_polygon(points: &[(Point, MqColor)]) -> Mesh {
     if points.len() < 3 {

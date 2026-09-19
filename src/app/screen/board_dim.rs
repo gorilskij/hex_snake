@@ -7,11 +7,11 @@ pub fn calculate_offset(board_dim: HexDim, cell_dim: CellDim) -> Point {
         x: screen_width(),
         y: screen_height(),
     };
-    let CellDim { side, sin, cos } = cell_dim;
+    let CellDim { sin, cos, .. } = cell_dim;
 
     let board_cartesian_dim = Point {
-        x: board_dim.h as f32 * (side + cos) + cos,
-        y: board_dim.v as f32 * 2. * sin + sin,
+        x: board_dim.h as f32 * (cell_dim.width() - cos) + cos,
+        y: board_dim.v as f32 * cell_dim.height() + sin,
     };
     (window_dim - board_cartesian_dim) / 2.
 }
@@ -21,10 +21,10 @@ pub fn calculate_board_dim(cell_dim: CellDim) -> HexDim {
         x: screen_width(),
         y: screen_height(),
     };
-    let CellDim { side, sin, cos } = cell_dim;
+    let CellDim { sin, cos, .. } = cell_dim;
 
     HexDim {
-        h: ((window_dim.x - cos) / (side + cos)) as isize,
-        v: ((window_dim.y - sin) / (2. * sin)) as isize,
+        h: ((window_dim.x - cos) / (cell_dim.width() - cos)) as isize,
+        v: ((window_dim.y - sin) / cell_dim.height()) as isize,
     }
 }

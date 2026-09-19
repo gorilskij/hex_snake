@@ -77,7 +77,6 @@ pub enum PaletteTemplate {
     },
 }
 
-// TODO: write a builder
 #[allow(dead_code)]
 impl PaletteTemplate {
     pub fn solid_white_red() -> Self {
@@ -108,12 +107,7 @@ impl PaletteTemplate {
         }
     }
 
-    pub fn oklab_gradient(
-        head_hue: f64,
-        tail_hue: f64,
-        lightness: f64,
-        eaten_lightness: f64,
-    ) -> Self {
+    pub fn oklab_gradient(head_hue: f64, tail_hue: f64, lightness: f64, eaten_lightness: f64) -> Self {
         Self::OkLabGradient {
             head_hue,
             tail_hue,
@@ -183,16 +177,6 @@ pub enum SegmentStyle {
 }
 
 impl SegmentStyle {
-    // TODO: deprecate or reimplement in terms of color_at_fraction
-    pub fn first_color(&self) -> Color {
-        match *self {
-            Self::Solid(color) => color,
-            Self::RGBGradient { start_color: start_rgb, .. } => start_rgb,
-            Self::HSLGradient { start_hue, lightness, .. } => HSL { h: start_hue, s: 1., l: lightness }.to_color(),
-            Self::OkLabGradient { start_hue, lightness, .. } => OkLab::from_lch(lightness, 0.5, start_hue).to_color(),
-        }
-    }
-
     pub fn color_at_fraction(&self) -> Box<dyn Fn(f64) -> Color> {
         match *self {
             SegmentStyle::Solid(color) => Box::new(move |_| color),
@@ -257,9 +241,6 @@ pub fn build_snake_lut(styles: &[SegmentStyle]) -> Vec<Color> {
 
 pub trait Palette: Send + Sync {
     fn segment_styles<'a>(&'a mut self, body: &'a Body) -> Box<dyn Iterator<Item = SegmentStyle> + 'a>;
-    // TODO: refactor as
-    //  fn color_at(&mut self, body: &SnakeBody, point: f32, frame_fraction: f32) -> Color;
-    //  this avoids unnecessary work for hex palette and is called exactly as many times as needed
 }
 
 impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {

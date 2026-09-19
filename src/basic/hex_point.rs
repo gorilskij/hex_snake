@@ -64,19 +64,19 @@ pub type HexDim = HexPoint;
 impl HexPoint {
     pub fn to_cartesian(self, cell_dim: CellDim) -> Point {
         let Self { h, v } = self;
-        let CellDim { side, sin, cos } = cell_dim;
+        let CellDim { side, cos, .. } = cell_dim;
         Point {
             x: h as f32 * (side + cos),
-            y: (v as f32 * 2. + (h % 2) as f32) * sin,
+            y: (v as f32 + (h % 2) as f32 / 2.) * cell_dim.height(),
         }
     }
 
     pub fn from_cartesian(point: Point, cell_dim: CellDim) -> Self {
         // top-right of the desired cell
         let Point { x, y } = point; // - cell_dim.center();
-        let CellDim { side, sin, cos } = cell_dim;
+        let CellDim { side, cos, .. } = cell_dim;
         let h = (x - cos / 2.) / (side + cos);
-        let v = (y / sin - h % 2.) / 2.;
+        let v = y / cell_dim.height() - (h % 2.) / 2.;
         Self { h: h as isize, v: v as isize }
     }
 
@@ -117,22 +117,12 @@ impl HexPoint {
         None
     }
 
-    // TODO: improve efficiency
     // Considers wrapping, None if there is no 1-step path
     pub fn single_step_dir_to(self, other: Self, board_dim: HexDim) -> Option<Dir> {
         Dir::iter().find(|&dir| self.wrapping_translate(dir, 1, board_dim) == other)
     }
 
-    // None if the two points are not on the same straight line or are farther than 1 unit apart
-    // This version allows wrapping around the board
-    pub fn wrapping_dir_to_1(self, other: Self, board_dim: HexDim) -> Option<Dir> {
-        // O(12) good enough?
-        Dir::iter().find(|dir| self.wrapping_translate(*dir, 1, board_dim) == other)
-    }
-
     pub fn find_border(&self, dir: Dir, board_dim: HexDim) -> HexPoint {
-        // TODO: efficientize and use this as part of wrapping
-
         // if a point is outside the board, we don't have a guarantee of finding a border
         assert!(board_dim.contains(*self));
 
@@ -250,7 +240,6 @@ impl HexPoint {
 
     // basically mod width, mod height
     // if the point is n cells out of bounds, it will be n cells from the edge
-    // TODO: improve efficiency
     #[must_use]
     fn wrap_around(mut self, board_dim: HexDim, axis: Axis) -> Option<Self> {
         use Axis::*;

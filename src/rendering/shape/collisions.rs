@@ -1,61 +1,51 @@
-use super::Line;
 use crate::basic::Point;
 
-// a b
-// c d
-const fn determinant_2x2(a: f32, b: f32, c: f32, d: f32) -> f32 {
-    a * d - b * c
+/// Whether `point` lies inside the polygon `points` (even-odd rule).
+///
+/// Casts a ray straight down from the point and counts the edges it crosses:
+/// an odd count means inside. An edge counts only if its endpoints lie
+/// strictly on opposite sides of the ray (one `>`, the other `<=`), so a ray
+/// through a vertex counts it once, and edges parallel to the ray are skipped.
+pub fn shape_point(points: &[Point], point: Point) -> bool {
+    let mut inside = false;
+    for (&a, &b) in points.iter().zip(points.iter().skip(1).chain(points.first())) {
+        if (a.x > point.x) != (b.x > point.x) {
+            // y where the edge crosses the vertical line through the point;
+            // a.x != b.x is guaranteed by the check above
+            let y = a.y + (point.x - a.x) * (b.y - a.y) / (b.x - a.x);
+            if y > point.y {
+                inside = !inside;
+            }
+        }
+    }
+    inside
 }
 
-/// Project a line vertically from `vertical_line_start` to infinity.
-/// Check whether this line intersects `bounded_line`.
-fn vertical_downward_line_bounded_line(vertical_line_start: Point, bounded_line: Line) -> bool {
-    let Point { x: x1, y: y1 } = vertical_line_start;
-    let Point { x: x2, y: y2 } = vertical_line_start + Point { x: 0., y: 1. };
-    let Point { x: x3, y: y3 } = bounded_line.start;
-    let Point { x: x4, y: y4 } = bounded_line.end;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::basic::CellDim;
+    use crate::rendering::shape::{Hexagon, Shape};
 
-    #[rustfmt::skip]
-    let u = determinant_2x2(
-        x1 - x2, x1 - x3,
-        y1 - y2, y1 - y3,
-    ) / determinant_2x2(
-        x1 - x2, x3 - x4,
-        y1 - y2, y3 - y4,
-    );
+    #[test]
+    fn hexagon_inside_and_outside() {
+        let cell_dim = CellDim::from(10.);
+        let hexagon = Hexagon::new(cell_dim);
+        let (w, h) = (cell_dim.width(), cell_dim.height());
 
-    if !(-1. ..=0.).contains(&u) {
-        return false;
+        assert!(shape_point(&hexagon, cell_dim.center()));
+        assert!(!shape_point(&hexagon, Point { x: -1., y: h / 2. }));
+        assert!(!shape_point(&hexagon, Point { x: w + 1., y: h / 2. }));
+        // the corner regions of the bounding box are outside the hexagon
+        assert!(!shape_point(&hexagon, Point { x: 0.5, y: 0.5 }));
     }
 
-    #[rustfmt::skip]
-    let t = determinant_2x2(
-        x1 - x3, x3 - x4,
-        y1 - y3, y3 - y4,
-    ) / determinant_2x2(
-        x1 - x2, x3 - x4,
-        y1 - y2, y3 - y4,
-    );
-
-    t >= 0.
-}
-
-/// Project a line straight down from the point, if this line intersects
-/// the shape an odd number of times, then the point must be inside the shape
-pub fn shape_point(points: &[Point], point: Point) -> bool {
-    let num_intersections = points
-        .iter()
-        .zip(points.iter().skip(1).chain(points.first()))
-        .filter(|win| {
-            let (&start, &end) = win;
-            let bounded_line = Line { start, end };
-            vertical_downward_line_bounded_line(point, bounded_line)
-        })
-        .count();
-    if num_intersections % 2 == 1 {
-        println!("shape <> point: {num_intersections} intersections");
-        true
-    } else {
-        false
+    #[test]
+    fn ray_through_a_vertex_counts_it_once() {
+        let cell_dim = CellDim::from(10.);
+        let hexagon = Hexagon::new(cell_dim);
+        // straight below this point lies the hexagon's bottom-left vertex
+        let point = Point { x: cell_dim.cos, y: cell_dim.height() / 2. };
+        assert!(shape_point(&hexagon, point));
     }
 }

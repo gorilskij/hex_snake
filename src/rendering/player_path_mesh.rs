@@ -9,23 +9,37 @@ use crate::apple::Apple;
 use crate::basic::{Dir, Point};
 use crate::rendering::shape::ShapePoints;
 use crate::snake::eat_mechanics::Knowledge;
-use crate::snake::Snake;
+use crate::snake::{SegmentType, Snake};
 use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
 use crate::view::snakes::OtherSnakes;
 
+/// The autopilot's path, as two meshes: the part to draw under the snakes,
+/// and the part over the player's own eaten segments, which the path passes
+/// through and which would otherwise hide it.
 pub fn player_path_mesh(
     player_snake: &mut Snake,
     other_snakes: OtherSnakes,
     apples: &[Apple],
     gtx: &GameContext,
     stats: &mut Stats,
-) -> Option<Result<Mesh>> {
+) -> Option<Result<(Mesh, Mesh)>> {
     let autopilot = player_snake.autopilot.as_mut()?;
-    // TODO: this conversion is too expensive
     let knowledge = Knowledge::accurate(&player_snake.eat_mechanics);
     let path = autopilot.get_path(&player_snake.body, Some(&knowledge), &other_snakes, apples, gtx)?;
 
-    let mut parts: Vec<Mesh> = vec![];
+    // the head is where the path starts, so it stays over the path even when
+    // eaten; only the body the path crosses further on is drawn under it
+    let eaten: Vec<_> = player_snake
+        .body
+        .segments
+        .iter()
+        .skip(1)
+        .filter(|segment| matches!(segment.segment_type, SegmentType::Eaten { .. }))
+        .map(|segment| segment.pos)
+        .collect();
+
+    let mut under: Vec<Mesh> = vec![];
+    let mut over: Vec<Mesh> = vec![];
 
     for (pos, next_pos) in path.iter().zip(path.iter().skip(1).map(Some).chain(iter::once(None))) {
         let dest = pos.to_cartesian(gtx.cell_dim) + gtx.cell_dim.center();
@@ -38,6 +52,7 @@ pub fn player_path_mesh(
         });
 
         let radius = gtx.cell_dim.side / 2.5;
+        let parts = if eaten.contains(pos) { &mut over } else { &mut under };
 
         parts.push(build_circle(DrawMode::fill(), dest, radius, crate::color::WHITE));
         stats.polygons += 1;
@@ -66,5 +81,5 @@ pub fn player_path_mesh(
         }
     }
 
-    Some(Ok(Mesh::combine(parts)))
+    Some(Ok((Mesh::combine(under), Mesh::combine(over))))
 }

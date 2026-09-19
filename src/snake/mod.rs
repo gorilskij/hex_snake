@@ -22,6 +22,8 @@ pub enum State {
     Living,
     Dying,
     Crashed,
+    /// Shrunk down to the minimum length (hunger mode); frozen like `Crashed`
+    Starved,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Enum)]
@@ -67,6 +69,49 @@ type SegmentFraction = f32;
 /// Half a cell puts the head tip at the cell's centre, where the hole is drawn.
 const HOLE_DEPTH: f32 = 0.5;
 
+/// Below this, a negative tail fraction is float noise rather than growth.
+const TAIL_EPSILON: f32 = 1e-4;
+
+/// A change to a snake's `length` spread over time. It eases out, so growth
+/// starts out faster than the snake moves and the tail briefly backs up.
+#[derive(Copy, Clone, Debug)]
+pub struct LengthChange {
+    amount: f32,
+    duration: f32,
+    elapsed: f32,
+    applied: f32,
+}
+
+impl LengthChange {
+    /// `amount` cells (negative to shrink) over `duration` seconds.
+    pub fn new(amount: f32, duration: f32) -> Self {
+        Self {
+            amount,
+            duration,
+            elapsed: 0.,
+            applied: 0.,
+        }
+    }
+
+    /// Advance by `dt` seconds, returning how much length that adds.
+    fn step(&mut self, dt: f32) -> f32 {
+        self.elapsed += dt;
+        let progress = if self.duration > 0. {
+            (self.elapsed / self.duration).min(1.)
+        } else {
+            1.
+        };
+        let total = self.amount * ezing::cubic_out(progress);
+        let delta = total - self.applied;
+        self.applied = total;
+        delta
+    }
+
+    fn is_done(&self) -> bool {
+        self.elapsed >= self.duration
+    }
+}
+
 pub struct Body {
     pub segments: VecDeque<Segment>,
 
@@ -80,8 +125,8 @@ pub struct Body {
     /// **The conserved quantity.** The snake's true length in cells, a float.
     /// A snake *is* this long from the moment it is created until it is gone;
     /// being born and dying do not change it, they only change how much of it
-    /// is on the board (see [`Body::on_board`]). It changes only by explicit,
-    /// capped growth in [`Snake::advance`] — never as a drifting difference of
+    /// is on the board (see [`Body::on_board`]). It changes only by digestion
+    /// and [`LengthChange`]s in [`Snake::advance`] — never as a drifting difference of
     /// two accumulators.
     pub length: f32,
 
@@ -96,6 +141,9 @@ pub struct Body {
     /// left. Never affects `length`.
     pub swallowed: f32,
 
+    /// Changes to `length` still being applied.
+    pub length_changes: Vec<LengthChange>,
+
     /// When a snake changes direction halfway through
     /// a segment appearing, the transition needs to be
     /// done smoothly, this indicates at which segment
@@ -109,6 +157,19 @@ pub struct Body {
 }
 
 impl Body {
+    /// Add (or, if negative, remove) material right away. Once the snake is all
+    /// the way out of its birth hole the change happens at the tail; before
+    /// that, only the part still in the hole changes.
+    fn change_length(&mut self, amount: f32) {
+        let all_out = self.emerged >= self.length;
+        self.length = (self.length + amount).max(0.);
+        self.emerged = if all_out {
+            self.length
+        } else {
+            self.emerged.min(self.length)
+        };
+    }
+
     /// The current length of the body (how many cells are visible)
     pub fn visible_len(&self) -> usize {
         self.segments.len()
@@ -129,6 +190,58 @@ impl Body {
     pub fn tail_fraction(&self) -> f32 {
         (self.visible_len() as f32 - 1.0) + self.head_fraction - self.on_board()
     }
+
+    /// Digest what the tail passes over as it moves `travel` cells from
+    /// `tail`, where it was (as a [`Self::tail_fraction`]), and return how
+    /// much `length` grows by. Through an eaten segment with food left the
+    /// tail moves at 1/(food+1) of `travel`'s pace, and the rest is growth,
+    /// taken from the segment's `food_left`; anywhere else it moves at full
+    /// pace. Growth slows the tail, so it may not get as far as `travel`.
+    fn digest(&mut self, tail: f32, travel: f32) -> f32 {
+        let mut growth = 0.;
+        // the flow of material still to pass the tail this frame
+        let mut flow = travel.max(0.);
+        // how far into segment `i` the tail is
+        let mut pos = tail.max(0.);
+        let mut i = self.segments.len();
+
+        while flow > 0. && i > 0 {
+            i -= 1;
+            let to_end = (1. - pos).max(0.);
+            match &mut self.segments[i].segment_type {
+                SegmentType::Eaten { original_food, food_left } if *food_left > 0. && *original_food > 0. => {
+                    let food = *original_food;
+                    // the flow that takes the tail to the end of the segment,
+                    // and the flow that uses up the food left in it; they
+                    // agree unless the segment was entered part-way
+                    let flow_here = flow.min(to_end * (food + 1.)).min(*food_left * (food + 1.) / food);
+                    let digested = (flow_here * food / (food + 1.)).min(*food_left);
+                    *food_left -= digested;
+                    growth += digested;
+                    flow -= flow_here;
+                    pos += flow_here / (food + 1.);
+                    if *food_left > 0. && pos < 1. {
+                        // the flow ran out inside the segment
+                        break;
+                    }
+                    // whatever is left of the segment is crossed at full pace
+                    let rest = flow.min((1. - pos).max(0.));
+                    flow -= rest;
+                    pos += rest;
+                }
+                _ => {
+                    let moved = flow.min(to_end);
+                    flow -= moved;
+                    pos += moved;
+                }
+            }
+            if pos < 1. {
+                break;
+            }
+            pos -= 1.;
+        }
+        growth
+    }
 }
 
 pub struct Snake {
@@ -136,6 +249,8 @@ pub struct Snake {
     pub eat_mechanics: EatMechanics,
     /// Speed is measured in cells/s
     pub speed: f32,
+    /// How fast the snake shrinks on its own, in cells/s (hunger mode)
+    pub starvation: f32,
 
     pub body: Body,
     pub state: State,
@@ -259,13 +374,15 @@ impl Snake {
     }
 
     /// Return value indicates whether a call to advance_cell should be made
-    pub fn advance(&mut self, elapsed: Duration) -> bool {
-        if self.state == State::Crashed {
+    pub fn advance(&mut self, elapsed: Duration, board_dim: HexDim) -> bool {
+        if matches!(self.state, State::Crashed | State::Starved) {
             return false;
         }
 
         // Every frame, `delta` cells of material flow forward along the body.
         let delta = self.speed * elapsed.as_secs_f32();
+        // where the tail starts this frame, for digestion
+        let tail_start = self.body.tail_fraction();
 
         // Front end: either the head advances into the next cell, or — once it
         // has sunk into the death hole — it stays put and the material flowing
@@ -280,14 +397,13 @@ impl Snake {
             State::Living => {
                 self.body.head_fraction += delta;
                 if self.body.head_fraction >= 1.0 {
-                    // TODO: might need to do multiple calls to advance_cell at high speeds
                     assert!(self.body.head_fraction < 2.0);
                     self.body.head_fraction -= 1.0;
                     self.dir_updated = false;
                     cell_boundary_crossed = true;
                 }
             }
-            State::Crashed => unreachable!("returned above"),
+            State::Crashed | State::Starved => unreachable!("returned above"),
         }
 
         // Back end: material leaves the birth hole at the head's speed until
@@ -295,36 +411,60 @@ impl Snake {
         // applied this frame is seen as "not yet emerged" and animates.
         self.body.emerged = (self.body.emerged + delta).min(self.body.length);
 
-        // Digestion: while the tail segment is eaten, the tail crosses it at
-        // 1/(food+1) speed, so length grows at food/(food+1) of the head's rate
-        // — and lags by exactly `food` once fully crossed. Capped at
-        // `food_left` so the total is exactly `food`, drift-free. Only a snake
-        // that is all the way out has a tail free to move at all. A dying snake
-        // keeps digesting — the material is still flowing — which does buy it a
-        // little time before the hole finishes it.
-        if self.body.emerged >= self.body.length {
-            if let Some(SegmentType::Eaten { original_food, food_left }) =
-                self.body.segments.back().map(|s| s.segment_type)
-            {
-                if food_left > 0.0 {
-                    let step = (delta * original_food / (original_food + 1.0)).min(food_left);
-                    self.body.length += step;
-                    if let Some(SegmentType::Eaten { food_left, .. }) =
-                        self.body.segments.back_mut().map(|s| &mut s.segment_type)
-                    {
-                        *food_left -= step;
-                    }
-                }
+        // Length changes (apples, bad apples, starvation). Once the snake is all
+        // the way out these move the tail directly, so growth faster than the
+        // snake moves pushes the tail backwards.
+        if self.state == State::Living {
+            let dt = elapsed.as_secs_f32();
+            let mut change = -self.starvation * dt;
+            self.body.length_changes.retain_mut(|length_change| {
+                change += length_change.step(dt);
+                !length_change.is_done()
+            });
+            if change != 0. {
+                self.body.change_length(change);
             }
+        }
+
+        // Digestion: while the tail is in an eaten segment it crosses it at
+        // 1/(food+1) of the speed it would otherwise move, and the difference
+        // is growth, so a segment grows `length` by exactly `food` once
+        // crossed. The tail can cross segment boundaries mid-frame, so its
+        // movement is followed segment by segment, each at its own rate. Only
+        // a snake that is all the way out has a tail free to move at all. A
+        // dying snake keeps digesting — the material is still flowing — which
+        // does buy it a little time before the hole finishes it.
+        let pending_push = cell_boundary_crossed as usize as f32;
+        if self.body.emerged >= self.body.length {
+            // how far the tail would move this frame without digestion
+            let travel = self.body.tail_fraction() + pending_push - tail_start;
+            let growth = self.body.digest(tail_start, travel);
+            // like any length change of a snake that is all the way out, this
+            // moves the tail directly, in this frame
+            self.body.change_length(growth);
         }
 
         // Drop trailing segments the tail has fully receded past. A living
         // snake pushes one head segment this frame (in advance_cell) when it
         // crosses a boundary; count it now so the tail stays continuous across
         // that push.
-        let pending_push = cell_boundary_crossed as usize as f32;
         while self.body.tail_fraction() + pending_push >= 1.0 && self.body.visible_len() > 1 {
             self.body.segments.pop_back();
+        }
+
+        // The tail backing up past its last segment grows new segments behind
+        // it, straight on from the last one.
+        while self.body.tail_fraction() + pending_push < -TAIL_EPSILON {
+            let last = *self.body.segments.back().expect("a snake always has a segment");
+            let dir = last.coming_from;
+            self.body.segments.push_back(Segment {
+                segment_type: SegmentType::Normal,
+                pos: last.pos.wrapping_translate(dir, 1, board_dim),
+                coming_from: dir,
+                going_to: Some(-dir),
+                teleported: None,
+                z_index: last.z_index,
+            });
         }
 
         cell_boundary_crossed
@@ -377,6 +517,7 @@ impl Snake {
                 self.body.segments.push_front(new_head);
             }
             State::Crashed => panic!("called advance_cell() on a crashed snake"),
+            State::Starved => panic!("called advance_cell() on a starved snake"),
         }
 
         self.body.turn_start = None;
@@ -404,9 +545,81 @@ impl Snake {
         }
     }
 
+    pub fn starve(&mut self) {
+        self.state = State::Starved;
+    }
+
     pub fn die(&mut self) {
         if !matches!(self.state, State::Dying) {
             self.state = State::Dying;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::game_mode::GameMode;
+    use crate::app::prefs::Prefs;
+    use crate::apple::spawn::SpawnPolicy;
+    use crate::basic::CellDim;
+    use crate::snake::eat_mechanics::EatBehavior;
+
+    const BOARD: HexDim = HexDim { h: 40, v: 40 };
+
+    fn snake() -> Snake {
+        builder::Builder::default()
+            .snake_type(Type::Player)
+            .eat_mechanics(EatMechanics::always(EatBehavior::PassOver))
+            .palette(PaletteTemplate::rainbow())
+            .controller(snake_control::Template::Programmed(vec![]))
+            .speed(5.)
+            .pos(HexPoint { h: 20, v: 20 })
+            .dir(Dir::U)
+            .len(4)
+            .build()
+            .unwrap()
+    }
+
+    fn step(snake: &mut Snake, dt: f32, gtx: &GameContext) {
+        if snake.advance(Duration::from_secs_f32(dt), BOARD) {
+            snake.advance_cell(&[], gtx);
+        }
+    }
+
+    /// An apple grows the snake by exactly its food, whatever the frame
+    /// length: the tail crosses segment boundaries mid-frame, and each part
+    /// of its movement must be digested at its own segment's rate.
+    #[test]
+    fn an_apple_grows_the_snake_by_exactly_its_food() {
+        let gtx = GameContext::new(
+            BOARD,
+            CellDim::from(10.),
+            crate::app::Palette::dark(),
+            Prefs::default(),
+            SpawnPolicy::None,
+            GameMode::Classic,
+        );
+
+        for dt in [1. / 60., 1. / 144., 1. / 7., 0.037, 0.0913] {
+            for food in [1., 2., 0.5] {
+                let mut snake = snake();
+                // all the way out, and the head at an odd point in its cell
+                for _ in 0..(10. / dt) as usize {
+                    step(&mut snake, dt, &gtx);
+                }
+                let before = snake.body.length;
+
+                // the head's cell becomes the eaten segment
+                snake.body.segments[0].segment_type = SegmentType::Eaten { original_food: food, food_left: food };
+
+                // until the tail has passed it
+                for _ in 0..(20. / dt) as usize {
+                    step(&mut snake, dt, &gtx);
+                }
+                let grown = snake.body.length - before;
+                assert!((grown - food).abs() < 1e-4, "dt {dt}, food {food}: grew by {grown}");
+            }
         }
     }
 }

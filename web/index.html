@@ -29,6 +29,14 @@
         })();
     </script>
     <script src="mq_js_bundle.js"></script>
+    <!--
+        Preference storage. sapp_jsutils marshals strings across the wasm
+        boundary (which carries only numbers and pointers); quad-storage is the
+        miniquad plugin that puts them in localStorage. Both must come after the
+        bundle, which defines miniquad_add_plugin, and before load().
+    -->
+    <script src="sapp_jsutils.js"></script>
+    <script src="quad-storage.js"></script>
     <script>
         // Keep the canvas focused so keyboard events reach the game.
         // (wrapped in an IIFE: the bundle already declares a global `canvas`)

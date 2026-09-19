@@ -1,20 +1,23 @@
 //! Functions that are common to all [`Screen`]s for
 //! collision detection and snake management
 
+use std::collections::HashSet;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use rand::distributions::uniform::SampleRange;
 
+use crate::app::game_mode::{hunger, GameMode};
 use crate::app::portal;
 use crate::app::screen::Environment;
-use crate::basic::board::{get_occupied_cells, random_free_spot};
+use crate::basic::board::{get_occupied_cells, occupied_or_near_players, random_free_spot};
 use crate::basic::{Dir, HexPoint};
+use crate::rendering::segments::centerline::Centerline;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
-use crate::snake::{self, SegmentType, State};
-use crate::snake_control;
+use crate::snake::{self, LengthChange, SegmentType, Snake, State};
 use crate::view::snakes::OtherSnakes;
+use crate::{rendering, snake_control};
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -22,7 +25,6 @@ pub enum Collision {
         snake_index: usize,
         apple_index: usize,
     },
-    // TODO: implement separate head-head collision mechanism
     // head of snake1 collided with head or body of snake2
     Snake {
         snake1_index: usize,
@@ -37,46 +39,94 @@ pub enum Collision {
     Portal(portal::Behavior),
 }
 
+/// Apples are eaten by whichever cell the head is in, and snakes collide by
+/// whatever the draw style says. The two are decided independently, so a head
+/// can reach an apple and hit something in the same tick.
 pub fn find_collisions<Rng>(env: &Environment<Rng>) -> Vec<Collision> {
     let mut collisions = vec![];
 
-    for (snake1_index, snake1) in env
-        .snakes
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying))
-    {
-        let pos = snake1.head().pos;
-
-        // snakes and apples cannot overlap
-        if let Some(apple_index) = env.apples.iter().position(|apple| apple.pos == pos) {
-            collisions.push(Collision::Apple {
-                snake_index: snake1_index,
-                apple_index,
-            });
-            continue;
-        }
-
-        // several segments can share a cell (one snake passing over another):
-        // the worst of them is what happens
-        let worst = segments_at(env, snake1_index, pos).max_by_key(|&(_, _, outcome)| outcome);
-        if let Some((snake2_index, segment_idx, _)) = worst {
-            collisions.push(if snake2_index == snake1_index {
-                Collision::Itself {
-                    snake_index: snake1_index,
-                    snake_segment_index: segment_idx,
-                }
-            } else {
-                Collision::Snake {
-                    snake1_index,
-                    snake2_index,
-                    snake2_segment_index: segment_idx,
-                }
-            });
+    for (snake_index, snake) in living_snakes(env) {
+        if let Some(apple_index) = env.apples.iter().position(|apple| apple.pos == snake.head().pos) {
+            collisions.push(Collision::Apple { snake_index, apple_index });
         }
     }
 
+    match env.gtx.prefs.draw_style {
+        // hexagon segments fill their whole cell, so there cells *are* the shape
+        rendering::Style::Hexagon => cell_snake_collisions(env, &mut collisions),
+        rendering::Style::Smooth => drawn_snake_collisions(env, &mut collisions),
+    }
+
     collisions
+}
+
+fn living_snakes<'a, Rng>(env: &'a Environment<Rng>) -> impl Iterator<Item = (usize, &'a Snake)> + 'a {
+    env.snakes
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| !matches!(s.state, State::Crashed | State::Dying | State::Starved))
+}
+
+fn collision(snake1_index: usize, snake2_index: usize, snake2_segment_index: usize) -> Collision {
+    if snake1_index == snake2_index {
+        Collision::Itself {
+            snake_index: snake1_index,
+            snake_segment_index: snake2_segment_index,
+        }
+    } else {
+        Collision::Snake {
+            snake1_index,
+            snake2_index,
+            snake2_segment_index,
+        }
+    }
+}
+
+/// A head collides with whatever shares its cell.
+fn cell_snake_collisions<Rng>(env: &Environment<Rng>, collisions: &mut Vec<Collision>) {
+    for (snake1_index, snake1) in living_snakes(env) {
+        // several segments can share a cell (one snake passing over another):
+        // the worst of them is what happens
+        let worst = segments_at(env, snake1_index, snake1.head().pos).max_by_key(|&(_, _, outcome)| outcome);
+        if let Some((snake2_index, segment_idx, _)) = worst {
+            collisions.push(collision(snake1_index, snake2_index, segment_idx));
+        }
+    }
+}
+
+/// The head's cell still decides *what* it runs into and what that does — a
+/// head only ever interacts with what shares its cell, exactly as before. All
+/// geometry adds is a veto: candidates whose drawn flesh the head does not
+/// actually reach are dropped, so a head no longer crashes into a tail that has
+/// already receded out of the way.
+///
+/// A snake is the `side/2` neighborhood of its centerline (see [`Centerline`]),
+/// so the head's cap touches a segment when it comes within the sum of the two
+/// half-widths of that segment's centerline.
+fn drawn_snake_collisions<Rng>(env: &Environment<Rng>, collisions: &mut Vec<Collision>) {
+    let centerlines: Vec<Centerline> = env
+        .snakes
+        .iter()
+        .map(|snake| Centerline::of(&snake.body, &env.gtx))
+        .collect();
+
+    for (snake1_index, snake1) in living_snakes(env) {
+        let head = &centerlines[snake1_index];
+        let Some(probe) = head.head_base() else { continue };
+
+        let worst = segments_at(env, snake1_index, snake1.head().pos)
+            .filter(|&(snake2_index, segment_index, _)| {
+                let other = &centerlines[snake2_index];
+                other
+                    .distance_to(segment_index, probe)
+                    .is_some_and(|distance| distance <= head.cap_radius + other.half_width)
+            })
+            .max_by_key(|&(_, _, outcome)| outcome);
+
+        if let Some((snake2_index, segment_index, _)) = worst {
+            collisions.push(collision(snake1_index, snake2_index, segment_index));
+        }
+    }
 }
 
 /// What would happen to a snake whose head entered a cell, in increasing order
@@ -106,8 +156,6 @@ fn segments_at<Rng>(
     snake_index: usize,
     pos: HexPoint,
 ) -> impl Iterator<Item = (usize, usize, Outcome)> + '_ {
-    use EatBehavior::*;
-
     let snake = &env.snakes[snake_index];
     env.snakes.iter().enumerate().flat_map(move |(other_index, other)| {
         let itself = other_index == snake_index;
@@ -120,21 +168,29 @@ fn segments_at<Rng>(
             .skip(itself as usize)
             .filter(move |(_, segment)| segment.pos == pos)
             .map(move |(segment_index, segment)| {
-                let behavior = if itself {
-                    snake.eat_mechanics.eat_self(segment.segment_type)
-                } else {
-                    snake.eat_mechanics.eat_other(other.snake_type, segment.segment_type)
-                };
-                let outcome = match behavior {
-                    Crash | Die => Outcome::Crash,
-                    // cutting another snake at its head kills both
-                    Cut if !itself && segment_index == 0 => Outcome::Crash,
-                    Cut => Outcome::Cut,
-                    PassUnder | PassOver => Outcome::Pass,
-                };
+                let outcome = outcome_for(snake, other, itself, segment_index, segment.segment_type);
                 (other_index, segment_index, outcome)
             })
     })
+}
+
+/// What happens to `snake` when its head runs into segment `segment_index` of
+/// `other`.
+fn outcome_for(snake: &Snake, other: &Snake, itself: bool, segment_index: usize, segment_type: SegmentType) -> Outcome {
+    use EatBehavior::*;
+
+    let behavior = if itself {
+        snake.eat_mechanics.eat_self(segment_type)
+    } else {
+        snake.eat_mechanics.eat_other(other.snake_type, segment_type)
+    };
+    match behavior {
+        Crash | Die => Outcome::Crash,
+        // cutting another snake at its head kills both
+        Cut if !itself && segment_index == 0 => Outcome::Crash,
+        Cut => Outcome::Cut,
+        PassUnder | PassOver => Outcome::Pass,
+    }
 }
 
 /// Apply the effect of every apple collision and remove the eaten apples.
@@ -167,9 +223,14 @@ pub fn handle_apple_collisions<Rng: rand::Rng>(
                     food_left: *food,
                 }
             }
-            Shrink(amount) => {
-                /////////////////////////////////////////////////////////////////////
-            }
+            Grow(amount) => env.snakes[snake_index]
+                .body
+                .length_changes
+                .push(LengthChange::new(*amount, hunger::GROW_DURATION)),
+            Shrink(amount) => env.snakes[snake_index]
+                .body
+                .length_changes
+                .push(LengthChange::new(-*amount, hunger::SHRINK_DURATION)),
             SpawnSnake(seed) => spawn_snakes.push((**seed).clone()),
             SpawnRain => {
                 let seed = SnakeBuilder::default()
@@ -275,9 +336,6 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
     let board_dim = env.gtx.board_dim;
 
     for mut snake_builder in snake_builders {
-        // avoid spawning too close to player snake heads
-        const PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS: usize = 7;
-
         // cells that are actually taken (snake bodies + apples)
         let occupied_cells = get_occupied_cells(&env.snakes, &env.apples);
 
@@ -285,13 +343,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
         // as a preference: on a board small enough that the neighborhood wraps
         // around and covers everything, fall back to plain occupancy so we can
         // still spawn wherever there is real free space
-        let mut preferred_free = occupied_cells.clone();
-        for snake in env.snakes.iter().filter(|s| s.snake_type == snake::Type::Player) {
-            let neighborhood = snake.reachable(PLAYER_SNAKE_HEAD_NO_SPAWN_RADIUS, board_dim);
-            preferred_free.extend_from_slice(&neighborhood);
-        }
-        preferred_free.sort_unstable();
-        preferred_free.dedup();
+        let preferred_free = occupied_or_near_players(&env.snakes, &env.apples, board_dim);
 
         match snake_builder.pos {
             Some(pos) => {
@@ -338,7 +390,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
     let mut remove_snakes = vec![];
     for (snake_idx, snake) in snakes.iter_mut().enumerate() {
         // advance the snake
-        if snake.advance(elapsed) {
+        if snake.advance(elapsed, env.gtx.board_dim) {
             // block is entered if the snake crossed a cell boundary
             new_cell_occupied = true;
 
@@ -355,6 +407,16 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
             }
 
             snake.advance_cell(&env.portals, &env.gtx);
+        }
+
+        // hunger mode: a snake shrunk down to the minimum has starved, which ends
+        // the game for the player; other snakes just die
+        if env.gtx.mode == GameMode::Hunger && snake.state == State::Living && snake.body.length <= hunger::MIN_LENGTH {
+            if snake.snake_type == snake::Type::Player {
+                snake.starve();
+            } else {
+                snake.die();
+            }
         }
 
         // remove the snake once the death hole has swallowed all of it (a snake
@@ -389,4 +451,36 @@ pub fn update_snake_dirs(env: &mut Environment) {
             snake.update_dir(other_snakes, &env.apples, &env.gtx);
         }
     }
+}
+
+/// Only heads eat apples: an apple that a tail has grown over (hunger mode)
+/// moves somewhere else.
+pub fn relocate_covered_apples<Rng: rand::Rng>(env: &mut Environment<Rng>) {
+    let covered: HashSet<HexPoint> = env
+        .snakes
+        .iter()
+        .flat_map(|snake| snake.body.segments.iter().skip(1))
+        .map(|segment| segment.pos)
+        .collect();
+    if !env.apples.iter().any(|apple| covered.contains(&apple.pos)) {
+        return;
+    }
+
+    let mut occupied = get_occupied_cells(&env.snakes, &env.apples);
+    let mut no_room = vec![];
+    for (apple_index, apple) in env.apples.iter_mut().enumerate() {
+        if !covered.contains(&apple.pos) {
+            continue;
+        }
+        match random_free_spot(&occupied, env.gtx.board_dim, &mut env.rng) {
+            Some(pos) => {
+                apple.pos = pos;
+                if let Err(idx) = occupied.binary_search(&pos) {
+                    occupied.insert(idx, pos);
+                }
+            }
+            None => no_room.push(apple_index),
+        }
+    }
+    env.remove_apples(no_room);
 }

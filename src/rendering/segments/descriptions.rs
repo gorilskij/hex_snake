@@ -11,28 +11,6 @@ pub struct SegmentFraction {
     pub end: f32,
 }
 
-impl SegmentFraction {
-    pub fn solid() -> Self {
-        Self { start: 0., end: 1. }
-    }
-
-    pub fn appearing(frame_fraction: f32) -> Self {
-        assert!(
-            (0. ..=1.).contains(&frame_fraction),
-            "Invalid frame fraction: {frame_fraction}",
-        );
-        Self { start: 0., end: frame_fraction }
-    }
-
-    pub fn disappearing(frame_fraction: f32) -> Self {
-        assert!(
-            (0. ..=1.).contains(&frame_fraction),
-            "Invalid frame fraction: {frame_fraction}",
-        );
-        Self { start: frame_fraction, end: 1. }
-    }
-}
-
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TurnDirection {
     Clockwise,

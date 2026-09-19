@@ -46,12 +46,18 @@ fn straight_cross_sections(cell_dim: CellDim, fraction: SegmentFraction) -> Vec<
     vec![
         (
             Point { x: cos, y: fraction.start * height },
-            Point { x: cos + side, y: fraction.start * height },
+            Point {
+                x: cos + side,
+                y: fraction.start * height,
+            },
             fraction.start,
         ),
         (
             Point { x: cos, y: fraction.end * height },
-            Point { x: cos + side, y: fraction.end * height },
+            Point {
+                x: cos + side,
+                y: fraction.end * height,
+            },
             fraction.end,
         ),
     ]
@@ -80,7 +86,7 @@ pub fn arc_params(description: &SegmentDescription) -> Option<ArcParams> {
         TurnType::Sharp(_) => {}
     }
 
-    let CellDim { side, sin, cos } = description.cell_dim;
+    let CellDim { side, cos, .. } = description.cell_dim;
 
     // distance of the pivot from where it is for a sharp turn
     let pivot_dist = 2. * cos * (1. / turn_fraction - 1.);
@@ -97,8 +103,8 @@ pub fn arc_params(description: &SegmentDescription) -> Option<ArcParams> {
     let total_angle = if (turn_fraction - 1.).abs() < f32::EPSILON {
         TAU / 3.
     } else {
-        let p0 = Point { x: cos + side / 2., y: sin };
-        let r0 = ((side / 2.).powi(2) + sin.powi(2)).sqrt();
+        let p0 = description.cell_dim.center();
+        let r0 = (side / 2.).hypot(description.cell_dim.height() / 2.);
         let intersection_point = upper_intersection_point(p0, r0, pivot, outer_radius);
         if intersection_point.x <= pivot.x {
             (intersection_point.y / (pivot.x - intersection_point.x)).atan()
@@ -175,8 +181,14 @@ fn curved_cross_sections(description: &SegmentDescription, fraction: SegmentFrac
             let t = k as f32 / steps as f32;
             let theta = start_angle + (end_angle - start_angle) * t;
             let (s, c) = theta.sin_cos();
-            let inner = Point { x: pivot.x + inner_radius * c, y: inner_radius * s };
-            let outer = Point { x: pivot.x + outer_radius * c, y: outer_radius * s };
+            let inner = Point {
+                x: pivot.x + inner_radius * c,
+                y: inner_radius * s,
+            };
+            let outer = Point {
+                x: pivot.x + outer_radius * c,
+                y: outer_radius * s,
+            };
             let frac = fraction.start + (fraction.end - fraction.start) * t;
             (inner, outer, frac)
         })
@@ -190,13 +202,19 @@ fn curved_cross_sections(description: &SegmentDescription, fraction: SegmentFrac
 /// when placed on the board.
 pub fn segment_cross_sections(description: &SegmentDescription) -> (Vec<CrossSection>, bool) {
     match description.turn.turn_type() {
-        TurnType::Straight => (straight_cross_sections(description.cell_dim, description.fraction), false),
+        TurnType::Straight => (
+            straight_cross_sections(description.cell_dim, description.fraction),
+            false,
+        ),
         TurnType::Blunt(dir) | TurnType::Sharp(dir) => {
             let cw = dir == TurnDirection::Clockwise;
             match curved_cross_sections(description, description.fraction) {
                 Some(sections) => (sections, cw),
                 // fell back to a symmetric box: no flip needed
-                None => (straight_cross_sections(description.cell_dim, description.fraction), false),
+                None => (
+                    straight_cross_sections(description.cell_dim, description.fraction),
+                    false,
+                ),
             }
         }
     }
