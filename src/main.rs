@@ -14,7 +14,7 @@ use macroquad::window::{next_frame, screen_height, screen_width, Conf};
 
 use crate::app::game_mode::GameMode;
 use crate::app::keyboard_control::ControlSetup;
-use crate::app::screen::{Game, Screen};
+use crate::app::screen::{Screen, StartScreen};
 use crate::app::Palette;
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Side};
@@ -28,6 +28,7 @@ mod support;
 #[macro_use]
 mod basic;
 mod app;
+mod button;
 mod color;
 mod keyboard_layout;
 mod snake;
@@ -119,16 +120,26 @@ async fn main() {
         hand: Side::Right,
     };
 
-    let cell_dim = CellDim::from(50.);
-    let seeds = vec![player_seed(control_setup, GAME_MODE)];
+    // a second player on the left of the keyboard: S D F / Z X C
+    let control_setup_2 = ControlSetup {
+        keyboard_side: Side::Left,
+        hand: Side::Left,
+        ..control_setup
+    };
 
-    let mut game = Game::new(
+    let cell_dim = CellDim::from(50.);
+    let seeds = vec![
+        player_seed(control_setup, GAME_MODE),
+        player_seed(control_setup_2, GAME_MODE),
+    ];
+
+    let mut screen: Box<dyn Screen> = Box::new(StartScreen::new(
         cell_dim,
         seeds,
         Palette::dark(),
         SpawnPolicy::Random { apple_count: 3 },
         GAME_MODE,
-    );
+    ));
 
     let mut last_size = (screen_width(), screen_height());
 
@@ -136,19 +147,22 @@ async fn main() {
         let size = (screen_width(), screen_height());
         if size != last_size {
             last_size = size;
-            let _ = game.resize_event(size.0, size.1);
+            let _ = screen.resize_event(size.0, size.1);
         }
 
         for key in get_keys_pressed() {
-            let _ = game.key_down_event(key);
+            let _ = screen.key_down_event(key);
         }
         for key in get_keys_released() {
-            let _ = game.key_up_event(key);
+            let _ = screen.key_up_event(key);
         }
 
-        let _ = game.update();
-        if let Err(e) = game.draw() {
+        let _ = screen.update();
+        if let Err(e) = screen.draw() {
             eprintln!("{e:?}");
+        }
+        if let Some(next) = screen.next_screen() {
+            screen = next;
         }
 
         next_frame().await;

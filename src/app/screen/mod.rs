@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 pub use game::Game;
+pub use start_screen::StartScreen;
 use macroquad::input::KeyCode;
 use rand::rngs::ThreadRng;
 
@@ -11,6 +12,7 @@ use crate::snake::Snake;
 
 mod board_dim;
 mod game;
+mod start_screen;
 
 /// The interface every screen (the game, and eventually menus/settings/editor)
 /// implements so the main loop can drive it uniformly: per-frame `update`/`draw`
@@ -31,6 +33,12 @@ pub trait Screen {
 
     fn resize_event(&mut self, width: f32, height: f32) -> Result<()> {
         Ok(())
+    }
+
+    /// The screen to switch to, if this one is done (e.g. the start screen
+    /// once the player starts a game). Polled once per frame.
+    fn next_screen(&mut self) -> Option<Box<dyn Screen>> {
+        None
     }
 }
 
