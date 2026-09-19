@@ -9,8 +9,10 @@ single backend: **macroquad**.
 > dissolved into direct macroquad calls + `support/`. Snake coloring was moved to
 > the GPU (see [Snake coloring](#snake-coloring-shader-based)), and the snake was
 > reworked into a float-length model (see [Snake length model](#snake-length-model-snakemodrs)).
-> Current work (on `master`) is game modes and new apple types: Hunger mode
-> (`app/game_mode.rs`) is implemented and is currently the default.
+> Game modes and new apple types came next: Hunger mode (`app/game_mode.rs`)
+> is implemented, but `main.rs`'s `GAME_MODE` is currently Classic. Most
+> recently (`menus` branch, merged): a start screen, in-game menus and
+> rebindable, layout-aware controls — see [Screens & menus](#screens--menus).
 
 ## Build / run / test
 
@@ -20,6 +22,9 @@ single backend: **macroquad**.
 - **Wasm:** `./web/build.sh` (debug) or `./web/build.sh release`. Builds
   `wasm32-unknown-unknown` and copies the artifact to `web/hex_snake.wasm`
   (gitignored, ~25 MB debug).
+- **Release for the web:** `./web/build.sh release` — the default debug build
+  is far too slow in wasm to judge smoothness. Add
+  `CARGO_PROFILE_RELEASE_DEBUG=false` for a ~2 MB file instead of ~25 MB.
 - **Serve:** `(cd web && python3 -m http.server 4000)` → open
   `http://127.0.0.1:4000/index.html`. `web/` holds `index.html` + vendored
   `mq_js_bundle.js` (canvas id `glcanvas`; inline JS is wrapped in an IIFE because
@@ -69,22 +74,31 @@ what the layout types — see below), then `next_frame().await`.
     palette LUT texture (`PaletteLut`) for snake coloring.
   - `time.rs` — `Instant` over `macroquad::time::get_time()` (std `Instant`
     panics on wasm). Also `partial_min_max` (NaN-safe), `flip`.
+  - `text.rs` — all text, in the bundled font, rasterized at a few fixed sizes
+    and scaled (see Gotchas). `storage.rs` — the saved-preferences blob
+    (localStorage on the web, a config file natively).
   - (The `Screen` trait — the old `EventHandler` — now lives in
     `app/screen/mod.rs`; `Game` implements it.)
 - **`app/`** — game orchestration.
   - `screen/game.rs` — **the `Game` struct**: owns the world (`Environment`),
-    `FpsControl`, cached meshes, and the `draw`/`update` event handlers. This is
-    where rendering is assembled and drawn.
-  - `screen/mod.rs` — `Environment<Rng>` (snakes, apples, portals, `GameContext`).
+    `FpsControl`, cached meshes, the menu, and the `draw`/`update` event
+    handlers. This is where rendering is assembled and drawn.
+  - `screen/mod.rs` — the `Screen` trait, `Transition` (the screen stack), and
+    `Environment<Rng>` (snakes, apples, portals, `GameContext`).
+  - `screen/start_screen.rs`, `screen/{menu,options_menu,controls_menu}.rs` —
+    see [Screens & menus](#screens--menus). `key.rs` — layout-aware keys and
+    player bindings.
   - `fps_control.rs` — play/pause/game-over state, the world's per-frame
     time step (smoothed frame duration × global debug speed multiplier, stepped
     with `[` / `]`; `Game::update` splits fast frames into ticks of ≤ half a cell).
   - `game_context.rs` (`GameContext`: cell_dim, board_dim, prefs, palette, mode),
     `game_mode.rs` (`GameMode` — Classic / Hunger — and the `hunger` tuning
     constants; `main.rs`'s `GAME_MODE` picks one, no selection UI yet),
-    `prefs.rs` (`Prefs`; default draw_style = Smooth, grid+border on),
-    `stats.rs` (the `S` overlay: polygons built this frame + the player's exact
-    `length`), `message.rs` (macroquad text overlay), `palette.rs` (board/bg
+    `prefs.rs` (`Prefs`, saved on every change: display settings, key
+    bindings, single-player side; default draw_style = Smooth, grid+border on),
+    `stats.rs` (the stats overlay: polygons built this frame + the player's
+    exact `length`), `message.rs` (text overlays, multi-line, optionally on a
+    dimmed box), `palette.rs` (board/bg
     colors, distinct from snake palette), `snake_management.rs` (advance, spawn,
     collisions — see [Collision](#collision-appsnake_managementrs) — and
     `outcome_at`), `border_hints.rs` (marks wrap-around edges —
@@ -94,8 +108,8 @@ what the layout types — see below), then `next_frame().await`.
     growing a triangle inwards from the arrival end as it closes.
     `HintStyle`, cycled from the options menu), `distance_grid.rs`,
     `portal/`, `board_dim.rs`.
-  - `screen/{start_screen,snake_control_creator_screen,debug_scenario}.rs` — **out
-    of the module tree** (not compiled); page chrome to be done in HTML/JS later.
+  - `screen/{snake_control_creator_screen,debug_scenario}.rs` — **out of the
+    module tree** (not compiled).
 - **`snake/`** — snake model. `mod.rs` (`Snake`, `Body`, `Segment`,
   `SegmentType`; the float-length model — see [Snake length model](#snake-length-model-snakemodrs)),
   `builder.rs`, `eat_mechanics.rs`, **`palette.rs`** (snake coloring: `Palette`
@@ -114,8 +128,34 @@ what the layout types — see below), then `next_frame().await`.
   ops; `oklab.rs`, `to_color.rs` (HSL→Color).
 - **`view/`** — `OtherSnakes`/`Snakes` borrowing helpers (`split_snakes`).
 - **`basic/`, `error.rs`** — misc.
-- **Out of tree (not compiled):** `button/`, `support/text_layout.rs`. Still on
-  disk with stale `ggez` references; harmless.
+- **`button/`** — immediate-mode polygon buttons (`Button`, `ButtonData`:
+  outline, inner shapes, text spans; hit-tested on the exact outline) and the
+  shared `style` (colors: grey, green hover, `ACCENT` yellow when pressed).
+- **Out of tree (not compiled):** `support/text_layout.rs`. Still on disk with
+  stale `ggez` references; harmless.
+
+## Screens & menus
+
+- **Screen stack** (`main.rs`, `Transition`): `StartScreen` stays at the bottom;
+  starting a game pushes a `Game`; "Main menu" pops it, back to the start screen
+  as it was left (`resume` reloads prefs, which the game may have changed).
+- **Start screen:** players (one/two) and Options buttons, one demo per player
+  (a hexagonal board one cell wider than the snake's programmed loop, defined
+  by a center + loop radius; follows the snake style, grid and border
+  settings; grid/border built once per size), palette arrows under each. ←/→
+  change palettes only with one player; Enter starts; Esc opens the options.
+- **Menus** (`menu.rs`, over a 90% black layer; the game is paused while open
+  and stays paused after): options (`options_menu.rs`: lines of hexagon
+  buttons, scrolling when too tall; in-game: Close, Restart + Main menu (each
+  behind an "are you sure?"), Controls, then the display settings) and Controls
+  (`controls_menu.rs`: both players' keys as hexagons with a key per corner,
+  a single-player radio button in each center; binding a key already used
+  moves it and flashes the old slot).
+- **Debug keys** (not in the menu, by layout character): Space play/pause,
+  `X` special apples, `D` distance grid, `1`–`9` apple food, `[`/`]` global
+  speed, ↑/↓ cell size.
+- **Cursor:** hidden on a key press while playing, shown again on any mouse
+  movement (macOS hides it app-wide, so it must be shown explicitly).
 
 ## Snake length model (`snake/mod.rs`)
 
@@ -174,7 +214,9 @@ removed once `state == Dying && on_board() <= 0`.
 `Game::draw` (`app/screen/game.rs`) lazily builds cached meshes and draws them in
 z-order onto a `Canvas`:
 
-1. Each `rendering::*_mesh` fn builds a `support::mesh::Mesh` (grid, border,
+1. Each `rendering::*_mesh` fn builds a `support::mesh::Mesh` (grid, border —
+   drawn edge by edge for any set of cells, `region_grid_mesh`/`region_border_mesh`,
+   the board being the full rectangle —
    apples, portals, distance grid, player path) via `MeshBuilder` (lyon fill/
    stroke → chunked macroquad meshes; chunks kept under macroquad's per-draw
    10000-vert / 5000-index clamp).
@@ -333,6 +375,18 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   wraps `getContext` to set `drawingBufferColorSpace = "display-p3"` (where
   supported), matching native. Raw texture/vertex data isn't converted, so
   nothing else needs to change.
+- **macroquad's glyph cache only grows:** every (character, font size) pair is
+  rasterized into one atlas texture that doubles when full and is never
+  cleared. Text sized with the window adds sizes on every resize frame until
+  the atlas outgrows the GPU ("texture unloadable") and all text vanishes.
+  `support::text` rasterizes at a few fixed sizes and scales with `font_scale`.
+- **Intermittent head judder on the web** (all browsers, not natively): the
+  game renders every frame at the right position and its per-frame work is
+  tiny (≤ 2 ms measured), but some frames reach the screen a refresh late,
+  so the head seems to step back and forth. It comes and goes — system
+  load on the browser/compositor path (GPU contention, memory pressure,
+  screen recording), not our code. Measured from screen recordings by
+  tracking the head tip per frame; don't re-chase it as a pacing bug.
 
 ## TODOs / not yet done
 
@@ -352,8 +406,9 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   (fine for the single-player game; revisit for multi-snake).
 - **`uv.y` (across-width)** is emitted but unused — hook for tube/curvature
   shading later.
-- **Deferred features from the wasm port:** on-canvas buttons, start screen, and
-  the non-Game screens (to be HTML/JS page chrome).
+- **Perf, more generally:** each frame rebuilds the snake mesh and the border
+  hints; worth trimming if frame work ever matters (it measured ≤ 2 ms in a
+  release wasm build at 120 Hz).
 - **Bad (shrink) apples, follow-ups:** the autopilot targets every apple
   (`view/targets.rs`) — it should only seek good apples and avoid bad ones; border
   hints report every apple as `Outcome::Apple` (green) — bad apples need their own
