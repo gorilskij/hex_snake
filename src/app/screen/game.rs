@@ -62,6 +62,8 @@ pub struct Game {
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
+    /// The part of the path over the player's eaten segments
+    player_path_over_mesh: Option<Mesh>,
 
     /// The menu shown over the game (paused underneath), if any
     menu: Menu,
@@ -117,6 +119,7 @@ impl Game {
             apple_mesh: None,
             distance_grid_mesh: None,
             player_path_mesh: None,
+            player_path_over_mesh: None,
 
             menu: Menu::Closed,
             leave: false,
@@ -170,6 +173,7 @@ impl Game {
             self.distance_grid.invalidate();
             self.border_hints.clear();
             self.player_path_mesh = None;
+            self.player_path_over_mesh = None;
         }
     }
 
@@ -184,6 +188,7 @@ impl Game {
         self.apple_mesh = None;
         self.distance_grid_mesh = None;
         self.player_path_mesh = None;
+        self.player_path_over_mesh = None;
 
         // seeds without a defined spawn point
         let unpositioned = self
@@ -481,6 +486,7 @@ impl Game {
                     "Path on"
                 } else {
                     self.player_path_mesh = None;
+                    self.player_path_over_mesh = None;
                     "Path off"
                 };
                 self.display_notification(text);
@@ -650,9 +656,9 @@ impl Screen for Game {
 
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
-            self.player_path_mesh =
-                rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats)
-                    .transpose()?;
+            let meshes = rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats)
+                .transpose()?;
+            (self.player_path_mesh, self.player_path_over_mesh) = meshes.unzip();
         }
 
         if env.gtx.prefs.display_stats {
@@ -677,6 +683,7 @@ impl Screen for Game {
             &self.player_path_mesh,
         ];
         let after_snake = [
+            &self.player_path_over_mesh,
             &self.apple_mesh,
             &self.border_mesh,
             &border_hint_mesh,

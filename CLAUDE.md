@@ -140,7 +140,11 @@ count. Head and tail are independent; nothing pins them to cell boundaries.
   tail position cannot drift (only `length` is stored, and only additively).
 - **Digestion:** an `Eaten { original_food, food_left }` tail segment is crossed
   at `1/(food+1)` speed, growing `length` by exactly `food` (capped by
-  `food_left`, drift-free). Dying snakes keep digesting.
+  `food_left`, drift-free). The tail can cross segment boundaries mid-frame, so
+  `Body::digest` follows its movement segment by segment, each at its own
+  rate — applying one rate to the whole frame lost up to a frame's worth of
+  growth per apple. Growth goes through `change_length`, so it moves the tail
+  in the same frame. Dying snakes keep digesting.
 - **Length changes (hunger mode):** `Grow`/`Shrink` apples push a `LengthChange`
   (an amount eased out over a duration) and apple-eating snakes have a constant
   `starvation` rate. Once the snake is all the way out, `Body::change_length`
@@ -179,7 +183,8 @@ z-order onto a `Canvas`:
 3. Snakes are special — drawn through a shader (below).
 
 Draw order (default material, split around the snake): distance_grid,
-hints (gradient style), grid, player_path → **snake (shaded)** → apple, border,
+hints (gradient style), grid, player_path → **snake (shaded)** → player_path
+over the player's own eaten segments (which it passes through), apple, border,
 hints (border style), portal → message text.
 
 ### Snake coloring (shader-based)
