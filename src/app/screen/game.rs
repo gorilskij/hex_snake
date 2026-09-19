@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
-use macroquad::input::{show_mouse, KeyCode};
+use macroquad::input::{mouse_position, show_mouse, KeyCode};
 use macroquad::material::Material;
 use macroquad::window::clear_background;
 use rand::prelude::*;
@@ -69,6 +69,8 @@ pub struct Game {
     menu: Menu,
     /// Whether to leave for the main menu
     leave: bool,
+    /// Where the mouse was last frame, to show the cursor when it moves
+    last_mouse: (f32, f32),
 }
 
 impl Game {
@@ -123,6 +125,7 @@ impl Game {
 
             menu: Menu::Closed,
             leave: false,
+            last_mouse: mouse_position(),
         };
         this.update_dim();
         // warning: this spawns apples before there are any snakes
@@ -397,18 +400,11 @@ impl Game {
     fn on_menu_event(&mut self, event: MenuEvent) {
         match event {
             // the game stays paused (Space resumes it)
-            MenuEvent::Closed => {
-                if self.env.gtx.prefs.hide_cursor {
-                    show_mouse(false);
-                }
-            }
+            MenuEvent::Closed => {}
             MenuEvent::Toggled(toggle) => self.toggled(toggle),
             MenuEvent::Restart => {
                 self.restart();
                 self.fps_control.play();
-                if self.env.gtx.prefs.hide_cursor {
-                    show_mouse(false);
-                }
             }
             MenuEvent::MainMenu => self.leave = true,
         }
@@ -587,6 +583,14 @@ impl Screen for Game {
     fn draw(&mut self) -> Result<()> {
         self.fps_control.graphics_frame();
 
+        // the cursor comes back as soon as the mouse moves (macOS would
+        // otherwise keep it hidden everywhere, even outside the window)
+        let mouse = mouse_position();
+        if mouse != self.last_mouse {
+            self.last_mouse = mouse;
+            show_mouse(true);
+        }
+
         if self.env.gtx.prefs.display_fps {
             self.update_fps_message();
         }
@@ -738,16 +742,18 @@ impl Screen for Game {
         if let Some(event) = event {
             self.on_menu_event(event);
         }
+        // Playing with the keyboard hides the cursor until the mouse moves.
+        // (Esc that closed the menu counts; Esc that is about to open it
+        // doesn't.)
+        if self.env.gtx.prefs.hide_cursor && !self.menu.is_open() && (used || key != Key::Code(Escape)) {
+            show_mouse(false);
+        }
         if used {
             return Ok(());
         }
         if key == Key::Code(Escape) {
             self.open_menu();
             return Ok(());
-        }
-
-        if self.env.gtx.prefs.hide_cursor && !self.menu.is_open() {
-            show_mouse(false);
         }
 
         // keys as the layout names them (see `app::key`)
