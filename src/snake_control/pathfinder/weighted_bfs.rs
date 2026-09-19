@@ -98,7 +98,11 @@ impl PathFinder for WeightedBFS {
                     + weights.step
                     + weights.turn(dir, new_dir)
                     + if teleported { weights.teleport } else { 0 }
-                    + if obstacle == Some(Obstacle::Passable) { weights.pass_through } else { 0 };
+                    + if obstacle == Some(Obstacle::Passable) {
+                        weights.pass_through
+                    } else {
+                        0
+                    };
 
                 let new_state = (new_pos, new_dir);
                 if costs.get(&new_state).is_none_or(|&old_cost| new_cost < old_cost) {

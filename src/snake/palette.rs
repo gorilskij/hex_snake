@@ -108,12 +108,7 @@ impl PaletteTemplate {
         }
     }
 
-    pub fn oklab_gradient(
-        head_hue: f64,
-        tail_hue: f64,
-        lightness: f64,
-        eaten_lightness: f64,
-    ) -> Self {
+    pub fn oklab_gradient(head_hue: f64, tail_hue: f64, lightness: f64, eaten_lightness: f64) -> Self {
         Self::OkLabGradient {
             head_hue,
             tail_hue,

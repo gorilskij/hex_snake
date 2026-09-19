@@ -69,16 +69,21 @@ impl Obstacles {
             .map(|seg| (seg.pos, knowledge.is_some_and(|k| k.can_pass_through_self(seg))));
         // other snakes are judged by how this snake eats *them*, not itself
         let others = other_snakes.iter().flat_map(|snake| {
-            snake
-                .body
-                .segments
-                .iter()
-                .map(move |seg| (seg.pos, knowledge.is_some_and(|k| k.can_pass_through_other(snake.snake_type, seg))))
+            snake.body.segments.iter().map(move |seg| {
+                (
+                    seg.pos,
+                    knowledge.is_some_and(|k| k.can_pass_through_other(snake.snake_type, seg)),
+                )
+            })
         });
 
         let mut cells = HashMap::new();
         for (pos, passable) in own.chain(others) {
-            let obstacle = if passable { Obstacle::Passable } else { Obstacle::Blocked };
+            let obstacle = if passable {
+                Obstacle::Passable
+            } else {
+                Obstacle::Blocked
+            };
             // several segments can share a cell: the worst of them counts
             cells
                 .entry(pos)

@@ -27,15 +27,14 @@ use crate::app::snake_management::{
 };
 use crate::app::stats::Stats;
 use crate::apple::spawn::{expire_apples, food_apple, spawn_apples, spawn_bad_apples, SpawnPolicy};
-use crate::apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
-use crate::rendering;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
 use crate::support::material::snake_material;
 use crate::support::mesh::{set_board_camera, Mesh};
 use crate::view::snakes::OtherSnakes;
+use crate::{apple, rendering};
 
 pub struct Game {
     env: Environment,
@@ -420,7 +419,12 @@ impl Screen for Game {
         }
 
         if self.snake_render.is_none() || playing {
-            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.apples, &env.gtx, &mut stats)?);
+            self.snake_render = Some(rendering::snake_mesh(
+                &mut env.snakes,
+                &env.apples,
+                &env.gtx,
+                &mut stats,
+            )?);
         }
 
         if env.apples.is_empty() {
@@ -489,10 +493,7 @@ impl Screen for Game {
             &self.portal_mesh,
         ];
 
-        let has_snake = self
-            .snake_render
-            .as_ref()
-            .is_some_and(|r| !r.shaded.is_empty());
+        let has_snake = self.snake_render.as_ref().is_some_and(|r| !r.shaded.is_empty());
         let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
@@ -646,17 +647,17 @@ impl Screen for Game {
             }
             Tab => {
                 changed = true;
-                let text;
-                match prefs.draw_style {
+
+                let text = match prefs.draw_style {
                     rendering::Style::Hexagon => {
                         prefs.draw_style = rendering::Style::Smooth;
-                        text = "draw style: smooth";
+                        "draw style: smooth"
                     }
                     rendering::Style::Smooth => {
                         prefs.draw_style = rendering::Style::Hexagon;
-                        text = "draw style: hexagon";
+                        "draw style: hexagon"
                     }
-                }
+                };
                 self.snake_render = None;
                 self.apple_mesh = None;
                 self.display_notification(text);

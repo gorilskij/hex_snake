@@ -53,11 +53,32 @@ pub fn occupied_or_near_players(snakes: &[Snake], apples: &[Apple], board_dim: H
     cells
 }
 
+pub fn random_free_spot(occupied_cells: &[HexPoint], board_dim: HexDim, rng: &mut impl Rng) -> Option<HexPoint> {
+    let free_spaces = (board_dim.h * board_dim.v) as usize - occupied_cells.len();
+    if free_spaces == 0 {
+        return None;
+    }
+
+    let mut new_idx = (0..free_spaces).sample_single(rng);
+    for HexPoint { h, v } in occupied_cells {
+        let idx = (v * board_dim.h + h) as usize;
+        if idx <= new_idx {
+            new_idx += 1;
+        }
+    }
+
+    assert!(new_idx < (board_dim.h * board_dim.v) as usize);
+    Some(HexPoint {
+        h: new_idx as isize % board_dim.h,
+        v: new_idx as isize / board_dim.h,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const CELL_DIM: CellDim = CellDim { side: 50., sin: 43.301270, cos: 25. };
+    const CELL_DIM: CellDim = CellDim { side: 50., sin: 43.30127, cos: 25. };
 
     /// The cartesian step must agree with the cells' own cartesian positions,
     /// for both column parities (the hex coordinate delta differs between them,
@@ -96,25 +117,4 @@ mod tests {
             "board space puts the wrapped neighbour {board_space} away, stepping puts it {stepped}",
         );
     }
-}
-
-pub fn random_free_spot(occupied_cells: &[HexPoint], board_dim: HexDim, rng: &mut impl Rng) -> Option<HexPoint> {
-    let free_spaces = (board_dim.h * board_dim.v) as usize - occupied_cells.len();
-    if free_spaces == 0 {
-        return None;
-    }
-
-    let mut new_idx = (0..free_spaces).sample_single(rng);
-    for HexPoint { h, v } in occupied_cells {
-        let idx = (v * board_dim.h + h) as usize;
-        if idx <= new_idx {
-            new_idx += 1;
-        }
-    }
-
-    assert!(new_idx < (board_dim.h * board_dim.v) as usize);
-    Some(HexPoint {
-        h: new_idx as isize % board_dim.h,
-        v: new_idx as isize / board_dim.h,
-    })
 }

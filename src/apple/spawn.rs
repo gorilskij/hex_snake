@@ -1,4 +1,3 @@
-use std::iter;
 use std::time::Duration;
 
 use rand::distributions::uniform::SampleRange;
@@ -54,11 +53,8 @@ impl SpawnScheduleBuilder {
     }
 
     pub fn spawn(mut self, pos: HexPoint, apple_type: apple::Type) -> Self {
-        self.0.push(SpawnEvent::Spawn(Apple {
-            pos,
-            apple_type,
-            time_left: None,
-        }));
+        self.0
+            .push(SpawnEvent::Spawn(Apple { pos, apple_type, time_left: None }));
         self
     }
 

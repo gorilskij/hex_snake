@@ -12,13 +12,12 @@ use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, occupied_or_near_players, random_free_spot};
 use crate::basic::{Dir, HexPoint};
-use crate::rendering;
 use crate::rendering::segments::centerline::Centerline;
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, LengthChange, SegmentType, Snake, State};
-use crate::snake_control;
 use crate::view::snakes::OtherSnakes;
+use crate::{rendering, snake_control};
 
 #[derive(Copy, Clone)]
 pub enum Collision {
@@ -178,13 +177,7 @@ fn segments_at<Rng>(
 
 /// What happens to `snake` when its head runs into segment `segment_index` of
 /// `other`.
-fn outcome_for(
-    snake: &Snake,
-    other: &Snake,
-    itself: bool,
-    segment_index: usize,
-    segment_type: SegmentType,
-) -> Outcome {
+fn outcome_for(snake: &Snake, other: &Snake, itself: bool, segment_index: usize, segment_type: SegmentType) -> Outcome {
     use EatBehavior::*;
 
     let behavior = if itself {
@@ -419,10 +412,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
 
         // hunger mode: a snake shrunk down to the minimum has starved, which ends
         // the game for the player; other snakes just die
-        if env.gtx.mode == GameMode::Hunger
-            && snake.state == State::Living
-            && snake.body.length <= hunger::MIN_LENGTH
-        {
+        if env.gtx.mode == GameMode::Hunger && snake.state == State::Living && snake.body.length <= hunger::MIN_LENGTH {
             if snake.snake_type == snake::Type::Player {
                 snake.starve();
             } else {

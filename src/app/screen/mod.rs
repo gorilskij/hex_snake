@@ -1,12 +1,11 @@
+use anyhow::{Context, Result};
 pub use game::Game;
 use macroquad::input::KeyCode;
 use rand::rngs::ThreadRng;
 
 use crate::app::game_context::GameContext;
 use crate::app::portal::Portal;
-pub use crate::app::prefs::Prefs;
 use crate::apple::Apple;
-use anyhow::{Context, Result};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
 

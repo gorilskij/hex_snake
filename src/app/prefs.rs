@@ -224,20 +224,34 @@ impl Prefs {
     }
 }
 
+// builder
+impl Prefs {
+    pub fn apple_food(mut self, food: f32) -> Self {
+        self.apple_food = food;
+        self
+    }
+
+    pub fn special_apples(mut self, special_apples: bool) -> Self {
+        self.special_apples = special_apples;
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn a_saved_file_reads_back_the_same() {
-        let mut prefs = Prefs::default();
-        prefs.draw_grid = DrawGrid::Dots;
-        prefs.hint_style = HintStyle::Gradient;
-        prefs.draw_style = rendering::Style::Hexagon;
-        prefs.draw_border = false;
-        prefs.display_fps = true;
-        prefs.message_duration = Duration::from_millis(4500);
-
+        let prefs = Prefs {
+            draw_grid: DrawGrid::Dots,
+            hint_style: HintStyle::Gradient,
+            draw_style: rendering::Style::Hexagon,
+            draw_border: false,
+            display_fps: true,
+            message_duration: Duration::from_millis(4500),
+            ..Default::default()
+        };
         assert_eq!(Prefs::read(&prefs.to_text()).to_text(), prefs.to_text());
     }
 
@@ -286,18 +300,5 @@ mod tests {
         prefs.prob_spawn_killer = 0.5;
 
         assert_eq!(prefs.to_text(), before);
-    }
-}
-
-// builder
-impl Prefs {
-    pub fn apple_food(mut self, food: f32) -> Self {
-        self.apple_food = food;
-        self
-    }
-
-    pub fn special_apples(mut self, special_apples: bool) -> Self {
-        self.special_apples = special_apples;
-        self
     }
 }

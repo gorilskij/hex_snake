@@ -321,7 +321,9 @@ fn teleport_hints(body: &Body, board_dim: HexDim, color: Color) -> HashMap<(HexP
     // Exits go in second because one edge can be both: a board small enough
     // puts a destination back on the very cell the wrap left from, and there
     // the exit's triangle has to win.
-    let entries = wraps.iter().map(|&(entry, dir, ..)| ((entry, dir), Mark { color, depth: 0. }));
+    let entries = wraps
+        .iter()
+        .map(|&(entry, dir, ..)| ((entry, dir), Mark { color, depth: 0. }));
     let exits = wraps
         .iter()
         .map(|&(_, dir, destination, depth)| ((destination, -dir), Mark { color, depth }));
@@ -467,9 +469,16 @@ mod tests {
         let entry = hints[&(HexPoint { h: 40, v: 0 }, Dir::U)];
         assert_eq!(entry.depth, 0., "the border it leaves through stays flat");
 
-        let exit = hints.iter().find(|(_, mark)| mark.depth > 0.).expect("an exit triangle");
+        let exit = hints
+            .iter()
+            .find(|(_, mark)| mark.depth > 0.)
+            .expect("an exit triangle");
         assert_eq!(exit.0 .1, -Dir::U, "the exit is the side it arrives through");
-        assert_ne!(exit.0 .0, HexPoint { h: 40, v: 0 }, "and a different cell on a big board");
+        assert_ne!(
+            exit.0 .0,
+            HexPoint { h: 40, v: 0 },
+            "and a different cell on a big board"
+        );
     }
 
     /// The far end of the range marks its border with no triangle at all, so a

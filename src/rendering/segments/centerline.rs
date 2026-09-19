@@ -190,13 +190,17 @@ mod tests {
     use crate::rendering::segments::smooth_segments::segment_cross_sections;
     use crate::snake::SegmentType;
 
-    const CELL_DIM: CellDim = CellDim { side: 50., sin: 43.301270, cos: 25. };
+    const CELL_DIM: CellDim = CellDim { side: 50., sin: 43.30127, cos: 25. };
 
     fn desc(coming_from: Dir, going_to: Dir, turn_fraction: f32) -> SegmentDescription {
         SegmentDescription {
             segment_idx: 0,
             destination: Point { x: 137., y: -91. },
-            turn: TurnDescription { coming_from, going_to, fraction: turn_fraction },
+            turn: TurnDescription {
+                coming_from,
+                going_to,
+                fraction: turn_fraction,
+            },
             fraction: SegmentFraction { start: 0., end: 1. },
             draw_style: rendering::Style::Smooth,
             segment_type: SegmentType::Normal,
@@ -287,7 +291,10 @@ mod tests {
         let segments = (0..len)
             .map(|i| Segment {
                 segment_type: SegmentType::Normal,
-                pos: HexPoint { h: head_cell.h, v: head_cell.v + i as isize },
+                pos: HexPoint {
+                    h: head_cell.h,
+                    v: head_cell.v + i as isize,
+                },
                 coming_from: Dir::D,
                 going_to: (i > 0).then_some(Dir::U),
                 teleported: None,
@@ -377,7 +384,10 @@ mod tests {
         let threshold = entering.cap_radius + leaving.half_width;
         let distance = leaving.distance_to(2, probe).unwrap();
 
-        assert!(distance <= threshold, "overlapping snakes are {distance} apart (threshold {threshold})");
+        assert!(
+            distance <= threshold,
+            "overlapping snakes are {distance} apart (threshold {threshold})"
+        );
     }
 
     /// A point beyond the end of a clipped range falls back to the end point,

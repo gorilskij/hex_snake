@@ -55,7 +55,7 @@ macroquad's `KeyCode` passed straight through, then `next_frame().await`.
   - `material.rs` — custom GLSL shader (`SnakeMaterial` via `snake_material()`) +
     palette LUT texture (`PaletteLut`) for snake coloring.
   - `time.rs` — `Instant` over `macroquad::time::get_time()` (std `Instant`
-    panics on wasm). Also `partial_min_max` (NaN-safe), `flip`, `filter_scan`.
+    panics on wasm). Also `partial_min_max` (NaN-safe), `flip`.
   - (The `Screen` trait — the old `EventHandler` — now lives in
     `app/screen/mod.rs`; `Game` implements it.)
 - **`app/`** — game orchestration.

@@ -1,11 +1,12 @@
+use anyhow::Result;
+use macroquad::color::Color;
+
 use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};
 use crate::app::stats::Stats;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
-use macroquad::color::Color;
-use anyhow::Result;
-use crate::support::mesh::{build_line, Mesh};
 use crate::rendering::shape::ShapePoints;
+use crate::support::mesh::{build_line, Mesh};
 
 pub fn render_hexagon_edge(dir: Dir, CellDim { side, sin, cos }: CellDim) -> ShapePoints {
     use Dir::*;
