@@ -85,7 +85,7 @@ impl Game {
                     HexPoint { h: 0, v: 0 },
                     cell_dim,
                     palette,
-                    Prefs::default(),
+                    Prefs::load(),
                     apple_spawn_policy,
                     mode,
                 ),
@@ -533,6 +533,8 @@ impl Screen for Game {
 
     fn key_down_event(&mut self, keycode: KeyCode) -> Result<()> {
         let prefs = &mut self.env.gtx.prefs;
+        // set by every branch that changes a stored preference
+        let mut changed = false;
 
         if prefs.hide_cursor {
             show_mouse(false);
@@ -555,6 +557,7 @@ impl Screen for Game {
                 fps_control::State::Paused => self.fps_control.play(),
             },
             B => {
+                changed = true;
                 let text = match prefs.draw_border.flip() {
                     true => "Border on",
                     false => "Border off",
@@ -563,6 +566,7 @@ impl Screen for Game {
                 self.display_notification(text);
             }
             G => {
+                changed = true;
                 let text = match prefs.draw_grid.rotate_next() {
                     DrawGrid::Grid => "Grid",
                     DrawGrid::Dots => "Dot grid",
@@ -572,6 +576,7 @@ impl Screen for Game {
                 self.display_notification(text);
             }
             H => {
+                changed = true;
                 let text = match prefs.hint_style.rotate_next() {
                     HintStyle::Border => "Border hints",
                     HintStyle::Gradient => "Gradient hints",
@@ -582,6 +587,7 @@ impl Screen for Game {
                 self.display_notification(text);
             }
             D => {
+                changed = true;
                 let text = if prefs.draw_distance_grid.flip() {
                     "Distance grid on"
                 } else {
@@ -591,6 +597,7 @@ impl Screen for Game {
                 self.display_notification(text);
             }
             P => {
+                changed = true;
                 let text = if prefs.draw_player_path.flip() {
                     "Path on"
                 } else {
@@ -600,11 +607,13 @@ impl Screen for Game {
                 self.display_notification(text);
             }
             F => {
+                changed = true;
                 if !prefs.display_fps.flip() {
                     self.messages.remove(&MessageID::Fps);
                 }
             }
             S => {
+                changed = true;
                 if !prefs.display_stats.flip() {
                     self.messages.remove(&MessageID::Stats);
                 }
@@ -635,6 +644,7 @@ impl Screen for Game {
                 }
             }
             Tab => {
+                changed = true;
                 let text;
                 match prefs.draw_style {
                     rendering::Style::Hexagon => {
@@ -700,6 +710,12 @@ impl Screen for Game {
                     }
                 }
             }
+        }
+
+        // Preferences go to storage the moment one changes: the web build has
+        // no reliable moment to flush them later.
+        if changed {
+            self.env.gtx.prefs.save();
         }
 
         Ok(())
