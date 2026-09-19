@@ -47,7 +47,8 @@ what the layout types — see below), then `next_frame().await`.
   paired from miniquad's ordered key-down + char events; other keys keep their
   code (`Key::Code`). Players' bindings live in `Prefs` (left/right player,
   plus which one a single player uses), edited from the options menu's
-  Controls screens; the keyboard controller looks them up on every press.
+  Controls screen (both players side by side); the keyboard controller looks
+  them up on every press.
 - All text uses the bundled DejaVu Sans (`support/text.rs`,
   `assets/fonts/`); macroquad's default font is ASCII-only.
 - `web/mq_js_bundle.js` is patched to map `MetaLeft`/`MetaRight` (the upstream
