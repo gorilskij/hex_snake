@@ -7,7 +7,7 @@
 
 use macroquad::input::KeyCode;
 
-use super::controls_menu::{self, KeysAction, KeysScreen, PlayersAction};
+use super::controls_menu::{self, ControlsAction, ControlsScreen};
 use super::options_menu::{self, Line};
 use crate::app::key::Key;
 use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
@@ -154,9 +154,8 @@ pub enum Menu {
     Closed,
     /// How far down the options are scrolled, in pixels
     Options { scroll: f32 },
-    /// The choice of player whose keys to change
-    Players,
-    Keys(KeysScreen),
+    /// Both players' keys
+    Controls(ControlsScreen),
     Confirm(Confirm),
 }
 
@@ -177,9 +176,8 @@ impl Menu {
                 *self = Menu::Closed;
                 return Some(MenuEvent::Closed);
             }
-            Menu::Players => self.open(),
-            Menu::Keys(keys) if keys.listening.is_some() => keys.listening = None,
-            Menu::Keys(_) => *self = Menu::Players,
+            Menu::Controls(controls) if controls.listening.is_some() => controls.listening = None,
+            Menu::Controls(_) => self.open(),
             Menu::Confirm(_) => self.open(),
         }
         None
@@ -196,7 +194,7 @@ impl Menu {
         if key == Key::Code(KeyCode::Escape) {
             return (true, self.back());
         }
-        if let Menu::Keys(KeysScreen { listening: Some(_), .. }) = self {
+        if let Menu::Controls(ControlsScreen { listening: Some(_), .. }) = self {
             if !matches!(key, Key::Code(KeyCode::Space | KeyCode::Unknown)) {
                 self.bind_key(key, prefs);
             }
@@ -208,10 +206,10 @@ impl Menu {
     /// Bind `key` to the listening key of the keys screen. A key already bound
     /// elsewhere (for either player) moves here, and its old place flashes.
     fn bind_key(&mut self, key: Key, prefs: &mut Prefs) {
-        let Menu::Keys(keys) = self else {
+        let Menu::Controls(screen) = self else {
             return;
         };
-        let Some(dir) = keys.listening.take() else {
+        let Some((target_side, dir)) = screen.listening.take() else {
             return;
         };
 
@@ -219,12 +217,12 @@ impl Menu {
             let controls = prefs.controls_mut(side);
             while let Some(old) = controls.dir_of(key) {
                 controls.set(old, None);
-                if (side, old) != (keys.side, dir) {
-                    keys.flash(side, old);
+                if (side, old) != (target_side, dir) {
+                    screen.flash(side, old);
                 }
             }
         }
-        prefs.controls_mut(keys.side).set(dir, Some(key));
+        prefs.controls_mut(target_side).set(dir, Some(key));
         prefs.save();
     }
 
@@ -262,25 +260,21 @@ impl Menu {
                         toggle.apply(prefs);
                         return Some(MenuEvent::Toggled(toggle));
                     }
-                    Some(Entry::Controls) => *self = Menu::Players,
+                    Some(Entry::Controls) => *self = Menu::Controls(ControlsScreen::default()),
                     Some(Entry::Confirm(confirm)) => *self = Menu::Confirm(confirm),
                     None => {}
                 }
             }
-            Menu::Players => match controls_menu::draw_players(prefs.single_player) {
-                Some(PlayersAction::Back) => self.open(),
-                Some(PlayersAction::Open(side)) => *self = Menu::Keys(KeysScreen::new(side)),
-                Some(PlayersAction::SinglePlayer(side)) => {
+            Menu::Controls(screen) => match controls_menu::draw_controls(screen, prefs) {
+                Some(ControlsAction::Back) => self.open(),
+                // clicking the key that's listening stops it
+                Some(ControlsAction::Select(side, dir)) => {
+                    let key = Some((side, dir));
+                    screen.listening = if screen.listening == key { None } else { key };
+                }
+                Some(ControlsAction::SinglePlayer(side)) => {
                     prefs.single_player = side;
                     prefs.save();
-                }
-                None => {}
-            },
-            Menu::Keys(keys) => match controls_menu::draw_keys(keys, prefs.controls(keys.side)) {
-                Some(KeysAction::Back) => *self = Menu::Players,
-                // clicking the key that's listening stops it
-                Some(KeysAction::Select(dir)) => {
-                    keys.listening = if keys.listening == Some(dir) { None } else { Some(dir) };
                 }
                 None => {}
             },
