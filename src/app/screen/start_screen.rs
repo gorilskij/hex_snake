@@ -419,6 +419,8 @@ impl Screen for StartScreen {
 
         let players = self.players();
         for demo in &mut self.demos[..players] {
+            // the demos show the snakes as the game will
+            demo.env.gtx.prefs.draw_style = self.prefs.draw_style;
             demo.draw_board(material)?;
         }
 

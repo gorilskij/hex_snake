@@ -20,8 +20,10 @@ use crate::support::text::{draw_text, measure_text};
 const OVERLAY_ALPHA: f32 = 0.9;
 /// Share of the window's width each button takes
 const BUTTON_WIDTH: f32 = 0.75;
-/// Space between buttons, relative to a button's height
+/// Space between lines, and the extra space of a [`Line::Gap`], relative to a
+/// button's height
 const GAP: f32 = 0.25;
+const SECTION_GAP: f32 = 0.5;
 
 /// Dim the whole window, for a menu to be drawn over the game.
 pub fn draw_overlay() {
@@ -64,47 +66,60 @@ pub fn draw_confirm(question: &str) -> Option<bool> {
     answer
 }
 
-/// Draw the overlay and one button per label, top to bottom, and return the
-/// index of the button clicked this frame, if any. The caller must have set
-/// the default (screen-space) camera.
+/// A line of the options menu
+pub enum Line {
+    /// Buttons side by side, sharing the line's width
+    Buttons(Vec<String>),
+    /// Extra space
+    Gap,
+}
+
+/// Draw the overlay and the lines, top to bottom, and return which button was
+/// clicked this frame, if any, numbering the buttons in reading order. The
+/// caller must have set the default (screen-space) camera.
 ///
 /// A column taller than the window scrolls with the mouse wheel; `scroll` is
 /// how far down it is, in pixels, kept between frames by the caller.
-pub fn draw(labels: &[String], scroll: &mut f32) -> Option<usize> {
+pub fn draw(lines: &[Line], scroll: &mut f32) -> Option<usize> {
     let (width, height) = (screen_width(), screen_height());
     draw_overlay();
 
-    let n = labels.len() as f32;
-    if n == 0. {
-        return None;
-    }
-
     let margin = BUTTON_CELL_DIM.side;
     let button_height = BUTTON_CELL_DIM.height();
-    let total_height = n * button_height + (n - 1.) * GAP * button_height;
+    let line_height = |line: &Line| match line {
+        Line::Buttons(_) => button_height,
+        Line::Gap => SECTION_GAP * button_height,
+    };
+    let gaps = lines.len().saturating_sub(1) as f32 * GAP * button_height;
+    let total_height = lines.iter().map(line_height).sum::<f32>() + gaps;
 
     // the wheel reports how far the content should move: up is positive
     let overflow = (total_height - (height - 2. * margin)).max(0.);
     *scroll = (*scroll - mouse_wheel().1).clamp(0., overflow);
-    let top = if overflow > 0. {
+    let mut y = if overflow > 0. {
         margin - *scroll
     } else {
         (height - total_height) / 2.
     };
 
-    let button_width = BUTTON_WIDTH * width;
-    let h_side = (button_width - 2. * BUTTON_CELL_DIM.cos).max(0.);
-    let shape = WideHexagon::with_h_side(BUTTON_CELL_DIM, h_side);
-    let x = (width - button_width) / 2.;
+    let line_width = BUTTON_WIDTH * width;
+    let left = (width - line_width) / 2.;
 
+    let mut index = 0;
     let mut clicked = None;
-    for (i, label) in labels.iter().enumerate() {
-        let data =
-            ButtonData::new(shape.clone(), STROKE_THICKNESS, BUTTON_COLOR).text(label.as_str(), FONT_SIZE, BUTTON_COLOR);
-        let y = top + i as f32 * (1. + GAP) * button_height;
-        if Button::click(Point { x, y }, data).draw() {
-            clicked = Some(i);
+    for line in lines {
+        if let Line::Buttons(labels) = line {
+            let n = labels.len() as f32;
+            let button_width = (line_width - (n - 1.) * margin) / n;
+            for (i, label) in labels.iter().enumerate() {
+                let x = left + i as f32 * (button_width + margin);
+                if Button::click(Point { x, y }, wide_button(button_width, label)).draw() {
+                    clicked = Some(index);
+                }
+                index += 1;
+            }
         }
+        y += line_height(line) + GAP * button_height;
     }
     clicked
 }

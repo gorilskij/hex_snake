@@ -8,7 +8,7 @@
 use macroquad::input::KeyCode;
 
 use super::controls_menu::{self, KeysAction, KeysScreen, PlayersAction};
-use super::options_menu;
+use super::options_menu::{self, Line};
 use crate::app::key::{Key, KeyPress};
 use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
 use crate::basic::Side;
@@ -32,16 +32,15 @@ pub enum Toggle {
 
 impl Toggle {
     /// The options that are stored preferences, so they can be set before a
-    /// game exists
-    pub const PREFS: [Toggle; 8] = [
+    /// game exists (the distance grid is one too, but it's a debug key)
+    pub const PREFS: [Toggle; 7] = [
+        Toggle::DrawStyle,
         Toggle::Grid,
         Toggle::Border,
         Toggle::Hints,
-        Toggle::DrawStyle,
+        Toggle::PlayerPath,
         Toggle::Stats,
         Toggle::Fps,
-        Toggle::PlayerPath,
-        Toggle::DistanceGrid,
     ];
 
     /// What the option's button says: the setting and its current value. The
@@ -237,16 +236,23 @@ impl Menu {
         match self {
             Menu::Closed => {}
             Menu::Options { scroll } => {
-                let mut entries: Vec<(Entry, String)> = vec![(Entry::Close, "Close".to_string())];
-                entries.extend(options.iter().map(|(toggle, label)| (Entry::Toggle(*toggle), label.clone())));
-                entries.push((Entry::Controls, "Controls".to_string()));
+                // buttons in reading order, and how they're laid out
+                let mut entries = vec![(Entry::Close, "Close".to_string())];
+                let mut lines = vec![Line::Buttons(vec!["Close".to_string()])];
                 if in_game {
                     entries.push((Entry::Confirm(Confirm::Restart), "Restart".to_string()));
                     entries.push((Entry::Confirm(Confirm::MainMenu), "Main menu".to_string()));
+                    lines.push(Line::Buttons(vec!["Restart".to_string(), "Main menu".to_string()]));
+                }
+                entries.push((Entry::Controls, "Controls".to_string()));
+                lines.push(Line::Buttons(vec!["Controls".to_string()]));
+                lines.push(Line::Gap);
+                for (toggle, label) in options {
+                    entries.push((Entry::Toggle(*toggle), label.clone()));
+                    lines.push(Line::Buttons(vec![label.clone()]));
                 }
 
-                let labels: Vec<String> = entries.iter().map(|(_, label)| label.clone()).collect();
-                match options_menu::draw(&labels, scroll).map(|i| entries[i].0) {
+                match options_menu::draw(&lines, scroll).map(|i| entries[i].0) {
                     Some(Entry::Close) => {
                         *self = Menu::Closed;
                         return Some(MenuEvent::Closed);

@@ -374,18 +374,17 @@ impl Game {
 }
 
 impl Game {
-    /// The options menu's toggles, top to bottom
-    const MENU: [Toggle; 10] = [
+    /// The options menu's toggles, top to bottom (special apples and the
+    /// distance grid are debug keys)
+    const MENU: [Toggle; 8] = [
+        Toggle::DrawStyle,
         Toggle::Grid,
         Toggle::Border,
         Toggle::Hints,
-        Toggle::DrawStyle,
+        Toggle::Autopilot,
+        Toggle::PlayerPath,
         Toggle::Stats,
         Toggle::Fps,
-        Toggle::PlayerPath,
-        Toggle::DistanceGrid,
-        Toggle::SpecialApples,
-        Toggle::Autopilot,
     ];
 
     /// Open the options menu, pausing the game
@@ -768,6 +767,12 @@ impl Screen for Game {
                 fps_control::State::Playing => self.fps_control.pause(),
                 fps_control::State::Paused => self.fps_control.play(),
             },
+            // debug toggles
+            k @ (X | D) => {
+                let toggle = if k == X { Toggle::SpecialApples } else { Toggle::DistanceGrid };
+                toggle.apply(&mut self.env.gtx.prefs);
+                self.toggled(toggle);
+            }
             k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
                 let new_food = idx as f32 + 1.0;
                 self.env.gtx.prefs.apple_food = new_food;
