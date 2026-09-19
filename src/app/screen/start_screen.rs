@@ -151,11 +151,10 @@ impl SnakeDemo {
 
         let board = Self::board_size(cell_dim);
         let y = pos.y + board.y + BUTTON_CELL_DIM.side;
-        self.left_button.pos = Point { x: pos.x, y };
-        self.right_button.pos = Point {
-            x: pos.x + board.x - BUTTON_CELL_DIM.width(),
-            y,
-        };
+        // centered at a quarter and three quarters of the board's width
+        let x = |fraction: f32| pos.x + fraction * board.x - BUTTON_CELL_DIM.width() / 2.;
+        self.left_button.pos = Point { x: x(0.25), y };
+        self.right_button.pos = Point { x: x(0.75), y };
     }
 
     fn palette(&self) -> PaletteTemplate {
