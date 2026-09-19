@@ -38,7 +38,8 @@ Requires nightly for: `stmt_expr_attributes`, `try_blocks`,
 to return to the main menu — see `Transition`),
 polls resize + key presses (`app/key.rs`'s `KeyInput`) / `get_keys_released`, and drives the `Screen` trait
 (`app/screen/mod.rs`): `update`/`draw`/`key_down_event`/`resize_event` with
-each `KeyPress` (key code + layout-aware `Key`), then `next_frame().await`.
+each layout-aware `Key` (every key check, debug keys included, goes by
+what the layout types — see below), then `next_frame().await`.
 
 - **Keys follow the layout** (`app/key.rs`): key codes are positional on macOS,
   Windows and the web (Linux X11 is layout-based), so a key that types

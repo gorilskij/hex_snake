@@ -19,7 +19,7 @@ use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
 use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
-use crate::app::key::KeyPress;
+use crate::app::key::Key;
 use crate::app::screen::menu::{Menu, MenuEvent, Toggle};
 use crate::app::screen::{Environment, Screen, Transition};
 use crate::app::snake_management::{
@@ -731,18 +731,17 @@ impl Screen for Game {
         Ok(())
     }
 
-    fn key_down_event(&mut self, press: KeyPress) -> Result<()> {
+    fn key_down_event(&mut self, key: Key) -> Result<()> {
         use KeyCode::*;
-        let keycode = press.code;
 
-        let (used, event) = self.menu.key_pressed(press, &mut self.env.gtx.prefs);
+        let (used, event) = self.menu.key_pressed(key, &mut self.env.gtx.prefs);
         if let Some(event) = event {
             self.on_menu_event(event);
         }
         if used {
             return Ok(());
         }
-        if keycode == Escape {
+        if key == Key::Code(Escape) {
             self.open_menu();
             return Ok(());
         }
@@ -751,13 +750,11 @@ impl Screen for Game {
             show_mouse(false);
         }
 
-        let numeric_keys = [Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9];
-
-        // TODO: also tie these to a keymap (dvorak-centric for now)
-        match keycode {
+        // keys as the layout names them (see `app::key`)
+        match key {
             // play/pause, or start over after a game over; ignored while the
             // menu is open
-            Space if !self.menu.is_open() => match self.fps_control.state() {
+            Key::Code(Space) if !self.menu.is_open() => match self.fps_control.state() {
                 fps_control::State::GameOver => {
                     self.restart();
                     self.fps_control.play();
@@ -766,13 +763,13 @@ impl Screen for Game {
                 fps_control::State::Paused => self.fps_control.play(),
             },
             // debug toggles
-            k @ (X | D) => {
-                let toggle = if k == X { Toggle::SpecialApples } else { Toggle::DistanceGrid };
+            Key::Char(c @ ('X' | 'D')) => {
+                let toggle = if c == 'X' { Toggle::SpecialApples } else { Toggle::DistanceGrid };
                 toggle.apply(&mut self.env.gtx.prefs);
                 self.toggled(toggle);
             }
-            k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
-                let new_food = idx as f32 + 1.0;
+            Key::Char(c @ '1'..='9') => {
+                let new_food = c.to_digit(10).expect("a digit") as f32;
                 self.env.gtx.prefs.apple_food = new_food;
                 // change existing apples
                 for apple in &mut self.env.apples {
@@ -782,7 +779,7 @@ impl Screen for Game {
                 }
                 self.display_notification(format!("Apple food: {new_food}"));
             }
-            k @ Down | k @ Up => {
+            Key::Code(k @ (Down | Up)) => {
                 let factor = if k == Down { 0.9 } else { 1. / 0.9 };
                 let mut new_side_length = self.env.gtx.cell_dim.side * factor;
                 new_side_length = new_side_length.clamp(Self::CELL_SIDE_MIN, Self::CELL_SIDE_MAX);
@@ -790,8 +787,8 @@ impl Screen for Game {
                 self.update_dim();
                 self.display_notification(format!("Cell side: {new_side_length}"));
             }
-            k @ LeftBracket | k @ RightBracket => {
-                let speed = if k == LeftBracket {
+            Key::Char(c @ ('[' | ']')) => {
+                let speed = if c == '[' {
                     self.fps_control.slower()
                 } else {
                     self.fps_control.faster()
@@ -801,7 +798,7 @@ impl Screen for Game {
             _ => {
                 if self.fps_control.state() == fps_control::State::Playing {
                     for snake in &mut self.env.snakes {
-                        snake.controller.key_pressed(press.key, &self.env.gtx)
+                        snake.controller.key_pressed(key, &self.env.gtx)
                     }
                 }
             }

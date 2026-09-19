@@ -5,7 +5,7 @@ use macroquad::input::KeyCode;
 use rand::rngs::ThreadRng;
 
 use crate::app::game_context::GameContext;
-use crate::app::key::KeyPress;
+use crate::app::key::Key;
 use crate::app::portal::Portal;
 use crate::apple::Apple;
 use crate::snake::builder::Builder as SnakeBuilder;
@@ -27,7 +27,7 @@ pub trait Screen {
 
     fn draw(&mut self) -> Result<()>;
 
-    fn key_down_event(&mut self, press: KeyPress) -> Result<()> {
+    fn key_down_event(&mut self, key: Key) -> Result<()> {
         Ok(())
     }
 

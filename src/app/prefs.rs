@@ -15,7 +15,7 @@ use crate::support::storage;
 /// recognised as old when something eventually does.
 const VERSION: u32 = 1;
 
-#[derive(Copy, Clone, EnumRotate)]
+#[derive(Copy, Clone, Eq, PartialEq, EnumRotate)]
 pub enum DrawGrid {
     Grid,
     Dots,

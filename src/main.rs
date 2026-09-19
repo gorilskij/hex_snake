@@ -134,8 +134,8 @@ async fn main() {
             let _ = screen.resize_event(size.0, size.1);
         }
 
-        for press in key_input.poll() {
-            let _ = screen.key_down_event(press);
+        for key in key_input.poll() {
+            let _ = screen.key_down_event(key);
         }
         for key in get_keys_released() {
             let _ = screen.key_up_event(key);

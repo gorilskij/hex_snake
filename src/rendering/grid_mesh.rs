@@ -65,6 +65,21 @@ pub fn region_border_mesh(
     })
 }
 
+/// A dot on every corner of `cells`, each drawn once.
+pub fn region_dot_mesh(cells: impl Iterator<Item = HexPoint>, cell_dim: CellDim, radius: f32, color: Color) -> Mesh {
+    // neighbouring cells share corners; compare them to a fraction of a pixel
+    let mut seen = std::collections::HashSet::new();
+    let parts = cells.flat_map(|pos| {
+        let corners: Vec<Point> = Hexagon::new(cell_dim).translate(pos.to_cartesian(cell_dim)).into();
+        corners
+    });
+    let parts = parts
+        .filter(|p| seen.insert(((p.x * 16.).round() as i64, (p.y * 16.).round() as i64)))
+        .map(|p| build_circle(DrawMode::fill(), p, radius, color))
+        .collect::<Vec<_>>();
+    Mesh::combine(parts)
+}
+
 /// One line for each edge of `cells` that `draw(cell, dir)` picks. Lines have
 /// round ends, so edges meet cleanly at corners.
 fn edges_mesh(

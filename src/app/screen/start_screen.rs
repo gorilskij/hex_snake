@@ -7,15 +7,15 @@ use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
 use macroquad::input::{show_mouse, KeyCode};
 use macroquad::material::Material;
-use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, screen_height, screen_width};
 use rand::prelude::*;
 
 use super::Game;
 use crate::app::game_context::GameContext;
+use crate::app::fps_control::FpsControl;
 use crate::app::game_mode::GameMode;
-use crate::app::key::KeyPress;
-use crate::app::prefs::Prefs;
+use crate::app::key::Key;
+use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::menu::{Menu, Toggle};
 use crate::app::screen::{Environment, Screen, Transition};
 use crate::app::snake_management::{advance_snakes, update_snake_dirs};
@@ -33,7 +33,7 @@ use crate::snake::{self, PaletteTemplate, Snake};
 use crate::snake_control::Template;
 use crate::support::material::snake_material;
 use crate::support::text::{draw_text, measure_text};
-use crate::support::mesh::set_board_camera;
+use crate::support::mesh::{set_board_camera, Mesh};
 
 /// Palettes a player can pick from
 fn palettes() -> Vec<PaletteTemplate> {
@@ -60,24 +60,44 @@ struct SnakeDemo {
     current_palette: usize,
     left_button: Button,
     right_button: Button,
+
+    /// The grid and border, built once for the settings and cell size they
+    /// were built for (only the snake changes from frame to frame)
+    board_meshes: Option<(BoardKey, Option<Mesh>, Option<Mesh>)>,
+}
+
+/// What the demo's grid and border depend on
+#[derive(Copy, Clone, PartialEq)]
+struct BoardKey {
+    side: f32,
+    grid: DrawGrid,
+    border: bool,
 }
 
 impl SnakeDemo {
-    const BOARD_DIM: HexDim = HexPoint { h: 11, v: 8 };
+    /// The center of the snake's hexagonal loop, and how far the loop is
+    /// from it; the board is just big enough for the drawn cells around it
+    const CENTER: HexPoint = HexPoint { h: 4, v: 4 };
+    const LOOP_RADIUS: usize = 3;
+    const BOARD_DIM: HexDim = HexPoint { h: 9, v: 9 };
+    /// Space between the board and the arrow buttons, relative to a button's
+    /// side
+    const ARROW_GAP: f32 = 0.4;
 
     fn new(cell_dim: CellDim, pos: Point, app_palette: app::Palette) -> Self {
         let palettes = palettes();
 
-        // side 2 makes a closed loop of 6 sides of 3 cells, longer than the
-        // snake, so it never runs into itself
+        // A loop of 6 sides of LOOP_RADIUS cells around CENTER, longer than
+        // the snake, so it never runs into itself. It starts at the bottom-left
+        // corner, going up.
         let snake = SnakeBuilder::default()
             .snake_type(snake::Type::Simulated)
             .eat_mechanics(EatMechanics::new(
                 enum_map! { _ => EatBehavior::Crash },
                 enum_map! { _ => enum_map! { _ => EatBehavior::Crash } },
             ))
-            .controller(Template::demo_hexagon_pattern(Dir::U, 2))
-            .pos(HexPoint { h: 2, v: 5 })
+            .controller(Template::demo_hexagon_pattern(Dir::U, Self::LOOP_RADIUS - 1))
+            .pos(Self::CENTER.translate(Dir::Dl, Self::LOOP_RADIUS))
             .dir(Dir::U)
             .len(10)
             .speed(4.)
@@ -108,6 +128,7 @@ impl SnakeDemo {
             // placed and sized by `layout`
             left_button: Button::click(Point::zero(), left),
             right_button: Button::click(Point::zero(), right),
+            board_meshes: None,
         };
         this.layout(cell_dim, pos);
         this
@@ -136,13 +157,37 @@ impl SnakeDemo {
         (left, right)
     }
 
+    /// The board's cells that are drawn: a hexagon one cell wider on every
+    /// side than the snake's loop
+    fn cells() -> impl Iterator<Item = HexPoint> {
+        let HexDim { h, v } = Self::BOARD_DIM;
+        (0..h)
+            .flat_map(move |h| (0..v).map(move |v| HexPoint { h, v }))
+            .filter(|&pos| Self::shown(pos))
+    }
+
+    fn shown(pos: HexPoint) -> bool {
+        pos.manhattan_distance(Self::CENTER) <= Self::LOOP_RADIUS + 1
+    }
+
+    /// Top-left and bottom-right of the drawn cells, in board coordinates
+    fn bounds(cell_dim: CellDim) -> (Point, Point) {
+        let size = Point { x: cell_dim.width(), y: cell_dim.height() };
+        Self::cells().map(|pos| pos.to_cartesian(cell_dim)).fold(
+            (Point { x: f32::MAX, y: f32::MAX }, Point { x: f32::MIN, y: f32::MIN }),
+            |(min, max), p| {
+                (
+                    Point { x: min.x.min(p.x), y: min.y.min(p.y) },
+                    Point { x: max.x.max(p.x + size.x), y: max.y.max(p.y + size.y) },
+                )
+            },
+        )
+    }
+
     /// Size of the demo board (without the buttons) for a given cell size
     fn board_size(cell_dim: CellDim) -> Point {
-        let CellDim { side, cos, .. } = cell_dim;
-        Point {
-            x: Self::BOARD_DIM.h as f32 * (side + cos) + cos,
-            y: (Self::BOARD_DIM.v as f32 + 0.5) * cell_dim.height(),
-        }
+        let (min, max) = Self::bounds(cell_dim);
+        max - min
     }
 
     /// Move the demo to `pos` and resize it to `cell_dim`, placing the arrow
@@ -163,7 +208,7 @@ impl SnakeDemo {
         let (left, right) = Self::arrow_buttons(scale);
         let button_dim = BUTTON_CELL_DIM * scale;
 
-        let y = pos.y + board.y + button_dim.side;
+        let y = pos.y + board.y + Self::ARROW_GAP * button_dim.side;
         let x = |fraction: f32| pos.x + fraction * board.x - button_dim.width() / 2.;
         self.left_button = Button::click(Point { x: x(0.25), y }, left);
         self.right_button = Button::click(Point { x: x(0.75), y }, right);
@@ -179,7 +224,12 @@ impl SnakeDemo {
     }
 
     fn next_palette(&mut self) {
-        self.current_palette = (self.current_palette + 1) % self.palettes.len();
+        self.set_palette(self.current_palette + 1);
+    }
+
+    /// Show the `index`th palette (wrapping around the list)
+    fn set_palette(&mut self, index: usize) {
+        self.current_palette = index % self.palettes.len();
         self.env.snakes[0].palette = self.palette().into();
     }
 
@@ -214,19 +264,64 @@ impl SnakeDemo {
         update_snake_dirs(&mut self.env);
     }
 
+    /// The grid and border, rebuilt only when what they depend on changes
+    fn board_meshes(&mut self) -> (Option<&Mesh>, Option<&Mesh>) {
+        let gtx = &self.env.gtx;
+        let key = BoardKey {
+            side: gtx.cell_dim.side,
+            grid: gtx.prefs.draw_grid,
+            border: gtx.prefs.draw_border,
+        };
+        if self.board_meshes.as_ref().is_none_or(|(built, ..)| *built != key) {
+            let palette = &gtx.palette;
+            let grid = match key.grid {
+                DrawGrid::Grid => Some(rendering::region_grid_mesh(
+                    Self::cells(),
+                    Self::shown,
+                    gtx.cell_dim,
+                    palette.grid_thickness,
+                    palette.grid_color,
+                )),
+                DrawGrid::Dots => Some(rendering::region_dot_mesh(
+                    Self::cells(),
+                    gtx.cell_dim,
+                    palette.grid_dot_radius,
+                    palette.grid_dot_color,
+                )),
+                DrawGrid::None => None,
+            };
+            let border = key.border.then(|| {
+                rendering::region_border_mesh(
+                    Self::cells(),
+                    Self::shown,
+                    gtx.cell_dim,
+                    palette.border_thickness,
+                    palette.border_color,
+                )
+            });
+            self.board_meshes = Some((key, grid, border));
+        }
+        let (_, grid, border) = self.board_meshes.as_ref().expect("just built");
+        (grid.as_ref(), border.as_ref())
+    }
+
     /// Draw the board and snake. Buttons are drawn separately, in screen space.
     fn draw_board(&mut self, material: &Material) -> Result<()> {
-        let gtx = &self.env.gtx;
-        let grid = rendering::grid_mesh(gtx)?;
-        let border = rendering::border_mesh(gtx)?;
-        let snake = rendering::snake_mesh(&mut self.env.snakes, &[], gtx, &mut Stats::default())?;
+        let offset = self.pos - Self::bounds(self.env.gtx.cell_dim).0;
+        let snake = rendering::snake_mesh(&mut self.env.snakes, &[], &self.env.gtx, &mut Stats::default())?;
+        let (grid, border) = self.board_meshes();
 
-        set_board_camera(self.pos);
-        grid.draw();
+        // the drawn cells start at `pos`
+        set_board_camera(offset);
+        if let Some(grid) = grid {
+            grid.draw();
+        }
         for (mesh, _lut) in &snake.shaded {
             mesh.draw_shaded(material);
         }
-        border.draw();
+        if let Some(border) = border {
+            border.draw();
+        }
         Ok(())
     }
 
@@ -262,6 +357,8 @@ pub struct StartScreen {
     start_button: Button,
     /// The options menu, over the start screen
     menu: Menu,
+    /// Evens out the frame durations the demos advance by
+    frame_pace: FpsControl,
     /// The preferences the menu edits (the game loads them when it starts)
     prefs: Prefs,
     demos: Vec<SnakeDemo>,
@@ -296,7 +393,13 @@ impl StartScreen {
 
         let mut demos: Vec<SnakeDemo> = seeds
             .iter()
-            .map(|_| SnakeDemo::new(CellDim::from(20.), Point::zero(), palette.clone()))
+            .enumerate()
+            .map(|(i, _)| {
+                let mut demo = SnakeDemo::new(CellDim::from(20.), Point::zero(), palette.clone());
+                // each player starts out with a different palette
+                demo.set_palette(i);
+                demo
+            })
             .collect();
         // all demos run the same schedule in step
         if let Some((leader, followers)) = demos.split_first_mut() {
@@ -319,6 +422,7 @@ impl StartScreen {
             options_button: Button::click(Point::zero(), button(&players_shape, "Options")),
             start_button: Button::click(Point::zero(), button(&WideHexagon::new(BUTTON_CELL_DIM), "Start")),
             menu: Menu::Closed,
+            frame_pace: FpsControl::new(),
             prefs: Prefs::load(),
             demos,
             snake_material: None,
@@ -368,21 +472,24 @@ impl StartScreen {
 
         // the demos fill the space between the buttons, arrows included
         let players = self.players();
-        let top = 2. * margin + button_height;
-        let bottom = start_y - margin;
-        let arrows = BUTTON_CELL_DIM.side + BUTTON_CELL_DIM.height();
+        // space above the demos, below them (under the arrows), and between
+        let (above, below) = (100., 60.);
+        let demo_gap = 2. * margin;
+        let top = margin + button_height + above;
+        let bottom = start_y - below;
+        let arrows = SnakeDemo::ARROW_GAP * BUTTON_CELL_DIM.side + BUTTON_CELL_DIM.height();
         let unit = SnakeDemo::board_size(CellDim::from(1.));
-        let side = ((width - margin * (players + 1) as f32) / players as f32 / unit.x)
+        let side = ((width - 2. * margin - demo_gap * (players - 1) as f32) / players as f32 / unit.x)
             .min((bottom - top - arrows) / unit.y)
             .max(1.);
         let cell_dim = CellDim::from(side);
         let board = SnakeDemo::board_size(cell_dim);
 
-        let total_width = players as f32 * board.x + (players - 1) as f32 * margin;
+        let total_width = players as f32 * board.x + (players - 1) as f32 * demo_gap;
         let left = (width - total_width) / 2.;
         let y = top + (bottom - top - arrows - board.y) / 2.;
         for (i, demo) in self.demos.iter_mut().enumerate() {
-            let x = left + i as f32 * (board.x + margin);
+            let x = left + i as f32 * (board.x + demo_gap);
             demo.layout(cell_dim, Point { x, y });
         }
     }
@@ -390,8 +497,11 @@ impl StartScreen {
 
 impl Screen for StartScreen {
     fn update(&mut self) -> Result<()> {
-        // capped so a stalled frame doesn't send the snakes flying
-        let elapsed = Duration::from_secs_f32(get_frame_time().min(0.1));
+        // smoothed like the game's, so the demos move as evenly as the game
+        // (the web's clock only has whole milliseconds)
+        let Some(elapsed) = self.frame_pace.update() else {
+            return Ok(());
+        };
 
         // Hidden demos keep moving too, so a player's demo is already in step
         // when it appears. The first demo leads; the others follow its timing.
@@ -419,8 +529,11 @@ impl Screen for StartScreen {
 
         let players = self.players();
         for demo in &mut self.demos[..players] {
-            // the demos show the snakes as the game will
-            demo.env.gtx.prefs.draw_style = self.prefs.draw_style;
+            // the demos show the board and snakes as the game will
+            let prefs = &mut demo.env.gtx.prefs;
+            prefs.draw_style = self.prefs.draw_style;
+            prefs.draw_grid = self.prefs.draw_grid;
+            prefs.draw_border = self.prefs.draw_border;
             demo.draw_board(material)?;
         }
 
@@ -466,15 +579,17 @@ impl Screen for StartScreen {
         Ok(())
     }
 
-    fn key_down_event(&mut self, press: KeyPress) -> Result<()> {
-        if self.menu.key_pressed(press, &mut self.prefs).0 || self.menu.is_open() {
+    fn key_down_event(&mut self, key: Key) -> Result<()> {
+        if self.menu.key_pressed(key, &mut self.prefs).0 || self.menu.is_open() {
             return Ok(());
         }
-        match press.code {
-            KeyCode::Escape => self.menu.open(),
-            KeyCode::Enter => self.start_game = true,
-            KeyCode::Left => self.demos[0].prev_palette(),
-            KeyCode::Right => self.demos[0].next_palette(),
+        match key {
+            Key::Code(KeyCode::Escape) => self.menu.open(),
+            Key::Code(KeyCode::Enter) => self.start_game = true,
+            // with two players it would be unclear whose palette the keys
+            // change: only the on-screen buttons work then
+            Key::Code(KeyCode::Left) if self.players() == 1 => self.demos[0].prev_palette(),
+            Key::Code(KeyCode::Right) if self.players() == 1 => self.demos[0].next_palette(),
             _ => {}
         }
         Ok(())
@@ -518,5 +633,38 @@ impl Screen for StartScreen {
         self.prefs = Prefs::load();
         self.menu = Menu::Closed;
         show_mouse(true);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The snake runs its loop at exactly the loop's radius from the center,
+    /// so the drawn hexagon is one cell wider than the loop all round.
+    #[test]
+    fn the_demo_snake_loops_around_the_center() {
+        let mut demo = SnakeDemo::new(CellDim::from(10.), Point::zero(), app::Palette::dark());
+        let mut visited = std::collections::HashSet::new();
+        // well over a few laps, in small steps
+        for _ in 0..2000 {
+            demo.update(Duration::from_secs_f32(0.01));
+            let snake = &demo.env.snakes[0];
+            for segment in &snake.body.segments {
+                visited.insert(segment.pos);
+            }
+        }
+        assert_eq!(visited.len(), 6 * SnakeDemo::LOOP_RADIUS, "one cell per step of the loop");
+        for pos in visited {
+            assert_eq!(pos.manhattan_distance(SnakeDemo::CENTER), SnakeDemo::LOOP_RADIUS, "{pos:?}");
+            assert!(SnakeDemo::BOARD_DIM.contains(pos));
+        }
+    }
+
+    /// The whole hexagon fits on the board: none of it is cut off.
+    #[test]
+    fn the_drawn_hexagon_is_whole() {
+        let radius = SnakeDemo::LOOP_RADIUS + 1;
+        assert_eq!(SnakeDemo::cells().count(), 1 + 3 * radius * (radius + 1));
     }
 }

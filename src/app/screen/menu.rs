@@ -9,7 +9,7 @@ use macroquad::input::KeyCode;
 
 use super::controls_menu::{self, KeysAction, KeysScreen, PlayersAction};
 use super::options_menu::{self, Line};
-use crate::app::key::{Key, KeyPress};
+use crate::app::key::Key;
 use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
 use crate::basic::Side;
 use crate::rendering;
@@ -189,16 +189,16 @@ impl Menu {
     /// waiting to be bound takes any other press, except Space (play/pause)
     /// and keys that aren't recognised. Returns whether the press was used,
     /// and what the host should know about.
-    pub fn key_pressed(&mut self, press: KeyPress, prefs: &mut Prefs) -> (bool, Option<MenuEvent>) {
+    pub fn key_pressed(&mut self, key: Key, prefs: &mut Prefs) -> (bool, Option<MenuEvent>) {
         if !self.is_open() {
             return (false, None);
         }
-        if press.code == KeyCode::Escape {
+        if key == Key::Code(KeyCode::Escape) {
             return (true, self.back());
         }
         if let Menu::Keys(KeysScreen { listening: Some(_), .. }) = self {
-            if !matches!(press.code, KeyCode::Space | KeyCode::Unknown) {
-                self.bind_key(press.key, prefs);
+            if !matches!(key, Key::Code(KeyCode::Space | KeyCode::Unknown)) {
+                self.bind_key(key, prefs);
             }
             return (true, None);
         }

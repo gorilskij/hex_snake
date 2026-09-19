@@ -40,14 +40,7 @@ impl Key {
     }
 }
 
-/// One key press: the raw code, and the key the layout makes of it.
-#[derive(Copy, Clone, Debug)]
-pub struct KeyPress {
-    pub code: KeyCode,
-    pub key: Key,
-}
-
-/// Turns miniquad's input events into [`KeyPress`]es, in the order they
+/// Turns miniquad's input events into [`Key`] presses, in the order they
 /// happened.
 ///
 /// Every platform sends a key's code and then, if it types something, the
@@ -63,7 +56,7 @@ impl KeyInput {
     }
 
     /// The key presses since the last call. Call once per frame.
-    pub fn poll(&mut self) -> Vec<KeyPress> {
+    pub fn poll(&mut self) -> Vec<Key> {
         let mut collector = Collector::default();
         repeat_all_miniquad_input(&mut collector, self.subscriber);
         collector.flush();
@@ -73,7 +66,7 @@ impl KeyInput {
 
 #[derive(Default)]
 struct Collector {
-    presses: Vec<KeyPress>,
+    presses: Vec<Key>,
     /// The last key down and whether it was a repeat, waiting to see whether
     /// a character follows
     pending: Option<(KeyCode, bool)>,
@@ -83,7 +76,7 @@ impl Collector {
     fn flush(&mut self) {
         if let Some((code, repeat)) = self.pending.take() {
             if !repeat {
-                self.presses.push(KeyPress { code, key: Key::Code(code) });
+                self.presses.push(Key::Code(code));
             }
         }
     }
@@ -105,8 +98,7 @@ impl EventHandler for Collector {
             return;
         };
         if !repeat {
-            let key = Key::from_char(character).unwrap_or(Key::Code(code));
-            self.presses.push(KeyPress { code, key });
+            self.presses.push(Key::from_char(character).unwrap_or(Key::Code(code)));
         }
     }
 }
