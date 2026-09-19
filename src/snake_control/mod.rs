@@ -1,9 +1,8 @@
 use itertools::{repeat_n, Itertools};
-use macroquad::input::KeyCode;
 pub use programmed::Move;
 
 use crate::app::game_context::GameContext;
-use crate::app::keyboard_control::ControlSetup;
+use crate::app::key::Key;
 use crate::apple::Apple;
 use crate::basic::{Dir, Side};
 use crate::snake::eat_mechanics::Knowledge;
@@ -23,7 +22,8 @@ mod rain;
 #[derive(Clone, Debug)]
 pub enum Template {
     Keyboard {
-        control_setup: ControlSetup,
+        /// Whose keys the snake answers to; `None` for the single player
+        side: Option<Side>,
         knowledge: Knowledge,
     },
     Mouse,
@@ -60,7 +60,7 @@ pub trait Controller {
 
     fn reset(&mut self, _dir: Dir) {}
 
-    fn key_pressed(&mut self, _key: KeyCode) {}
+    fn key_pressed(&mut self, _key: Key, _gtx: &GameContext) {}
 
     /// For controllers that follow a repeating schedule: how many cells into
     /// the current cycle they are.
@@ -175,9 +175,7 @@ impl Template {
         use rain::Rain;
 
         match self {
-            Template::Keyboard { control_setup, knowledge } => {
-                Box::new(Keyboard::new(control_setup, start_dir, knowledge))
-            }
+            Template::Keyboard { side, knowledge } => Box::new(Keyboard::new(side, start_dir, knowledge)),
             Template::Mouse => Box::new(Mouse),
             Template::Programmed(move_sequence) => Box::new(Programmed::new(move_sequence, start_dir)),
             Template::Killer => Box::new(Killer),

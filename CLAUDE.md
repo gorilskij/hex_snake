@@ -33,13 +33,24 @@ Requires nightly for: `stmt_expr_attributes`, `try_blocks`,
 
 ## Entry point & main loop
 
-`src/main.rs` — `#[macroquad::main]` async loop. Constructs a `Game` directly,
-polls resize + `get_keys_pressed/released`, and drives the `Screen` trait
+`src/main.rs` — `#[macroquad::main]` async loop. Keeps a stack of screens
+(`StartScreen` at the bottom; starting a game pushes a `Game`, which pops itself
+to return to the main menu — see `Transition`),
+polls resize + key presses (`app/key.rs`'s `KeyInput`) / `get_keys_released`, and drives the `Screen` trait
 (`app/screen/mod.rs`): `update`/`draw`/`key_down_event`/`resize_event` with
-macroquad's `KeyCode` passed straight through, then `next_frame().await`.
+each `KeyPress` (key code + layout-aware `Key`), then `next_frame().await`.
 
-- Web delivers physical (qwerty-position) keycodes, so the player uses
-  `Layout::Qwerty` (ul=J u=K ur=L dl=M d=Comma dr=Period).
+- **Keys follow the layout** (`app/key.rs`): key codes are positional on macOS,
+  Windows and the web (Linux X11 is layout-based), so a key that types
+  something is identified by the character it types (`Key::Char`, uppercase),
+  paired from miniquad's ordered key-down + char events; other keys keep their
+  code (`Key::Code`). Players' bindings live in `Prefs` (left/right player,
+  plus which one a single player uses), edited from the options menu's
+  Controls screens; the keyboard controller looks them up on every press.
+- All text uses the bundled DejaVu Sans (`support/text.rs`,
+  `assets/fonts/`); macroquad's default font is ASCII-only.
+- `web/mq_js_bundle.js` is patched to map `MetaLeft`/`MetaRight` (the upstream
+  bundle only knows the obsolete `OSLeft`/`OSRight`).
 - `register_custom_getrandom!` backs `rand`/`thread_rng` with macroquad's PRNG on
   wasm (native uses the OS backend).
 
@@ -79,7 +90,7 @@ macroquad's `KeyCode` passed straight through, then `next_frame().await`.
     stretches or gradients into the cell; or by where the head would come out,
     recoloring both ends of each wrap it could reach (one per direction) and
     growing a triangle inwards from the arrival end as it closes.
-    `HintStyle`, `H` cycles border/gradient/teleport/off), `distance_grid.rs`,
+    `HintStyle`, cycled from the options menu), `distance_grid.rs`,
     `portal/`, `board_dim.rs`.
   - `screen/{start_screen,snake_control_creator_screen,debug_scenario}.rs` — **out
     of the module tree** (not compiled); page chrome to be done in HTML/JS later.
@@ -100,7 +111,7 @@ macroquad's `KeyCode` passed straight through, then `next_frame().await`.
 - **`color/`** — `Color` newtype over `macroquad::color::Color` with arithmetic
   ops; `oklab.rs`, `to_color.rs` (HSL→Color).
 - **`view/`** — `OtherSnakes`/`Snakes` borrowing helpers (`split_snakes`).
-- **`basic/`, `error.rs`, `keyboard_layout.rs`** — misc.
+- **`basic/`, `error.rs`** — misc.
 - **Out of tree (not compiled):** `button/`, `support/text_layout.rs`. Still on
   disk with stale `ggez` references; harmless.
 

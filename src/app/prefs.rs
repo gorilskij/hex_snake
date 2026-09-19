@@ -4,6 +4,8 @@ use std::time::Duration;
 
 use enum_rotate::EnumRotate;
 
+use crate::app::key::{Controls, Key};
+use crate::basic::{Dir, Side};
 use crate::rendering;
 use crate::support::storage;
 
@@ -54,6 +56,12 @@ pub struct Prefs {
     pub draw_style: rendering::Style,
     // pub draw_ai_debug_artifacts: bool,
     pub hide_cursor: bool,
+
+    /// The keys of the player on the left and right of the keyboard
+    pub left_controls: Controls,
+    pub right_controls: Controls,
+    /// Whose keys a single player uses
+    pub single_player: Side,
 }
 
 impl Default for Prefs {
@@ -78,6 +86,10 @@ impl Default for Prefs {
             draw_style: rendering::Style::Smooth,
             // draw_ai_debug_artifacts: false,
             hide_cursor: true,
+
+            left_controls: Controls::default_for(Side::Left),
+            right_controls: Controls::default_for(Side::Right),
+            single_player: Side::Right,
         }
     }
 }
@@ -86,7 +98,7 @@ impl Default for Prefs {
 /// on the enums because they are a file-format concern: renaming a variant
 /// should not silently invalidate everyone's saved preferences.
 mod names {
-    use super::{rendering, DrawGrid, HintStyle};
+    use super::{rendering, Dir, DrawGrid, HintStyle, Side};
 
     pub fn draw_grid(value: DrawGrid) -> &'static str {
         match value {
@@ -128,6 +140,32 @@ mod names {
         match value {
             rendering::Style::Hexagon => "hexagon",
             rendering::Style::Smooth => "smooth",
+        }
+    }
+
+    pub fn side(value: Side) -> &'static str {
+        match value {
+            Side::Left => "left",
+            Side::Right => "right",
+        }
+    }
+
+    pub fn read_side(text: &str) -> Option<Side> {
+        match text {
+            "left" => Some(Side::Left),
+            "right" => Some(Side::Right),
+            _ => None,
+        }
+    }
+
+    pub fn dir(value: Dir) -> &'static str {
+        match value {
+            Dir::U => "u",
+            Dir::Ur => "ur",
+            Dir::Dr => "dr",
+            Dir::D => "d",
+            Dir::Dl => "dl",
+            Dir::Ul => "ul",
         }
     }
 
@@ -185,10 +223,28 @@ impl Prefs {
             ("message_duration_ms", self.message_duration.as_millis().to_string()),
             ("draw_style", names::draw_style(self.draw_style).to_string()),
             ("hide_cursor", self.hide_cursor.to_string()),
+            ("single_player", names::side(self.single_player).to_string()),
         ]
-        .iter()
+        .into_iter()
+        .map(|(key, value)| (key.to_string(), value))
+        .chain(Self::control_fields().map(|(side, dir, key)| {
+            // an unbound direction is stored as nothing, so that it stays
+            // unbound rather than falling back to its default
+            let value = self.controls(side).get(dir).map(Key::to_text).unwrap_or_default();
+            (key, value)
+        }))
         .map(|(key, value)| format!("{key}={value}\n"))
         .collect()
+    }
+
+    /// One stored field per player and direction: `(side, dir, "keys.left.ul")`
+    fn control_fields() -> impl Iterator<Item = (Side, Dir, String)> {
+        [Side::Left, Side::Right].into_iter().flat_map(|side| {
+            Dir::iter().map(move |dir| {
+                let key = format!("keys.{}.{}", names::side(side), names::dir(dir));
+                (side, dir, key)
+            })
+        })
     }
 
     fn read(text: &str) -> Self {
@@ -215,12 +271,43 @@ impl Prefs {
         prefs.display_stats = flag("display_stats", prefs.display_stats);
         prefs.hide_cursor = flag("hide_cursor", prefs.hide_cursor);
 
+        prefs.single_player = field("single_player")
+            .and_then(names::read_side)
+            .unwrap_or(prefs.single_player);
+        for (side, dir, key) in Self::control_fields() {
+            match field(&key) {
+                Some("") => prefs.controls_mut(side).set(dir, None),
+                Some(text) => {
+                    if let Some(key) = Key::from_text(text) {
+                        prefs.controls_mut(side).set(dir, Some(key));
+                    }
+                }
+                None => {}
+            }
+        }
+
         prefs.message_duration = field("message_duration_ms")
             .and_then(|v| u64::from_str(v).ok())
             .map(Duration::from_millis)
             .unwrap_or(prefs.message_duration);
 
         prefs
+    }
+}
+
+impl Prefs {
+    pub fn controls(&self, side: Side) -> &Controls {
+        match side {
+            Side::Left => &self.left_controls,
+            Side::Right => &self.right_controls,
+        }
+    }
+
+    pub fn controls_mut(&mut self, side: Side) -> &mut Controls {
+        match side {
+            Side::Left => &mut self.left_controls,
+            Side::Right => &mut self.right_controls,
+        }
     }
 }
 
@@ -253,6 +340,22 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(Prefs::read(&prefs.to_text()).to_text(), prefs.to_text());
+    }
+
+    /// Rebound keys read back, and a direction left without a key stays
+    /// without one rather than getting its default back.
+    #[test]
+    fn key_bindings_read_back() {
+        let mut prefs = Prefs::default();
+        prefs.left_controls.set(Dir::U, Some(Key::Char('É')));
+        prefs.left_controls.set(Dir::D, None);
+        prefs.right_controls.set(Dir::Ul, Some(Key::Code(macroquad::input::KeyCode::RightShift)));
+        prefs.single_player = Side::Left;
+
+        let read = Prefs::read(&prefs.to_text());
+        assert_eq!(read.left_controls, prefs.left_controls);
+        assert_eq!(read.right_controls, prefs.right_controls);
+        assert_eq!(read.single_player, Side::Left);
     }
 
     /// A file from an older or newer build still loads: keys this build does

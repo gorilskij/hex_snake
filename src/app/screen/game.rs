@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use enum_rotate::EnumRotate;
 use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
 use macroquad::input::{show_mouse, KeyCode};
@@ -20,7 +19,9 @@ use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
 use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
-use crate::app::screen::{Environment, Screen};
+use crate::app::key::KeyPress;
+use crate::app::screen::menu::{Menu, MenuEvent, Toggle};
+use crate::app::screen::{Environment, Screen, Transition};
 use crate::app::snake_management::{
     advance_snakes, find_collisions, handle_apple_collisions, handle_snake_collisions, relocate_covered_apples,
     spawn_snakes, update_snake_dirs,
@@ -61,6 +62,11 @@ pub struct Game {
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
+
+    /// The menu shown over the game (paused underneath), if any
+    menu: Menu,
+    /// Whether to leave for the main menu
+    leave: bool,
 }
 
 impl Game {
@@ -111,6 +117,9 @@ impl Game {
             apple_mesh: None,
             distance_grid_mesh: None,
             player_path_mesh: None,
+
+            menu: Menu::Closed,
+            leave: false,
         };
         this.update_dim();
         // warning: this spawns apples before there are any snakes
@@ -359,6 +368,187 @@ impl Game {
     }
 }
 
+impl Game {
+    /// The options menu's toggles, top to bottom
+    const MENU: [Toggle; 10] = [
+        Toggle::Grid,
+        Toggle::Border,
+        Toggle::Hints,
+        Toggle::DrawStyle,
+        Toggle::Stats,
+        Toggle::Fps,
+        Toggle::PlayerPath,
+        Toggle::DistanceGrid,
+        Toggle::SpecialApples,
+        Toggle::Autopilot,
+    ];
+
+    /// Open the options menu, pausing the game
+    fn open_menu(&mut self) {
+        self.menu.open();
+        if self.fps_control.state() == fps_control::State::Playing {
+            self.fps_control.pause();
+        }
+        show_mouse(true);
+    }
+
+    fn on_menu_event(&mut self, event: MenuEvent) {
+        match event {
+            // the game stays paused (Space resumes it)
+            MenuEvent::Closed => {
+                if self.env.gtx.prefs.hide_cursor {
+                    show_mouse(false);
+                }
+            }
+            MenuEvent::Toggled(toggle) => self.toggled(toggle),
+            MenuEvent::Restart => {
+                self.restart();
+                self.fps_control.play();
+                if self.env.gtx.prefs.hide_cursor {
+                    show_mouse(false);
+                }
+            }
+            MenuEvent::MainMenu => self.leave = true,
+        }
+    }
+
+    /// Draw the open menu over the game and act on a click
+    fn draw_menu(&mut self) {
+        let options: Vec<_> = Self::MENU
+            .iter()
+            .map(|&toggle| (toggle, self.toggle_label(toggle)))
+            .collect();
+        if let Some(event) = self.menu.draw(&options, true, &mut self.env.gtx.prefs) {
+            self.on_menu_event(event);
+        }
+    }
+
+    /// What a toggle's menu button says: the setting and its current value
+    fn toggle_label(&self, toggle: Toggle) -> String {
+        if toggle != Toggle::Autopilot {
+            return toggle.label(&self.env.gtx.prefs);
+        }
+        let player = self.env.snakes.iter().find(|snake| snake.snake_type == snake::Type::Player);
+        match player {
+            _ if self.seeds.len() != 1 => "Autopilot: single player only".to_string(),
+            Some(snake) if snake.autopilot.is_some() => {
+                format!("Autopilot: {}", if snake.autopilot_control { "on" } else { "off" })
+            }
+            _ => "Autopilot: unavailable".to_string(),
+        }
+    }
+
+    /// Follow up on a toggle whose preference the menu has just changed
+    fn toggled(&mut self, toggle: Toggle) {
+        let prefs = &self.env.gtx.prefs;
+
+        match toggle {
+            Toggle::Border => {
+                self.border_mesh = None;
+                self.display_notification(if prefs.draw_border { "Border on" } else { "Border off" });
+            }
+            Toggle::Grid => {
+                let text = match prefs.draw_grid {
+                    DrawGrid::Grid => "Grid",
+                    DrawGrid::Dots => "Dot grid",
+                    DrawGrid::None => "Grid off",
+                };
+                self.grid_mesh = None;
+                self.display_notification(text);
+            }
+            Toggle::Hints => {
+                let text = match prefs.hint_style {
+                    HintStyle::Border => "Border hints",
+                    HintStyle::Gradient => "Gradient hints",
+                    HintStyle::Teleport => "Teleport hints",
+                    HintStyle::None => "Hints off",
+                };
+                // start the new style fresh rather than fading from the old one's colors
+                self.border_hints.clear();
+                self.display_notification(text);
+            }
+            Toggle::DistanceGrid => {
+                let text = if prefs.draw_distance_grid {
+                    "Distance grid on"
+                } else {
+                    self.distance_grid_mesh = None;
+                    "Distance grid off"
+                };
+                self.display_notification(text);
+            }
+            Toggle::PlayerPath => {
+                let text = if prefs.draw_player_path {
+                    "Path on"
+                } else {
+                    self.player_path_mesh = None;
+                    "Path off"
+                };
+                self.display_notification(text);
+            }
+            Toggle::Fps => {
+                if !prefs.display_fps {
+                    self.messages.remove(&MessageID::Fps);
+                }
+            }
+            Toggle::Stats => {
+                if !prefs.display_stats {
+                    self.messages.remove(&MessageID::Stats);
+                }
+            }
+            Toggle::Autopilot => {
+                // only apply if there is exactly one player snake
+                if self.seeds.len() == 1 {
+                    let player_snake = self
+                        .env
+                        .snakes
+                        .iter_mut()
+                        .find(|snake| snake.snake_type == snake::Type::Player)
+                        .unwrap();
+
+                    if player_snake.autopilot.is_some() {
+                        let text = if player_snake.autopilot_control.flip() {
+                            "Autopilot on"
+                        } else {
+                            player_snake.controller.reset(player_snake.body.dir);
+                            "Autopilot off"
+                        };
+                        self.display_notification(text);
+                    } else {
+                        self.display_notification("Autopilot not available");
+                    }
+                } else {
+                    self.display_notification(format!("Can't use autopilot with {} players", self.seeds.len()));
+                }
+            }
+            Toggle::DrawStyle => {
+                let text = match prefs.draw_style {
+                    rendering::Style::Smooth => "draw style: smooth",
+                    rendering::Style::Hexagon => "draw style: hexagon",
+                };
+                self.snake_render = None;
+                self.apple_mesh = None;
+                self.display_notification(text);
+            }
+            Toggle::SpecialApples => {
+                let text = if prefs.special_apples {
+                    "Special apples enabled"
+                } else {
+                    // replace special apples with normal apples
+                    let food = food_apple(&self.env.gtx);
+                    self.env.apples.iter_mut().for_each(|apple| {
+                        if matches!(apple.apple_type, apple::Type::SpawnSnake(_) | apple::Type::SpawnRain) {
+                            apple.apple_type = food.clone();
+                        }
+                    });
+                    self.apple_mesh = None;
+                    "Special apples disabled"
+                };
+                self.display_notification(text);
+            }
+        }
+    }
+}
+
 impl Screen for Game {
     fn update(&mut self) -> Result<()> {
         /// Most cells the fastest snake may travel in one tick, so no snake
@@ -529,158 +719,51 @@ impl Screen for Game {
             }
         }
 
+        if self.menu.is_open() {
+            set_default_camera();
+            self.draw_menu();
+        }
+
         Ok(())
     }
 
-    fn key_down_event(&mut self, keycode: KeyCode) -> Result<()> {
-        let prefs = &mut self.env.gtx.prefs;
-        // set by every branch that changes a stored preference
-        let mut changed = false;
+    fn key_down_event(&mut self, press: KeyPress) -> Result<()> {
+        use KeyCode::*;
+        let keycode = press.code;
 
-        if prefs.hide_cursor {
-            show_mouse(false);
+        let (used, event) = self.menu.key_pressed(press, &mut self.env.gtx.prefs);
+        if let Some(event) = event {
+            self.on_menu_event(event);
+        }
+        if used {
+            return Ok(());
+        }
+        if keycode == Escape {
+            self.open_menu();
+            return Ok(());
         }
 
-        use KeyCode::*;
+        if self.env.gtx.prefs.hide_cursor && !self.menu.is_open() {
+            show_mouse(false);
+        }
 
         let numeric_keys = [Key1, Key2, Key3, Key4, Key5, Key6, Key7, Key8, Key9];
 
         // TODO: also tie these to a keymap (dvorak-centric for now)
         match keycode {
-            Escape => match self.fps_control.state() {
+            // play/pause, or start over after a game over; ignored while the
+            // menu is open
+            Space if !self.menu.is_open() => match self.fps_control.state() {
                 fps_control::State::GameOver => {
                     self.restart();
                     self.fps_control.play();
                 }
-                fps_control::State::Playing => {
-                    self.fps_control.pause();
-                }
+                fps_control::State::Playing => self.fps_control.pause(),
                 fps_control::State::Paused => self.fps_control.play(),
             },
-            B => {
-                changed = true;
-                let text = match prefs.draw_border.flip() {
-                    true => "Border on",
-                    false => "Border off",
-                };
-                self.border_mesh = None;
-                self.display_notification(text);
-            }
-            G => {
-                changed = true;
-                let text = match prefs.draw_grid.rotate_next() {
-                    DrawGrid::Grid => "Grid",
-                    DrawGrid::Dots => "Dot grid",
-                    DrawGrid::None => "Grid off",
-                };
-                self.grid_mesh = None;
-                self.display_notification(text);
-            }
-            H => {
-                changed = true;
-                let text = match prefs.hint_style.rotate_next() {
-                    HintStyle::Border => "Border hints",
-                    HintStyle::Gradient => "Gradient hints",
-                    HintStyle::Teleport => "Teleport hints",
-                    HintStyle::None => "Hints off",
-                };
-                // start the new style fresh rather than fading from the old one's colors
-                self.border_hints.clear();
-                self.display_notification(text);
-            }
-            D => {
-                changed = true;
-                let text = if prefs.draw_distance_grid.flip() {
-                    "Distance grid on"
-                } else {
-                    self.distance_grid_mesh = None;
-                    "Distance grid off"
-                };
-                self.display_notification(text);
-            }
-            P => {
-                changed = true;
-                let text = if prefs.draw_player_path.flip() {
-                    "Path on"
-                } else {
-                    self.player_path_mesh = None;
-                    "Path off"
-                };
-                self.display_notification(text);
-            }
-            F => {
-                changed = true;
-                if !prefs.display_fps.flip() {
-                    self.messages.remove(&MessageID::Fps);
-                }
-            }
-            S => {
-                changed = true;
-                if !prefs.display_stats.flip() {
-                    self.messages.remove(&MessageID::Stats);
-                }
-            }
-            A => {
-                // only apply if there is exactly one player snake
-                if self.seeds.len() == 1 {
-                    let player_snake = self
-                        .env
-                        .snakes
-                        .iter_mut()
-                        .find(|snake| snake.snake_type == snake::Type::Player)
-                        .unwrap();
-
-                    if player_snake.autopilot.is_some() {
-                        let text = if player_snake.autopilot_control.flip() {
-                            "Autopilot on"
-                        } else {
-                            player_snake.controller.reset(player_snake.body.dir);
-                            "Autopilot off"
-                        };
-                        self.display_notification(text);
-                    } else {
-                        self.display_notification("Autopilot not available");
-                    }
-                } else {
-                    self.display_notification(format!("Can't use autopilot with {} players", self.seeds.len()));
-                }
-            }
-            Tab => {
-                changed = true;
-
-                let text = match prefs.draw_style {
-                    rendering::Style::Hexagon => {
-                        prefs.draw_style = rendering::Style::Smooth;
-                        "draw style: smooth"
-                    }
-                    rendering::Style::Smooth => {
-                        prefs.draw_style = rendering::Style::Hexagon;
-                        "draw style: hexagon"
-                    }
-                };
-                self.snake_render = None;
-                self.apple_mesh = None;
-                self.display_notification(text);
-            }
-            X => {
-                let text = if prefs.special_apples.flip() {
-                    "Special apples enabled"
-                } else {
-                    // replace special apples with normal apples
-                    let food = food_apple(&self.env.gtx);
-                    self.env.apples.iter_mut().for_each(|apple| {
-                        if matches!(apple.apple_type, apple::Type::SpawnSnake(_) | apple::Type::SpawnRain) {
-                            apple.apple_type = food.clone();
-                        }
-                    });
-                    self.apple_mesh = None;
-                    "Special apples disabled"
-                };
-                self.display_notification(text);
-            }
             k if let Some(idx) = numeric_keys.iter().position(|nk| *nk == k) => {
                 let new_food = idx as f32 + 1.0;
-                prefs.apple_food = new_food;
+                self.env.gtx.prefs.apple_food = new_food;
                 // change existing apples
                 for apple in &mut self.env.apples {
                     if let apple::Type::Eat(food) = &mut apple.apple_type {
@@ -705,22 +788,20 @@ impl Screen for Game {
                 };
                 self.display_notification(format!("Speed: {speed}x"));
             }
-            k => {
+            _ => {
                 if self.fps_control.state() == fps_control::State::Playing {
                     for snake in &mut self.env.snakes {
-                        snake.controller.key_pressed(k)
+                        snake.controller.key_pressed(press.key, &self.env.gtx)
                     }
                 }
             }
         }
 
-        // Preferences go to storage the moment one changes: the web build has
-        // no reliable moment to flush them later.
-        if changed {
-            self.env.gtx.prefs.save();
-        }
-
         Ok(())
+    }
+
+    fn transition(&mut self) -> Option<Transition> {
+        self.leave.then_some(Transition::Pop)
     }
 
     // TODO: forbid resizing in-game

@@ -25,6 +25,7 @@ impl Stats {
             font_size: Message::DEFAULT_FONT_SIZE,
             color: crate::color::WHITE,
             disappear: None,
+            background: true,
         }
     }
 }

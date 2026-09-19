@@ -7,7 +7,6 @@ use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
 use macroquad::input::{show_mouse, KeyCode};
 use macroquad::material::Material;
-use macroquad::text::{draw_text, measure_text};
 use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, screen_height, screen_width};
 use rand::prelude::*;
@@ -15,14 +14,17 @@ use rand::prelude::*;
 use super::Game;
 use crate::app::game_context::GameContext;
 use crate::app::game_mode::GameMode;
+use crate::app::key::KeyPress;
 use crate::app::prefs::Prefs;
-use crate::app::screen::{Environment, Screen};
+use crate::app::screen::menu::{Menu, Toggle};
+use crate::app::screen::{Environment, Screen, Transition};
 use crate::app::snake_management::{advance_snakes, update_snake_dirs};
 use crate::app::stats::Stats;
 use crate::app::{self};
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
-use crate::button::{Button, ButtonData, TriColor};
+use crate::button::style::{BUTTON_CELL_DIM, BUTTON_COLOR, FONT_SIZE, STROKE_THICKNESS};
+use crate::button::{Button, ButtonData};
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape, ShapePoints, TriangleArrowLeft, WideHexagon};
 use crate::snake::builder::Builder as SnakeBuilder;
@@ -30,17 +32,8 @@ use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, PaletteTemplate, Snake};
 use crate::snake_control::Template;
 use crate::support::material::snake_material;
+use crate::support::text::{draw_text, measure_text};
 use crate::support::mesh::set_board_camera;
-
-const BUTTON_COLOR: TriColor = TriColor {
-    normal: Color::new(0.5, 0.5, 0.5, 1.),
-    hover: Color::new(0., 1., 0., 1.),
-    pressed: Color::new(1., 0., 0., 1.),
-};
-const STROKE_THICKNESS: f32 = 4.;
-const FONT_SIZE: f32 = 32.;
-/// Cell size of the menu's buttons, independent of the window size
-const BUTTON_CELL_DIM: CellDim = CellDim { side: 30., sin: 25.980762, cos: 15. };
 
 /// Palettes a player can pick from
 fn palettes() -> Vec<PaletteTemplate> {
@@ -92,21 +85,7 @@ impl SnakeDemo {
             .build()
             .expect("the demo snake is fully specified");
 
-        let outer_shape = Hexagon::new(BUTTON_CELL_DIM);
-        let inner_shape = TriangleArrowLeft::new(BUTTON_CELL_DIM * 0.6);
-        let arrow_offset = outer_shape.center() - inner_shape.center();
-        let left = ButtonData::new(outer_shape.clone(), STROKE_THICKNESS, BUTTON_COLOR).inner_shape(
-            inner_shape.clone(),
-            arrow_offset,
-            STROKE_THICKNESS,
-            BUTTON_COLOR,
-        );
-        let right = ButtonData::new(outer_shape, STROKE_THICKNESS, BUTTON_COLOR).inner_shape(
-            inner_shape.rotate_clockwise_about_center(TAU / 2.),
-            arrow_offset,
-            STROKE_THICKNESS,
-            BUTTON_COLOR,
-        );
+        let (left, right) = Self::arrow_buttons(1.);
 
         let mut this = Self {
             pos,
@@ -126,12 +105,35 @@ impl SnakeDemo {
             },
             palettes,
             current_palette: 0,
-            // placed by `layout`
+            // placed and sized by `layout`
             left_button: Button::click(Point::zero(), left),
             right_button: Button::click(Point::zero(), right),
         };
         this.layout(cell_dim, pos);
         this
+    }
+
+    /// The previous/next palette buttons, at `scale` times their full size
+    fn arrow_buttons(scale: f32) -> (ButtonData, ButtonData) {
+        let cell_dim = BUTTON_CELL_DIM * scale;
+        let stroke_thickness = STROKE_THICKNESS * scale;
+
+        let outer_shape = Hexagon::new(cell_dim);
+        let inner_shape = TriangleArrowLeft::new(cell_dim * 0.6);
+        let arrow_offset = outer_shape.center() - inner_shape.center();
+        let left = ButtonData::new(outer_shape.clone(), stroke_thickness, BUTTON_COLOR).inner_shape(
+            inner_shape.clone(),
+            arrow_offset,
+            stroke_thickness,
+            BUTTON_COLOR,
+        );
+        let right = ButtonData::new(outer_shape, stroke_thickness, BUTTON_COLOR).inner_shape(
+            inner_shape.rotate_clockwise_about_center(TAU / 2.),
+            arrow_offset,
+            stroke_thickness,
+            BUTTON_COLOR,
+        );
+        (left, right)
     }
 
     /// Size of the demo board (without the buttons) for a given cell size
@@ -150,11 +152,21 @@ impl SnakeDemo {
         self.env.gtx.cell_dim = cell_dim;
 
         let board = Self::board_size(cell_dim);
-        let y = pos.y + board.y + BUTTON_CELL_DIM.side;
-        // centered at a quarter and three quarters of the board's width
-        let x = |fraction: f32| pos.x + fraction * board.x - BUTTON_CELL_DIM.width() / 2.;
-        self.left_button.pos = Point { x: x(0.25), y };
-        self.right_button.pos = Point { x: x(0.75), y };
+
+        // The buttons are centered at a quarter and three quarters of the
+        // board's width, half a board apart. Once the board is too narrow for
+        // two full-size buttons (outline stroke included) and a gap in that
+        // space, they shrink so they keep the gap.
+        const GAP: f32 = 10.;
+        let full_width = BUTTON_CELL_DIM.width() + STROKE_THICKNESS;
+        let scale = ((board.x / 2. - GAP) / full_width).clamp(0., 1.);
+        let (left, right) = Self::arrow_buttons(scale);
+        let button_dim = BUTTON_CELL_DIM * scale;
+
+        let y = pos.y + board.y + button_dim.side;
+        let x = |fraction: f32| pos.x + fraction * board.x - button_dim.width() / 2.;
+        self.left_button = Button::click(Point { x: x(0.25), y }, left);
+        self.right_button = Button::click(Point { x: x(0.75), y }, right);
     }
 
     fn palette(&self) -> PaletteTemplate {
@@ -218,7 +230,14 @@ impl SnakeDemo {
         Ok(())
     }
 
-    fn draw_buttons(&mut self) {
+    /// Draw the palette arrows; `interactive` is false while a menu covers
+    /// them
+    fn draw_buttons(&mut self, interactive: bool) {
+        if !interactive {
+            self.left_button.draw_idle();
+            self.right_button.draw_idle();
+            return;
+        }
         if self.left_button.draw() {
             self.prev_palette();
         }
@@ -235,11 +254,16 @@ pub struct StartScreen {
     seeds: Vec<SnakeBuilder>,
     cell_dim: CellDim,
     palette: app::Palette,
-    spawn_policy: Option<SpawnPolicy>,
+    spawn_policy: SpawnPolicy,
     mode: GameMode,
 
     players_button: Button,
+    options_button: Button,
     start_button: Button,
+    /// The options menu, over the start screen
+    menu: Menu,
+    /// The preferences the menu edits (the game loads them when it starts)
+    prefs: Prefs,
     demos: Vec<SnakeDemo>,
     /// Compiled lazily on first draw (needs a live GL context)
     snake_material: Option<Material>,
@@ -287,12 +311,15 @@ impl StartScreen {
             seeds,
             cell_dim,
             palette,
-            spawn_policy: Some(spawn_policy),
+            spawn_policy,
             mode,
 
             // placed by `layout`
             players_button: Button::rotate(Point::zero(), player_options),
+            options_button: Button::click(Point::zero(), button(&players_shape, "Options")),
             start_button: Button::click(Point::zero(), button(&WideHexagon::new(BUTTON_CELL_DIM), "Start")),
+            menu: Menu::Closed,
+            prefs: Prefs::load(),
             demos,
             snake_material: None,
 
@@ -307,8 +334,19 @@ impl StartScreen {
         self.players_button.index() + 1
     }
 
-    /// Place everything relative to the window: the players button at the
-    /// top, the demos of the active players side by side in the middle, the
+    const HINT: &'static str = "Enter to start";
+    const HINT_SIZE: f32 = 20.;
+    /// Space below the hint, and between it and the start button
+    const HINT_MARGIN: f32 = 20.;
+    const HINT_GAP: f32 = 16.;
+
+    /// Where the hint's text starts, from the top
+    fn hint_top(height: f32) -> f32 {
+        height - Self::HINT_MARGIN - measure_text(Self::HINT, Self::HINT_SIZE).height
+    }
+
+    /// Place everything relative to the window: the players and options
+    /// buttons side by side at the top, the demos of the active players side by side in the middle, the
     /// start button at the bottom.
     fn layout(&mut self) {
         let (width, height) = (screen_width(), screen_height());
@@ -316,15 +354,22 @@ impl StartScreen {
 
         let margin = BUTTON_CELL_DIM.side;
         let button_height = BUTTON_CELL_DIM.height();
-        let centered = |button: &Button, y: f32| Point { x: (width - button.size().x) / 2., y };
 
-        self.players_button.pos = centered(&self.players_button, margin);
-        self.start_button.pos = centered(&self.start_button, height - margin - button_height);
+        // the two top buttons are the same width, centered together
+        let top_width = self.players_button.size().x;
+        let top_gap = 2. * margin;
+        let top_left = (width - 2. * top_width - top_gap) / 2.;
+        self.players_button.pos = Point { x: top_left, y: margin };
+        self.options_button.pos = Point { x: top_left + top_width + top_gap, y: margin };
 
-        // the demos fill the space between the two buttons, arrows included
+        // the start button sits above the hint
+        let start_y = Self::hint_top(height) - Self::HINT_GAP - button_height;
+        self.start_button.pos = Point { x: (width - self.start_button.size().x) / 2., y: start_y };
+
+        // the demos fill the space between the buttons, arrows included
         let players = self.players();
         let top = 2. * margin + button_height;
-        let bottom = height - 2. * margin - button_height;
+        let bottom = start_y - margin;
         let arrows = BUTTON_CELL_DIM.side + BUTTON_CELL_DIM.height();
         let unit = SnakeDemo::board_size(CellDim::from(1.));
         let side = ((width - margin * (players + 1) as f32) / players as f32 / unit.x)
@@ -378,32 +423,53 @@ impl Screen for StartScreen {
         }
 
         set_default_camera();
+        // under the menu, the buttons are only a picture
+        let interactive = !self.menu.is_open();
         for demo in &mut self.demos[..players] {
-            demo.draw_buttons();
+            demo.draw_buttons(interactive);
         }
-        if self.players_button.draw() {
-            // the demos rearrange for the new number of players
-            self.layout();
-        }
-        if self.start_button.draw() {
-            self.start_game = true;
+        if interactive {
+            if self.players_button.draw() {
+                // the demos rearrange for the new number of players
+                self.layout();
+            }
+            if self.options_button.draw() {
+                self.menu.open();
+            }
+            if self.start_button.draw() {
+                self.start_game = true;
+            }
+        } else {
+            self.players_button.draw_idle();
+            self.options_button.draw_idle();
+            self.start_button.draw_idle();
         }
 
-        let hint = "Enter to start";
-        let dims = measure_text(hint, None, 24, 1.);
+        let dims = measure_text(Self::HINT, Self::HINT_SIZE);
         draw_text(
-            hint,
+            Self::HINT,
             (screen_width() - dims.width) / 2.,
-            screen_height() - 10.,
-            24.,
+            Self::hint_top(screen_height()) + dims.offset_y,
+            Self::HINT_SIZE,
             Color::new(0.5, 0.5, 0.5, 1.),
         );
+
+        // only the options that are preferences: the others belong to a game
+        let options: Vec<_> = Toggle::PREFS
+            .iter()
+            .map(|&toggle| (toggle, toggle.label(&self.prefs)))
+            .collect();
+        self.menu.draw(&options, false, &mut self.prefs);
 
         Ok(())
     }
 
-    fn key_down_event(&mut self, keycode: KeyCode) -> Result<()> {
-        match keycode {
+    fn key_down_event(&mut self, press: KeyPress) -> Result<()> {
+        if self.menu.key_pressed(press, &mut self.prefs).0 || self.menu.is_open() {
+            return Ok(());
+        }
+        match press.code {
+            KeyCode::Escape => self.menu.open(),
             KeyCode::Enter => self.start_game = true,
             KeyCode::Left => self.demos[0].prev_palette(),
             KeyCode::Right => self.demos[0].next_palette(),
@@ -412,10 +478,11 @@ impl Screen for StartScreen {
         Ok(())
     }
 
-    fn next_screen(&mut self) -> Option<Box<dyn Screen>> {
+    fn transition(&mut self) -> Option<Transition> {
         if !self.start_game {
             return None;
         }
+        self.start_game = false;
 
         let players = self.players();
         let seeds = self
@@ -423,15 +490,31 @@ impl Screen for StartScreen {
             .iter()
             .zip(&self.demos)
             .take(players)
-            .map(|(seed, demo)| seed.clone().palette(demo.palette()))
+            .map(|(seed, demo)| {
+                let mut seed = seed.clone().palette(demo.palette());
+                // a single player uses whichever keys the preferences pick
+                if players == 1 {
+                    if let Some(Template::Keyboard { side, .. }) = &mut seed.controller {
+                        *side = None;
+                    }
+                }
+                seed
+            })
             .collect();
 
-        Some(Box::new(Game::new(
+        Some(Transition::Push(Box::new(Game::new(
             self.cell_dim,
             seeds,
             self.palette.clone(),
-            self.spawn_policy.take()?,
+            self.spawn_policy.clone(),
             self.mode,
-        )))
+        ))))
+    }
+
+    /// Back from a game: the game may have changed the preferences
+    fn resume(&mut self) {
+        self.prefs = Prefs::load();
+        self.menu = Menu::Closed;
+        show_mouse(true);
     }
 }

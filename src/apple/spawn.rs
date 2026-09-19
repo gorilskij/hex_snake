@@ -38,6 +38,7 @@ use crate::{snake, snake_control};
 //     };
 // }
 
+#[derive(Clone)]
 pub enum SpawnEvent {
     Spawn(Apple),
     Wait(Frames),
@@ -69,6 +70,7 @@ impl SpawnScheduleBuilder {
 }
 
 // TODO: specify which types of apples spawn when
+#[derive(Clone)]
 pub enum SpawnPolicy {
     None, // no apples
     Random {

@@ -6,13 +6,34 @@
 //! screen space: the caller sets the default camera first.
 
 use macroquad::color::Color;
+use macroquad::text::TextDimensions;
 use macroquad::input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton};
-use macroquad::text::{draw_text, measure_text};
 
 use crate::basic::Point;
+
+/// The look shared by the menus' buttons
+pub mod style {
+    use macroquad::color::Color;
+
+    use super::TriColor;
+    use crate::basic::CellDim;
+
+    /// Highlights: a pressed button, a key waiting to be bound
+    pub const ACCENT: Color = Color::new(1., 0.85, 0., 1.);
+    pub const BUTTON_COLOR: TriColor = TriColor {
+        normal: Color::new(0.5, 0.5, 0.5, 1.),
+        hover: Color::new(0., 200. / 255., 0., 1.),
+        pressed: ACCENT,
+    };
+    pub const STROKE_THICKNESS: f32 = 4.;
+    pub const FONT_SIZE: f32 = 27.;
+    /// Cell size of a full-size button, independent of the window size
+    pub const BUTTON_CELL_DIM: CellDim = CellDim { side: 30., sin: 25.980762, cos: 15. };
+}
 use crate::rendering::shape::collisions::shape_point;
 use crate::rendering::shape::ShapePoints;
 use crate::support::mesh::{build_polygon, DrawMode, Mesh};
+use crate::support::text::{draw_text, measure_text};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum State {
@@ -44,14 +65,15 @@ impl TriColor {
 struct ButtonShape {
     /// Relative to the button's position
     points: ShapePoints,
-    stroke_thickness: f32,
+    mode: DrawMode,
     color: TriColor,
 }
 
 #[derive(Clone, Debug)]
 struct ButtonText {
-    text: String,
-    font_size: f32,
+    /// Pieces of text in a row, each with its own font size, sharing a
+    /// baseline
+    spans: Vec<(String, f32)>,
     /// Where the text is centered, relative to the button's position
     center: Point,
     color: TriColor,
@@ -69,7 +91,11 @@ impl ButtonData {
     /// A button outlined by `points` (relative to the button's position).
     pub fn new(points: ShapePoints, stroke_thickness: f32, color: TriColor) -> Self {
         Self {
-            outer_shape: ButtonShape { points, stroke_thickness, color },
+            outer_shape: ButtonShape {
+                points,
+                mode: DrawMode::stroke(stroke_thickness),
+                color,
+            },
             inner_shapes: vec![],
             text: None,
         }
@@ -80,17 +106,32 @@ impl ButtonData {
     pub fn inner_shape(mut self, points: ShapePoints, offset: Point, stroke_thickness: f32, color: TriColor) -> Self {
         self.inner_shapes.push(ButtonShape {
             points: points.translate(offset),
-            stroke_thickness,
+            mode: DrawMode::stroke(stroke_thickness),
+            color,
+        });
+        self
+    }
+
+    /// Add a filled shape drawn `offset` from the button's position.
+    pub fn inner_fill(mut self, points: ShapePoints, offset: Point, color: TriColor) -> Self {
+        self.inner_shapes.push(ButtonShape {
+            points: points.translate(offset),
+            mode: DrawMode::fill(),
             color,
         });
         self
     }
 
     /// Add a text label centered in the outer shape.
-    pub fn text(mut self, text: impl Into<String>, font_size: f32, color: TriColor) -> Self {
+    pub fn text(self, text: impl Into<String>, font_size: f32, color: TriColor) -> Self {
+        self.spans(vec![(text.into(), font_size)], color)
+    }
+
+    /// Add a label made of pieces of different sizes, centered in the outer
+    /// shape.
+    pub fn spans(mut self, spans: Vec<(String, f32)>, color: TriColor) -> Self {
         self.text = Some(ButtonText {
-            text: text.into(),
-            font_size,
+            spans,
             center: self.outer_shape.points.center(),
             color,
         });
@@ -101,18 +142,30 @@ impl ButtonData {
         let shapes = std::iter::once(&self.outer_shape).chain(&self.inner_shapes);
         let mesh = Mesh::combine(shapes.map(|shape| {
             let points = shape.points.clone().translate(pos);
-            build_polygon(DrawMode::stroke(shape.stroke_thickness), &points, shape.color.get(state))
+            build_polygon(shape.mode, &points, shape.color.get(state))
         }));
         mesh.draw();
 
         if let Some(text) = &self.text {
-            let font_size = text.font_size as u16;
-            let dims = measure_text(&text.text, None, font_size, 1.);
+            let dims: Vec<_> = text.spans.iter().map(|(s, size)| measure_text(s, *size)).collect();
+            let width: f32 = dims.iter().map(|d| d.width).sum();
+            // the tallest piece is centered; the others share its baseline
+            let tallest = dims.iter().fold(None, |max: Option<&TextDimensions>, d| match max {
+                Some(m) if m.height >= d.height => Some(m),
+                _ => Some(d),
+            });
+            let Some(tallest) = tallest else {
+                return;
+            };
+
             let center = pos + text.center;
             // draw_text's y is the baseline
-            let x = center.x - dims.width / 2.;
-            let y = center.y - dims.height / 2. + dims.offset_y;
-            draw_text(&text.text, x, y, text.font_size, text.color.get(state));
+            let y = center.y - tallest.height / 2. + tallest.offset_y;
+            let mut x = center.x - width / 2.;
+            for ((s, size), d) in text.spans.iter().zip(&dims) {
+                draw_text(s, x, y, *size, text.color.get(state));
+                x += d.width;
+            }
         }
     }
 }
@@ -168,6 +221,11 @@ impl Button {
         let (x, y) = mouse_position();
         let mouse = Point { x, y } - self.pos;
         shape_point(&self.data().outer_shape.points, mouse)
+    }
+
+    /// Draw the button at rest, ignoring the mouse (e.g. under a menu).
+    pub fn draw_idle(&self) {
+        self.data().draw(self.pos, State::Normal);
     }
 
     /// Draw the button and report whether it was clicked this frame. A click
