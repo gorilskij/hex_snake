@@ -29,6 +29,8 @@ pub struct Builder {
     pub controller: Option<snake_control::Template>,
 
     pub autopilot: Option<pathfinder::Template>,
+    /// How many apples ahead the autopilot plans for (one by default)
+    pub autopilot_targets: Option<usize>,
     pub autopilot_control: bool,
 }
 
@@ -93,6 +95,13 @@ impl Builder {
     #[must_use]
     pub fn autopilot(mut self, value: pathfinder::Template) -> Self {
         self.autopilot = Some(value);
+        self
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub fn autopilot_targets(mut self, value: usize) -> Self {
+        self.autopilot_targets = Some(value);
         self
     }
 
@@ -182,8 +191,11 @@ impl Builder {
                 .palette
                 .ok_or_else(|| BuilderError(Box::new(self.clone()), "mssing field `palette`"))?
                 .into(),
-            autopilot: self.autopilot.clone().map(|template| {
-                let controller_template = snake_control::Template::AppleSeeker(template);
+            autopilot: self.autopilot.clone().map(|pathfinder| {
+                let controller_template = snake_control::Template::AppleSeeker {
+                    pathfinder,
+                    targets: self.autopilot_targets.unwrap_or(1),
+                };
                 controller_template.into_controller(dir)
             }),
             autopilot_control: self.autopilot_control,

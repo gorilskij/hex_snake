@@ -100,6 +100,8 @@ fn player_seed(side: Side, mode: GameMode) -> snake::builder::Builder {
             })),
             backup: Box::new(pathfinder::Template::SpaceFilling),
         })
+        // plan a route through the next three apples, not just the nearest one
+        .autopilot_targets(3)
 }
 
 #[macroquad::main(window_conf)]

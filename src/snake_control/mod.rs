@@ -7,7 +7,7 @@ use crate::apple::Apple;
 use crate::basic::{Dir, Side};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
-use crate::snake_control::pathfinder::Path;
+use crate::snake_control::pathfinder::Plan;
 use crate::view::snakes::Snakes;
 
 mod apple_seeker;
@@ -29,7 +29,11 @@ pub enum Template {
     Mouse,
     Programmed(Vec<Move>),
     Killer,
-    AppleSeeker(pathfinder::Template),
+    AppleSeeker {
+        pathfinder: pathfinder::Template,
+        /// How many apples ahead to plan for.
+        targets: usize,
+    },
     Rain,
 }
 
@@ -47,14 +51,14 @@ pub trait Controller {
     ) -> Option<Dir>;
 
     // only implemented for autopilot-like controllers
-    fn get_path(
+    fn get_plan(
         &mut self,
         _body: &Body,
         _knowledge: Option<&Knowledge>,
         _other_snakes: &dyn Snakes,
         _apples: &[Apple],
         _gtx: &GameContext,
-    ) -> Option<&Path> {
+    ) -> Option<&Plan> {
         None
     }
 
@@ -179,9 +183,10 @@ impl Template {
             Template::Mouse => Box::new(Mouse),
             Template::Programmed(move_sequence) => Box::new(Programmed::new(move_sequence, start_dir)),
             Template::Killer => Box::new(Killer),
-            Template::AppleSeeker(template) => Box::new(AppleSeeker {
-                pathfinder: template.into_pathfinder(start_dir),
-                path: None,
+            Template::AppleSeeker { pathfinder, targets } => Box::new(AppleSeeker {
+                pathfinder: pathfinder.into_pathfinder(start_dir),
+                targets,
+                plan: None,
             }),
             Template::Rain => Box::new(Rain),
         }

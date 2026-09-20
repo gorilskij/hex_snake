@@ -94,7 +94,13 @@ impl Knowledge {
     /// Checks whether the snake can safely pass through a given segment
     /// belonging to itself
     pub fn can_pass_through_self(&self, seg: &Segment) -> bool {
-        self.0.eat_self(seg.segment_type).is_inert()
+        self.can_pass_through_own(seg.segment_type)
+    }
+
+    /// The same for a segment that doesn't exist yet — what a plan expects to
+    /// find where it has been.
+    pub fn can_pass_through_own(&self, segment_type: SegmentType) -> bool {
+        self.0.eat_self(segment_type).is_inert()
     }
 
     /// Checks whether the snake can safely pass through a given segment

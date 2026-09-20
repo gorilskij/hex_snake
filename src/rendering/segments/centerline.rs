@@ -28,6 +28,10 @@ use crate::snake::Body;
 pub struct Centerline {
     segments: Vec<SegmentDescription>,
     cell_dim: CellDim,
+    /// Where the ribbon ended before the caps truncated it, which is exactly
+    /// where the head cap's apex is put back (see [`cap`](super::cap)) — the
+    /// tip of the drawn snake. `None` if the body draws nothing at all.
+    head_tip: Option<Point>,
     /// Half the ribbon's width: how far the flesh reaches from the centerline.
     pub half_width: f32,
     /// The round cap's radius, equal to `half_width` except on snakes too short
@@ -38,6 +42,8 @@ pub struct Centerline {
 impl Centerline {
     pub fn of(body: &Body, gtx: &GameContext) -> Self {
         let mut segments = segment_descriptions(body, gtx);
+        // taken before truncation: the cap puts its apex back exactly here
+        let head_tip = head_segment(&segments, gtx.cell_dim).map(|desc| centerline_at(&desc, desc.fraction.end));
         let cap_radius = if segments.is_empty() {
             0.
         } else {
@@ -48,6 +54,7 @@ impl Centerline {
             cell_dim: gtx.cell_dim,
             half_width: gtx.cell_dim.side / 2.,
             cap_radius,
+            head_tip,
             segments,
         }
     }
@@ -59,22 +66,17 @@ impl Centerline {
     /// The centre of the head's round cap: where the ribbon ends and the cap
     /// begins, and the point a head-on collision is measured from. `None` if
     /// the body draws nothing at all.
-    ///
-    /// The base can sit a segment or two back when the cap straddles a cell
-    /// boundary, so this steps from the head's own cell rather than reading
-    /// that segment's board position — which would be a board away if the body
-    /// happens to cross a board edge there.
     pub fn head_base(&self) -> Option<Point> {
-        let mut destination = self.segments.first()?.destination;
-        for desc in &self.segments {
-            if drawn_extent(desc.fraction) > 0. {
-                let mut desc = desc.clone();
-                desc.destination = destination;
-                return Some(centerline_at(&desc, desc.fraction.end));
-            }
-            destination += cartesian_step(desc.turn.coming_from, self.cell_dim);
-        }
-        None
+        let desc = head_segment(&self.segments, self.cell_dim)?;
+        Some(centerline_at(&desc, desc.fraction.end))
+    }
+
+    /// The very tip of the drawn head — the apex of its round cap, one cap
+    /// radius *along the path* past [`head_base`](Self::head_base). Through a
+    /// turn the path is an arc, so the tip sits on that arc rather than along
+    /// the cell's axis or on the chord.
+    pub fn head_tip(&self) -> Option<Point> {
+        self.head_tip
     }
 
     /// Distance from `probe` to the flesh of segment `idx`, which must be in
@@ -124,15 +126,54 @@ impl Centerline {
     }
 }
 
+/// The head end of the ribbon: the first segment that draws anything.
+///
+/// That can sit a segment or two back when the cap straddles a cell boundary,
+/// so this steps from the head's own cell rather than reading that segment's
+/// board position — which would be a board away if the body happens to cross a
+/// board edge there.
+fn head_segment(segments: &[SegmentDescription], cell_dim: CellDim) -> Option<SegmentDescription> {
+    let mut destination = segments.first()?.destination;
+    for desc in segments {
+        if drawn_extent(desc.fraction) > 0. {
+            let mut desc = desc.clone();
+            desc.destination = destination;
+            return Some(desc);
+        }
+        destination += cartesian_step(desc.turn.coming_from, cell_dim);
+    }
+    None
+}
+
 fn drawn_extent(fraction: SegmentFraction) -> f32 {
     (fraction.end - fraction.start).max(0.)
 }
 
-/// The centerline point at `frac`, in board space. The ribbon is centred
-/// between its two edges, so this is just their midpoint.
-fn centerline_at(desc: &SegmentDescription, frac: f32) -> Point {
+/// The centerline point at `frac`, in the segment's default orientation. The
+/// ribbon is centred between its two edges, so this is just their midpoint.
+fn centerline_local(desc: &SegmentDescription, frac: f32) -> Point {
     let (inner, outer) = cross_section_at(desc, frac);
-    desc.board_transform()((inner + outer) * 0.5)
+    (inner + outer) * 0.5
+}
+
+/// The centerline point at `frac`, in board space.
+fn centerline_at(desc: &SegmentDescription, frac: f32) -> Point {
+    desc.board_transform()(centerline_local(desc, frac))
+}
+
+/// The centerline inside `fraction` as a polyline, in board space.
+///
+/// A straight segment needs no subdivision; an arc is sampled `steps` times.
+/// This is how anything that wants to *follow* a snake's path — rather than
+/// measure against it — gets the same curves the ribbon is built around.
+pub fn centerline_polyline(desc: &SegmentDescription, fraction: SegmentFraction, steps: usize) -> Vec<Point> {
+    let steps = if arc_params(desc).is_some() { steps.max(1) } else { 1 };
+    (0..=steps)
+        .map(|i| {
+            let t = i as f32 / steps as f32;
+            centerline_at(desc, fraction.start + (fraction.end - fraction.start) * t)
+        })
+        .collect()
 }
 
 /// Distance from `probe` to the part of `desc`'s centerline inside `fraction`.
@@ -266,6 +307,43 @@ mod tests {
         }
     }
 
+    /// Consecutive cells' centerlines meet exactly at the side they share, so
+    /// anything drawn cell by cell along a path (the autopilot's line) comes
+    /// out as one continuous curve rather than a string of pieces.
+    #[test]
+    fn centerlines_meet_at_cell_boundaries() {
+        let full = SegmentFraction { start: 0., end: 1. };
+
+        for coming_from in Dir::iter() {
+            for going_to in Dir::iter() {
+                if coming_from == going_to {
+                    continue;
+                }
+
+                let first = desc(coming_from, going_to, 1.);
+                for next_going_to in Dir::iter() {
+                    // the next cell is entered from the side this one leaves by
+                    let next_coming_from = -going_to;
+                    if next_going_to == next_coming_from {
+                        continue;
+                    }
+
+                    let mut second = desc(next_coming_from, next_going_to, 1.);
+                    second.destination = first.destination + cartesian_step(going_to, CELL_DIM);
+
+                    let end = *centerline_polyline(&first, full, 8).last().unwrap();
+                    let start = centerline_polyline(&second, full, 8)[0];
+                    assert!(
+                        (end - start).magnitude() < 0.01,
+                        "{coming_from:?} -> {going_to:?} -> {next_going_to:?}: \
+                         the curve jumps {} at the boundary",
+                        (end - start).magnitude(),
+                    );
+                }
+            }
+        }
+    }
+
     fn gtx() -> GameContext {
         use crate::app::game_mode::GameMode;
         use crate::apple::spawn::SpawnPolicy;
@@ -340,6 +418,48 @@ mod tests {
             "base is {} from the tip, expected {}",
             (tip - base).magnitude(),
             centerline.cap_radius,
+        );
+    }
+
+    /// A body whose head is turning: the head cell is entered from below and
+    /// left going `heading`, `head_fraction` of the way through the turn.
+    fn turning_body(heading: crate::basic::Dir, head_fraction: f32) -> Body {
+        let mut body = straight_body_at(HexPoint { h: 6, v: 6 }, 4, head_fraction, 0.);
+        body.dir = heading;
+        body
+    }
+
+    /// The tip is the apex of the head's round cap, so it travels the arc the
+    /// head is drawn around. Anything derived from the cell's axis instead cuts
+    /// the corner, and jumps back onto the path when the turn ends.
+    #[test]
+    fn the_tip_follows_the_turn() {
+        use crate::basic::board::cartesian_step;
+        use crate::basic::Dir;
+
+        let gtx = gtx();
+        let tip_at = |fraction| Centerline::of(&turning_body(Dir::Ur, fraction), &gtx).head_tip().unwrap();
+
+        // the tip moves smoothly all the way through the turn and out of it:
+        // no step is much longer than the average one
+        let steps: Vec<f32> = (1..=100)
+            .map(|i| (tip_at(i as f32 / 100.) - tip_at((i - 1) as f32 / 100.)).magnitude())
+            .collect();
+        let longest = steps.iter().copied().fold(0., f32::max);
+        let average = steps.iter().sum::<f32>() / steps.len() as f32;
+        assert!(
+            longest < 2. * average,
+            "the tip jumped {longest} in one step, averaging {average}",
+        );
+
+        // and it is genuinely off the cell's axis mid-turn, which is what makes
+        // asking the renderer worth it
+        let cell_center = HexPoint { h: 6, v: 6 }.to_cartesian(CELL_DIM) + CELL_DIM.center();
+        let guess = cell_center + cartesian_step(Dir::Ur, CELL_DIM) * (0.5 - 0.5);
+        let off = (tip_at(0.5) - guess).magnitude();
+        assert!(
+            off > CELL_DIM.side / 5.,
+            "mid-turn the tip is only {off} from the cell-axis guess",
         );
     }
 

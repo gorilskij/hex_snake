@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::HashSet;
 
-use super::{Obstacles, Path, PathFinder};
+use super::{Committed, Leg, Obstacles, Path, PathFinder, Start};
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
@@ -17,24 +17,32 @@ pub struct SpaceFilling;
 impl PathFinder for SpaceFilling {
     fn get_path(
         &self,
+        start: Start,
         _targets: &dyn Targets,
+        // the crawl is one step long and only ever planned on its own, so
+        // there is never a committed route to avoid
+        _committed: Committed,
         body: &Body,
         knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         gtx: &GameContext,
-    ) -> Option<Path> {
+    ) -> Option<Leg> {
         let obstacles = Obstacles::new(body, knowledge, other_snakes);
-        let head = body.segments[0].pos;
+        let (from, heading) = start;
 
         Dir::iter()
-            .filter(|&dir| dir != -body.dir)
-            .map(|dir| (dir, head.wrapping_translate(dir, 1, gtx.board_dim)))
+            .filter(|&dir| dir != -heading)
+            .map(|dir| (dir, from.wrapping_translate(dir, 1, gtx.board_dim)))
             .filter(|&(_, pos)| !obstacles.blocks(pos))
             .max_by_key(|&(dir, pos)| {
-                let turn = body.dir.clockwise_distance_to(dir);
+                let turn = heading.clockwise_distance_to(dir);
                 (room(pos, &obstacles, gtx.board_dim), Reverse(turn.min(6 - turn)))
             })
-            .map(|(_, pos)| Path::from([head, pos]))
+            // going nowhere in particular: no target
+            .map(|(_, pos)| Leg {
+                cells: Path::from([from, pos]),
+                target: None,
+            })
     }
 }
 

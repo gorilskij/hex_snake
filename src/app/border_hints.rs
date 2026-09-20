@@ -6,6 +6,12 @@
 //! to the player on crossing it (see [`Outcome`]), either by recoloring that
 //! stretch of the border or as a gradient fading from it into the cell.
 //!
+//! [`HintStyle::Lines`] and [`HintStyle::SmoothLines`] say *which way out*: one
+//! line along each of the three axes, from under the head out to the border it
+//! would leave through either way, drawn over the snake so a line is never
+//! hidden by the body it crosses. The first snaps to the head's cell, the
+//! second follows the head itself.
+//!
 //! [`HintStyle::Teleport`] instead says *where the head would come out*. For
 //! each direction it could keep going in, it recolors both ends of that wrap —
 //! the border it would leave through and the one it would arrive at. Nearer in,
@@ -16,15 +22,17 @@ use std::collections::HashMap;
 
 use macroquad::color::Color;
 
-use crate::app::palette::HintColors;
+use crate::app::game_context::GameContext;
+use crate::app::palette::{HintColors, Palette, TeleportHintColors};
 use crate::app::prefs::HintStyle;
 use crate::app::screen::Environment;
 use crate::app::snake_management::{outcome_at, Outcome};
-use crate::basic::{Dir, HexDim, HexPoint, Point};
+use crate::basic::{board, CellDim, Dir, HexDim, HexPoint, Point};
 use crate::color::lerp;
+use crate::rendering::segments::centerline::Centerline;
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Body;
-use crate::support::mesh::{build_colored_polygon, build_polygon, DrawMode, Mesh};
+use crate::support::mesh::{build_colored_polygon, build_line, build_polygon, DrawMode, Mesh};
 use crate::support::time::Instant;
 
 /// Roughly how long (s) a hint takes to settle after what's behind it changes.
@@ -133,30 +141,30 @@ impl BorderHints {
         // exponential approach, ~95% of the way there after FADE_TIME
         let step = 1. - (-3. * elapsed / FADE_TIME).exp();
 
+        if let HintStyle::Lines | HintStyle::SmoothLines = style {
+            self.clear();
+            let body = &env.snakes[player_idx].body;
+            return line_hints(
+                body,
+                &env.gtx,
+                style == HintStyle::SmoothLines,
+                palette.hint_line_color,
+                palette.hint_line_thickness,
+            );
+        }
+
         let targets = match style {
             HintStyle::Border => outcome_hints(env, player_idx, palette.border_hint_colors),
             HintStyle::Gradient => outcome_hints(env, player_idx, palette.gradient_hint_colors),
             HintStyle::Teleport => {
                 let body = &env.snakes[player_idx].body;
-                teleport_hints(body, env.gtx.board_dim, palette.teleport_hint_color)
+                teleport_hints(body, env.gtx.board_dim, palette.teleport_hint_colors)
             }
-            HintStyle::None => unreachable!("returned above"),
+            HintStyle::Lines | HintStyle::SmoothLines | HintStyle::None => unreachable!("returned above"),
         };
 
-        // What an edge with nothing to say looks like. The outcome styles sit
-        // beside the border and fade their own color out; a teleport mark is
-        // painted *over* the border, so it stays opaque and eases back to the
-        // border's own color instead, with its triangle shrinking to nothing.
-        let absent = |mark: Mark| match style {
-            HintStyle::Teleport => Mark {
-                color: palette.border_color,
-                depth: 0.,
-            },
-            _ => Mark {
-                color: Color { a: 0., ..mark.color },
-                depth: 0.,
-            },
-        };
+        let draw_border = env.gtx.prefs.draw_border;
+        let absent = |mark: Mark| absent_mark(style, palette, draw_border, mark);
 
         for (edge, target) in &targets {
             self.hints.entry(*edge).or_insert(Hint::new(*target));
@@ -251,10 +259,155 @@ impl BorderHints {
                         (inward(start), clear),
                     ])
                 }
-                HintStyle::None => unreachable!("returned above"),
+                HintStyle::Lines | HintStyle::SmoothLines | HintStyle::None => unreachable!("returned above"),
             }
         }))
     }
+}
+
+/// What an edge with nothing to say looks like, which is what a hint eases out
+/// towards as it loses its mark.
+///
+/// The outcome styles sit beside the border and fade their own color out. A
+/// mark painted *over* the border stays opaque instead, and eases back into
+/// whatever it is painted over: the border's own color while the border is
+/// drawn, the board's background once it is off — otherwise turning the border
+/// off would leave the mark fading into a line that is not there.
+fn absent_mark(style: HintStyle, palette: &Palette, draw_border: bool, mark: Mark) -> Mark {
+    match style {
+        HintStyle::Teleport => Mark {
+            color: if draw_border {
+                palette.border_color
+            } else {
+                palette.background_color
+            },
+            depth: 0.,
+        },
+        _ => Mark {
+            color: Color { a: 0., ..mark.color },
+            depth: 0.,
+        },
+    }
+}
+
+/// A line along each of the three axes, from the head out to the borders.
+///
+/// Each axis is one polyline through the head, so the two ends are the two
+/// borders it would leave through going either way along it.
+///
+/// [`HintStyle::Lines`] snaps the origin to the head's cell center, so the
+/// lines step from cell to cell; [`HintStyle::SmoothLines`] puts it on the tip
+/// of the drawn head, and the lines slide with it. An origin off the cell center
+/// is what makes the ends interesting: they are no longer the middle of a
+/// border cell's outer side, so each one is found by clipping the ray against
+/// the board's own edge (see [`ray_to_border`]) and slides along it as the head
+/// moves.
+fn line_hints(body: &Body, gtx: &GameContext, smooth: bool, color: Color, thickness: f32) -> Mesh {
+    let (board_dim, cell_dim) = (gtx.board_dim, gtx.cell_dim);
+    let head = body.segments[0].pos;
+    let mut origin = head.to_cartesian(cell_dim) + Hexagon::center(cell_dim);
+    if smooth {
+        // The tip of the drawn head, taken from the renderer's own centerline
+        // rather than guessed from the head's fraction along its cell: through
+        // a turn the head travels an arc, so anything derived from the cell's
+        // axis cuts the corner and the lines snap as the turn ends.
+        if let Some(tip) = Centerline::of(body, gtx).head_tip() {
+            origin = tip;
+        }
+    }
+
+    let lines = line_hint_points(origin, head, board_dim, cell_dim);
+    Mesh::combine(lines.map(|points| build_line(&points, thickness, color)))
+}
+
+/// The three lines, each as the polyline `[one border, the head, the other]`.
+///
+/// One per axis, so only half the directions are walked; the other half is the
+/// same line's other end.
+fn line_hint_points(origin: Point, head: HexPoint, board_dim: HexDim, cell_dim: CellDim) -> [[Point; 3]; 3] {
+    let border = border_segments(board_dim, cell_dim);
+    [Dir::U, Dir::Ul, Dir::Ur].map(|dir| {
+        [
+            ray_to_border(origin, dir, head, &border, board_dim, cell_dim),
+            origin,
+            ray_to_border(origin, -dir, head, &border, board_dim, cell_dim),
+        ]
+    })
+}
+
+/// Every side of the board's edge, as a segment and the way out through it.
+/// These are exactly the sides that wrap: a side is on the edge precisely when
+/// what lies across it is on the other side of the board.
+fn border_segments(board_dim: HexDim, cell_dim: CellDim) -> Vec<(Point, Point, Dir)> {
+    let corners = Hexagon::raw_points(cell_dim);
+    wrap_edges(board_dim)
+        .map(|(pos, dir, _)| {
+            // side i runs from corner i to corner i + 1 and faces Dir i
+            let origin = pos.to_cartesian(cell_dim);
+            let side = dir as usize;
+            (origin + corners[side], origin + corners[(side + 1) % 6], dir)
+        })
+        .collect()
+}
+
+/// Where a ray from `origin` along `dir` leaves the board.
+///
+/// The board's edge zigzags, so the ray is clipped against it segment by
+/// segment and the nearest hit wins, rather than assuming which cell's side it
+/// comes out of: from anywhere but a cell center it can leave through a
+/// neighbouring cell's side instead.
+///
+/// Only sides the ray is *leaving* through count. A head on the border itself
+/// is on two of them at once, and the one it is heading into ends the line
+/// right there (a line of no length), while the one behind it must not end the
+/// line going the other way.
+///
+/// The fallback — a ray that grazes the edge between two segments and misses
+/// both — steps out along `head`'s lane of cells instead, as if from its center.
+fn ray_to_border(
+    origin: Point,
+    dir: Dir,
+    head: HexPoint,
+    border: &[(Point, Point, Dir)],
+    board_dim: HexDim,
+    cell_dim: CellDim,
+) -> Point {
+    let step = board::cartesian_step(dir, cell_dim);
+
+    // origin + t * step = a + u * (b - a), for the smallest t ahead of the head
+    let hit = border
+        .iter()
+        .filter(|&&(.., out)| {
+            // pointing out through this side, not in through it
+            let out = board::cartesian_step(out, cell_dim);
+            step.x * out.x + step.y * out.y > 0.
+        })
+        .filter_map(|&(a, b, _)| {
+            let along = b - a;
+            let denominator = step.x * along.y - step.y * along.x;
+            if denominator.abs() < 1e-6 {
+                // parallel to this side, so either no crossing or a graze
+                return None;
+            }
+            let offset = a - origin;
+            let t = (offset.x * along.y - offset.y * along.x) / denominator;
+            let u = (offset.x * step.y - offset.y * step.x) / denominator;
+            // the ends are shared with the next side, so a corner counts
+            (t >= 0. && (-1e-6..=1. + 1e-6).contains(&u)).then_some(t)
+        })
+        .fold(f32::INFINITY, f32::min);
+
+    if hit.is_finite() {
+        return origin + step * hit;
+    }
+
+    let mut cells = 0.;
+    let mut cell = head;
+    while board_dim.contains(cell.translate(dir, 1)) {
+        cell = cell.translate(dir, 1);
+        cells += 1.;
+    }
+    origin + step * (cells + 0.5)
 }
 
 /// What the player would run into across each wrapping edge, marked on the edge
@@ -282,11 +435,15 @@ fn outcome_hints(env: &Environment, player_idx: usize, colors: HintColors) -> Ha
 /// cell's `-dir` side — the *exit*, on the border too, being the other half of
 /// the same wrap.
 ///
+/// Both ends of a wrap are colored by how close the head is, on the same
+/// quantity that opens the triangle: purple while the wrap is merely in range,
+/// sweeping down through the hues to red as the head arrives.
+///
 /// How many marks that comes to is left to the range: usually three wraps,
 /// since the two along an axis are a board apart and only one of each pair is
 /// close, but four in a corner, where a diagonal through the board is a single
 /// cell and so leaves it in both directions at once.
-fn teleport_hints(body: &Body, board_dim: HexDim, color: Color) -> HashMap<(HexPoint, Dir), Mark> {
+fn teleport_hints(body: &Body, board_dim: HexDim, colors: TeleportHintColors) -> HashMap<(HexPoint, Dir), Mark> {
     let head = body.segments[0].pos;
 
     let wraps: Vec<(HexPoint, Dir, HexPoint, f32)> = Dir::iter()
@@ -321,12 +478,24 @@ fn teleport_hints(body: &Body, board_dim: HexDim, color: Color) -> HashMap<(HexP
     // Exits go in second because one edge can be both: a board small enough
     // puts a destination back on the very cell the wrap left from, and there
     // the exit's triangle has to win.
-    let entries = wraps
-        .iter()
-        .map(|&(entry, dir, ..)| ((entry, dir), Mark { color, depth: 0. }));
-    let exits = wraps
-        .iter()
-        .map(|&(_, dir, destination, depth)| ((destination, -dir), Mark { color, depth }));
+    let entries = wraps.iter().map(|&(entry, dir, _, progress)| {
+        (
+            (entry, dir),
+            Mark {
+                color: colors.at(progress),
+                depth: 0.,
+            },
+        )
+    });
+    let exits = wraps.iter().map(|&(_, dir, destination, progress)| {
+        (
+            (destination, -dir),
+            Mark {
+                color: colors.at(progress),
+                depth: progress,
+            },
+        )
+    });
     entries.chain(exits).collect()
 }
 
@@ -349,6 +518,29 @@ mod tests {
 
     use super::*;
     use crate::snake::{Segment, SegmentType};
+
+    /// A teleport mark is painted over the border, so it has to ease back into
+    /// what it covers: the border while it is drawn, the background once it is
+    /// off. The outcome styles fade their own color out either way.
+    #[test]
+    fn a_teleport_mark_eases_into_what_it_covers() {
+        let palette = Palette::dark();
+        let mark = Mark { color: TINT.at(1.), depth: 1. };
+
+        let with_border = absent_mark(HintStyle::Teleport, &palette, true, mark);
+        assert_eq!(with_border.color, palette.border_color);
+        assert_eq!(with_border.depth, 0., "and its triangle shrinks to nothing");
+
+        let without = absent_mark(HintStyle::Teleport, &palette, false, mark);
+        assert_eq!(without.color, palette.background_color);
+        assert_eq!(without.color.a, 1., "it stays opaque, it is not a fade-out");
+
+        for draw_border in [true, false] {
+            let outcome = absent_mark(HintStyle::Border, &palette, draw_border, mark);
+            assert_eq!(outcome.color.a, 0., "an outcome hint fades its own color out");
+            assert_eq!(outcome.color.r, mark.color.r);
+        }
+    }
 
     /// Teleport hints are drawn on `(destination, -dir)`, which is only a
     /// border edge — and only meets the border cleanly — if wrapping is an
@@ -375,7 +567,13 @@ mod tests {
 
     const BOARD: HexDim = HexPoint { h: 20, v: 20 };
     const BIG: HexDim = HexPoint { h: 80, v: 80 };
-    const TINT: Color = Color::new(0.72, 0.16, 0.16, 1.);
+    const CELL_DIM: CellDim = CellDim { side: 50., sin: 43.30127, cos: 25. };
+    const TINT: TeleportHintColors = TeleportHintColors {
+        far_hue: 280.,
+        near_hue: 0.,
+        saturation: 0.636,
+        lightness: 0.44,
+    };
 
     /// A one-segment snake, its head `head_fraction` into `head` going `heading`.
     fn body_at(head: HexPoint, heading: Dir, head_fraction: f32) -> Body {
@@ -399,6 +597,120 @@ mod tests {
         }
     }
 
+    fn cell_center(cell: HexPoint) -> Point {
+        cell.to_cartesian(CELL_DIM) + Hexagon::center(CELL_DIM)
+    }
+
+    /// Snapped to a cell center, each line runs out to the far side of the last
+    /// on-board cell either way along its axis — the board's edge.
+    #[test]
+    fn line_hints_reach_the_border_both_ways() {
+        let head = HexPoint { h: 3, v: 4 };
+        let lines = line_hint_points(cell_center(head), head, BOARD, CELL_DIM);
+
+        assert_eq!(lines.len(), 3, "one line per axis");
+        for (line, dir) in lines.iter().zip([Dir::U, Dir::Ul, Dir::Ur]) {
+            assert!(
+                (line[1] - cell_center(head)).magnitude() < 0.01,
+                "the line passes through the head's cell center",
+            );
+
+            for (end, dir) in [(line[0], dir), (line[2], -dir)] {
+                // the last cell the line covers, found without stepping
+                let mut last = head;
+                while BOARD.contains(last.translate(dir, 1)) {
+                    last = last.translate(dir, 1);
+                }
+                assert!(
+                    !BOARD.contains(last.translate(dir, 1)),
+                    "{last:?} should be the last cell going {dir:?}",
+                );
+
+                // half a cell past its center is the middle of its outer side
+                let expected = cell_center(last) + board::cartesian_step(dir, CELL_DIM) * 0.5;
+                assert!(
+                    (end - expected).magnitude() < 0.01,
+                    "the {dir:?} end should be at {expected:?}, got {end:?}",
+                );
+            }
+        }
+    }
+
+    /// How far `point` is from the board's edge.
+    fn distance_to_border(point: Point, board_dim: HexDim) -> f32 {
+        border_segments(board_dim, CELL_DIM)
+            .into_iter()
+            .map(|(a, b, _)| {
+                let along = b - a;
+                let u = ((point - a).x * along.x + (point - a).y * along.y) / (along.x.powi(2) + along.y.powi(2));
+                (point - (a + along * u.clamp(0., 1.))).magnitude()
+            })
+            .fold(f32::INFINITY, f32::min)
+    }
+
+    /// Wherever the head is within its cell, both ends of every line sit on the
+    /// board's edge, ahead of the head along its own axis. From off the center
+    /// that is no longer a cell side's middle: the ends slide along the edge.
+    #[test]
+    fn line_ends_stay_on_the_border_wherever_the_head_is() {
+        for (h, v) in [(3, 4), (0, 0), (0, 9), (9, 0), (BOARD.h - 1, BOARD.v - 1), (5, BOARD.v - 1)] {
+            let head = HexPoint { h, v };
+            for heading in Dir::iter() {
+                for fraction in [0., 0.25, 0.5, 0.75, 1.] {
+                    let origin = cell_center(head) + board::cartesian_step(heading, CELL_DIM) * (fraction - 0.5);
+                    let lines = line_hint_points(origin, head, BOARD, CELL_DIM);
+
+                    for (line, dir) in lines.iter().zip([Dir::U, Dir::Ul, Dir::Ur]) {
+                        for (end, dir) in [(line[0], dir), (line[2], -dir)] {
+                            let distance = distance_to_border(end, BOARD);
+                            assert!(
+                                distance < 0.01,
+                                "{head:?} {heading:?} {fraction}: the {dir:?} end is {distance} off the border",
+                            );
+
+                            // and it is out along the axis, not behind the head
+                            // (a head already on that border ends it right
+                            // there, a line of no length)
+                            let step = board::cartesian_step(dir, CELL_DIM);
+                            let out = end - origin;
+                            assert!(
+                                (out.x * step.y - out.y * step.x).abs() < 0.01 * step.magnitude()
+                                    && out.x * step.x + out.y * step.y >= 0.,
+                                "{head:?} {heading:?} {fraction}: the {dir:?} end is not out along its axis",
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The smooth lines move with the head: half a step of travel moves the
+    /// origin half a step, and the ends follow rather than staying put.
+    #[test]
+    fn smooth_lines_follow_the_head() {
+        let head = HexPoint { h: 5, v: 5 };
+        let at = |fraction: f32| {
+            let origin = cell_center(head) + board::cartesian_step(Dir::Ur, CELL_DIM) * (fraction - 0.5);
+            line_hint_points(origin, head, BOARD, CELL_DIM)
+        };
+
+        let (early, late) = (at(0.25), at(0.75));
+        let travelled = (late[0][1] - early[0][1]).magnitude();
+        let expected = board::cartesian_step(Dir::Ur, CELL_DIM).magnitude() / 2.;
+        assert!(
+            (travelled - expected).abs() < 0.01,
+            "the origin should have moved {expected}, moved {travelled}",
+        );
+
+        // the U line is not the one being travelled along, so both its ends
+        // have to slide along the border to keep up
+        for end in [0, 2] {
+            let moved = (late[0][end] - early[0][end]).magnitude();
+            assert!(moved > 0.01, "the U line's end {end} did not move at all");
+        }
+    }
+
     /// A head about to cross marks the exit it is heading for at full depth —
     /// on the far side of the board, not under itself.
     #[test]
@@ -411,6 +723,46 @@ mod tests {
         assert_eq!(full.len(), 1, "expected the exit straight ahead, got {full:?}");
         assert_eq!(full[0].0 .0.h, BOARD.h - 1, "the exit is on the opposite edge");
         assert_eq!(full[0].0 .1, -Dir::Ul, "and on the side it comes in through");
+    }
+
+    /// Both ends of a wrap sweep from purple to red in step with the triangle,
+    /// and they always agree with each other.
+    #[test]
+    fn marks_sweep_from_purple_to_red_as_the_head_closes_in() {
+        let hints_at = |v, fraction| teleport_hints(&body_at(HexPoint { h: 40, v }, Dir::U, fraction), BIG, TINT);
+
+        // out at the edge of the range, the triangle not yet opening
+        let far = hints_at(9, 0.);
+        for mark in far.values() {
+            assert_eq!(
+                mark.color,
+                TINT.at(0.),
+                "out of triangle range it should be flat purple"
+            );
+            assert!(mark.color.b > mark.color.g, "purple is blue-ish: {:?}", mark.color);
+        }
+
+        // right up against one, all but across (the other directions off the
+        // same border are wraps of their own, each at its own distance)
+        let near = hints_at(0, 1.);
+        let arriving = near
+            .values()
+            .max_by(|a, b| a.depth.total_cmp(&b.depth))
+            .expect("the wrap straight ahead");
+        assert_eq!(arriving.color, TINT.at(1.), "arriving it should be red");
+        assert!(
+            arriving.color.r > 2. * arriving.color.b,
+            "red is red: {:?}",
+            arriving.color
+        );
+
+        // and in between, both ends of a wrap share the triangle's progress
+        let middle = hints_at(2, 0.);
+        let depth = deepest(&middle);
+        assert!(depth > 0. && depth < 1., "expected a part-open triangle, got {depth}");
+        let entry = middle[&(HexPoint { h: 40, v: 0 }, Dir::U)];
+        assert_eq!(entry.depth, 0., "the entry stays flat");
+        assert_eq!(entry.color, TINT.at(depth), "but sweeps with its exit's triangle");
     }
 
     /// The deepest mark in `hints` — the exit's, entries always being flat.

@@ -127,9 +127,10 @@ fn generate_apple_type(gtx: &GameContext, rng: &mut impl Rng) -> apple::Type {
                     .eat_mechanics(EatMechanics::always(EatBehavior::Die))
                     .palette(palette.palette_competitor)
                     .starvation(gtx.mode.starvation())
-                    .controller(snake_control::Template::AppleSeeker(pathfinder::Template::WeightedBFS(
-                        pathfinder::Weights { sharp_turn: 8, ..Default::default() },
-                    )))
+                    .controller(snake_control::Template::AppleSeeker {
+                        pathfinder: pathfinder::Template::WeightedBFS(Default::default()),
+                        targets: 1,
+                    })
                     .speed(1.),
             )),
             1 => apple::Type::SpawnSnake(Box::new(

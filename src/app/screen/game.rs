@@ -45,6 +45,11 @@ pub struct Game {
     offset: Point,
 
     seeds: Vec<SnakeBuilder>,
+    /// Whether the player's autopilot is driving. Kept here rather than read
+    /// off the snake so that it survives a restart, which rebuilds every snake
+    /// from its seed. It is the game's state, not a preference: leaving the
+    /// game drops it.
+    autopilot_control: bool,
     animated_apples: bool,
 
     distance_grid: DistanceGrid,
@@ -105,6 +110,7 @@ impl Game {
             // updated immediately after creation
             offset: Point { x: 0., y: 0. },
 
+            autopilot_control: seeds.iter().any(|seed| seed.autopilot_control),
             seeds,
             animated_apples: false,
 
@@ -245,6 +251,16 @@ impl Game {
 
         let left = unpositioned_h_pos.count();
         assert_eq!(left, 0, "unexpected iterator length");
+
+        // the freshly built snakes start from their seeds, which don't know
+        // the autopilot was turned on
+        let autopilot_control = self.autopilot_control;
+        if let Some(idx) = self.first_player_snake_idx() {
+            let player = &mut self.env.snakes[idx];
+            if player.autopilot.is_some() {
+                player.autopilot_control = autopilot_control;
+            }
+        }
 
         self.spawn_apples();
     }
@@ -459,6 +475,8 @@ impl Game {
                     HintStyle::Border => "Border hints",
                     HintStyle::Gradient => "Gradient hints",
                     HintStyle::Teleport => "Teleport hints",
+                    HintStyle::Lines => "Line hints",
+                    HintStyle::SmoothLines => "Smooth line hints",
                     HintStyle::None => "Hints off",
                 };
                 // start the new style fresh rather than fading from the old one's colors
@@ -505,12 +523,15 @@ impl Game {
                         .unwrap();
 
                     if player_snake.autopilot.is_some() {
-                        let text = if player_snake.autopilot_control.flip() {
+                        let on = player_snake.autopilot_control.flip();
+                        let text = if on {
                             "Autopilot on"
                         } else {
                             player_snake.controller.reset(player_snake.body.dir);
                             "Autopilot off"
                         };
+                        // so a restart brings it back the way it is now
+                        self.autopilot_control = on;
                         self.display_notification(text);
                     } else {
                         self.display_notification("Autopilot not available");
@@ -643,10 +664,12 @@ impl Screen for Game {
         let hint_style = env.gtx.prefs.hint_style;
         let hint_mesh = Some(self.border_hints.mesh(env, player_idx, hint_style));
         // gradients go under the grid (so its lines stay untinted), recolored
-        // border stretches right on top of the border
-        let (gradient_hint_mesh, border_hint_mesh) = match hint_style {
-            HintStyle::Gradient => (hint_mesh, None),
-            HintStyle::Border | HintStyle::Teleport | HintStyle::None => (None, hint_mesh),
+        // border stretches right on top of the border, and the lines over the
+        // snake, so the body never hides one crossing it
+        let (gradient_hint_mesh, over_snake_hint_mesh, border_hint_mesh) = match hint_style {
+            HintStyle::Gradient => (hint_mesh, None, None),
+            HintStyle::Lines | HintStyle::SmoothLines => (None, hint_mesh, None),
+            HintStyle::Border | HintStyle::Teleport | HintStyle::None => (None, None, hint_mesh),
         };
 
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
@@ -684,6 +707,7 @@ impl Screen for Game {
             &self.player_path_mesh,
         ];
         let after_snake = [
+            &over_snake_hint_mesh,
             &self.player_path_over_mesh,
             &self.apple_mesh,
             &self.border_mesh,

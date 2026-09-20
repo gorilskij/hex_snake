@@ -105,8 +105,14 @@ what the layout types — see below), then `next_frame().await`.
     by what the player would hit on the other side, as recolored border
     stretches or gradients into the cell; or by where the head would come out,
     recoloring both ends of each wrap it could reach (one per direction) and
-    growing a triangle inwards from the arrival end as it closes.
-    `HintStyle`, cycled from the options menu), `distance_grid.rs`,
+    growing a triangle inwards from the arrival end as it closes, both ends
+    sweeping down the hues from purple to red in step with the triangle; or
+    by the way out, as one translucent grey line per axis from the head out to
+    the borders, drawn over the snake — snapped to the head's cell, or through
+    the tip of the drawn head (`Centerline::head_tip`, the cap's apex, so the
+    origin follows the arc through a turn), in which case each end is clipped
+    against the board's zigzag edge and slides along it. `HintStyle`, cycled from the
+    options menu), `distance_grid.rs`,
     `portal/`, `board_dim.rs`.
   - `screen/{snake_control_creator_screen,debug_scenario}.rs` — **out of the
     module tree** (not compiled).
@@ -119,7 +125,21 @@ what the layout types — see below), then `next_frame().await`.
   in a `Weights` struct — step, blunt/sharp turn, teleport, pass-through), a
   space-filling survival fallback, with-backup, and `Obstacles` (occupied cells
   judged by the snake's `eat_self` for its own segments, `eat_other` for other
-  snakes').
+  snakes'). A search finds **one `Leg`** — the cheapest way from a start state
+  `(cell, heading)` to any target not already taken, around what the plan has
+  already `Committed` to — and chaining legs into a `Plan` is **path
+  management**, done by `apple_seeker.rs`, not by the searches: the head walks
+  the plan off the front and a new leg is appended at the back as targets are
+  eaten, so the committed part of the route never moves. `Leg::target` is
+  `None` for the survival crawl, which is what makes a plan a fallback (and is
+  only ever accepted as a plan's only leg). The route is an obstacle to its own
+  later legs — cells it uses are `Blocked`, except targets, which will hold an
+  eaten segment and are `Passable` when the snake's own eat mechanics say it
+  can pass through one. An apple that appears **on** the route is promoted to a
+  target by splitting that leg in two at its cell, leaving the route itself
+  untouched; that can push a plan past its target count, and extending waits
+  until it is back under. The player's autopilot plans 3 targets ahead
+  (`autopilot_targets`, `main.rs`); other snakes plan 1.
 - **`rendering/`** — turns the world into meshes (see next section).
 - **`basic/`** — `Point` (f32 x/y, cartesian), `HexPoint` (hex grid coord),
   `Dir`/`Dir12` (hex directions), `CellDim` (side/sin/cos, `height()`, `center()`),
@@ -217,7 +237,12 @@ z-order onto a `Canvas`:
 1. Each `rendering::*_mesh` fn builds a `support::mesh::Mesh` (grid, border —
    drawn edge by edge for any set of cells, `region_grid_mesh`/`region_border_mesh`,
    the board being the full rectangle —
-   apples, portals, distance grid, player path) via `MeshBuilder` (lyon fill/
+   apples, portals, distance grid, player path — the autopilot's `Plan` as one
+   continuous curve, drawn cell by cell along the same centerline the
+   snake ribbon is built around (`centerline_polyline`), so it turns exactly as
+   a snake taking it would and, starting at the head's own fraction into its
+   cell, is eaten continuously rather than a cell at a time; each leg is a step
+   darker, 70% white for the one being walked down to 30% for the last) via `MeshBuilder` (lyon fill/
    stroke → chunked macroquad meshes; chunks kept under macroquad's per-draw
    10000-vert / 5000-index clamp).
 2. `set_board_camera` sets a board-offset `Camera2D` once (pixel coords,
@@ -409,6 +434,14 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
 - **Perf, more generally:** each frame rebuilds the snake mesh and the border
   hints; worth trimming if frame work ever matters (it measured ≤ 2 ms in a
   release wasm build at 120 Hz).
+- **Autopilot pathfinding follow-ups:** the search
+  (`snake_control/pathfinder/weighted_bfs.rs`) is Dijkstra (`h = 0`); a
+  *landmark* heuristic (this same search run backwards from each target) would
+  make it A* — a closed-form hex distance can't work, since `wrap_around` isn't
+  a lattice translation. And a fallback plan (the survival crawl, a leg with no
+  target) is thrown away every tick, so it is recomputed every tick while the
+  snake is stuck; it should be kept and walked while only the main finder is
+  retried, which needs `PathFinder` to hold state (`&mut self`).
 - **Bad (shrink) apples, follow-ups:** the autopilot targets every apple
   (`view/targets.rs`) — it should only seek good apples and avoid bad ones; border
   hints report every apple as `Outcome::Apple` (green) — bad apples need their own

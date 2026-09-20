@@ -1,24 +1,34 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
-use crate::basic::{Dir, HexDim};
+use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
-use crate::snake_control::pathfinder::{Obstacles, Path, PathFinder};
+use crate::snake::SegmentType;
+use crate::snake_control::pathfinder::{Committed, Leg, Obstacle, Obstacles, Path, PathFinder, Plan};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
-/// Seeks apples by pathfinding to the nearest one (using the wrapped
-/// [`PathFinder`] strategy) and following the resulting path.
+/// More targets than this is a planning mistake, not a configuration: each one
+/// is another search, and a route that long is stale before it is walked.
+const MAX_TARGETS: usize = 8;
+
+/// Seeks apples by planning a route through the next few of them (using the
+/// wrapped [`PathFinder`] strategy one leg at a time) and following it.
+///
+/// The plan is kept as long as it stays true: the head walks it off the front,
+/// and a new leg is appended at the back as targets are eaten, so the part of
+/// the route already committed to never moves. Only something actually going
+/// wrong — the board resizing, an obstacle appearing, a target vanishing,
+/// straying off the path — throws any of it away.
 pub struct AppleSeeker {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
-    // implicitly, the target is always the last cell in the path; paired with
-    // the board it was planned on, since steps across the edge only connect
-    // on a board of that size
-    pub path: Option<(Path, HexDim)>,
+    /// How many targets to plan ahead for.
+    pub targets: usize,
+    pub plan: Option<Plan>,
 }
 
 impl AppleSeeker {
-    fn recalculate_path(
+    fn recalculate_plan(
         &mut self,
         body: &Body,
         knowledge: Option<&Knowledge>,
@@ -26,57 +36,197 @@ impl AppleSeeker {
         apples: &[Apple],
         gtx: &GameContext,
     ) {
-        // recalculate the path if there is no target of if the last target isn't there anymore
-        let recalculate_path = match &mut self.path {
-            None => true,
-            Some((path, _)) if path.is_empty() => true,
-            // the board was resized
-            Some((_, board_dim)) if *board_dim != gtx.board_dim => true,
-            Some((path, _)) => 'arm: {
-                // recalculate if we're not following the path
-                let head = body.segments[0].pos;
-                if head == path[0] {
-                } else if path.len() >= 2 && head == path[1] {
-                    path.pop_front();
-                } else {
-                    // strayed off the path (or the path is too short to
-                    // still be following it) -> recalculate
-                    break 'arm true;
-                }
+        debug_assert!(self.targets <= MAX_TARGETS, "{} targets is too many", self.targets);
+        let head = body.segments[0].pos;
 
-                // recalculate if the next step doesn't connect (e.g. the head
-                // was moved some other way)
-                if path.len() >= 2 && path[0].single_step_dir_to(path[1], gtx.board_dim).is_none() {
-                    break 'arm true;
-                }
-
-                // recalculate if something moved into the way (the head
-                // itself is path[0])
-                let obstacles = Obstacles::new(body, knowledge, other_snakes);
-                if path.iter().skip(1).any(|&pos| obstacles.blocks(pos)) {
-                    break 'arm true;
-                }
-
-                // recalculate if the target isn't there anymore (always, for
-                // a backup path that doesn't lead to an apple)
-                let target = *path.back().unwrap();
-                !apples.iter().any(|apple| apple.pos == target)
+        // keep whatever is still true
+        if let Some(plan) = &mut self.plan {
+            let obstacles = Obstacles::new(body, knowledge, other_snakes);
+            // TODO: a fallback plan is thrown away every tick, so the survival
+            //  crawl is recomputed every tick while the snake is stuck. It
+            //  should instead be kept and walked while only the main finder is
+            //  retried, which needs the pathfinders to hold state (`&mut self`).
+            let mut keep = plan.board_dim == gtx.board_dim && !plan.is_fallback() && follow(plan, head);
+            if keep {
+                drop_spent_legs(plan);
+                keep = connects(plan, gtx.board_dim) && !blocked_ahead(plan, &obstacles);
             }
-        };
-
-        if recalculate_path {
-            // find the shortest path to any apple and lock in that apple as the target
-            self.path = self
-                .pathfinder
-                .get_path(&apples, body, knowledge, other_snakes, gtx)
-                .map(|path| (path, gtx.board_dim));
-
-            if self.path.is_none() {
-                println!("failed to find path");
-                println!("apples: {}", apples.len());
+            if keep {
+                // a target someone else ate (or one that expired) ends the plan
+                // there; the legs before it are still good
+                if let Some(idx) = plan
+                    .legs
+                    .iter()
+                    .position(|leg| leg.target.is_some_and(|target| !is_apple(target, apples)))
+                {
+                    plan.legs.truncate(idx);
+                }
+                promote_apples_on_route(plan, apples);
+            } else {
+                self.plan = None;
             }
         }
+
+        // and extend it to the full number of targets
+        let mut plan = self.plan.take().unwrap_or_else(|| Plan {
+            legs: vec![],
+            board_dim: gtx.board_dim,
+        });
+        while plan.legs.len() < self.targets {
+            // each leg starts where the previous one ends, the first at the head
+            let start = match plan.legs.last() {
+                Some(leg) => match leg.arrival(gtx.board_dim) {
+                    Some(start) => start,
+                    None => break,
+                },
+                None => (head, body.dir),
+            };
+
+            let targets: Vec<HexPoint> = plan.targets().collect();
+            let cells: Vec<(HexPoint, Obstacle)> = committed_cells(&plan, &targets, knowledge);
+            let committed = Committed {
+                cells: &cells,
+                targets: &targets,
+            };
+
+            let leg = self
+                .pathfinder
+                .get_path(start, &apples, committed, body, knowledge, other_snakes, gtx);
+
+            match leg {
+                // A leg going nowhere in particular is as far as planning goes,
+                // and only worth having at all when there is nothing else: tack
+                // it onto a good plan and the whole plan counts as a fallback,
+                // to be thrown away and redone on the next tick.
+                Some(leg) if leg.target.is_none() => {
+                    if plan.legs.is_empty() {
+                        plan.legs.push(leg);
+                    }
+                    break;
+                }
+                Some(leg) => plan.legs.push(leg),
+                None => break,
+            }
+        }
+
+        if plan.legs.is_empty() {
+            println!("failed to find path");
+            println!("apples: {}", apples.len());
+        }
+        self.plan = (!plan.legs.is_empty()).then_some(plan);
     }
+}
+
+/// What the route already commits to, as the next leg's search will find it.
+///
+/// A target's cell will hold an eaten segment by the time the route comes back
+/// around, which the snake may be able to pass through; everywhere else it will
+/// be body, which it may not.
+fn committed_cells(plan: &Plan, targets: &[HexPoint], knowledge: Option<&Knowledge>) -> Vec<(HexPoint, Obstacle)> {
+    let eaten = SegmentType::Eaten {
+        original_food: 1.,
+        food_left: 1.,
+    };
+    let pass_eaten = knowledge.is_some_and(|knowledge| knowledge.can_pass_through_own(eaten));
+
+    plan.cells()
+        .map(|pos| {
+            let obstacle = if pass_eaten && targets.contains(&pos) {
+                Obstacle::Passable
+            } else {
+                Obstacle::Blocked
+            };
+            (pos, obstacle)
+        })
+        .collect()
+}
+
+/// Make a target of every apple that has appeared on the route.
+///
+/// The snake is going to walk over it and eat it either way, so the plan should
+/// say so: the leg it lands on splits in two at that cell, which leaves the
+/// route itself untouched. This is what can push a plan past the number of
+/// targets it plans for — extending simply waits until it is back under.
+fn promote_apples_on_route(plan: &mut Plan, apples: &[Apple]) {
+    let claimed: Vec<HexPoint> = plan.targets().collect();
+
+    let mut idx = 0;
+    while idx < plan.legs.len() {
+        let cells = &plan.legs[idx].cells;
+        // the first cell is the head or the previous leg's target, and the last
+        // is this leg's own; neither is new
+        let found = (1..cells.len().saturating_sub(1))
+            .find(|&at| is_apple(cells[at], apples) && !claimed.contains(&cells[at]));
+
+        let Some(at) = found else {
+            idx += 1;
+            continue;
+        };
+
+        // the two legs share the cell they meet in, like any other pair
+        let leg = &mut plan.legs[idx];
+        let rest: Path = leg.cells.iter().skip(at).copied().collect();
+        let target = leg.cells[at];
+        leg.cells.truncate(at + 1);
+        let tail = Leg {
+            cells: rest,
+            target: leg.target,
+        };
+        leg.target = Some(target);
+        plan.legs.insert(idx + 1, tail);
+        idx += 1;
+    }
+}
+
+/// Walk the plan forward to wherever the head is now, dropping legs it has
+/// finished. `false` if the head isn't on the plan at all any more.
+fn follow(plan: &mut Plan, head: HexPoint) -> bool {
+    loop {
+        let Some(leg) = plan.legs.first_mut() else { return false };
+
+        if leg.cells.front() == Some(&head) {
+            return true;
+        }
+        if leg.cells.len() >= 2 && leg.cells[1] == head {
+            leg.cells.pop_front();
+            return true;
+        }
+        // Nothing left of this leg for the head to be on: its target has been
+        // reached, and the next leg starts in that same cell. Otherwise the
+        // head is somewhere else entirely and the plan is worthless.
+        if leg.cells.len() < 2 {
+            plan.legs.remove(0);
+        } else {
+            return false;
+        }
+    }
+}
+
+/// Drop a leading leg the head has nothing left to walk, so the leg being
+/// followed always has the next step in it. The leg after it starts in the same
+/// cell, so nothing is lost — but a spent leg left in front would make the
+/// snake hold its course through a cell it should be turning in.
+fn drop_spent_legs(plan: &mut Plan) {
+    while plan.legs.len() > 1 && plan.legs[0].cells.len() < 2 {
+        plan.legs.remove(0);
+    }
+}
+
+/// Whether the next step is one a snake can actually take. A freshly planned
+/// leg always connects; one the head was moved along by other means may not.
+fn connects(plan: &Plan, board_dim: HexDim) -> bool {
+    let Some(leg) = plan.legs.first() else { return false };
+    leg.cells.len() < 2 || leg.cells[0].single_step_dir_to(leg.cells[1], board_dim).is_some()
+}
+
+/// Whether anything has moved into the way of the rest of the plan.
+fn blocked_ahead(plan: &Plan, obstacles: &Obstacles) -> bool {
+    // the head itself is the first cell
+    plan.cells().skip(1).any(|pos| obstacles.blocks(pos))
+}
+
+fn is_apple(pos: HexPoint, apples: &[Apple]) -> bool {
+    apples.iter().any(|apple| apple.pos == pos)
 }
 
 impl Controller for AppleSeeker {
@@ -88,34 +238,137 @@ impl Controller for AppleSeeker {
         apples: &[Apple],
         gtx: &GameContext,
     ) -> Option<Dir> {
-        self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
+        self.recalculate_plan(body, knowledge, other_snakes, apples, gtx);
 
         // TODO: detect and warn about excessive recalculation
         // WARNING: this can cause excessive recalculation
-        let (path, _) = self.path.as_ref()?;
-        if path.len() < 2 {
-            // if the path has length 1, we're about to eat an apple, maintain course
-            return Some(body.dir);
-        }
+        // the first leg with a step left in it — `drop_spent_legs` keeps that
+        // one at the front, finding it is belt and braces
+        let leg: Option<&Leg> = self.plan.as_ref()?.legs.iter().find(|leg| leg.cells.len() >= 2);
 
-        // not `dir_to`: across the board's edge that points the opposite way.
-        // A freshly (re)calculated path always connects.
-        path[0].single_step_dir_to(path[1], gtx.board_dim)
+        match leg {
+            // not `dir_to`: across the board's edge that points the opposite
+            // way. A freshly (re)calculated plan always connects.
+            Some(leg) => leg.cells[0].single_step_dir_to(leg.cells[1], gtx.board_dim),
+            // nothing left to walk: about to eat the last target, hold course
+            None => Some(body.dir),
+        }
     }
 
-    fn get_path(
+    fn get_plan(
         &mut self,
         body: &Body,
         knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         apples: &[Apple],
         gtx: &GameContext,
-    ) -> Option<&Path> {
-        self.recalculate_path(body, knowledge, other_snakes, apples, gtx);
-        self.path.as_ref().map(|(path, _)| path)
+    ) -> Option<&Plan> {
+        self.recalculate_plan(body, knowledge, other_snakes, apples, gtx);
+        self.plan.as_ref()
     }
 
     fn reset(&mut self, _dir: Dir) {
-        self.path = None;
+        self.plan = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::basic::HexDim;
+
+    const BOARD: HexDim = HexPoint { h: 20, v: 20 };
+
+    fn cell(h: isize) -> HexPoint {
+        HexPoint { h, v: 5 }
+    }
+
+    fn apple(h: isize) -> Apple {
+        Apple {
+            pos: cell(h),
+            apple_type: crate::apple::Type::Eat(1.),
+            time_left: None,
+        }
+    }
+
+    /// One leg running along a row, from `from` to `to`, its target the last cell.
+    fn leg(from: isize, to: isize) -> Leg {
+        Leg {
+            cells: (from..=to).map(cell).collect(),
+            target: Some(cell(to)),
+        }
+    }
+
+    fn plan(legs: Vec<Leg>) -> Plan {
+        Plan { legs, board_dim: BOARD }
+    }
+
+    /// An apple that appears on the route is walked over and eaten either way,
+    /// so the plan splits there and counts it as a target. The route itself
+    /// must come out exactly as it went in.
+    #[test]
+    fn an_apple_on_the_route_becomes_a_target() {
+        let mut route = plan(vec![leg(0, 6)]);
+        let before: Vec<HexPoint> = route.cells().collect();
+
+        promote_apples_on_route(&mut route, &[apple(3)]);
+
+        assert_eq!(route.legs.len(), 2, "the leg should have split at the apple");
+        assert_eq!(route.legs[0].target, Some(cell(3)), "the new target");
+        assert_eq!(route.legs[1].target, Some(cell(6)), "and the old one after it");
+        assert_eq!(
+            route.cells().collect::<Vec<_>>(),
+            before,
+            "splitting a leg must not move the route",
+        );
+        // the two legs meet in the target's cell, like any other pair
+        assert_eq!(route.legs[0].cells.back(), route.legs[1].cells.front());
+    }
+
+    /// Several apples on one leg, and apples that are already targets, are all
+    /// accounted for — the second split has to be found in the tail of the
+    /// first one.
+    #[test]
+    fn every_apple_on_the_route_is_promoted_once() {
+        let mut route = plan(vec![leg(0, 8)]);
+
+        promote_apples_on_route(&mut route, &[apple(2), apple(5), apple(8)]);
+
+        let targets: Vec<HexPoint> = route.targets().collect();
+        assert_eq!(targets, vec![cell(2), cell(5), cell(8)]);
+
+        // running it again finds nothing new
+        let legs = route.legs.len();
+        promote_apples_on_route(&mut route, &[apple(2), apple(5), apple(8)]);
+        assert_eq!(route.legs.len(), legs, "targets are not promoted twice");
+    }
+
+    /// The route is in the way of whatever is planned after it, except where it
+    /// will have eaten something and can pass through — and that last part is
+    /// the snake's own eat mechanics talking, not an assumption.
+    #[test]
+    fn the_route_blocks_what_comes_after_it() {
+        let route = plan(vec![leg(0, 4)]);
+        let targets: Vec<HexPoint> = route.targets().collect();
+
+        let passes = Knowledge::always(true);
+        let committed = committed_cells(&route, &targets, Some(&passes));
+        assert_eq!(committed.len(), 5, "every cell of the route: {committed:?}");
+        assert_eq!(
+            committed.iter().find(|&&(pos, _)| pos == cell(4)).unwrap().1,
+            Obstacle::Passable,
+            "the target will be an eaten segment, which this snake passes through",
+        );
+        assert!(
+            committed.iter().filter(|&&(pos, _)| pos != cell(4)).all(|&(_, o)| o == Obstacle::Blocked),
+            "the rest of the route is body: {committed:?}",
+        );
+
+        let crashes = Knowledge::always(false);
+        let committed = committed_cells(&route, &targets, Some(&crashes));
+        assert!(
+            committed.iter().all(|&(_, obstacle)| obstacle == Obstacle::Blocked),
+            "a snake that crashes into its own eaten segments has to go around: {committed:?}",
+        );
     }
 }

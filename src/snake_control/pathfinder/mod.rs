@@ -10,7 +10,7 @@ pub use weighted_bfs::Weights;
 use with_backup::WithBackup;
 
 use crate::app::game_context::GameContext;
-use crate::basic::{Dir, HexPoint};
+use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::view::snakes::Snakes;
@@ -18,15 +18,101 @@ use crate::view::targets::Targets;
 
 pub type Path = VecDeque<HexPoint>;
 
+/// Where a search starts: a cell and the heading arrived with, since turn costs
+/// make the two inseparable. Usually the head, but a leg that continues an
+/// earlier one starts where that one ended.
+pub type Start = (HexPoint, Dir);
+
+/// One search's worth of path: the cells, and the target it ends on.
+///
+/// `target` is `None` for a path that isn't heading anywhere in particular (the
+/// survival crawl), which is also what tells a follower not to get attached
+/// to it.
+#[derive(Clone, Debug)]
+pub struct Leg {
+    pub cells: Path,
+    pub target: Option<HexPoint>,
+}
+
+impl Leg {
+    /// The heading a snake arrives at the end with — where a continuing leg
+    /// has to start from.
+    ///
+    /// Not `dir_to`: across the board's edge that points the opposite way.
+    pub fn arrival(&self, board_dim: HexDim) -> Option<Start> {
+        let [before, last] = [self.cells.len().checked_sub(2)?, self.cells.len() - 1];
+        let (before, last) = (self.cells[before], self.cells[last]);
+        Some((last, before.single_step_dir_to(last, board_dim)?))
+    }
+}
+
+/// A route through several targets, one [`Leg`] per target, each starting where
+/// the previous one ended.
+///
+/// This is what a follower keeps and a renderer draws; building it out of legs
+/// is path management, deliberately kept out of the searches themselves.
+#[derive(Clone, Debug)]
+pub struct Plan {
+    pub legs: Vec<Leg>,
+    /// The board it was planned on: steps across the edge only connect on a
+    /// board of that size.
+    pub board_dim: HexDim,
+}
+
+impl Plan {
+    /// Whether any leg is going nowhere in particular, in which case the plan
+    /// is worth reconsidering as soon as possible.
+    pub fn is_fallback(&self) -> bool {
+        self.legs.iter().any(|leg| leg.target.is_none())
+    }
+
+    /// The targets still to be reached, in order.
+    pub fn targets(&self) -> impl Iterator<Item = HexPoint> + '_ {
+        self.legs.iter().filter_map(|leg| leg.target)
+    }
+
+    /// Every cell of the route, head first. Legs share the cell they meet in,
+    /// which is what makes them one continuous route; this yields it once.
+    pub fn cells(&self) -> impl Iterator<Item = HexPoint> + '_ {
+        self.legs.iter().enumerate().flat_map(|(idx, leg)| {
+            let shared = if idx == 0 { 0 } else { 1 };
+            leg.cells.iter().skip(shared).copied()
+        })
+    }
+}
+
+/// What the plan this leg extends has already committed to.
+///
+/// A route is a promise about where the snake will be, so the cells it already
+/// uses are in the way of anything planned after it — that is what stops a
+/// later leg from crossing an earlier one.
+#[derive(Copy, Clone, Default)]
+pub struct Committed<'a> {
+    /// Cells the route already uses, and what the snake expects to find there
+    /// by the time it comes back around: its own body, or (at a target it will
+    /// have eaten) a segment it may be able to pass through.
+    pub cells: &'a [(HexPoint, Obstacle)],
+    /// Targets earlier legs are already going for, which are therefore no
+    /// longer targets for this one.
+    pub targets: &'a [HexPoint],
+}
+
+/// A search for one leg: the cheapest way from `start` to any target that isn't
+/// already taken, going around what the plan has already `committed` to.
+///
+/// Collecting several targets is not a mode of the search — it is the caller
+/// chaining legs, each starting where the last one ended (see [`Plan`]).
 pub trait PathFinder {
     fn get_path(
         &self,
+        start: Start,
         targets: &dyn Targets,
+        committed: Committed,
         body: &Body,
         knowledge: Option<&Knowledge>,
         other_snakes: &dyn Snakes,
         gtx: &GameContext,
-    ) -> Option<Path>;
+    ) -> Option<Leg>;
 }
 
 #[derive(Clone, Debug)]

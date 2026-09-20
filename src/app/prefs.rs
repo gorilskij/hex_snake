@@ -33,6 +33,11 @@ pub enum HintStyle {
     /// Where the head would come out if it teleported: the exit edges thicken
     /// and tint, the closer the head is to being able to use them
     Teleport,
+    /// One line along each of the three axes, from under the head out to the
+    /// borders it would leave through, snapped to the head's cell
+    Lines,
+    /// The same, following the head itself rather than its cell
+    SmoothLines,
     None,
 }
 
@@ -122,6 +127,8 @@ mod names {
             HintStyle::Border => "border",
             HintStyle::Gradient => "gradient",
             HintStyle::Teleport => "teleport",
+            HintStyle::Lines => "lines",
+            HintStyle::SmoothLines => "smooth_lines",
             HintStyle::None => "none",
         }
     }
@@ -131,6 +138,8 @@ mod names {
             "border" => Some(HintStyle::Border),
             "gradient" => Some(HintStyle::Gradient),
             "teleport" => Some(HintStyle::Teleport),
+            "lines" => Some(HintStyle::Lines),
+            "smooth_lines" => Some(HintStyle::SmoothLines),
             "none" => Some(HintStyle::None),
             _ => None,
         }
