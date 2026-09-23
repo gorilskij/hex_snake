@@ -311,8 +311,13 @@ That's **gone**. Now:
   lazily and calls `draw_shaded` per piece. The fragment shader samples the LUT by `uv.x`, clamped to the segment's
   own slot (`normal.xy`), and scales it by a per-vertex brightness (`normal.z`;
   1 for the body, lower for details like passability marks) (linear filtered →
-  smooth gradients; hard segment boundaries stay sharp). `uv.y` is currently
-  unused (reserved for across-width shading).
+  smooth gradients; hard segment boundaries stay sharp). Then it lights the
+  smooth body as a round tube from straight above, by `uv.y` (across the
+  width), and the round caps as hemispheres, like a pill's ends, by `normal.w`
+  (`Surface`: how far along the cap, `sin φ`; −1 for flat surfaces). Lambert
+  diffuse + a Blinn-Phong highlight down the middle; the constants are at the
+  top of the fragment shader. Passability marks and the hexagon style stay flat
+  for now.
 
 Key files: `support/material.rs`, `snake/palette.rs` (`build_snake_lut`),
 `rendering/snake_mesh.rs`, `rendering/segments/{smooth_segments/mod,point_factory,
@@ -452,8 +457,9 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   similar localized effect and want a shared approach.
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
   freezes at `hunger::MIN_LENGTH`, `State::Starved`).
-- **`uv.y` (across-width)** is emitted but unused — hook for tube/curvature
-  shading later.
+- **Snake lighting follow-ups:** a light from a fixed direction on screen
+  (off-center highlight; needs each vertex's across direction), passability
+  marks as part of the tube instead of a flat overlay, and the hexagon style.
 - **Perf, more generally:** each frame rebuilds the snake mesh and the border
   hints; worth trimming if frame work ever matters (it measured ≤ 2 ms in a
   release wasm build at 120 Hz).

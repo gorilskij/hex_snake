@@ -24,21 +24,21 @@ attribute vec4 normal;
 varying vec2 uv;
 varying vec2 seg_bounds;
 varying float brightness;
+varying float along;
 uniform mat4 Model;
 uniform mat4 Projection;
 void main() {
     gl_Position = Projection * Model * vec4(position, 1);
     uv = texcoord;
-    // normal.xy carries this segment's [lo, hi] uv range and normal.z the
-    // brightness multiplier (see build_shaded_ribbon)
+    // normal.xy carries this segment's [lo, hi] uv range, normal.z the
+    // brightness multiplier and normal.w how it is lit (see Surface)
     seg_bounds = normal.xy;
     brightness = normal.z;
+    along = normal.w;
 }"#;
 
 // Samples the palette LUT by uv.x ("distance along body"). The LUT is a
-// single-row texture, so v is fixed at 0.5. uv.y (across-width) is currently
-// ignored, matching the old flat-across-width look; it is available for future
-// shading.
+// single-row texture, so v is fixed at 0.5.
 //
 // The lookup is clamped to this segment's own uv range (already inset by half a
 // texel on the CPU, see build_shaded) so linear filtering never bleeds across a
@@ -48,16 +48,38 @@ void main() {
 //
 // The color is then scaled by the vertex's brightness (1 for the body itself;
 // less for darker details drawn over it, like passability marks).
+//
+// Finally it is lit, unless the surface is flat (along < 0). The body is a
+// round tube lit from straight above: uv.y runs across it, so x = 2·uv.y − 1 is
+// where on the tube's cross-section the pixel is, and √(1 − x²) how much its
+// surface faces up. The ends are hemispheres, like a pill's: along (0 where an
+// end joins the body, 1 at its tip) tilts the surface away along the body too,
+// so it faces up by √(1 − along²)·√(1 − x²). Facing up is all that counts with
+// the light and the eye both straight above: diffuse light (Lambert) is that,
+// and the specular highlight (Blinn-Phong) a power of it.
 const FRAGMENT: &str = r#"#version 100
 precision highp float;
 varying vec2 uv;
 varying vec2 seg_bounds;
 varying float brightness;
+varying float along;
 uniform sampler2D Texture;
+const float AMBIENT = 0.45;
+const float DIFFUSE = 0.55;
+const float SPECULAR = 0.3;
+const float SHININESS = 24.0;
 void main() {
     float u = clamp(uv.x, seg_bounds.x, seg_bounds.y);
     vec4 color = texture2D(Texture, vec2(u, 0.5));
-    gl_FragColor = vec4(color.rgb * brightness, color.a);
+    vec3 base = color.rgb * brightness;
+    if (along < -0.5) {
+        gl_FragColor = vec4(base, color.a);
+        return;
+    }
+    float x = uv.y * 2.0 - 1.0;
+    float up = sqrt(max(0.0, 1.0 - x * x)) * sqrt(max(0.0, 1.0 - along * along));
+    vec3 lit = base * (AMBIENT + DIFFUSE * up) + SPECULAR * pow(up, SHININESS);
+    gl_FragColor = vec4(lit, color.a);
 }"#;
 
 pub fn snake_material() -> Result<Material> {

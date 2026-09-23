@@ -3,7 +3,7 @@ use crate::rendering;
 use crate::rendering::segments::descriptions::{SegmentDescription, TurnDirection, TurnType};
 use crate::rendering::segments::hexagon_segments::hexagon_outline;
 use crate::rendering::segments::smooth_segments::segment_cross_sections;
-use crate::support::mesh::{build_shaded_polygon, build_shaded_ribbon, Mesh};
+use crate::support::mesh::{build_shaded_polygon, build_shaded_ribbon, Mesh, Surface};
 
 impl SegmentDescription {
     /// Whether this segment's default-orientation geometry must be mirrored
@@ -104,6 +104,7 @@ impl SegmentDescription {
                     &cross_sections,
                     self.seg_bounds(num_segments, lut_size),
                     1.,
+                    Surface::Tube,
                     self.u_of(num_segments),
                     self.board_transform(),
                 )
