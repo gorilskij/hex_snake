@@ -373,8 +373,10 @@ impl Snake {
         }
     }
 
-    /// Return value indicates whether a call to advance_cell should be made
-    pub fn advance(&mut self, elapsed: Duration, board_dim: HexDim) -> bool {
+    /// Return value indicates whether a call to advance_cell should be made.
+    /// `occupied` is every cell a snake is in, for a tail growing backwards to
+    /// go around.
+    pub fn advance(&mut self, elapsed: Duration, board_dim: HexDim, occupied: &HashSet<HexPoint>) -> bool {
         if matches!(self.state, State::Crashed | State::Starved) {
             return false;
         }
@@ -453,14 +455,28 @@ impl Snake {
         }
 
         // The tail backing up past its last segment grows new segments behind
-        // it, straight on from the last one.
+        // it, the way the last one comes from. That way is chosen when the
+        // segment is grown, while only its far end shows, as straight on or
+        // the gentlest turn around whatever is in the way; only if something
+        // has moved into it since does it change, bending a tail end already
+        // drawn. With nowhere free to go, the tail goes straight on regardless.
+        let mut grown = vec![];
         while self.body.tail_fraction() + pending_push < -TAIL_EPSILON {
+            let blocked = |pos: HexPoint, grown: &[HexPoint]| occupied.contains(&pos) || grown.contains(&pos);
             let last = *self.body.segments.back().expect("a snake always has a segment");
-            let dir = last.coming_from;
+            let mut dir = last.coming_from;
+            if blocked(last.pos.wrapping_translate(dir, 1, board_dim), &grown) {
+                dir = way_back(last.pos, dir, last.going_to, board_dim, |pos| blocked(pos, &grown)).unwrap_or(dir);
+                self.body.segments.back_mut().unwrap().coming_from = dir;
+            }
+
+            let pos = last.pos.wrapping_translate(dir, 1, board_dim);
+            grown.push(pos);
+            let coming_from = way_back(pos, dir, Some(-dir), board_dim, |pos| blocked(pos, &grown)).unwrap_or(dir);
             self.body.segments.push_back(Segment {
                 segment_type: SegmentType::Normal,
-                pos: last.pos.wrapping_translate(dir, 1, board_dim),
-                coming_from: dir,
+                pos,
+                coming_from,
                 going_to: Some(-dir),
                 teleported: None,
                 z_index: last.z_index,
@@ -556,6 +572,23 @@ impl Snake {
     }
 }
 
+/// Which way from `pos` a tail growing backwards goes next: `straight` if it
+/// can, else the gentlest turn, never `except` (where the segment goes to).
+/// `None` if every way is `blocked`.
+fn way_back(
+    pos: HexPoint,
+    straight: Dir,
+    except: Option<Dir>,
+    board_dim: HexDim,
+    blocked: impl Fn(HexPoint) -> bool,
+) -> Option<Dir> {
+    std::iter::once(straight)
+        .chain(straight.blunt_turns().iter().copied())
+        .chain(straight.sharp_turns().iter().copied())
+        .filter(|&dir| Some(dir) != except)
+        .find(|&dir| !blocked(pos.wrapping_translate(dir, 1, board_dim)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,9 +615,80 @@ mod tests {
     }
 
     fn step(snake: &mut Snake, dt: f32, gtx: &GameContext) {
-        if snake.advance(Duration::from_secs_f32(dt), BOARD) {
+        step_around(snake, dt, gtx, &HashSet::new());
+    }
+
+    fn step_around(snake: &mut Snake, dt: f32, gtx: &GameContext, occupied: &HashSet<HexPoint>) {
+        if snake.advance(Duration::from_secs_f32(dt), BOARD, occupied) {
             snake.advance_cell(&[], gtx);
         }
+    }
+
+    fn gtx() -> GameContext {
+        GameContext::new(
+            BOARD,
+            CellDim::from(10.),
+            crate::app::Palette::dark(),
+            Prefs::default(),
+            SpawnPolicy::None,
+            GameMode::Classic,
+        )
+    }
+
+    /// A snake all the way out, whose tail then grows backwards by `amount`
+    /// much faster than the snake moves, around `occupied`.
+    fn back_up(amount: f32, occupied: &HashSet<HexPoint>) -> (Snake, HexPoint) {
+        let gtx = gtx();
+        let mut snake = snake();
+        for _ in 0..600 {
+            step(&mut snake, 1. / 60., &gtx);
+        }
+        let tail = snake.body.segments.back().unwrap().pos;
+        snake.body.length_changes.push(LengthChange::new(amount, 0.2));
+        for _ in 0..30 {
+            step_around(&mut snake, 1. / 60., &gtx, occupied);
+        }
+        (snake, tail)
+    }
+
+    /// Each segment comes from the one behind it.
+    fn continuous(snake: &Snake) -> bool {
+        let segments = &snake.body.segments;
+        segments
+            .iter()
+            .zip(segments.iter().skip(1))
+            .all(|(a, b)| a.pos.wrapping_translate(a.coming_from, 1, BOARD) == b.pos && b.going_to == Some(-a.coming_from))
+    }
+
+    #[test]
+    fn a_tail_backing_up_goes_straight_on_when_it_can() {
+        let (snake, tail) = back_up(8., &HashSet::new());
+        assert!(continuous(&snake));
+        let behind: Vec<HexPoint> = (1..=3).map(|n| tail.translate(Dir::D, n)).collect();
+        assert!(
+            behind.iter().all(|pos| snake.body.segments.iter().any(|seg| seg.pos == *pos)),
+            "straight down from {tail:?}: {:?}",
+            snake.body.segments.iter().map(|seg| seg.pos).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn a_tail_backing_up_goes_around_what_is_in_the_way() {
+        let (_, tail) = back_up(0., &HashSet::new());
+        // a wall straight behind the tail, four cells deep
+        let occupied: HashSet<HexPoint> = (1..=4).map(|n| tail.translate(Dir::D, n)).collect();
+        let (snake, _) = back_up(8., &occupied);
+        assert!(continuous(&snake));
+        assert!(
+            snake.body.segments.iter().any(|seg| seg.pos.h != tail.h),
+            "it went off to the side: {:?}",
+            snake.body.segments.iter().map(|seg| seg.pos).collect::<Vec<_>>()
+        );
+        assert!(
+            snake.body.segments.iter().all(|seg| !occupied.contains(&seg.pos)),
+            "{:?}",
+            snake.body.segments.iter().map(|seg| seg.pos).collect::<Vec<_>>()
+        );
     }
 
     /// An apple grows the snake by exactly its food, whatever the frame
@@ -592,14 +696,7 @@ mod tests {
     /// of its movement must be digested at its own segment's rate.
     #[test]
     fn an_apple_grows_the_snake_by_exactly_its_food() {
-        let gtx = GameContext::new(
-            BOARD,
-            CellDim::from(10.),
-            crate::app::Palette::dark(),
-            Prefs::default(),
-            SpawnPolicy::None,
-            GameMode::Classic,
-        );
+        let gtx = gtx();
 
         for dt in [1. / 60., 1. / 144., 1. / 7., 0.037, 0.0913] {
             for food in [1., 2., 0.5] {

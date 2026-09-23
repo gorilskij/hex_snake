@@ -404,6 +404,12 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
 
 /// Return value indicates whether any snake has crossed into a new cell
 pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
+    // as the tick starts, for tails growing backwards to go around
+    let occupied: HashSet<HexPoint> = env
+        .snakes
+        .iter()
+        .flat_map(|snake| snake.body.segments.iter().map(|segment| segment.pos))
+        .collect();
     let snakes = &mut env.snakes;
 
     let mut new_cell_occupied = false;
@@ -411,7 +417,7 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
     let mut remove_snakes = vec![];
     for (snake_idx, snake) in snakes.iter_mut().enumerate() {
         // advance the snake
-        if snake.advance(elapsed, env.gtx.board_dim) {
+        if snake.advance(elapsed, env.gtx.board_dim, &occupied) {
             // block is entered if the snake crossed a cell boundary
             new_cell_occupied = true;
 

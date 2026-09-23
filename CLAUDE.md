@@ -226,7 +226,10 @@ count. Head and tail are independent; nothing pins them to cell boundaries.
   `starvation` rate. Once the snake is all the way out, `Body::change_length`
   moves `emerged` along with `length`, so the tail moves directly: growth faster
   than the head pushes the tail *backwards*, and `advance` grows new segments
-  behind the last one, straight on along its `coming_from`. At
+  behind the last one, along its `coming_from` — picked when that segment is
+  grown, as straight on or the gentlest turn around any snake in the way
+  (`way_back`; `advance` gets the occupied cells), and picked again only if
+  something has moved into it since. At
   `hunger::MIN_LENGTH` the player becomes `State::Starved` (frozen like a crash,
   game over); other snakes `die()`. Apples a tail grows over are moved elsewhere
   (`relocate_covered_apples`); bad apples expire (`Apple::time_left`) and don't
@@ -441,8 +444,7 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   to black as it enters/leaves. Collision graphics (a crash effect) are a
   similar localized effect and want a shared approach.
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
-  freezes at `hunger::MIN_LENGTH`, `State::Starved`); a backing-up tail only goes
-  straight (no obstacle avoidance).
+  freezes at `hunger::MIN_LENGTH`, `State::Starved`).
 - **Cross-snake z-ordering:** shaded snakes are drawn per-snake in sequence, so
   the old global z-index interleaving across *different* snakes is not preserved
   (fine for the single-player game; revisit for multi-snake).
