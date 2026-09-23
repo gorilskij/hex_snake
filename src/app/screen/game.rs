@@ -186,7 +186,6 @@ impl Game {
         }
     }
 
-    // TODO: R as a restart shortcut but only in debug mode
     fn restart(&mut self) {
         let env = &mut self.env;
 
@@ -841,7 +840,7 @@ impl Screen for Game {
         self.leave.then_some(Transition::Pop)
     }
 
-    // TODO: forbid resizing in-game
+    // TODO: Figure out how resizing interacts with the game
     fn resize_event(&mut self, _width: f32, _height: f32) -> Result<()> {
         self.update_dim();
         let HexDim { h, v } = self.env.gtx.board_dim;

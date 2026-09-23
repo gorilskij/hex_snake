@@ -162,7 +162,6 @@ impl Template {
         })
     }
 
-    // TODO: remove start_dir
     pub fn into_controller(self, start_dir: Dir) -> Box<dyn Controller + Send + Sync> {
         // use crate::snake_control::a_star::AStar;
         use apple_seeker::AppleSeeker;
@@ -178,7 +177,7 @@ impl Template {
             Template::Programmed(move_sequence) => Box::new(Programmed::new(move_sequence, start_dir)),
             Template::Killer => Box::new(Killer),
             Template::AppleSeeker { pathfinder, targets } => Box::new(AppleSeeker {
-                pathfinder: pathfinder.into_pathfinder(start_dir),
+                pathfinder: pathfinder.into_pathfinder(),
                 targets,
                 plan: None,
             }),

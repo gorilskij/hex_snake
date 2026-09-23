@@ -123,13 +123,13 @@ pub enum Template {
 }
 
 impl Template {
-    pub fn into_pathfinder(self, _start_dir: Dir) -> Box<dyn PathFinder + Send + Sync> {
+    pub fn into_pathfinder(self) -> Box<dyn PathFinder + Send + Sync> {
         match self {
             Template::WeightedBFS(weights) => Box::new(WeightedBFS { weights }),
             Template::SpaceFilling => Box::new(SpaceFilling),
             Template::WithBackup { main, backup } => Box::new(WithBackup {
-                main: main.into_pathfinder(_start_dir),
-                backup: backup.into_pathfinder(_start_dir),
+                main: main.into_pathfinder(),
+                backup: backup.into_pathfinder(),
             }),
         }
     }

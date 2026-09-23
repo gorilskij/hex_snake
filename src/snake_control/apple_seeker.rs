@@ -240,8 +240,6 @@ impl Controller for AppleSeeker {
     ) -> Option<Dir> {
         self.recalculate_plan(body, knowledge, other_snakes, apples, gtx);
 
-        // TODO: detect and warn about excessive recalculation
-        // WARNING: this can cause excessive recalculation
         // the first leg with a step left in it — `drop_spent_legs` keeps that
         // one at the front, finding it is belt and braces
         let leg: Option<&Leg> = self.plan.as_ref()?.legs.iter().find(|leg| leg.cells.len() >= 2);
