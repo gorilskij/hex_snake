@@ -73,7 +73,6 @@ impl<Rng> Environment<Rng> {
     pub fn add_snake(&mut self, snake_builder: &SnakeBuilder) -> Result<()> {
         self.snakes
             .push(snake_builder.build().context("Environment::add_snake")?);
-        // TODO: check that the snake can be added, report error if it can't
         Ok(())
     }
 

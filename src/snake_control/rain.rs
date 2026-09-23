@@ -6,6 +6,8 @@ use crate::snake::{self, Body};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
+/// Falls straight down, around anything that isn't rain, until it disappears
+/// at the bottom of the board (see `advance_snakes`).
 pub struct Rain;
 
 impl Controller for Rain {
@@ -17,46 +19,23 @@ impl Controller for Rain {
         _: &[Apple],
         gtx: &GameContext,
     ) -> Option<Dir> {
-        if body.segments[0].pos.v == gtx.board_dim.v - 1 {
-            // todo!("return die")
-            eprintln!("TODO: suicide (or even better, disappear)");
-            return None;
-        }
+        let head = body.segments[0].pos;
+        let free = |dir: Dir| {
+            let next = head.wrapping_translate(dir, 1, gtx.board_dim);
+            !other_snakes
+                .iter()
+                .filter(|s| s.snake_type != snake::Type::Rain)
+                .flat_map(|s| s.body.segments.iter())
+                .any(|segment| segment.pos == next)
+        };
 
-        // TODO: randomize, make dl and dr equal probability
-        // if possible, go down, else try to go down left or down right, else crash
-        let next_d = body.segments[0].pos.translate(Dir::D, 1);
-        let next_dl = body.segments[0].pos.wrapping_translate(Dir::Dl, 1, gtx.board_dim);
-        let next_dr = body.segments[0].pos.wrapping_translate(Dir::Dr, 1, gtx.board_dim);
-
-        let mut d_occupied = false;
-        let mut dl_occupied = false;
-        let mut dr_occupied = false;
-
-        other_snakes
-            .iter()
-            .filter(|s| s.snake_type != snake::Type::Rain)
-            .flat_map(|s| s.body.segments.iter().map(|c| c.pos))
-            .for_each(|pos| {
-                if pos == next_d {
-                    d_occupied = true;
-                }
-                if pos == next_dl {
-                    dl_occupied = true;
-                }
-                if pos == next_dr {
-                    dr_occupied = true;
-                }
-            });
-
-        if !d_occupied {
-            Some(Dir::D)
-        } else if !dl_occupied {
-            Some(Dir::Dl)
-        } else if !dr_occupied {
-            Some(Dir::Dr)
+        // down if possible, else down left or down right (either first, at
+        // random), else crash
+        let sides = if rand::random() {
+            [Dir::Dl, Dir::Dr]
         } else {
-            None
-        }
+            [Dir::Dr, Dir::Dl]
+        };
+        std::iter::once(Dir::D).chain(sides).find(|&dir| free(dir))
     }
 }

@@ -410,6 +410,11 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
             // block is entered if the snake crossed a cell boundary
             new_cell_occupied = true;
 
+            snake.advance_cell(&env.portals, &env.gtx);
+
+            // after entering the new cell, so the snake sinks into a hole there
+            // (a dying snake never crosses into another one)
+            let at_bottom = snake.head().pos.v == env.gtx.board_dim.v - 1;
             match &mut snake.snake_type {
                 snake::Type::Competitor { life: Some(life) } | snake::Type::Killer { life: Some(life) } => {
                     if *life == 0 {
@@ -419,10 +424,10 @@ pub fn advance_snakes(env: &mut Environment, elapsed: Duration) -> bool {
                         *life -= 1;
                     }
                 }
+                // rain falls until it reaches the bottom of the board
+                snake::Type::Rain if at_bottom => snake.die(),
                 _ => (),
             }
-
-            snake.advance_cell(&env.portals, &env.gtx);
         }
 
         // hunger mode: a snake shrunk down to the minimum has starved, which ends
@@ -536,6 +541,11 @@ mod tests {
             })
             .collect();
 
+        environment(snakes, ())
+    }
+
+    /// Cell-based collisions, so only the cells decide who touches whom.
+    fn environment<Rng>(snakes: Vec<Snake>, rng: Rng) -> Environment<Rng> {
         let mut prefs = Prefs::default();
         prefs.draw_style = rendering::Style::Hexagon;
         Environment {
@@ -550,8 +560,27 @@ mod tests {
                 SpawnPolicy::None,
                 GameMode::Classic,
             ),
-            rng: (),
+            rng,
         }
+    }
+
+    /// A snake going down from `pos`, advanced until its head enters the next
+    /// cell.
+    fn enter_next_cell(snake_type: snake::Type, controller: snake_control::Template, pos: HexPoint) -> Snake {
+        let snake = SnakeBuilder::default()
+            .snake_type(snake_type)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Die))
+            .palette(snake::PaletteTemplate::rainbow())
+            .controller(controller)
+            .pos(pos)
+            .dir(Dir::D)
+            .len(3)
+            .speed(1.)
+            .build()
+            .unwrap();
+        let mut env = environment(vec![snake], rand::thread_rng());
+        while !advance_snakes(&mut env, Duration::from_secs_f32(0.1)) {}
+        env.snakes.remove(0)
     }
 
     fn collide(env: &mut Environment<()>) -> ([State; 2], bool) {
@@ -586,6 +615,32 @@ mod tests {
         // a head can't be cut off, so cutting one kills the cutter
         let mut env = head_on(EatBehavior::Cut, [0.2, 0.6]);
         assert_eq!(collide(&mut env), ([State::Dying, State::Living], false));
+    }
+
+    #[test]
+    fn a_snake_that_runs_out_of_life_dies_in_its_new_cell() {
+        let snake = enter_next_cell(
+            snake::Type::Competitor { life: Some(0) },
+            snake_control::Template::Programmed(vec![]),
+            MEETING,
+        );
+        assert_eq!(snake.state, State::Dying);
+        assert_eq!(snake.head().pos, MEETING.translate(Dir::D, 1));
+    }
+
+    #[test]
+    fn rain_disappears_at_the_bottom() {
+        let above_bottom = HexPoint { h: 10, v: BOARD.v - 3 };
+        let snake = enter_next_cell(snake::Type::Rain, snake_control::Template::Rain, above_bottom);
+        assert_eq!(snake.state, State::Living);
+
+        let snake = enter_next_cell(
+            snake::Type::Rain,
+            snake_control::Template::Rain,
+            HexPoint { h: 10, v: BOARD.v - 2 },
+        );
+        assert_eq!(snake.state, State::Dying);
+        assert_eq!(snake.head().pos.v, BOARD.v - 1);
     }
 
     #[test]
