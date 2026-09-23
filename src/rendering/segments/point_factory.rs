@@ -3,7 +3,7 @@ use crate::rendering;
 use crate::rendering::segments::descriptions::{SegmentDescription, TurnDirection, TurnType};
 use crate::rendering::segments::hexagon_segments::hexagon_outline;
 use crate::rendering::segments::smooth_segments::segment_cross_sections;
-use crate::support::mesh::{build_shaded_polygon, build_shaded_ribbon, Mesh};
+use crate::support::mesh::{Mesh, build_shaded_polygon, build_shaded_ribbon};
 
 impl SegmentDescription {
     /// Whether this segment's default-orientation geometry must be mirrored

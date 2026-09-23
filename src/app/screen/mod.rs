@@ -1,15 +1,15 @@
 use anyhow::{Context, Result};
 pub use game::Game;
-pub use start_screen::StartScreen;
 use macroquad::input::KeyCode;
 use rand::rngs::ThreadRng;
+pub use start_screen::StartScreen;
 
 use crate::app::game_context::GameContext;
 use crate::app::key::Key;
 use crate::app::portal::Portal;
 use crate::apple::Apple;
-use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::Snake;
+use crate::snake::builder::Builder as SnakeBuilder;
 
 mod board_dim;
 mod controls_menu;

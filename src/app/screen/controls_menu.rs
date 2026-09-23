@@ -48,7 +48,11 @@ const EMPTY_COLOR: TriColor = TriColor {
 };
 
 const fn uniform(color: Color) -> TriColor {
-    TriColor { normal: color, hover: color, pressed: color }
+    TriColor {
+        normal: color,
+        hover: color,
+        pressed: color,
+    }
 }
 
 fn side_name(side: Side) -> &'static str {
@@ -61,7 +65,13 @@ fn side_name(side: Side) -> &'static str {
 /// Draw `text` centered on `x`, with its top at `top`
 fn centered_text(text: &str, x: f32, top: f32, font_size: f32) {
     let dims = measure_text(text, font_size);
-    draw_text(text, x - dims.width / 2., top + dims.offset_y, font_size, BUTTON_COLOR.normal);
+    draw_text(
+        text,
+        x - dims.width / 2.,
+        top + dims.offset_y,
+        font_size,
+        BUTTON_COLOR.normal,
+    );
 }
 
 /// A back button centered at the bottom of the window
@@ -220,7 +230,11 @@ fn draw_keys(screen: &ControlsScreen, side: Side, controls: &Controls, center: P
 /// A key's label in pieces: `L`/`R` full size, a word smaller
 fn label_spans(key: Key, font_size: f32) -> Vec<(String, f32)> {
     let label = key.label();
-    let name_size = if label.small { KEY_WORD_FONT * font_size } else { font_size };
+    let name_size = if label.small {
+        KEY_WORD_FONT * font_size
+    } else {
+        font_size
+    };
     label
         .side
         .map(|side| (side.to_string(), font_size))

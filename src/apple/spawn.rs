@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use rand::distr::weighted::WeightedIndex;
 use rand::distr::Distribution;
+use rand::distr::weighted::WeightedIndex;
 use rand::{Rng, RngExt};
 
 use crate::app::game_context::GameContext;
-use crate::app::game_mode::{hunger, GameMode};
+use crate::app::game_mode::{GameMode, hunger};
 use crate::app::screen::Environment;
 use crate::apple::{self, Apple};
 use crate::basic::board::{get_occupied_cells, occupied_or_near_players, random_free_spot};

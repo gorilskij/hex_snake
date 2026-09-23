@@ -2,15 +2,15 @@
 
 use enum_map_lite::enum_map;
 use macroquad::input::get_keys_released;
-use macroquad::window::{next_frame, screen_height, screen_width, Conf};
+use macroquad::window::{Conf, next_frame, screen_height, screen_width};
 
+use crate::app::Palette;
 use crate::app::key::KeyInput;
 use crate::app::screen::{Screen, StartScreen, Transition};
-use crate::app::Palette;
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Side};
-use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::SegmentType;
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake_control::appetite::Appetite;
 use crate::snake_control::pathfinder;
 
@@ -93,10 +93,7 @@ fn player_seed(side: Side) -> snake::builder::Builder {
         // plan a route through the next three apples, not just the nearest one
         .autopilot_targets(3)
         // and go around the ones that would shrink it
-        .autopilot_appetite(Appetite {
-            shrink: -15,
-            ..Default::default()
-        })
+        .autopilot_appetite(Appetite { shrink: -15, ..Default::default() })
 }
 
 #[macroquad::main(window_conf)]

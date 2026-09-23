@@ -10,7 +10,7 @@ use crate::apple::Apple;
 use crate::basic::{Dir, Frames, HexDim, HexPoint};
 use crate::snake::eat_mechanics::{EatMechanics, Knowledge};
 use crate::snake_control;
-use crate::snake_control::{pathfinder, Controller};
+use crate::snake_control::{Controller, pathfinder};
 use crate::view::snakes::Snakes;
 
 pub mod builder;
@@ -654,10 +654,9 @@ mod tests {
     /// Each segment comes from the one behind it.
     fn continuous(snake: &Snake) -> bool {
         let segments = &snake.body.segments;
-        segments
-            .iter()
-            .zip(segments.iter().skip(1))
-            .all(|(a, b)| a.pos.wrapping_translate(a.coming_from, 1, BOARD) == b.pos && b.going_to == Some(-a.coming_from))
+        segments.iter().zip(segments.iter().skip(1)).all(|(a, b)| {
+            a.pos.wrapping_translate(a.coming_from, 1, BOARD) == b.pos && b.going_to == Some(-a.coming_from)
+        })
     }
 
     #[test]
@@ -666,7 +665,9 @@ mod tests {
         assert!(continuous(&snake));
         let behind: Vec<HexPoint> = (1..=3).map(|n| tail.translate(Dir::D, n)).collect();
         assert!(
-            behind.iter().all(|pos| snake.body.segments.iter().any(|seg| seg.pos == *pos)),
+            behind
+                .iter()
+                .all(|pos| snake.body.segments.iter().any(|seg| seg.pos == *pos)),
             "straight down from {tail:?}: {:?}",
             snake.body.segments.iter().map(|seg| seg.pos).collect::<Vec<_>>()
         );
@@ -708,7 +709,10 @@ mod tests {
                 let before = snake.body.length;
 
                 // the head's cell becomes the eaten segment
-                snake.body.segments[0].segment_type = SegmentType::Eaten { original_food: food, food_left: food };
+                snake.body.segments[0].segment_type = SegmentType::Eaten {
+                    original_food: food,
+                    food_left: food,
+                };
 
                 // until the tail has passed it
                 for _ in 0..(20. / dt) as usize {

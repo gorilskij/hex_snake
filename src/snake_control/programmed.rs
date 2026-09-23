@@ -1,8 +1,8 @@
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::Dir;
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
@@ -121,8 +121,9 @@ impl Controller for Programmed {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use Dir::*;
+
+    use super::*;
 
     fn pattern() -> Programmed {
         Programmed::new(vec![Move::Turn(U), Move::Wait(2), Move::Turn(Ur), Move::Wait(3)], D)

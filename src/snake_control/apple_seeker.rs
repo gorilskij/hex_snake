@@ -4,13 +4,12 @@ use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
-use crate::snake::Body;
-use crate::snake::SegmentType;
+use crate::snake::{Body, SegmentType};
+use crate::snake_control::Controller;
 use crate::snake_control::appetite::Appetite;
 use crate::snake_control::pathfinder::{
-    surroundings, Committed, Goals, Leg, Obstacle, Obstacles, Path, PathFinder, Plan,
+    Committed, Goals, Leg, Obstacle, Obstacles, Path, PathFinder, Plan, surroundings,
 };
-use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
 /// More targets than this is a planning mistake, not a configuration: each one
@@ -134,10 +133,7 @@ impl AppleSeeker {
 
             let targets: Vec<HexPoint> = plan.targets().collect();
             let cells: Vec<(HexPoint, Obstacle)> = committed_cells(&plan, &targets, knowledge);
-            let committed = Committed {
-                cells: &cells,
-                targets: &targets,
-            };
+            let committed = Committed { cells: &cells, targets: &targets };
 
             let leg = self
                 .pathfinder
@@ -179,10 +175,7 @@ impl AppleSeeker {
 /// around, which the snake may be able to pass through; everywhere else it will
 /// be body, which it may not.
 fn committed_cells(plan: &Plan, targets: &[HexPoint], knowledge: Option<&Knowledge>) -> Vec<(HexPoint, Obstacle)> {
-    let eaten = SegmentType::Eaten {
-        original_food: 1.,
-        food_left: 1.,
-    };
+    let eaten = SegmentType::Eaten { original_food: 1., food_left: 1. };
     let pass_eaten = knowledge.is_some_and(|knowledge| knowledge.can_pass_through_own(eaten));
 
     plan.cells()
@@ -224,10 +217,7 @@ fn promote_targets_on_route(plan: &mut Plan, targets: &[HexPoint]) {
         let rest: Path = leg.cells.iter().skip(at).copied().collect();
         let target = leg.cells[at];
         leg.cells.truncate(at + 1);
-        let tail = Leg {
-            cells: rest,
-            target: leg.target,
-        };
+        let tail = Leg { cells: rest, target: leg.target };
         leg.target = Some(target);
         plan.legs.insert(idx + 1, tail);
         idx += 1;
@@ -458,7 +448,10 @@ mod tests {
             "the target will be an eaten segment, which this snake passes through",
         );
         assert!(
-            committed.iter().filter(|&&(pos, _)| pos != cell(4)).all(|&(_, o)| o == Obstacle::Blocked),
+            committed
+                .iter()
+                .filter(|&&(pos, _)| pos != cell(4))
+                .all(|&(_, o)| o == Obstacle::Blocked),
             "the rest of the route is body: {committed:?}",
         );
 

@@ -5,8 +5,8 @@ use crate::apple::Apple;
 use crate::rendering;
 use crate::rendering::segments::cap::build_round_caps;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
-use crate::rendering::segments::marks::{build_marks, Joins};
-use crate::snake::palette::{build_snake_lut, SegmentStyle};
+use crate::rendering::segments::marks::{Joins, build_marks};
+use crate::snake::palette::{SegmentStyle, build_snake_lut};
 use crate::snake::{Body, Segment, Snake, ZIndex};
 use crate::support::material::PaletteLut;
 use crate::support::mesh::Mesh;
@@ -154,9 +154,7 @@ pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext) -> 
         }
     }
 
-    Ok(SnakeRender {
-        pieces: draw_order(pieces),
-    })
+    Ok(SnakeRender { pieces: draw_order(pieces) })
 }
 
 /// Consecutive items with the same z, grouped, in order.
@@ -195,14 +193,25 @@ mod tests {
                 (0, vec!['g']),
             ]
         );
-        assert_eq!(runs([(0, 'a'), (0, 'b')]), [(0, vec!['a', 'b'])], "one piece without crossings");
+        assert_eq!(
+            runs([(0, 'a'), (0, 'b')]),
+            [(0, vec!['a', 'b'])],
+            "one piece without crossings"
+        );
     }
 
     /// A over B at one crossing (its +1 piece) and under B at another (its -1
     /// piece): B goes between them.
     #[test]
     fn a_snake_can_be_over_and_under_another_at_once() {
-        let pieces = vec![(0, "A1"), (1, "A over"), (0, "A2"), (-1, "A under"), (0, "A3"), (0, "B")];
+        let pieces = vec![
+            (0, "A1"),
+            (1, "A over"),
+            (0, "A2"),
+            (-1, "A under"),
+            (0, "A3"),
+            (0, "B"),
+        ];
         assert_eq!(draw_order(pieces), ["A under", "A1", "A2", "A3", "B", "A over"]);
     }
 

@@ -5,13 +5,13 @@ use anyhow::Result;
 use enum_map_lite::enum_map;
 use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
-use macroquad::input::{show_mouse, KeyCode};
+use macroquad::input::{KeyCode, show_mouse};
 use macroquad::material::Material;
 use macroquad::window::{clear_background, screen_height, screen_width};
 
 use super::Game;
-use crate::app::game_context::GameContext;
 use crate::app::fps_control::FpsControl;
+use crate::app::game_context::GameContext;
 use crate::app::game_mode::GameMode;
 use crate::app::key::Key;
 use crate::app::prefs::{DrawGrid, Prefs};
@@ -30,8 +30,8 @@ use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, PaletteTemplate, Snake};
 use crate::snake_control::Template;
 use crate::support::material::snake_material;
+use crate::support::mesh::{Mesh, set_board_camera};
 use crate::support::text::{draw_text, measure_text};
-use crate::support::mesh::{set_board_camera, Mesh};
 
 /// Palettes a player can pick from
 fn palettes() -> Vec<PaletteTemplate> {
@@ -170,13 +170,22 @@ impl SnakeDemo {
 
     /// Top-left and bottom-right of the drawn cells, in board coordinates
     fn bounds(cell_dim: CellDim) -> (Point, Point) {
-        let size = Point { x: cell_dim.width(), y: cell_dim.height() };
+        let size = Point {
+            x: cell_dim.width(),
+            y: cell_dim.height(),
+        };
         Self::cells().map(|pos| pos.to_cartesian(cell_dim)).fold(
             (Point { x: f32::MAX, y: f32::MAX }, Point { x: f32::MIN, y: f32::MIN }),
             |(min, max), p| {
                 (
-                    Point { x: min.x.min(p.x), y: min.y.min(p.y) },
-                    Point { x: max.x.max(p.x + size.x), y: max.y.max(p.y + size.y) },
+                    Point {
+                        x: min.x.min(p.x),
+                        y: min.y.min(p.y),
+                    },
+                    Point {
+                        x: max.x.max(p.x + size.x),
+                        y: max.y.max(p.y + size.y),
+                    },
                 )
             },
         )
@@ -370,12 +379,7 @@ pub struct StartScreen {
 }
 
 impl StartScreen {
-    pub fn new(
-        cell_dim: CellDim,
-        seeds: Vec<SnakeBuilder>,
-        palette: app::Palette,
-        spawn_policy: SpawnPolicy,
-    ) -> Self {
+    pub fn new(cell_dim: CellDim, seeds: Vec<SnakeBuilder>, palette: app::Palette, spawn_policy: SpawnPolicy) -> Self {
         assert!(!seeds.is_empty(), "No players specified");
 
         let button = |shape: &ShapePoints, text: &str| {
@@ -471,14 +475,24 @@ impl StartScreen {
         let top_width = self.players_button.size().x;
         let top_gap = 2. * margin;
         let top_left = (width - 3. * top_width - 2. * top_gap) / 2.;
-        let top_buttons = [&mut self.players_button, &mut self.mode_button, &mut self.options_button];
+        let top_buttons = [
+            &mut self.players_button,
+            &mut self.mode_button,
+            &mut self.options_button,
+        ];
         for (i, button) in top_buttons.into_iter().enumerate() {
-            button.pos = Point { x: top_left + i as f32 * (top_width + top_gap), y: margin };
+            button.pos = Point {
+                x: top_left + i as f32 * (top_width + top_gap),
+                y: margin,
+            };
         }
 
         // the start button sits above the hint
         let start_y = Self::hint_top(height) - Self::HINT_GAP - button_height;
-        self.start_button.pos = Point { x: (width - self.start_button.size().x) / 2., y: start_y };
+        self.start_button.pos = Point {
+            x: (width - self.start_button.size().x) / 2.,
+            y: start_y,
+        };
 
         // the demos fill the space between the buttons, arrows included
         let players = self.players();
@@ -667,9 +681,17 @@ mod tests {
                 visited.insert(segment.pos);
             }
         }
-        assert_eq!(visited.len(), 6 * SnakeDemo::LOOP_RADIUS, "one cell per step of the loop");
+        assert_eq!(
+            visited.len(),
+            6 * SnakeDemo::LOOP_RADIUS,
+            "one cell per step of the loop"
+        );
         for pos in visited {
-            assert_eq!(pos.manhattan_distance(SnakeDemo::CENTER), SnakeDemo::LOOP_RADIUS, "{pos:?}");
+            assert_eq!(
+                pos.manhattan_distance(SnakeDemo::CENTER),
+                SnakeDemo::LOOP_RADIUS,
+                "{pos:?}"
+            );
             assert!(SnakeDemo::BOARD_DIM.contains(pos));
         }
     }

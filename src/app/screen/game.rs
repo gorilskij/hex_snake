@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
-use macroquad::input::{mouse_position, show_mouse, KeyCode};
+use macroquad::input::{KeyCode, mouse_position, show_mouse};
 use macroquad::material::Material;
 use macroquad::window::clear_background;
 
@@ -13,12 +13,12 @@ use crate::app::distance_grid::DistanceGrid;
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
 use crate::app::game_mode::GameMode;
+use crate::app::key::Key;
 use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
 use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
-use crate::app::key::Key;
 use crate::app::screen::menu::{Menu, MenuEvent, Toggle};
 use crate::app::screen::{Environment, Screen, Transition};
 use crate::app::snake_management::{
@@ -26,13 +26,13 @@ use crate::app::snake_management::{
     spawn_snakes, update_snake_dirs,
 };
 use crate::app::stats::Stats;
-use crate::apple::spawn::{expire_apples, food_apple, spawn_apples, spawn_bad_apples, SpawnPolicy};
+use crate::apple::spawn::{SpawnPolicy, expire_apples, food_apple, spawn_apples, spawn_bad_apples};
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
 use crate::support::material::snake_material;
-use crate::support::mesh::{set_board_camera, Mesh};
+use crate::support::mesh::{Mesh, set_board_camera};
 use crate::view::snakes::OtherSnakes;
 use crate::{apple, rendering};
 
@@ -422,7 +422,11 @@ impl Game {
         if toggle != Toggle::Autopilot {
             return toggle.label(&self.env.gtx.prefs);
         }
-        let player = self.env.snakes.iter().find(|snake| snake.snake_type == snake::Type::Player);
+        let player = self
+            .env
+            .snakes
+            .iter()
+            .find(|snake| snake.snake_type == snake::Type::Player);
         match player {
             _ if self.seeds.len() != 1 => "Autopilot: single player only".to_string(),
             Some(snake) if snake.autopilot.is_some() => {
@@ -616,11 +620,7 @@ impl Screen for Game {
         }
 
         if self.snake_render.is_none() || playing {
-            self.snake_render = Some(rendering::snake_mesh(
-                &mut env.snakes,
-                &env.apples,
-                &env.gtx,
-            )?);
+            self.snake_render = Some(rendering::snake_mesh(&mut env.snakes, &env.apples, &env.gtx)?);
         }
 
         if env.apples.is_empty() {
@@ -659,8 +659,7 @@ impl Screen for Game {
 
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
-            let meshes = rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx)
-                .transpose()?;
+            let meshes = rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx).transpose()?;
             (self.player_path_mesh, self.player_path_over_mesh) = meshes.unzip();
         }
 
@@ -777,7 +776,11 @@ impl Screen for Game {
             },
             // debug toggles
             Key::Char(c @ ('X' | 'D')) => {
-                let toggle = if c == 'X' { Toggle::SpecialApples } else { Toggle::DistanceGrid };
+                let toggle = if c == 'X' {
+                    Toggle::SpecialApples
+                } else {
+                    Toggle::DistanceGrid
+                };
                 toggle.apply(&mut self.env.gtx.prefs);
                 self.toggled(toggle);
             }

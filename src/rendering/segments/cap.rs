@@ -16,7 +16,7 @@ use crate::basic::Point;
 use crate::rendering::segments::descriptions::SegmentDescription;
 use crate::rendering::segments::smooth_segments::{cross_section_at, full_path_length};
 use crate::snake::SegmentType;
-use crate::support::mesh::{build_shaded_ribbon, Mesh};
+use crate::support::mesh::{Mesh, build_shaded_ribbon};
 
 /// Target on-screen spacing (px) between successive cap cross-sections.
 const CAP_STEP: f32 = 3.0;

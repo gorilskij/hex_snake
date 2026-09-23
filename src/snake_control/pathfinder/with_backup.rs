@@ -1,7 +1,7 @@
 use super::{Committed, Goals, Leg, PathFinder, Start};
 use crate::app::game_context::GameContext;
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::view::snakes::Snakes;
 
 pub struct WithBackup {

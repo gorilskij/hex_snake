@@ -5,7 +5,7 @@ use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};
 use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::rendering::shape::ShapePoints;
-use crate::support::mesh::{build_line, Mesh};
+use crate::support::mesh::{Mesh, build_line};
 
 pub fn render_hexagon_edge(dir: Dir, cell_dim: CellDim) -> ShapePoints {
     let CellDim { side, cos, .. } = cell_dim;

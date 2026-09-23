@@ -2,9 +2,9 @@ use std::cmp::Ordering;
 use std::f32::consts::TAU;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
+use Dir::*;
 use itertools::Itertools;
 use rand::{Rng, RngExt};
-use Dir::*;
 
 use crate::basic::angle_distance;
 

@@ -1,11 +1,11 @@
 use std::cmp::Reverse;
 use std::collections::HashSet;
 
-use super::{surroundings, Committed, Goals, Leg, Obstacles, Path, PathFinder, Start};
+use super::{Committed, Goals, Leg, Obstacles, Path, PathFinder, Start, surroundings};
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::view::snakes::Snakes;
 
 /// How far ahead the crawl plans. It is walked rather than recomputed, so it

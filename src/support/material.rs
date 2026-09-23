@@ -12,7 +12,7 @@
 
 use anyhow::{Context, Result};
 use macroquad::color::Color;
-use macroquad::material::{load_material, Material, MaterialParams};
+use macroquad::material::{Material, MaterialParams, load_material};
 use macroquad::miniquad::{BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource};
 use macroquad::texture::{FilterMode, Texture2D};
 

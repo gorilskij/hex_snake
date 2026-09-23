@@ -103,7 +103,7 @@ impl Default for Prefs {
 /// on the enums because they are a file-format concern: renaming a variant
 /// should not silently invalidate everyone's saved preferences.
 mod names {
-    use super::{rendering, Dir, DrawGrid, HintStyle, Side};
+    use super::{Dir, DrawGrid, HintStyle, Side, rendering};
 
     pub fn draw_grid(value: DrawGrid) -> &'static str {
         match value {
@@ -358,7 +358,9 @@ mod tests {
         let mut prefs = Prefs::default();
         prefs.left_controls.set(Dir::U, Some(Key::Char('É')));
         prefs.left_controls.set(Dir::D, None);
-        prefs.right_controls.set(Dir::Ul, Some(Key::Code(macroquad::input::KeyCode::RightShift)));
+        prefs
+            .right_controls
+            .set(Dir::Ul, Some(Key::Code(macroquad::input::KeyCode::RightShift)));
         prefs.single_player = Side::Left;
 
         let read = Prefs::read(&prefs.to_text());

@@ -4,8 +4,8 @@ use std::mem;
 use itertools::Itertools;
 
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::snake_control::pathfinder::Obstacles;
 use crate::view::snakes::Snakes;
 
@@ -119,7 +119,9 @@ impl DistanceGrid {
         let head = player_snake.head().pos;
         if self.current.is_none() || self.measured_from != Some(head) {
             self.measured_from = Some(head);
-            self.last = self.current.replace(find_distances(player_snake, other_snakes, board_dim));
+            self.last = self
+                .current
+                .replace(find_distances(player_snake, other_snakes, board_dim));
         }
     }
 

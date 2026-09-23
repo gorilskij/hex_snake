@@ -155,7 +155,9 @@ pub enum Confirm {
 pub enum Menu {
     Closed,
     /// How far down the options are scrolled, in pixels
-    Options { scroll: f32 },
+    Options {
+        scroll: f32,
+    },
     /// Both players' keys
     Controls(ControlsScreen),
     Confirm(Confirm),
@@ -249,7 +251,10 @@ impl Menu {
                 lines.push(Line::Buttons(vec!["Controls".to_string()]));
                 lines.push(Line::Gap);
                 for line in options {
-                    entries.extend(line.iter().map(|(toggle, label)| (Entry::Toggle(*toggle), label.clone())));
+                    entries.extend(
+                        line.iter()
+                            .map(|(toggle, label)| (Entry::Toggle(*toggle), label.clone())),
+                    );
                     lines.push(Line::Buttons(line.iter().map(|(_, label)| label.clone()).collect()));
                 }
 

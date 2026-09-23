@@ -14,9 +14,9 @@ use std::f32::consts::FRAC_PI_2;
 use crate::basic::{CellDim, Point};
 use crate::rendering;
 use crate::rendering::segments::descriptions::{SegmentDescription, TurnType};
-use crate::rendering::segments::smooth_segments::{arc_params, cross_section_at, ArcParams};
+use crate::rendering::segments::smooth_segments::{ArcParams, arc_params, cross_section_at};
 use crate::rendering::shape::{Hexagon, Shape};
-use crate::support::mesh::{build_shaded_polygon, build_shaded_ribbon, Mesh};
+use crate::support::mesh::{Mesh, build_shaded_polygon, build_shaded_ribbon};
 
 // Dimensions are first guesses, to be tuned by eye.
 

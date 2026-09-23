@@ -4,12 +4,12 @@ use macroquad::color::Color;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
+use crate::rendering::Style;
 use crate::rendering::segments::centerline::centerline_polyline;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
-use crate::rendering::Style;
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::{SegmentType, Snake};
-use crate::support::mesh::{build_line, Mesh};
+use crate::support::mesh::{Mesh, build_line};
 use crate::view::snakes::OtherSnakes;
 
 /// How wide the path is drawn, as a fraction of a cell's side.
@@ -116,7 +116,12 @@ pub fn player_path_mesh(
             [
                 (coming_from, -coming_from, SegmentFraction { start, end: 0.5 }, leg_idx),
                 // `start` matters here too: the head can be past the center
-                (-going_to, going_to, SegmentFraction { start: start.max(0.5), end }, leg_idx + 1),
+                (
+                    -going_to,
+                    going_to,
+                    SegmentFraction { start: start.max(0.5), end },
+                    leg_idx + 1,
+                ),
             ]
         } else {
             [

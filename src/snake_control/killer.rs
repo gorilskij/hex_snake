@@ -2,7 +2,7 @@ use std::f32::consts::TAU;
 
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
-use crate::basic::{angle_distance, CellDim, Dir, HexDim, HexPoint};
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, angle_distance};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::{self, Body, Segment};
 use crate::snake_control::Controller;

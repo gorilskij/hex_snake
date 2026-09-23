@@ -7,7 +7,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use rand::RngExt;
 
-use crate::app::game_mode::{hunger, GameMode};
+use crate::app::game_mode::{GameMode, hunger};
 use crate::app::portal;
 use crate::app::screen::Environment;
 use crate::basic::board::{get_occupied_cells, occupied_or_near_players, random_free_spot};
@@ -394,9 +394,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
         }
 
         snake_builder.dir.get_or_insert_with(|| Dir::random(&mut env.rng));
-        snake_builder
-            .len
-            .get_or_insert_with(|| env.rng.random_range(7..15));
+        snake_builder.len.get_or_insert_with(|| env.rng.random_range(7..15));
 
         env.add_snake(&snake_builder).context("spawn_snakes")?;
     }

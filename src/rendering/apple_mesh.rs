@@ -8,7 +8,7 @@ use crate::apple::Apple;
 use crate::color::to_color::ToColor;
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape};
-use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
+use crate::support::mesh::{DrawMode, Mesh, build_circle, build_polygon};
 
 pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration) -> Result<Mesh> {
     assert!(!apples.is_empty(), "tried to draw a mesh with 0 apples");

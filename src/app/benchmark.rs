@@ -13,7 +13,7 @@ use crate::app::snake_management::{
     advance_snakes, find_collisions, handle_apple_collisions, handle_snake_collisions, relocate_covered_apples,
     spawn_snakes, update_snake_dirs,
 };
-use crate::apple::spawn::{expire_apples, spawn_apples, spawn_bad_apples, SpawnPolicy};
+use crate::apple::spawn::{SpawnPolicy, expire_apples, spawn_apples, spawn_bad_apples};
 use crate::basic::{CellDim, HexDim};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};

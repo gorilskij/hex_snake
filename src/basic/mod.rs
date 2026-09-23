@@ -31,9 +31,5 @@ pub fn angle_distance(angle1: f32, angle2: f32) -> f32 {
     let dist = (angle1 - angle2).abs();
     // if the distance is more than halfway around the circle,
     // go around the other way
-    if dist > TAU / 2. {
-        TAU - dist
-    } else {
-        dist
-    }
+    if dist > TAU / 2. { TAU - dist } else { dist }
 }

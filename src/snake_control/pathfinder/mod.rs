@@ -11,8 +11,8 @@ use with_backup::WithBackup;
 
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::view::snakes::Snakes;
 
 pub type Path = VecDeque<HexPoint>;

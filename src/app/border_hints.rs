@@ -26,13 +26,13 @@ use crate::app::game_context::GameContext;
 use crate::app::palette::{HintColors, Palette, TeleportHintColors};
 use crate::app::prefs::HintStyle;
 use crate::app::screen::Environment;
-use crate::app::snake_management::{outcome_at, Outcome};
-use crate::basic::{board, CellDim, Dir, HexDim, HexPoint, Point};
+use crate::app::snake_management::{Outcome, outcome_at};
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point, board};
 use crate::color::lerp;
 use crate::rendering::segments::centerline::Centerline;
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Body;
-use crate::support::mesh::{build_colored_polygon, build_line, build_polygon, DrawMode, Mesh};
+use crate::support::mesh::{DrawMode, Mesh, build_colored_polygon, build_line, build_polygon};
 use crate::support::time::Instant;
 
 /// Roughly how long (s) a hint takes to settle after what's behind it changes.
@@ -654,7 +654,14 @@ mod tests {
     /// that is no longer a cell side's middle: the ends slide along the edge.
     #[test]
     fn line_ends_stay_on_the_border_wherever_the_head_is() {
-        for (h, v) in [(3, 4), (0, 0), (0, 9), (9, 0), (BOARD.h - 1, BOARD.v - 1), (5, BOARD.v - 1)] {
+        for (h, v) in [
+            (3, 4),
+            (0, 0),
+            (0, 9),
+            (9, 0),
+            (BOARD.h - 1, BOARD.v - 1),
+            (5, BOARD.v - 1),
+        ] {
             let head = HexPoint { h, v };
             for heading in Dir::iter() {
                 for fraction in [0., 0.25, 0.5, 0.75, 1.] {
@@ -722,8 +729,8 @@ mod tests {
 
         let full: Vec<_> = hints.iter().filter(|(_, mark)| mark.depth > 0.999).collect();
         assert_eq!(full.len(), 1, "expected the exit straight ahead, got {full:?}");
-        assert_eq!(full[0].0 .0.h, BOARD.h - 1, "the exit is on the opposite edge");
-        assert_eq!(full[0].0 .1, -Dir::Ul, "and on the side it comes in through");
+        assert_eq!(full[0].0.0.h, BOARD.h - 1, "the exit is on the opposite edge");
+        assert_eq!(full[0].0.1, -Dir::Ul, "and on the side it comes in through");
     }
 
     /// Both ends of a wrap sweep from purple to red in step with the triangle,
@@ -826,9 +833,9 @@ mod tests {
             .iter()
             .find(|(_, mark)| mark.depth > 0.)
             .expect("an exit triangle");
-        assert_eq!(exit.0 .1, -Dir::U, "the exit is the side it arrives through");
+        assert_eq!(exit.0.1, -Dir::U, "the exit is the side it arrives through");
         assert_ne!(
-            exit.0 .0,
+            exit.0.0,
             HexPoint { h: 40, v: 0 },
             "and a different cell on a big board"
         );
