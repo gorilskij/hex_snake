@@ -33,6 +33,11 @@ single backend: **macroquad**.
   `#![feature(...)]`). `.cargo/config.toml` passes `--import-undefined` for the
   wasm target (miniquad's JS-host `extern "C"` symbols).
 
+- **Benchmark:** `cargo test --release benchmark -- --ignored --nocapture`
+  (`app/benchmark.rs`): the headless world update with 24 apple-seeking
+  snakes on an 80x50 board with 80 apples, timing planning apart from the
+  rest.
+
 Requires nightly for: `stmt_expr_attributes`, `try_blocks`,
 `exhaustive_patterns`, `if_let_guard` (see `src/main.rs`).
 
@@ -450,7 +455,10 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   (`snake_control/pathfinder/weighted_bfs.rs`) is Dijkstra (`h = 0`); a
   *landmark* heuristic (this same search run backwards from each target) would
   make it A* — a closed-form hex distance can't work, since `wrap_around` isn't
-  a lattice translation.
+  a lattice translation. Not needed yet: the benchmark (native release,
+  2026-09) plans in ~60 µs/tick on average with one target per snake, ~120 µs
+  with three; the worst ticks are 1.5–2.5 ms mid-game and 5–7 ms on the first
+  tick, when every snake plans three targets at once.
 
 ## Deploy (separate, in progress)
 
