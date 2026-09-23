@@ -689,7 +689,7 @@ impl Screen for Game {
 
         if self.env.gtx.prefs.display_stats {
             let meshes = before_snake.iter().chain(after_snake.iter()).copied().flatten();
-            let snake_meshes = self.snake_render.iter().flat_map(|render| render.shaded.iter().map(|(mesh, _)| mesh));
+            let snake_meshes = self.snake_render.iter().flat_map(|render| render.pieces.iter());
             let stats = Stats {
                 polygons: meshes.chain(snake_meshes).map(Mesh::polygons).sum(),
                 player_length: Some(self.env.snakes[player_idx].body.length),
@@ -699,7 +699,7 @@ impl Screen for Game {
 
         let message_drawables = Self::get_message_drawables(&mut self.messages);
 
-        let has_snake = self.snake_render.as_ref().is_some_and(|r| !r.shaded.is_empty());
+        let has_snake = self.snake_render.as_ref().is_some_and(|r| !r.pieces.is_empty());
         let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
@@ -716,8 +716,8 @@ impl Screen for Game {
 
             if let Some(render) = &self.snake_render {
                 let material = self.snake_material.as_ref().unwrap();
-                for (mesh, _lut) in &render.shaded {
-                    mesh.draw_shaded(material);
+                for piece in &render.pieces {
+                    piece.draw_shaded(material);
                 }
             }
 

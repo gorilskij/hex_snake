@@ -300,10 +300,15 @@ That's **gone**. Now:
   segment owns a fixed slot of `lut_texels_per_segment` texels (so segment
   boundaries sit on texel edges regardless of length). This reuses all the
   existing HSL/OkLab/gradient math; the LUT *is* the whole-body gradient.
-- **Draw** (`rendering/snake_mesh.rs` → `SnakeRender`): one shaded `Mesh` + one
-  `PaletteLut` per snake (LUT baked as the mesh's `texture`). `game.rs` compiles
-  the `SnakeMaterial` (`snake_material()`) lazily and calls `mesh.draw_shaded` per
-  snake. The fragment shader samples the LUT by `uv.x`, clamped to the segment's
+- **Draw** (`rendering/snake_mesh.rs` → `SnakeRender`): one `PaletteLut` per
+  snake, baked as the `texture` of its shaded meshes. A snake is one mesh unless
+  it crosses something: a crossing sets the crossing segment's `z_index` to the
+  crossed one's ±1 (`PassOver`/`PassUnder`), and a snake is cut into pieces
+  wherever its `z_index` changes (`runs`). Every snake's pieces are drawn
+  together, lowest z first, equal z snake by snake and tail to head
+  (`draw_order`), so a snake can be over another at one crossing and under it
+  at the next. `game.rs` compiles the `SnakeMaterial` (`snake_material()`)
+  lazily and calls `draw_shaded` per piece. The fragment shader samples the LUT by `uv.x`, clamped to the segment's
   own slot (`normal.xy`), and scales it by a per-vertex brightness (`normal.z`;
   1 for the body, lower for details like passability marks) (linear filtered →
   smooth gradients; hard segment boundaries stay sharp). `uv.y` is currently
@@ -447,9 +452,6 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   similar localized effect and want a shared approach.
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
   freezes at `hunger::MIN_LENGTH`, `State::Starved`).
-- **Cross-snake z-ordering:** shaded snakes are drawn per-snake in sequence, so
-  the old global z-index interleaving across *different* snakes is not preserved
-  (fine for the single-player game; revisit for multi-snake).
 - **`uv.y` (across-width)** is emitted but unused — hook for tube/curvature
   shading later.
 - **Perf, more generally:** each frame rebuilds the snake mesh and the border

@@ -7,15 +7,20 @@ use crate::rendering::segments::cap::build_round_caps;
 use crate::rendering::segments::descriptions::{SegmentDescription, SegmentFraction, TurnDescription};
 use crate::rendering::segments::marks::{build_marks, Joins};
 use crate::snake::palette::{build_snake_lut, SegmentStyle};
-use crate::snake::{Body, Segment, Snake};
+use crate::snake::{Body, Segment, Snake, ZIndex};
 use crate::support::material::PaletteLut;
 use crate::support::mesh::Mesh;
 
-/// Drawable output for all snakes: one shaded mesh + palette LUT per snake.
+/// Drawable output for all snakes, as pieces to draw in order.
+///
+/// A snake is one piece unless it crosses over or under something: then the
+/// segments on either side of each change of `z_index` are separate pieces,
+/// so that every snake's pieces can be drawn by z, together. That is what lets
+/// a snake be over another at one crossing and under it at the next.
 pub struct SnakeRender {
-    /// One entry per snake: the segment mesh (with its LUT baked in as texture)
-    /// and the LUT itself (kept alive so the texture isn't freed).
-    pub shaded: Vec<(Mesh, PaletteLut)>,
+    /// Shaded meshes, in the order to draw them. Each holds its snake's LUT
+    /// as texture, which keeps it alive (`Texture2D` is reference counted).
+    pub pieces: Vec<Mesh>,
 }
 
 /// Describe every segment of a body, head → tail. Shared with the collision
@@ -85,7 +90,7 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 /// segment (no color subdivision); color is applied per-pixel by the snake
 /// shader sampling that snake's palette LUT.
 pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext) -> Result<SnakeRender> {
-    let mut shaded = Vec::with_capacity(snakes.len());
+    let mut pieces = vec![];
 
     for snake in snakes.iter_mut() {
         let body = &snake.body;
@@ -120,10 +125,13 @@ pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext) -> 
             .upcoming_eaten_segment(apples, gtx)
             .is_some_and(|segment_type| eat_mechanics.is_marked(segment_type));
 
-        // Shaded segments. Draw tail → head so the head paints on top; the
-        // caps keep that order (tail cap under, head cap over). A segment's
-        // marks go directly on top of it.
-        let segments = tail_cap
+        // Shaded segments, each with its z. Draw tail → head so the head
+        // paints on top; the caps keep that order (tail cap under, head cap
+        // over) and their end's z. A segment's marks go directly on top of it.
+        let tail_z = descs.last().map_or(0, |desc| desc.z_index);
+        let head_z = descs.first().map_or(0, |desc| desc.z_index);
+        let parts = tail_cap
+            .map(|cap| (tail_z, cap))
             .into_iter()
             .chain(descs.iter().rev().flat_map(|desc| {
                 let idx = desc.segment_idx;
@@ -134,13 +142,74 @@ pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext) -> 
                     };
                     build_marks(desc, joins, num_segments, lut_size)
                 });
-                std::iter::once(desc.build_shaded(num_segments, lut_size)).chain(marks)
+                std::iter::once(desc.build_shaded(num_segments, lut_size))
+                    .chain(marks)
+                    .map(|mesh| (desc.z_index, mesh))
             }))
-            .chain(head_cap);
-        let mut mesh = Mesh::combine(segments);
-        mesh.set_texture(lut.texture());
-        shaded.push((mesh, lut));
+            .chain(head_cap.map(|cap| (head_z, cap)));
+        for (z, run) in runs(parts) {
+            let mut mesh = Mesh::combine(run);
+            mesh.set_texture(lut.texture());
+            pieces.push((z, mesh));
+        }
     }
 
-    Ok(SnakeRender { shaded })
+    Ok(SnakeRender {
+        pieces: draw_order(pieces),
+    })
+}
+
+/// Consecutive items with the same z, grouped, in order.
+fn runs<T>(items: impl IntoIterator<Item = (ZIndex, T)>) -> Vec<(ZIndex, Vec<T>)> {
+    let mut runs: Vec<(ZIndex, Vec<T>)> = vec![];
+    for (z, item) in items {
+        match runs.last_mut() {
+            Some((run_z, run)) if *run_z == z => run.push(item),
+            _ => runs.push((z, vec![item])),
+        }
+    }
+    runs
+}
+
+/// Lowest z first. Equal z keeps the order given (snake by snake, tail to
+/// head), which is how pieces that don't cross anything have always drawn.
+fn draw_order<T>(mut pieces: Vec<(ZIndex, T)>) -> Vec<T> {
+    pieces.sort_by_key(|&(z, _)| z);
+    pieces.into_iter().map(|(_, piece)| piece).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_snake_is_cut_only_where_its_z_changes() {
+        let parts = [(0, 'a'), (0, 'b'), (1, 'c'), (1, 'd'), (0, 'e'), (-1, 'f'), (0, 'g')];
+        assert_eq!(
+            runs(parts),
+            [
+                (0, vec!['a', 'b']),
+                (1, vec!['c', 'd']),
+                (0, vec!['e']),
+                (-1, vec!['f']),
+                (0, vec!['g']),
+            ]
+        );
+        assert_eq!(runs([(0, 'a'), (0, 'b')]), [(0, vec!['a', 'b'])], "one piece without crossings");
+    }
+
+    /// A over B at one crossing (its +1 piece) and under B at another (its -1
+    /// piece): B goes between them.
+    #[test]
+    fn a_snake_can_be_over_and_under_another_at_once() {
+        let pieces = vec![(0, "A1"), (1, "A over"), (0, "A2"), (-1, "A under"), (0, "A3"), (0, "B")];
+        assert_eq!(draw_order(pieces), ["A under", "A1", "A2", "A3", "B", "A over"]);
+    }
+
+    /// Each snake over the other at a different crossing.
+    #[test]
+    fn two_snakes_can_each_be_over_the_other() {
+        let pieces = vec![(0, "A1"), (1, "A over"), (0, "A2"), (0, "B1"), (1, "B over"), (0, "B2")];
+        assert_eq!(draw_order(pieces), ["A1", "A2", "B1", "B2", "A over", "B over"]);
+    }
 }

@@ -69,8 +69,6 @@ pub struct SegmentDescription {
     pub fraction: SegmentFraction,
     pub draw_style: rendering::Style,
     pub segment_type: SegmentType,
-    // TODO: consumed once cross-snake z-ordering is reinstated (see snake_mesh)
-    #[allow(dead_code)]
     pub z_index: ZIndex,
     pub cell_dim: CellDim,
 }

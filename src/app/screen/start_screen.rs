@@ -315,8 +315,8 @@ impl SnakeDemo {
         if let Some(grid) = grid {
             grid.draw();
         }
-        for (mesh, _lut) in &snake.shaded {
-            mesh.draw_shaded(material);
+        for piece in &snake.pieces {
+            piece.draw_shaded(material);
         }
         if let Some(border) = border {
             border.draw();
