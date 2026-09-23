@@ -61,8 +61,6 @@ pub enum Transition {
 
 pub struct Environment<Rng = ThreadRng> {
     pub snakes: Vec<Snake>,
-    // TODO: keep apples in order of position to allow for binary search
-    // TODO: specialized Vec for that
     pub apples: Vec<Apple>,
     pub portals: Vec<Portal>,
     pub gtx: GameContext,
