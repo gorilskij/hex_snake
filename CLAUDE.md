@@ -29,10 +29,11 @@ single backend: **macroquad**.
   `http://127.0.0.1:4000/index.html`. `web/` holds `index.html` + vendored
   `mq_js_bundle.js` (canvas id `glcanvas`; inline JS is wrapped in an IIFE because
   the bundle declares a global `canvas`).
-- **Toolchain:** nightly (see `rust-toolchain.toml`; the crate uses several
-  `#![feature(...)]`). `.cargo/config.toml` passes `--import-undefined` for the
-  wasm target (miniquad's JS-host `extern "C"` symbols).
-
+- **Toolchain:** nightly (see `rust-toolchain.toml`, and below).
+  `.cargo/config.toml` passes `--import-undefined` for the wasm target
+  (miniquad's JS-host `extern "C"` symbols) and selects getrandom's custom
+  backend there.
+- **Format:** `cargo fmt` (`rustfmt.toml`, nightly rustfmt).
 - **Benchmark:** `cargo test --release benchmark -- --ignored --nocapture`
   (`app/benchmark.rs`): the headless world update with 24 apple-seeking
   snakes on an 80x50 board with 80 apples, timing planning apart from the
