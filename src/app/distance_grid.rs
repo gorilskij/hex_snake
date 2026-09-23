@@ -87,13 +87,15 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
     let knowledge = Knowledge::accurate(&player_snake.eat_mechanics);
     let obstacles = Obstacles::new(&player_snake.body, Some(&knowledge), &other_snakes);
 
-    // setup bfs
+    // setup bfs; the head's own cell is never given a distance, and marking
+    // it seen keeps the search from finding it again from its neighbours
+    let head = player_snake.head().pos;
     Iter {
         board_dim,
-        seen: HashSet::new(),
+        seen: HashSet::from([head]),
         obstacles,
         dist: 0,
-        generation_alive: vec![player_snake.head().pos],
+        generation_alive: vec![head],
         generation_dead: vec![],
         output_idx: 1, // trigger bfs step immediately
     }
