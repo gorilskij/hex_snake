@@ -20,9 +20,6 @@ pub struct Keyboard {
     // prevents infinite deferral for when frame_frac is always high
     // (high speed and laggy situations)
     deferred: bool,
-
-    // assumes the player knows everything
-    knowledge: Knowledge,
 }
 
 impl Keyboard {
@@ -33,14 +30,12 @@ impl Keyboard {
     /// jumps of the snake head
     const LAST_ACTIONABLE_THRESHOLD: f32 = 0.85;
 
-    pub fn new(side: Option<Side>, start_dir: Dir, knowledge: Knowledge) -> Self {
+    pub fn new(side: Option<Side>, start_dir: Dir) -> Self {
         Self {
             side,
             control_queue: VecDeque::with_capacity(Self::CTRL_QUEUE_LIMIT),
             dir: start_dir,
             deferred: false,
-
-            knowledge,
         }
     }
 }
@@ -91,9 +86,5 @@ impl Controller for Keyboard {
                 self.control_queue.push_back(new_dir);
             }
         }
-    }
-
-    fn knowledge(&self) -> Option<&Knowledge> {
-        Some(&self.knowledge)
     }
 }

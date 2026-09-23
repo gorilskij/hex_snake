@@ -18,7 +18,7 @@ use crate::app::screen::{Screen, StartScreen, Transition};
 use crate::app::Palette;
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Side};
-use crate::snake::eat_mechanics::{EatBehavior, EatMechanics, Knowledge};
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::SegmentType;
 use crate::snake_control::pathfinder;
 
@@ -84,13 +84,11 @@ fn player_seed(side: Side, mode: GameMode) -> snake::builder::Builder {
     )
     .mark_passable();
 
-    let knowledge = Knowledge::accurate(&eat_mechanics);
-
     snake::builder::Builder::default()
         .snake_type(snake::Type::Player)
         .eat_mechanics(eat_mechanics)
         .palette(snake::PaletteTemplate::rainbow())
-        .controller(snake_control::Template::Keyboard { side: Some(side), knowledge })
+        .controller(snake_control::Template::Keyboard { side: Some(side) })
         .speed(5.)
         .starvation(mode.starvation())
         .autopilot(pathfinder::Template::WithBackup {

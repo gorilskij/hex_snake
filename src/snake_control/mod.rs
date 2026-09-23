@@ -24,7 +24,6 @@ pub enum Template {
     Keyboard {
         /// Whose keys the snake answers to; `None` for the single player
         side: Option<Side>,
-        knowledge: Knowledge,
     },
     Mouse,
     Programmed(Vec<Move>),
@@ -75,11 +74,6 @@ pub trait Controller {
     /// Jump to `position` cells into the schedule (wrapped to one cycle), as
     /// if the controller had been stepped that many times from the start.
     fn set_schedule_position(&mut self, _position: usize) {}
-
-    // TODO: deprecate
-    fn knowledge(&self) -> Option<&Knowledge> {
-        None
-    }
 }
 
 // Group contiguous instances of Move::Wait together
@@ -179,7 +173,7 @@ impl Template {
         use rain::Rain;
 
         match self {
-            Template::Keyboard { side, knowledge } => Box::new(Keyboard::new(side, start_dir, knowledge)),
+            Template::Keyboard { side } => Box::new(Keyboard::new(side, start_dir)),
             Template::Mouse => Box::new(Mouse),
             Template::Programmed(move_sequence) => Box::new(Programmed::new(move_sequence, start_dir)),
             Template::Killer => Box::new(Killer),

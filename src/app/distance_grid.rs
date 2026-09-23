@@ -9,7 +9,9 @@ use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::color::lerp;
 use crate::rendering::shape::{Hexagon, Shape};
+use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
+use crate::snake_control::pathfinder::Obstacles;
 use crate::support::mesh::{build_polygon, DrawMode, Mesh};
 use crate::view::snakes::Snakes;
 
@@ -20,9 +22,8 @@ struct Iter {
     board_dim: HexDim,
 
     // -- bfs --
-    // also used to store positions occupied by snakes
     seen: HashSet<HexPoint>,
-    occupied: HashSet<HexPoint>,
+    obstacles: Obstacles,
     // all the positions in a generation have the same distance
     dist: usize,
     // search will only continue from generation_alive
@@ -62,7 +63,7 @@ impl Iterator for Iter {
                 .sorted_unstable()
                 .dedup()
                 .for_each(|pos| {
-                    if self.occupied.contains(&pos) {
+                    if self.obstacles.blocks(pos) {
                         self.generation_dead.push(pos)
                     } else {
                         self.generation_alive.push(pos)
@@ -83,30 +84,14 @@ impl Iterator for Iter {
 }
 
 fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: HexDim) -> GridData {
-    let occupied = if let Some(knowledge) = player_snake.controller.knowledge() {
-        player_snake
-            .body
-            .segments
-            .iter()
-            .chain(other_snakes.iter_segments())
-            .filter(|seg| !knowledge.can_pass_through_self(seg))
-            .map(|seg| seg.pos)
-            .collect()
-    } else {
-        player_snake
-            .body
-            .segments
-            .iter()
-            .chain(other_snakes.iter_segments())
-            .map(|seg| seg.pos)
-            .collect()
-    };
+    let knowledge = Knowledge::accurate(&player_snake.eat_mechanics);
+    let obstacles = Obstacles::new(&player_snake.body, Some(&knowledge), &other_snakes);
 
     // setup bfs
     Iter {
         board_dim,
         seen: HashSet::new(),
-        occupied,
+        obstacles,
         dist: 0,
         generation_alive: vec![player_snake.head().pos],
         generation_dead: vec![],
