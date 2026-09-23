@@ -417,6 +417,7 @@ fn outcome_hints(env: &Environment, player_idx: usize, colors: HintColors) -> Ha
         .filter_map(|(pos, dir, destination)| {
             let color = match outcome_at(env, player_idx, destination)? {
                 Outcome::Apple => colors.apple,
+                Outcome::BadApple => colors.bad_apple,
                 Outcome::Pass => colors.pass,
                 Outcome::Cut => colors.cut,
                 Outcome::Crash => colors.crash,

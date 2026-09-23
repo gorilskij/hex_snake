@@ -23,6 +23,7 @@ pub struct HintColors {
     pub cut: Color,
     pub pass: Color,
     pub apple: Color,
+    pub bad_apple: Color,
 }
 
 /// The teleport hint's color as the head closes in on a wrap: a sweep through
@@ -85,6 +86,8 @@ pub struct Palette {
 impl Palette {
     pub fn dark() -> Self {
         let hint_red = Color::new(0.72, 0.16, 0.16, 1.);
+        // vomit green
+        let bad_apple = Color::new(0.55, 0.62, 0.1, 1.);
 
         Self {
             grid_thickness: 1.,
@@ -96,20 +99,21 @@ impl Palette {
             grid_dot_color: crate::color::WHITE,
             border_color: crate::color::WHITE,
             apple_color: gray!(0.45),
-            // vomit green
-            bad_apple_color: Color::new(0.55, 0.62, 0.1, 1.),
+            bad_apple_color: bad_apple,
 
             border_hint_colors: HintColors {
                 crash: hint_red,
                 cut: Color::new(0.25, 0.4, 0.8, 1.),
                 pass: Color::new(0.86, 0.72, 0.2, 1.),
                 apple: Color::new(0.22, 0.6, 0.28, 1.),
+                bad_apple,
             },
             gradient_hint_colors: HintColors {
                 crash: Color::new(1., 0.1, 0.1, 0.4),
                 cut: Color::new(0.2, 0.4, 1., 0.4),
                 pass: Color::new(1., 0.85, 0.1, 0.4),
                 apple: Color::new(0.2, 0.9, 0.3, 0.4),
+                bad_apple: bad_apple.with_alpha(0.4),
             },
             // ends on the border hints' red, having started at purple
             teleport_hint_colors: TeleportHintColors {

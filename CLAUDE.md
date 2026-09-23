@@ -142,7 +142,13 @@ what the layout types — see below), then `next_frame().await`.
   target by splitting that leg in two at its cell, leaving the route itself
   untouched; that can push a plan past its target count, and extending waits
   until it is back under. The player's autopilot plans 3 targets ahead
-  (`autopilot_targets`, `main.rs`); other snakes plan 1.
+  (`autopilot_targets`, `main.rs`); other snakes plan 1. What a search goes
+  for comes from the autopilot's `Appetite` (`appetite.rs`, per apple kind, as
+  `Knowledge` is per segment kind): positive apples are `Goals::targets`,
+  negative ones `Goals::avoid` — that much extra cost to cross their cell. The
+  player's autopilot avoids shrink apples at −15 (`autopilot_appetite`); one
+  landing on the route triggers a single replan. Border hints show them as
+  `Outcome::BadApple`, in the bad apples' green.
 - **`rendering/`** — turns the world into meshes (see next section).
 - **`basic/`** — `Point` (f32 x/y, cartesian), `HexPoint` (hex grid coord),
   `Dir`/`Dir12` (hex directions), `CellDim` (side/sin/cos, `height()`, `center()`),
@@ -445,10 +451,6 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   *landmark* heuristic (this same search run backwards from each target) would
   make it A* — a closed-form hex distance can't work, since `wrap_around` isn't
   a lattice translation.
-- **Bad (shrink) apples, follow-ups:** the autopilot targets every apple
-  (`view/targets.rs`) — it should only seek good apples and avoid bad ones; border
-  hints report every apple as `Outcome::Apple` (green) — bad apples need their own
-  outcome/color.
 
 ## Deploy (separate, in progress)
 

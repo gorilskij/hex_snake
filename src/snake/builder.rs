@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use super::*;
+use crate::snake_control::appetite::Appetite;
 
 #[derive(Debug, Error)]
 #[must_use]
@@ -31,6 +32,9 @@ pub struct Builder {
     pub autopilot: Option<pathfinder::Template>,
     /// How many apples ahead the autopilot plans for (one by default)
     pub autopilot_targets: Option<usize>,
+    /// Which apples the autopilot goes for and which it avoids (all targets
+    /// by default)
+    pub autopilot_appetite: Option<Appetite>,
     pub autopilot_control: bool,
 }
 
@@ -102,6 +106,13 @@ impl Builder {
     #[must_use]
     pub fn autopilot_targets(mut self, value: usize) -> Self {
         self.autopilot_targets = Some(value);
+        self
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub fn autopilot_appetite(mut self, value: Appetite) -> Self {
+        self.autopilot_appetite = Some(value);
         self
     }
 
@@ -195,6 +206,7 @@ impl Builder {
                 let controller_template = snake_control::Template::AppleSeeker {
                     pathfinder,
                     targets: self.autopilot_targets.unwrap_or(1),
+                    appetite: self.autopilot_appetite.unwrap_or_default(),
                 };
                 controller_template.into_controller(dir)
             }),

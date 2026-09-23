@@ -130,6 +130,7 @@ fn generate_apple_type(gtx: &GameContext, rng: &mut impl Rng) -> apple::Type {
                     .controller(snake_control::Template::AppleSeeker {
                         pathfinder: pathfinder::Template::WeightedBFS(Default::default()),
                         targets: 1,
+                        appetite: Default::default(),
                     })
                     .speed(1.),
             )),

@@ -6,7 +6,10 @@ use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake::SegmentType;
-use crate::snake_control::pathfinder::{surroundings, Committed, Leg, Obstacle, Obstacles, Path, PathFinder, Plan};
+use crate::snake_control::appetite::Appetite;
+use crate::snake_control::pathfinder::{
+    surroundings, Committed, Goals, Leg, Obstacle, Obstacles, Path, PathFinder, Plan,
+};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
@@ -30,39 +33,40 @@ pub struct AppleSeeker {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
     /// How many targets to plan ahead for.
     pub targets: usize,
+    /// Which apples are targets and which are to be avoided.
+    pub appetite: Appetite,
     pub plan: Option<Plan>,
     /// While the plan is a fallback, what would make a target reachable.
     pub opening: Option<Opening>,
+    /// The cells to avoid as of the last tick, so that one appearing on the
+    /// route since is noticed (once: the route may be the best there is).
+    pub known_avoid: HashSet<HexPoint>,
 }
 
 /// Where the snake could go when it fell back to crawling: no target could be
-/// reached, so one only can be once a cell walling it in frees up, or an apple
+/// reached, so one only can be once a cell walling it in frees up, or a target
 /// appears in the part of the board it can reach.
 pub struct Opening {
     region: HashSet<HexPoint>,
     walls: HashSet<HexPoint>,
-    /// Apples already in the region, which it couldn't get to anyway (facing
+    /// Targets already in the region, which it couldn't get to anyway (facing
     /// the wrong way, say): only a new one is worth another try.
-    apples: HashSet<HexPoint>,
+    targets: HashSet<HexPoint>,
 }
 
 impl Opening {
-    fn new(head: HexPoint, apples: &[Apple], board_dim: HexDim, blocks: impl Fn(HexPoint) -> bool) -> Self {
+    fn new(head: HexPoint, targets: &[HexPoint], board_dim: HexDim, blocks: impl Fn(HexPoint) -> bool) -> Self {
         let (region, walls) = surroundings(head, board_dim, blocks);
-        let apples = apples
-            .iter()
-            .map(|apple| apple.pos)
-            .filter(|pos| region.contains(pos))
-            .collect();
-        Self { region, walls, apples }
+        let targets = targets.iter().copied().filter(|pos| region.contains(pos)).collect();
+        Self { region, walls, targets }
     }
 
     /// Whether a target may have become reachable since.
-    fn opened(&self, apples: &[Apple], blocks: impl Fn(HexPoint) -> bool) -> bool {
+    fn opened(&self, targets: &[HexPoint], blocks: impl Fn(HexPoint) -> bool) -> bool {
         self.walls.iter().any(|&wall| !blocks(wall))
-            || apples
+            || targets
                 .iter()
-                .any(|apple| self.region.contains(&apple.pos) && !self.apples.contains(&apple.pos))
+                .any(|pos| self.region.contains(pos) && !self.targets.contains(pos))
     }
 }
 
@@ -77,6 +81,8 @@ impl AppleSeeker {
     ) {
         debug_assert!(self.targets <= MAX_TARGETS, "{} targets is too many", self.targets);
         let head = body.segments[0].pos;
+        let goals = self.appetite.goals(apples);
+        let known_avoid = std::mem::replace(&mut self.known_avoid, goals.avoid.keys().copied().collect());
 
         // keep whatever is still true
         if let Some(plan) = &mut self.plan {
@@ -84,13 +90,15 @@ impl AppleSeeker {
             let mut keep = plan.board_dim == gtx.board_dim && follow(plan, head);
             if keep {
                 drop_spent_legs(plan);
-                keep = connects(plan, gtx.board_dim) && !blocked_ahead(plan, &obstacles);
+                keep = connects(plan, gtx.board_dim)
+                    && !blocked_ahead(plan, &obstacles)
+                    && !newly_avoided_ahead(plan, &goals, &known_avoid);
             }
             if keep && plan.is_fallback() {
                 keep = self
                     .opening
                     .as_ref()
-                    .is_some_and(|opening| !opening.opened(apples, |pos| obstacles.blocks(pos)));
+                    .is_some_and(|opening| !opening.opened(&goals.targets, |pos| obstacles.blocks(pos)));
             }
             if keep {
                 // a target someone else ate (or one that expired) ends the plan
@@ -98,11 +106,11 @@ impl AppleSeeker {
                 if let Some(idx) = plan
                     .legs
                     .iter()
-                    .position(|leg| leg.target.is_some_and(|target| !is_apple(target, apples)))
+                    .position(|leg| leg.target.is_some_and(|target| !goals.targets.contains(&target)))
                 {
                     plan.legs.truncate(idx);
                 }
-                promote_apples_on_route(plan, apples);
+                promote_targets_on_route(plan, &goals.targets);
             } else {
                 self.plan = None;
             }
@@ -133,7 +141,7 @@ impl AppleSeeker {
 
             let leg = self
                 .pathfinder
-                .get_path(start, &apples, committed, body, knowledge, other_snakes, gtx);
+                .get_path(start, &goals, committed, body, knowledge, other_snakes, gtx);
 
             match leg {
                 // A leg going nowhere in particular is as far as planning goes,
@@ -144,7 +152,8 @@ impl AppleSeeker {
                     if plan.legs.is_empty() {
                         plan.legs.push(leg);
                         let obstacles = Obstacles::new(body, knowledge, other_snakes);
-                        self.opening = Some(Opening::new(head, apples, gtx.board_dim, |pos| obstacles.blocks(pos)));
+                        let blocks = |pos| obstacles.blocks(pos);
+                        self.opening = Some(Opening::new(head, &goals.targets, gtx.board_dim, blocks));
                     }
                     break;
                 }
@@ -188,13 +197,13 @@ fn committed_cells(plan: &Plan, targets: &[HexPoint], knowledge: Option<&Knowled
         .collect()
 }
 
-/// Make a target of every apple that has appeared on the route.
+/// Make a target of every wanted apple that has appeared on the route.
 ///
 /// The snake is going to walk over it and eat it either way, so the plan should
 /// say so: the leg it lands on splits in two at that cell, which leaves the
 /// route itself untouched. This is what can push a plan past the number of
 /// targets it plans for — extending simply waits until it is back under.
-fn promote_apples_on_route(plan: &mut Plan, apples: &[Apple]) {
+fn promote_targets_on_route(plan: &mut Plan, targets: &[HexPoint]) {
     let claimed: Vec<HexPoint> = plan.targets().collect();
 
     let mut idx = 0;
@@ -203,7 +212,7 @@ fn promote_apples_on_route(plan: &mut Plan, apples: &[Apple]) {
         // the first cell is the head or the previous leg's target, and the last
         // is this leg's own; neither is new
         let found = (1..cells.len().saturating_sub(1))
-            .find(|&at| is_apple(cells[at], apples) && !claimed.contains(&cells[at]));
+            .find(|&at| targets.contains(&cells[at]) && !claimed.contains(&cells[at]));
 
         let Some(at) = found else {
             idx += 1;
@@ -272,8 +281,13 @@ fn blocked_ahead(plan: &Plan, obstacles: &Obstacles) -> bool {
     plan.cells().skip(1).any(|pos| obstacles.blocks(pos))
 }
 
-fn is_apple(pos: HexPoint, apples: &[Apple]) -> bool {
-    apples.iter().any(|apple| apple.pos == pos)
+/// Whether something to avoid has appeared on the rest of the route since the
+/// last tick. The route is worth another look then, but only then: if it is
+/// still the best way, it stays.
+fn newly_avoided_ahead(plan: &Plan, goals: &Goals, known_avoid: &HashSet<HexPoint>) -> bool {
+    plan.cells()
+        .skip(1)
+        .any(|pos| goals.avoid.contains_key(&pos) && !known_avoid.contains(&pos))
 }
 
 impl Controller for AppleSeeker {
@@ -315,6 +329,7 @@ impl Controller for AppleSeeker {
     fn reset(&mut self, _dir: Dir) {
         self.plan = None;
         self.opening = None;
+        self.known_avoid.clear();
     }
 }
 
@@ -327,14 +342,6 @@ mod tests {
 
     fn cell(h: isize) -> HexPoint {
         HexPoint { h, v: 5 }
-    }
-
-    fn apple(h: isize) -> Apple {
-        Apple {
-            pos: cell(h),
-            apple_type: crate::apple::Type::Eat(1.),
-            time_left: None,
-        }
     }
 
     /// One leg running along a row, from `from` to `to`, its target the last cell.
@@ -357,7 +364,7 @@ mod tests {
         let mut route = plan(vec![leg(0, 6)]);
         let before: Vec<HexPoint> = route.cells().collect();
 
-        promote_apples_on_route(&mut route, &[apple(3)]);
+        promote_targets_on_route(&mut route, &[cell(3)]);
 
         assert_eq!(route.legs.len(), 2, "the leg should have split at the apple");
         assert_eq!(route.legs[0].target, Some(cell(3)), "the new target");
@@ -378,15 +385,28 @@ mod tests {
     fn every_apple_on_the_route_is_promoted_once() {
         let mut route = plan(vec![leg(0, 8)]);
 
-        promote_apples_on_route(&mut route, &[apple(2), apple(5), apple(8)]);
+        promote_targets_on_route(&mut route, &[cell(2), cell(5), cell(8)]);
 
         let targets: Vec<HexPoint> = route.targets().collect();
         assert_eq!(targets, vec![cell(2), cell(5), cell(8)]);
 
         // running it again finds nothing new
         let legs = route.legs.len();
-        promote_apples_on_route(&mut route, &[apple(2), apple(5), apple(8)]);
+        promote_targets_on_route(&mut route, &[cell(2), cell(5), cell(8)]);
         assert_eq!(route.legs.len(), legs, "targets are not promoted twice");
+    }
+
+    /// Something to avoid landing on the route is worth one replan, but a
+    /// route that is still the best way is kept after that.
+    #[test]
+    fn a_bad_apple_on_the_route_is_noticed_once() {
+        let route = plan(vec![leg(0, 6)]);
+        let goals = Goals {
+            targets: vec![cell(6)],
+            avoid: std::collections::HashMap::from([(cell(3), 15)]),
+        };
+        assert!(newly_avoided_ahead(&route, &goals, &HashSet::new()));
+        assert!(!newly_avoided_ahead(&route, &goals, &HashSet::from([cell(3)])));
     }
 
     /// A pocket of cells along a row, walled in by everything else.
@@ -400,7 +420,7 @@ mod tests {
         let opening = Opening::new(cell(2), &[], BOARD, |pos| !open.contains(&pos));
         assert!(!opening.opened(&[], |pos| !open.contains(&pos)));
         // an apple outside the pocket is still out of reach
-        assert!(!opening.opened(&[apple(8)], |pos| !open.contains(&pos)));
+        assert!(!opening.opened(&[cell(8)], |pos| !open.contains(&pos)));
     }
 
     #[test]
@@ -416,9 +436,9 @@ mod tests {
         let open = pocket(0..=4);
         let blocks = |pos| !open.contains(&pos);
         // there already, and it couldn't be reached then
-        let opening = Opening::new(cell(2), &[apple(4)], BOARD, blocks);
-        assert!(!opening.opened(&[apple(4)], blocks));
-        assert!(opening.opened(&[apple(4), apple(1)], blocks));
+        let opening = Opening::new(cell(2), &[cell(4)], BOARD, blocks);
+        assert!(!opening.opened(&[cell(4)], blocks));
+        assert!(opening.opened(&[cell(4), cell(1)], blocks));
     }
 
     /// The route is in the way of whatever is planned after it, except where it

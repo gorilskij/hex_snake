@@ -134,6 +134,8 @@ fn drawn_snake_collisions<Rng>(env: &Environment<Rng>, collisions: &mut Vec<Coll
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Outcome {
     Apple,
+    /// An apple that shrinks the snake
+    BadApple,
     Pass,
     Cut,
     Crash,
@@ -143,8 +145,11 @@ pub enum Outcome {
 /// `None` if nothing is there. Decided exactly as [`find_collisions`] decides
 /// an actual collision.
 pub fn outcome_at<Rng>(env: &Environment<Rng>, snake_index: usize, pos: HexPoint) -> Option<Outcome> {
-    if env.apples.iter().any(|apple| apple.pos == pos) {
-        return Some(Outcome::Apple);
+    if let Some(apple) = env.apples.iter().find(|apple| apple.pos == pos) {
+        return Some(match apple.apple_type {
+            crate::apple::Type::Shrink(_) => Outcome::BadApple,
+            _ => Outcome::Apple,
+        });
     }
     segments_at(env, snake_index, pos).map(|(_, _, outcome)| outcome).max()
 }

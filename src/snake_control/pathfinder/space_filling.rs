@@ -1,13 +1,12 @@
 use std::cmp::Reverse;
 use std::collections::HashSet;
 
-use super::{surroundings, Committed, Leg, Obstacles, Path, PathFinder, Start};
+use super::{surroundings, Committed, Goals, Leg, Obstacles, Path, PathFinder, Start};
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::view::snakes::Snakes;
-use crate::view::targets::Targets;
 
 /// How far ahead the crawl plans. It is walked rather than recomputed, so it
 /// only needs to be long enough not to be redone all the time; every step
@@ -23,7 +22,7 @@ impl PathFinder for SpaceFilling {
     fn get_path(
         &self,
         start: Start,
-        _targets: &dyn Targets,
+        _goals: &Goals,
         // the crawl is only ever planned on its own, so there is never a
         // committed route to avoid
         _committed: Committed,

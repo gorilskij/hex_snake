@@ -14,7 +14,6 @@ use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::view::snakes::Snakes;
-use crate::view::targets::Targets;
 
 pub type Path = VecDeque<HexPoint>;
 
@@ -97,6 +96,17 @@ pub struct Committed<'a> {
     pub targets: &'a [HexPoint],
 }
 
+/// What a search is after (see [`Appetite`]).
+///
+/// [`Appetite`]: crate::snake_control::appetite::Appetite
+#[derive(Clone, Debug, Default)]
+pub struct Goals {
+    /// Cells worth getting to.
+    pub targets: Vec<HexPoint>,
+    /// Cells worth going around, and how much extra crossing each one costs.
+    pub avoid: HashMap<HexPoint, u32>,
+}
+
 /// A search for one leg: the cheapest way from `start` to any target that isn't
 /// already taken, going around what the plan has already `committed` to.
 ///
@@ -106,7 +116,7 @@ pub trait PathFinder {
     fn get_path(
         &self,
         start: Start,
-        targets: &dyn Targets,
+        goals: &Goals,
         committed: Committed,
         body: &Body,
         knowledge: Option<&Knowledge>,

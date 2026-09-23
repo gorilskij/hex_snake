@@ -1,13 +1,12 @@
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
-use super::{Committed, Leg, Obstacle, Obstacles, Path, PathFinder, Start};
+use super::{Committed, Goals, Leg, Obstacle, Obstacles, Path, PathFinder, Start};
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::view::snakes::Snakes;
-use crate::view::targets::Targets;
 
 /// The cost of each thing a path does. The search finds the cheapest path to
 /// any target.
@@ -72,7 +71,7 @@ impl PathFinder for WeightedBFS {
     fn get_path(
         &self,
         start: Start,
-        targets: &dyn Targets,
+        goals: &Goals,
         committed: Committed,
         body: &Body,
         knowledge: Option<&Knowledge>,
@@ -82,7 +81,8 @@ impl PathFinder for WeightedBFS {
         let weights = &self.weights;
         let obstacles = Obstacles::new(body, knowledge, other_snakes);
         // a target an earlier leg is already going for is no longer one
-        let targets: HashSet<_> = targets
+        let targets: HashSet<_> = goals
+            .targets
             .iter()
             .filter(|pos| !committed.targets.contains(pos))
             .collect();
@@ -124,7 +124,9 @@ impl PathFinder for WeightedBFS {
                         weights.pass_through
                     } else {
                         0
-                    };
+                    }
+                    // what the snake would rather not eat costs what it says
+                    + goals.avoid.get(&new_pos).copied().unwrap_or(0);
 
                 let new_state = (new_pos, new_dir);
                 if costs.get(&new_state).is_none_or(|&old_cost| new_cost < old_cost) {
@@ -146,4 +148,76 @@ fn path_to(mut state: State, parents: &HashMap<State, State>) -> Path {
         state = parent;
     }
     path
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::game_mode::GameMode;
+    use crate::app::prefs::Prefs;
+    use crate::apple::spawn::SpawnPolicy;
+    use crate::basic::{CellDim, HexDim};
+    use crate::snake::builder::Builder as SnakeBuilder;
+    use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
+    use crate::snake::{self, PaletteTemplate};
+    use crate::snake_control;
+    use crate::view::snakes::OtherSnakes;
+
+    const BOARD: HexDim = HexDim { h: 20, v: 20 };
+
+    /// The path a snake at the bottom of a column takes to a target five cells
+    /// straight up, with `avoid` on the way.
+    fn path_up(avoid: HashMap<HexPoint, u32>) -> Path {
+        let head = HexPoint { h: 10, v: 10 };
+        let snake = SnakeBuilder::default()
+            .snake_type(snake::Type::Player)
+            .eat_mechanics(EatMechanics::always(EatBehavior::Crash))
+            .palette(PaletteTemplate::rainbow())
+            .controller(snake_control::Template::Programmed(vec![]))
+            .pos(head)
+            .dir(Dir::U)
+            .len(3)
+            .speed(1.)
+            .build()
+            .unwrap();
+        let gtx = GameContext::new(
+            BOARD,
+            CellDim::from(10.),
+            crate::app::Palette::dark(),
+            Prefs::default(),
+            SpawnPolicy::None,
+            GameMode::Classic,
+        );
+        let goals = Goals {
+            targets: vec![HexPoint { h: 10, v: 5 }],
+            avoid,
+        };
+        let search = WeightedBFS { weights: Weights::default() };
+        let leg = search
+            .get_path(
+                (head, Dir::U),
+                &goals,
+                Committed::default(),
+                &snake.body,
+                None,
+                &OtherSnakes::empty(),
+                &gtx,
+            )
+            .expect("an open board");
+        leg.cells
+    }
+
+    #[test]
+    fn a_costly_cell_is_gone_around_when_that_is_cheaper() {
+        let bad = HexPoint { h: 10, v: 7 };
+        assert!(path_up(HashMap::new()).contains(&bad), "straight up, without the cost");
+        let path = path_up(HashMap::from([(bad, 15)]));
+        assert!(!path.contains(&bad), "{path:?}");
+    }
+
+    #[test]
+    fn a_costly_cell_is_crossed_when_going_around_costs_more() {
+        let bad = HexPoint { h: 10, v: 7 };
+        assert!(path_up(HashMap::from([(bad, 1)])).contains(&bad));
+    }
 }
