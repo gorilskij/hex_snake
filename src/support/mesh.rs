@@ -164,6 +164,8 @@ where
 /// cheap. Caps are kept comfortably below the defaults.
 pub struct Mesh {
     meshes: Vec<MqMesh>,
+    /// How many shapes went into it, for the stats overlay
+    polygons: usize,
 }
 
 const MAX_VERTS: usize = 9000;
@@ -172,7 +174,7 @@ const MAX_INDICES: usize = 4500;
 impl Mesh {
     /// A mesh that draws nothing.
     pub fn empty() -> Mesh {
-        Mesh { meshes: vec![] }
+        Mesh { meshes: vec![], polygons: 0 }
     }
 
     /// Wrap one tessellated shape (a single chunk). A single shape never
@@ -184,6 +186,7 @@ impl Mesh {
         } else {
             Mesh {
                 meshes: vec![MqMesh { vertices, indices, texture: None }],
+                polygons: 1,
             }
         }
     }
@@ -198,8 +201,10 @@ impl Mesh {
         let mut meshes = vec![];
         let mut vertices: Vec<Vertex> = vec![];
         let mut indices: Vec<u16> = vec![];
+        let mut polygons = 0;
 
-        for chunk in parts.into_iter().flat_map(|m| m.meshes) {
+        let parts = parts.into_iter().inspect(|m| polygons += m.polygons);
+        for chunk in parts.flat_map(|m| m.meshes) {
             if chunk.vertices.is_empty() {
                 continue;
             }
@@ -221,7 +226,11 @@ impl Mesh {
             meshes.push(MqMesh { vertices, indices, texture: None });
         }
 
-        Mesh { meshes }
+        Mesh { meshes, polygons }
+    }
+
+    pub fn polygons(&self) -> usize {
+        self.polygons
     }
 
     /// Attach a texture (e.g. a snake's palette LUT) to every chunk, so the

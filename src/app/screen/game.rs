@@ -320,23 +320,19 @@ impl Game {
         self.apple_mesh = None;
     }
 
-    fn get_message_drawables(&mut self) -> Vec<MessageDrawable> {
+    /// Takes just the messages, so it can be called while the meshes are
+    /// borrowed for drawing.
+    fn get_message_drawables(messages: &mut HashMap<MessageID, Message>) -> Vec<MessageDrawable> {
         // draw messages and remove the ones that have
         // outlived their durations
         let mut drawables = vec![];
-        let mut remove = vec![];
-
-        self.messages
-            .iter()
-            .for_each(|(id, message)| match message.get_drawable() {
-                Some(drawable) => drawables.push(drawable),
-                None => remove.push(*id),
-            });
-
-        remove.iter().for_each(|id| {
-            self.messages.remove(id);
+        messages.retain(|_, message| match message.get_drawable() {
+            Some(drawable) => {
+                drawables.push(drawable);
+                true
+            }
+            None => false,
         });
-
         drawables
     }
 
@@ -616,7 +612,6 @@ impl Screen for Game {
         }
 
         let env = &mut self.env;
-        let mut stats = Stats::default();
         let playing = self.fps_control.state() == fps_control::State::Playing;
 
         if self.grid_mesh.is_none() {
@@ -632,7 +627,7 @@ impl Screen for Game {
         }
 
         if self.portal_mesh.is_none() {
-            self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx, &mut stats)?);
+            self.portal_mesh = Some(rendering::portal_mesh(&mut env.portals, &env.gtx)?);
         }
 
         if self.snake_render.is_none() || playing {
@@ -640,7 +635,6 @@ impl Screen for Game {
                 &mut env.snakes,
                 &env.apples,
                 &env.gtx,
-                &mut stats,
             )?);
         }
 
@@ -652,7 +646,6 @@ impl Screen for Game {
                 &env.apples,
                 &env.gtx,
                 self.fps_control.elapsed_total(),
-                &mut stats,
             )?);
         }
 
@@ -679,23 +672,15 @@ impl Screen for Game {
 
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
             // could still be None if the player snake doesn't have an autopilot
-            let meshes = rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx, &mut stats)
+            let meshes = rendering::player_path_mesh(player_snake, other_snakes, &env.apples, &env.gtx)
                 .transpose()?;
             (self.player_path_mesh, self.player_path_over_mesh) = meshes.unzip();
-        }
-
-        if env.gtx.prefs.display_stats {
-            stats.player_length = Some(player_snake.body.length);
-            let message = stats.get_stats_message();
-            self.messages.insert(MessageID::Stats, message);
         }
 
         // Compile the snake shader lazily (GL context is live during draw).
         if self.snake_material.is_none() {
             self.snake_material = Some(snake_material()?);
         }
-
-        let message_drawables = self.get_message_drawables();
 
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
@@ -713,6 +698,18 @@ impl Screen for Game {
             &border_hint_mesh,
             &self.portal_mesh,
         ];
+
+        if self.env.gtx.prefs.display_stats {
+            let meshes = before_snake.iter().chain(after_snake.iter()).copied().flatten();
+            let snake_meshes = self.snake_render.iter().flat_map(|render| render.shaded.iter().map(|(mesh, _)| mesh));
+            let stats = Stats {
+                polygons: meshes.chain(snake_meshes).map(Mesh::polygons).sum(),
+                player_length: Some(self.env.snakes[player_idx].body.length),
+            };
+            self.messages.insert(MessageID::Stats, stats.get_stats_message());
+        }
+
+        let message_drawables = Self::get_message_drawables(&mut self.messages);
 
         let has_snake = self.snake_render.as_ref().is_some_and(|r| !r.shaded.is_empty());
         let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());

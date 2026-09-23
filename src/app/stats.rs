@@ -4,7 +4,7 @@ use crate::app::message::Message;
 /// Collect statistics about the current game state
 #[derive(Default)]
 pub struct Stats {
-    /// Number of polygons built this frame (only meshes that were rebuilt)
+    /// Number of polygons drawn this frame, cached meshes included
     pub polygons: usize,
     /// The player snake's true length in cells
     pub player_length: Option<f32>,

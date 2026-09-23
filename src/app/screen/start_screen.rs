@@ -19,7 +19,6 @@ use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::menu::{Menu, Toggle};
 use crate::app::screen::{Environment, Screen, Transition};
 use crate::app::snake_management::{advance_snakes, update_snake_dirs};
-use crate::app::stats::Stats;
 use crate::app::{self};
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
@@ -308,7 +307,7 @@ impl SnakeDemo {
     /// Draw the board and snake. Buttons are drawn separately, in screen space.
     fn draw_board(&mut self, material: &Material) -> Result<()> {
         let offset = self.pos - Self::bounds(self.env.gtx.cell_dim).0;
-        let snake = rendering::snake_mesh(&mut self.env.snakes, &[], &self.env.gtx, &mut Stats::default())?;
+        let snake = rendering::snake_mesh(&mut self.env.snakes, &[], &self.env.gtx)?;
         let (grid, border) = self.board_meshes();
 
         // the drawn cells start at `pos`

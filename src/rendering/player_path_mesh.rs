@@ -2,7 +2,6 @@ use anyhow::Result;
 use macroquad::color::Color;
 
 use crate::app::game_context::GameContext;
-use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexPoint};
 use crate::rendering::segments::centerline::centerline_polyline;
@@ -44,7 +43,6 @@ pub fn player_path_mesh(
     other_snakes: OtherSnakes,
     apples: &[Apple],
     gtx: &GameContext,
-    stats: &mut Stats,
 ) -> Option<Result<(Mesh, Mesh)>> {
     let autopilot = player_snake.autopilot.as_mut()?;
     let knowledge = Knowledge::accurate(&player_snake.eat_mechanics);
@@ -150,7 +148,6 @@ pub fn player_path_mesh(
             let points = centerline_polyline(&desc, desc.fraction, ARC_STEPS);
             let parts = if eaten.contains(&pos) { &mut over } else { &mut under };
             parts.push(build_line(&points, width, leg_color(leg_idx, legs)));
-            stats.polygons += 1;
         }
         coming_from = -going_to;
     }

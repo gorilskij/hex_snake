@@ -4,14 +4,13 @@ use anyhow::Result;
 use hsl::HSL;
 
 use crate::app::game_context::GameContext;
-use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::color::to_color::ToColor;
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
 
-pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration, stats: &mut Stats) -> Result<Mesh> {
+pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration) -> Result<Mesh> {
     assert!(!apples.is_empty(), "tried to draw a mesh with 0 apples");
 
     let mut parts: Vec<Mesh> = Vec::with_capacity(apples.len());
@@ -40,7 +39,6 @@ pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration, 
                 parts.push(build_circle(DrawMode::fill(), dest, radius, color));
             }
         }
-        stats.polygons += 1;
     }
 
     Ok(Mesh::combine(parts))

@@ -1,7 +1,6 @@
 use anyhow::Result;
 
 use crate::app::game_context::GameContext;
-use crate::app::stats::Stats;
 use crate::apple::Apple;
 use crate::rendering;
 use crate::rendering::segments::cap::build_round_caps;
@@ -85,7 +84,7 @@ fn segment_description(segment: &Segment, segment_idx: usize, body: &Body, gtx: 
 /// Build the drawable meshes for every snake. Each snake becomes one polygon per
 /// segment (no color subdivision); color is applied per-pixel by the snake
 /// shader sampling that snake's palette LUT.
-pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext, stats: &mut Stats) -> Result<SnakeRender> {
+pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext) -> Result<SnakeRender> {
     let mut shaded = Vec::with_capacity(snakes.len());
 
     for snake in snakes.iter_mut() {
@@ -104,9 +103,7 @@ pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext, sta
         // Round end caps (smooth style): truncate the body ribbon by one cap
         // radius at each end and fill with half-circle caps.
         let (tail_cap, head_cap) = if gtx.prefs.draw_style == rendering::Style::Smooth && !descs.is_empty() {
-            let caps = build_round_caps(&mut descs, num_segments, lut_size);
-            stats.polygons += (caps.0.is_some() as usize) + (caps.1.is_some() as usize);
-            caps
+            build_round_caps(&mut descs, num_segments, lut_size)
         } else {
             (None, None)
         };
@@ -137,7 +134,6 @@ pub fn snake_mesh(snakes: &mut [Snake], apples: &[Apple], gtx: &GameContext, sta
                     };
                     build_marks(desc, joins, num_segments, lut_size)
                 });
-                stats.polygons += 1 + marks.is_some() as usize;
                 std::iter::once(desc.build_shaded(num_segments, lut_size)).chain(marks)
             }))
             .chain(head_cap);

@@ -3,7 +3,6 @@ use macroquad::color::Color;
 
 use crate::app::game_context::GameContext;
 use crate::app::portal::{Behavior, Portal};
-use crate::app::stats::Stats;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
 use crate::rendering::shape::ShapePoints;
 use crate::support::mesh::{build_line, Mesh};
@@ -54,8 +53,7 @@ fn behavior_color(behavior: Behavior) -> Color {
     }
 }
 
-// TODO: update stats
-pub fn portal_mesh(portals: &mut [Portal], gtx: &GameContext, _stats: &mut Stats) -> Result<Mesh> {
+pub fn portal_mesh(portals: &mut [Portal], gtx: &GameContext) -> Result<Mesh> {
     let mut parts: Vec<Mesh> = vec![];
 
     for portal in portals {
