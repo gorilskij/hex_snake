@@ -2,5 +2,8 @@
 # …) as `extern "C"`. Recent rust-lld errors on these unless told to emit them as
 # wasm imports, which the macroquad JS bundle (mq_js_bundle.js) then satisfies at
 # instantiation. Only affects the wasm target; native builds are untouched.
+#
+# getrandom has no default backend there either: the `custom` one is ours,
+# `__getrandom_v03_custom` in src/main.rs, backed by macroquad's PRNG.
 [target.wasm32-unknown-unknown]
-rustflags = ["-C", "link-arg=--import-undefined"]
+rustflags = ["-C", "link-arg=--import-undefined", "--cfg", 'getrandom_backend="custom"']

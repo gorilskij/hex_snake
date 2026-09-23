@@ -1,5 +1,4 @@
-use rand::distributions::uniform::SampleRange;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
@@ -60,7 +59,7 @@ pub fn random_free_spot(occupied_cells: &[HexPoint], board_dim: HexDim, rng: &mu
         return None;
     }
 
-    let mut new_idx = (0..free_spaces).sample_single(rng);
+    let mut new_idx = rng.random_range(0..free_spaces);
     for HexPoint { h, v } in occupied_cells {
         let idx = (v * board_dim.h + h) as usize;
         if idx <= new_idx {

@@ -3,16 +3,18 @@ use std::fmt::{Display, Formatter};
 use super::*;
 use crate::snake_control::appetite::Appetite;
 
-#[derive(Debug, Error)]
+#[derive(Debug)]
 #[must_use]
 pub struct BuilderError(pub Box<Builder>, pub &'static str);
 
 impl Display for BuilderError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "snake builder error: {}", self.1)?;
-        writeln!(f, "builder: {:?}", self.1)
+        writeln!(f, "builder: {:?}", self.0)
     }
 }
+
+impl std::error::Error for BuilderError {}
 
 #[derive(Default, Clone, Debug)]
 pub struct Builder {

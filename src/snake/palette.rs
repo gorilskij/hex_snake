@@ -21,11 +21,8 @@ macro_rules! gray {
     };
 }
 
-lazy_static! {
-    static ref DEFAULT_EATEN_COLOR: Color = Color::from_rgba(0, 255, 128, 255);
-    static ref DEFAULT_CRASHED_COLOR: Color = Color::from_rgba(255, 0, 128, 255);
-    // static ref DEFAULT_PORTAL_COLOR: Color = Color::from_rgba(245, 192, 64, 255);
-}
+const DEFAULT_EATEN_COLOR: Color = Color::from_rgba(0, 255, 128, 255);
+const DEFAULT_CRASHED_COLOR: Color = Color::from_rgba(255, 0, 128, 255);
 
 #[derive(Copy, Clone, Debug)]
 pub enum EatenColor {
@@ -90,7 +87,7 @@ impl PaletteTemplate {
         Self::RGBGradient {
             head,
             tail,
-            eaten: EatenColor::Fixed(eaten.unwrap_or(*DEFAULT_EATEN_COLOR)),
+            eaten: EatenColor::Fixed(eaten.unwrap_or(DEFAULT_EATEN_COLOR)),
         }
     }
 
@@ -300,7 +297,7 @@ impl Palette for Solid {
             let color = match segment.segment_type {
                 Normal => self.color,
                 Eaten { .. } => self.eaten,
-                Crashed => *DEFAULT_CRASHED_COLOR,
+                Crashed => DEFAULT_CRASHED_COLOR,
             };
             SegmentStyle::Solid(color)
         }))
@@ -322,7 +319,7 @@ impl Palette for RGBGradient {
         let logical_len = body.length as f64;
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
-                SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
+                SegmentStyle::Solid(DEFAULT_CRASHED_COLOR)
             } else {
                 let r = i as f64 + body.swallowed as f64 + body.head_fraction as f64;
                 let start_color = lerp(self.head_color, self.tail_color, (r / logical_len) as f32);
@@ -330,11 +327,14 @@ impl Palette for RGBGradient {
 
                 match segment.segment_type {
                     Normal => SegmentStyle::RGBGradient { start_color, end_color },
-                    Eaten { .. } => SegmentStyle::RGBGradient {
-                        start_color: invert_rgb(start_color),
-                        end_color: invert_rgb(end_color),
+                    Eaten { .. } => match self.eaten {
+                        EatenColor::Fixed(color) => SegmentStyle::Solid(color),
+                        EatenColor::RGBInverted => SegmentStyle::RGBGradient {
+                            start_color: invert_rgb(start_color),
+                            end_color: invert_rgb(end_color),
+                        },
                     },
-                    Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
+                    Crashed => SegmentStyle::Solid(DEFAULT_CRASHED_COLOR),
                 }
             }
         }))
@@ -357,7 +357,7 @@ impl Palette for HSLGradient {
         let logical_len = body.length as f64;
         Box::new(body.segments.iter().enumerate().map(move |(i, segment)| {
             if segment.segment_type == Crashed {
-                SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR)
+                SegmentStyle::Solid(DEFAULT_CRASHED_COLOR)
             } else {
                 let r = i as f64 + body.swallowed as f64 + body.head_fraction as f64;
                 let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
@@ -386,7 +386,7 @@ impl Palette for HSLGradient {
                             end_color: invert_rgb(end_hsl.to_color()),
                         }
                     }
-                    Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
+                    Crashed => SegmentStyle::Solid(DEFAULT_CRASHED_COLOR),
                 }
             }
         }))
@@ -426,7 +426,7 @@ impl Palette for OkLabGradient {
                         end_color: invert_rgb(end_okl.to_color()),
                     }
                 }
-                Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
+                Crashed => SegmentStyle::Solid(DEFAULT_CRASHED_COLOR),
             }
         }))
     }
@@ -460,12 +460,12 @@ impl Palette for AlternatingFixed {
                 }
                 Eaten { .. } => {
                     if i % 2 == expected_mod {
-                        *DEFAULT_EATEN_COLOR
+                        DEFAULT_EATEN_COLOR
                     } else {
                         self.color2
                     }
                 }
-                Crashed => *DEFAULT_CRASHED_COLOR,
+                Crashed => DEFAULT_CRASHED_COLOR,
             };
             SegmentStyle::Solid(color)
         }))
@@ -504,8 +504,8 @@ impl Palette for Alternating {
 
                     SegmentStyle::RGBGradient { start_color, end_color }
                 }
-                Eaten { .. } => SegmentStyle::Solid(*DEFAULT_EATEN_COLOR),
-                Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
+                Eaten { .. } => SegmentStyle::Solid(DEFAULT_EATEN_COLOR),
+                Crashed => SegmentStyle::Solid(DEFAULT_CRASHED_COLOR),
             }
         }))
     }
@@ -523,8 +523,8 @@ impl Palette for Alternating {
 //                     BLACK
 //                 }
 //             }),
-//             eaten_color: Box::new(*DEFAULT_EATEN_COLOR),
-//             crashed_color: *DEFAULT_CRASHED_COLOR,
+//             eaten_color: Box::new(DEFAULT_EATEN_COLOR),
+//             crashed_color: DEFAULT_CRASHED_COLOR,
 //             portal_color: *DEFAULT_PORTAL_COLOR,
 //         }
 //     }
@@ -541,8 +541,8 @@ impl Palette for Alternating {
 //                     a: 1.,
 //                 }
 //             }),
-//             eaten_color: Box::new(*DEFAULT_EATEN_COLOR),
-//             crashed_color: *DEFAULT_CRASHED_COLOR,
+//             eaten_color: Box::new(DEFAULT_EATEN_COLOR),
+//             crashed_color: DEFAULT_CRASHED_COLOR,
 //             portal_color: *DEFAULT_PORTAL_COLOR,
 //         }
 //     }
@@ -560,8 +560,8 @@ impl Palette for Alternating {
 //                 };
 //                 Color::from(hsl.to_rgb())
 //             }),
-//             eaten_color: Box::new(*DEFAULT_EATEN_COLOR),
-//             crashed_color: *DEFAULT_CRASHED_COLOR,
+//             eaten_color: Box::new(DEFAULT_EATEN_COLOR),
+//             crashed_color: DEFAULT_CRASHED_COLOR,
 //             portal_color: *DEFAULT_PORTAL_COLOR,
 //         }
 //     }

@@ -9,34 +9,45 @@ When you hit the wall, where you get teleported depends on the direction you wer
 
 #### Movement
 
-It's possible to configure which side of the keyboard you're playing on, with which hand, and the keyboard layout.
+Six keys, one per direction. The defaults, for one player on each side of the
+keyboard (they follow the letters your layout types, not the key positions):
 
-As an example, these are the controls for playing on the right side
-of the keyboard with the right hand on qwerty (default).
+| Direction  | Left player | Right player |
+|------------|-------------|--------------|
+| Up-Left    | `S`         | `J`          |
+| Up         | `D`         | `K`          |
+| Up-Right   | `F`         | `L`          |
+| Down-Left  | `Z`         | `M`          |
+| Down       | `X`         | `,`          |
+| Down-Right | `C`         | `.`          |
 
-- `J` - Up-Left
-- `K` - Up
-- `L` - Up-Right
-- `M` - Down-Left
-- `,` - Down
-- `.` - Down-Right
+Keys can be rebound in Options → Controls. With one player, either side's
+keys can be the ones in use.
 
-#### Other
+#### Start screen
 
-- `G` - Toggle grid
-- `Space` - Play / Pause / Restart
-- `Esc` - Switch between drawing modes
-- `[` - Decrease snake speed
-- `]` - Increase snake speed
-- `F` - Show debug info
-- `A` - Toggle autopilot
-- `1`-`9` - Change nutritional value of apples
+- `Enter` - Start (one or two players, Classic or Hunger mode)
+- `←` / `→` - Change palette (one player)
+- `Esc` - Options
+
+#### In game
+
+- `Esc` - Menu (restart, main menu, autopilot, controls, display settings)
+- `Space` - Play / Pause, or start over after a game over
+
+Debug keys:
+
+- `[` / `]` - Slower / faster
+- `↑` / `↓` - Bigger / smaller cells
+- `1`-`9` - Nutritional value of apples
+- `X` - Toggle special apples (spawning AI snakes and rain)
+- `D` - Toggle the distance grid
 
 ## Screenshots
 
-The head of the snake is red, the tail is purple,
-if you run into yourself, the snake's tail will be
-cut off until you manage to regrow it again.
+The head of the snake is red, the tail is purple.
+In Classic mode, eating an apple leaves a segment you can pass through
+until it has been digested.
 ![](https://i.snipboard.io/jtsdXJ.jpg)
 
 Teleportation depends on direction.

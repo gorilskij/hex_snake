@@ -234,10 +234,10 @@ impl Button {
         let hovered = self.is_hovered();
         let clicked = hovered && is_mouse_button_pressed(MouseButton::Left);
 
-        if clicked {
-            if let ButtonType::Rotate { options, index } = &mut self.button_type {
-                *index = (*index + 1) % options.len();
-            }
+        if clicked
+            && let ButtonType::Rotate { options, index } = &mut self.button_type
+        {
+            *index = (*index + 1) % options.len();
         }
 
         let state = match (hovered, is_mouse_button_down(MouseButton::Left)) {

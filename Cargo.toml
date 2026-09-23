@@ -2,7 +2,7 @@
 name = "hex-snake"
 version = "0.1.0"
 authors = ["gorilskij <43991400@users.noreply.github.com>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 anyhow = "1"
@@ -10,19 +10,19 @@ macroquad = "0.4"
 lyon_geom = "~1.0"
 lyon_path = "1.0"
 lyon_tessellation = "1.0"
-rand = "0.8"
-# custom backend lets getrandom work on wasm32-unknown-unknown (where there is
-# no default backend) without pulling in wasm-bindgen, which would clash with
-# macroquad's own JS loader. On native, the OS backend is still used.
-getrandom = { version = "0.2", features = ["custom"] }
-itertools = "0.12"
-derive_more = "~0.99"
+rand = "0.10"
+# a custom backend (selected in .cargo/config.toml) lets getrandom work on
+# wasm32-unknown-unknown, where there is no default one, without pulling in
+# wasm-bindgen, which would clash with macroquad's own JS loader. On native, the
+# OS backend is still used.
+getrandom = "0.4"
+itertools = "0.15"
+derive_more = { version = "2.1", features = ["add", "add_assign", "mul"] }
 num-integer = "~0.1"
 hsl = "0.1.1"
-lazy_static = "1.4.0"
 ezing = "~0.2"
-enum-rotate = "0.1.0"
-num-traits = "0.2.18"
+enum-rotate = "0.1.1"
+num-traits = "0.2.19"
 enum-map-lite = "0.2.0"
 
 [profile.release]

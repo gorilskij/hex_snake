@@ -3,8 +3,7 @@ use std::f32::consts::TAU;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 
 use itertools::Itertools;
-use rand::distributions::uniform::SampleRange;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use Dir::*;
 
 use crate::basic::angle_distance;
@@ -147,7 +146,7 @@ impl Dir {
     }
 
     pub fn random(rng: &mut impl Rng) -> Self {
-        Self::from((0..6).sample_single(rng))
+        Self::from(rng.random_range(0..6))
     }
 
     /// Clockwise angle from self to other in units of 60°

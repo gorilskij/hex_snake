@@ -113,6 +113,7 @@ pub struct Goals {
 /// Collecting several targets is not a mode of the search — it is the caller
 /// chaining legs, each starting where the last one ended (see [`Plan`]).
 pub trait PathFinder {
+    #[allow(clippy::too_many_arguments)]
     fn get_path(
         &self,
         start: Start,

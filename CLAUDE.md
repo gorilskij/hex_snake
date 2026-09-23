@@ -38,8 +38,9 @@ single backend: **macroquad**.
   snakes on an 80x50 board with 80 apples, timing planning apart from the
   rest.
 
-Requires nightly for: `stmt_expr_attributes`, `try_blocks`,
-`exhaustive_patterns`, `if_let_guard` (see `src/main.rs`).
+Edition 2024. The crate no longer uses any `#![feature(...)]` (the last two
+were dropped once stable Rust covered them), but the toolchain is still
+pinned to nightly, and `rustfmt.toml` uses nightly-only options.
 
 ## Entry point & main loop
 
@@ -63,18 +64,22 @@ what the layout types — see below), then `next_frame().await`.
   `assets/fonts/`); macroquad's default font is ASCII-only.
 - `web/mq_js_bundle.js` is patched to map `MetaLeft`/`MetaRight` (the upstream
   bundle only knows the obsolete `OSLeft`/`OSRight`).
-- `register_custom_getrandom!` backs `rand`/`thread_rng` with macroquad's PRNG on
-  wasm (native uses the OS backend).
+- `__getrandom_v03_custom` (`main.rs`, wasm only) backs `rand::rng()` with
+  macroquad's PRNG on wasm, selected by `--cfg getrandom_backend="custom"` in
+  `.cargo/config.toml` (native uses the OS backend).
 
 ## Module map
 
 - **`support/`** — what used to be a `gfx/` ggez-compat layer, now dissolved: the
   game calls macroquad directly (`macroquad::color::Color`, `Material`,
   `clear_background`, cameras), and the few helpers that remain live here.
-  - `mesh.rs` — **the core of rendering**: `Mesh`, `MeshBuilder` (lyon fill/
-    stroke → chunked macroquad meshes), `DrawMode`, `build_circle`, and
-    `set_board_camera` (the board-offset `Camera2D`). `mesh.draw()` /
-    `mesh.draw_shaded(material)` replace the old `Canvas`.
+  - `mesh.rs` — **the core of rendering**: `Mesh` (chunked macroquad meshes,
+    each counting its polygons), the `build_*` functions (lyon fill/stroke
+    → a `Mesh`: `build_polygon`, `build_circle`, `build_line`, and the shaded
+    `build_shaded_polygon` / `build_shaded_ribbon` for snakes), `Mesh::combine`,
+    `DrawMode`, `Surface`, and `set_board_camera` (the board-offset
+    `Camera2D`). `mesh.draw()` / `mesh.draw_shaded(material)` replace the old
+    `Canvas`.
   - `material.rs` — custom GLSL shader (`SnakeMaterial` via `snake_material()`) +
     palette LUT texture (`PaletteLut`) for snake coloring.
   - `time.rs` — `Instant` over `macroquad::time::get_time()` (std `Instant`
@@ -119,15 +124,14 @@ what the layout types — see below), then `next_frame().await`.
     origin follows the arc through a turn), in which case each end is clipped
     against the board's zigzag edge and slides along it. `HintStyle`, cycled from the
     options menu), `distance_grid.rs`,
-    `portal/`, `board_dim.rs`.
-  - `screen/snake_control_creator_screen.rs` — **out of the module tree**
-    (not compiled).
+    `portal/` (dormant: nothing creates a portal), `board_dim.rs`,
+    `benchmark.rs` (test only).
 - **`snake/`** — snake model. `mod.rs` (`Snake`, `Body`, `Segment`,
   `SegmentType`; the float-length model — see [Snake length model](#snake-length-model-snakemodrs)),
   `builder.rs`, `eat_mechanics.rs`, **`palette.rs`** (snake coloring: `Palette`
   trait, `SegmentStyle`, gradient/solid/alternating palettes, `build_snake_lut`).
-- **`snake_control/`** — controllers: `keyboard`, AI `algorithm`/`killer`/`rain`/
-  `programmed`, and `pathfinder/`: cheapest-path search (`WeightedBFS`, costs
+- **`snake_control/`** — controllers: `keyboard`, `mouse`, AI
+  `apple_seeker`/`killer`/`rain`/`programmed`, `appetite`, and `pathfinder/`: cheapest-path search (`WeightedBFS`, costs
   in a `Weights` struct — step, blunt/sharp turn, teleport, pass-through), a
   space-filling survival fallback, with-backup, and `Obstacles` (occupied cells
   judged by the snake's `eat_self` for its own segments, `eat_other` for other
@@ -162,12 +166,9 @@ what the layout types — see below), then `next_frame().await`.
 - **`color/`** — `Color` newtype over `macroquad::color::Color` with arithmetic
   ops; `oklab.rs`, `to_color.rs` (HSL→Color).
 - **`view/`** — `OtherSnakes`/`Snakes` borrowing helpers (`split_snakes`).
-- **`basic/`, `error.rs`** — misc.
 - **`button/`** — immediate-mode polygon buttons (`Button`, `ButtonData`:
   outline, inner shapes, text spans; hit-tested on the exact outline) and the
   shared `style` (colors: grey, green hover, `ACCENT` yellow when pressed).
-- **Out of tree (not compiled):** `support/text_layout.rs`. Still on disk with
-  stale `ggez` references; harmless.
 
 ## Screens & menus
 
@@ -261,9 +262,10 @@ z-order onto a `Canvas`:
    snake ribbon is built around (`centerline_polyline`), so it turns exactly as
    a snake taking it would and, starting at the head's own fraction into its
    cell, is eaten continuously rather than a cell at a time; each leg is a step
-   darker, 70% white for the one being walked down to 30% for the last) via `MeshBuilder` (lyon fill/
-   stroke → chunked macroquad meshes; chunks kept under macroquad's per-draw
-   10000-vert / 5000-index clamp).
+   darker, 70% white for the one being walked down to 30% for the last) via the
+   `build_*` functions and `Mesh::combine` (lyon fill/stroke → chunked
+   macroquad meshes; chunks kept under macroquad's per-draw 10000-vert /
+   5000-index clamp).
 2. `set_board_camera` sets a board-offset `Camera2D` once (pixel coords,
    **y-down**; `zoom.y` must be positive), then `mesh.draw()` per mesh on the
    default material. (One camera set for all board meshes — each `set_camera`
@@ -287,14 +289,14 @@ That's **gone**. Now:
   of them. Each cross-section is `(inner, outer, frac)` in *default orientation*.
   `point_factory::build_shaded` normalizes `frac` → global body coordinate
   `uv.x = (seg_idx + (1 - frac)) / num_segments`, applies the flip/rotate/
-  translate to positions, and emits vertices via `MeshBuilder::push_shaded_ribbon`
+  translate to positions, and emits vertices via `build_shaded_ribbon`
   (macroquad `Vertex` carries `uv.x` = along-body, `uv.y` = across-width).
   - Adjacent cross-sections **share** vertices, so radial edges are single
     constant-`frac` lines → **seamless**. A complete sharp turn has
     `inner_radius == 0`: the inner point is just the pivot, reused across
     cross-sections with different `frac` — a true single point, no hole, no seam.
   - Hexagon draw style (`hexagon_segments::hexagon_outline`) is a flat hexagon
-    with constant `uv.x` (via `push_shaded_polygon`).
+    with constant `uv.x` (via `build_shaded_polygon`).
 - **Color** (`snake/palette.rs`): per snake per frame, `build_snake_lut` samples
   the existing `Palette`/`SegmentStyle` color functions into a LUT where each
   segment owns a fixed slot of `lut_texels_per_segment` texels (so segment
@@ -421,9 +423,14 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   (`attribute`/`varying`/`texture2D`/precision qualifiers).
 - **`Texture2D` is Arc-managed** (frees GPU on last drop), so rebuilding the LUT
   each frame doesn't leak — but it does churn a GPU texture per snake per frame
-  (see TODO).
-- **getrandom on wasm:** use the `custom` feature only; NOT `js`/`web-time`/
-  `instant` (they pull wasm-bindgen, which clashes with macroquad's JS loader).
+  (judged not worth fixing).
+- **getrandom on wasm:** use the `custom` backend only (0.3+: the
+  `getrandom_backend` cfg in `.cargo/config.toml` plus `__getrandom_v03_custom`
+  in `main.rs`); NOT `wasm_js`/`web-time`/`instant` (they pull wasm-bindgen,
+  which clashes with macroquad's JS loader). With `--import-undefined`, a
+  missing `__getrandom_v03_custom` would not fail the link: it would become a
+  JS import and fail on page load, so check the wasm's imports after touching
+  this.
 - **Web colors looked duller than native** on a Mac: the native OpenGL view is
   untagged, so macOS shows its values as display-native (Display P3), while a
   WebGL canvas defaults to sRGB and gets color-managed down. `web/index.html`
@@ -445,6 +452,11 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
 
 ## TODOs / not yet done
 
+- **README** — generally out of date: only the controls were brought up to
+  date (2026-09). It needs new screenshots (the snipboard-hosted links are from
+  the ggez days) and a video, and a description of the game as it is now:
+  the start screen, menus, modes (Classic/Hunger), autopilot, border hints,
+  the web build.
 - **Birth/death hole graphics** — the model exists (see [Snake length model](#snake-length-model-snakemodrs));
   the old black-hole circle was removed and nothing is drawn in its place yet.
   Reimplement as a hole opening/closing at the pinned end with the snake fading

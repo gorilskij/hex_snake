@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use rand::distributions::uniform::SampleRange;
-use rand::distributions::{Distribution, WeightedIndex};
-use rand::Rng;
+use rand::distr::weighted::WeightedIndex;
+use rand::distr::Distribution;
+use rand::{Rng, RngExt};
 
 use crate::app::game_context::GameContext;
 use crate::app::game_mode::{hunger, GameMode};
@@ -44,10 +44,14 @@ pub enum SpawnEvent {
     Wait(Frames),
 }
 
+// Scheduled spawning isn't used yet; kept for the spawn policies to come.
+#[allow(dead_code)]
 pub type SpawnSchedule = Vec<SpawnEvent>;
 
+#[allow(dead_code)]
 pub struct SpawnScheduleBuilder(SpawnSchedule);
 
+#[allow(dead_code)]
 impl SpawnScheduleBuilder {
     pub fn new() -> Self {
         Self(vec![])
@@ -261,7 +265,7 @@ pub fn spawn_bad_apples<Rng: rand::Rng>(env: &mut Environment<Rng>, elapsed: Dur
 
     // arrivals at random times, one per interval on average
     let chance = 1. - (-elapsed.as_secs_f64() / hunger::BAD_APPLE_INTERVAL as f64).exp();
-    if !env.rng.gen_bool(chance) {
+    if !env.rng.random_bool(chance) {
         return;
     }
 
@@ -269,7 +273,7 @@ pub fn spawn_bad_apples<Rng: rand::Rng>(env: &mut Environment<Rng>, elapsed: Dur
     let Some(pos) = random_free_spot(&blocked, env.gtx.board_dim, &mut env.rng) else {
         return;
     };
-    let amount = hunger::BAD_APPLE_SHRINK.sample_single(&mut env.rng);
+    let amount = env.rng.random_range(hunger::BAD_APPLE_SHRINK);
     env.apples.push(Apple {
         pos,
         apple_type: apple::Type::Shrink(amount),

@@ -1,3 +1,5 @@
+use derive_more::Mul;
+
 use crate::basic::Point;
 
 #[derive(Copy, Clone, Mul, Debug)]

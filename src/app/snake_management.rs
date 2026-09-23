@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use rand::distributions::uniform::SampleRange;
+use rand::RngExt;
 
 use crate::app::game_mode::{hunger, GameMode};
 use crate::app::portal;
@@ -36,6 +36,8 @@ pub enum Collision {
         snake_index: usize,
         snake_segment_index: usize,
     },
+    // portals are dormant: nothing creates one
+    #[allow(dead_code)]
     Portal(portal::Behavior),
 }
 
@@ -251,8 +253,8 @@ pub fn handle_apple_collisions<Rng: rand::Rng>(
                     spawn_snakes.push(
                         seed.clone()
                             .pos(HexPoint { h, v: 0 })
-                            .len((3..10).sample_single(&mut env.rng))
-                            .speed((0.2..1.5).sample_single(&mut env.rng)),
+                            .len(env.rng.random_range(3..10))
+                            .speed(env.rng.random_range(0.2..1.5)),
                     );
                 }
             }
@@ -394,7 +396,7 @@ pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) ->
         snake_builder.dir.get_or_insert_with(|| Dir::random(&mut env.rng));
         snake_builder
             .len
-            .get_or_insert_with(|| (7..15).sample_single(&mut env.rng));
+            .get_or_insert_with(|| env.rng.random_range(7..15));
 
         env.add_snake(&snake_builder).context("spawn_snakes")?;
     }
@@ -557,8 +559,10 @@ mod tests {
 
     /// Cell-based collisions, so only the cells decide who touches whom.
     fn environment<Rng>(snakes: Vec<Snake>, rng: Rng) -> Environment<Rng> {
-        let mut prefs = Prefs::default();
-        prefs.draw_style = rendering::Style::Hexagon;
+        let prefs = Prefs {
+            draw_style: rendering::Style::Hexagon,
+            ..Default::default()
+        };
         Environment {
             snakes,
             apples: vec![],
@@ -589,7 +593,7 @@ mod tests {
             .speed(1.)
             .build()
             .unwrap();
-        let mut env = environment(vec![snake], rand::thread_rng());
+        let mut env = environment(vec![snake], rand::rng());
         while !advance_snakes(&mut env, Duration::from_secs_f32(0.1)) {}
         env.snakes.remove(0)
     }

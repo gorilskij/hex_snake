@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::{Div, Mul};
 
+use derive_more::{Add, AddAssign, Sub, SubAssign};
 use lyon_geom::euclid::default::{Point2D, Vector2D};
 
 /// A more convenient version of mint::Point2<f32>

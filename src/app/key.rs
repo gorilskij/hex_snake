@@ -74,10 +74,10 @@ struct Collector {
 
 impl Collector {
     fn flush(&mut self) {
-        if let Some((code, repeat)) = self.pending.take() {
-            if !repeat {
-                self.presses.push(Key::Code(code));
-            }
+        if let Some((code, repeat)) = self.pending.take()
+            && !repeat
+        {
+            self.presses.push(Key::Code(code));
         }
     }
 }

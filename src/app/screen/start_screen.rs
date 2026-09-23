@@ -8,7 +8,6 @@ use macroquad::color::Color;
 use macroquad::input::{show_mouse, KeyCode};
 use macroquad::material::Material;
 use macroquad::window::{clear_background, screen_height, screen_width};
-use rand::prelude::*;
 
 use super::Game;
 use crate::app::game_context::GameContext;
@@ -120,7 +119,7 @@ impl SnakeDemo {
                     SpawnPolicy::None,
                     GameMode::Classic,
                 ),
-                rng: thread_rng(),
+                rng: rand::rng(),
             },
             palettes,
             current_palette: 0,
@@ -624,10 +623,10 @@ impl Screen for StartScreen {
             .map(|(seed, demo)| {
                 let mut seed = seed.clone().palette(demo.palette()).starvation(mode.starvation());
                 // a single player uses whichever keys the preferences pick
-                if players == 1 {
-                    if let Some(Template::Keyboard { side, .. }) = &mut seed.controller {
-                        *side = None;
-                    }
+                if players == 1
+                    && let Some(Template::Keyboard { side, .. }) = &mut seed.controller
+                {
+                    *side = None;
                 }
                 seed
             })

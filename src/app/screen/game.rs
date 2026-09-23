@@ -7,7 +7,6 @@ use macroquad::color::Color;
 use macroquad::input::{mouse_position, show_mouse, KeyCode};
 use macroquad::material::Material;
 use macroquad::window::clear_background;
-use rand::prelude::*;
 
 use crate::app::border_hints::BorderHints;
 use crate::app::distance_grid::DistanceGrid;
@@ -122,7 +121,7 @@ impl Game {
                     apple_spawn_policy,
                     mode,
                 ),
-                rng: thread_rng(),
+                rng: rand::rng(),
             },
             fps_control: FpsControl::new(),
 

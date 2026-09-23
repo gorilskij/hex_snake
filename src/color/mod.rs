@@ -15,10 +15,6 @@ pub const WHITE: Color = Color::new(1., 1., 1., 1.);
 pub const BLACK: Color = Color::new(0., 0., 0., 1.);
 pub const RED: Color = Color::new(1., 0., 0., 1.);
 pub const GREEN: Color = Color::new(0., 1., 0., 1.);
-pub const BLUE: Color = Color::new(0., 0., 1., 1.);
-pub const YELLOW: Color = Color::new(1., 1., 0., 1.);
-pub const MAGENTA: Color = Color::new(1., 0., 1., 1.);
-pub const TRANSPARENT: Color = Color::new(0., 0., 0., 0.);
 
 pub fn lerp(a: Color, b: Color, t: f32) -> Color {
     Color::from_vec(a.to_vec() * (1.0 - t) + b.to_vec() * t)
