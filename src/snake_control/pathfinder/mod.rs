@@ -2,7 +2,7 @@ mod space_filling;
 mod weighted_bfs;
 mod with_backup;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use space_filling::SpaceFilling;
 use weighted_bfs::WeightedBFS;
@@ -133,6 +133,29 @@ impl Template {
             }),
         }
     }
+}
+
+/// Every cell reachable from `start` without running into anything (`start`
+/// included), and the blocked cells walling them in.
+pub fn surroundings(
+    start: HexPoint,
+    board_dim: HexDim,
+    blocks: impl Fn(HexPoint) -> bool,
+) -> (HashSet<HexPoint>, HashSet<HexPoint>) {
+    let mut region = HashSet::from([start]);
+    let mut walls = HashSet::new();
+    let mut stack = vec![start];
+    while let Some(pos) = stack.pop() {
+        for dir in Dir::iter() {
+            let next = pos.wrapping_translate(dir, 1, board_dim);
+            if blocks(next) {
+                walls.insert(next);
+            } else if region.insert(next) {
+                stack.push(next);
+            }
+        }
+    }
+    (region, walls)
 }
 
 /// What a segment means to a head entering its cell, in increasing order of

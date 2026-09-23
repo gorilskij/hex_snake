@@ -180,6 +180,7 @@ impl Template {
                 pathfinder: pathfinder.into_pathfinder(),
                 targets,
                 plan: None,
+                opening: None,
             }),
             Template::Rain => Box::new(Rain),
         }

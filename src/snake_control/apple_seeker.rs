@@ -1,10 +1,12 @@
+use std::collections::HashSet;
+
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
 use crate::snake::SegmentType;
-use crate::snake_control::pathfinder::{Committed, Leg, Obstacle, Obstacles, Path, PathFinder, Plan};
+use crate::snake_control::pathfinder::{surroundings, Committed, Leg, Obstacle, Obstacles, Path, PathFinder, Plan};
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
@@ -20,11 +22,48 @@ const MAX_TARGETS: usize = 8;
 /// the route already committed to never moves. Only something actually going
 /// wrong — the board resizing, an obstacle appearing, a target vanishing,
 /// straying off the path — throws any of it away.
+///
+/// A fallback (the survival crawl, when no target can be reached) is walked
+/// the same way, and only given up for a real plan once one may be possible
+/// (see [`Opening`]).
 pub struct AppleSeeker {
     pub pathfinder: Box<dyn PathFinder + Send + Sync>,
     /// How many targets to plan ahead for.
     pub targets: usize,
     pub plan: Option<Plan>,
+    /// While the plan is a fallback, what would make a target reachable.
+    pub opening: Option<Opening>,
+}
+
+/// Where the snake could go when it fell back to crawling: no target could be
+/// reached, so one only can be once a cell walling it in frees up, or an apple
+/// appears in the part of the board it can reach.
+pub struct Opening {
+    region: HashSet<HexPoint>,
+    walls: HashSet<HexPoint>,
+    /// Apples already in the region, which it couldn't get to anyway (facing
+    /// the wrong way, say): only a new one is worth another try.
+    apples: HashSet<HexPoint>,
+}
+
+impl Opening {
+    fn new(head: HexPoint, apples: &[Apple], board_dim: HexDim, blocks: impl Fn(HexPoint) -> bool) -> Self {
+        let (region, walls) = surroundings(head, board_dim, blocks);
+        let apples = apples
+            .iter()
+            .map(|apple| apple.pos)
+            .filter(|pos| region.contains(pos))
+            .collect();
+        Self { region, walls, apples }
+    }
+
+    /// Whether a target may have become reachable since.
+    fn opened(&self, apples: &[Apple], blocks: impl Fn(HexPoint) -> bool) -> bool {
+        self.walls.iter().any(|&wall| !blocks(wall))
+            || apples
+                .iter()
+                .any(|apple| self.region.contains(&apple.pos) && !self.apples.contains(&apple.pos))
+    }
 }
 
 impl AppleSeeker {
@@ -42,14 +81,16 @@ impl AppleSeeker {
         // keep whatever is still true
         if let Some(plan) = &mut self.plan {
             let obstacles = Obstacles::new(body, knowledge, other_snakes);
-            // TODO: a fallback plan is thrown away every tick, so the survival
-            //  crawl is recomputed every tick while the snake is stuck. It
-            //  should instead be kept and walked while only the main finder is
-            //  retried, which needs the pathfinders to hold state (`&mut self`).
-            let mut keep = plan.board_dim == gtx.board_dim && !plan.is_fallback() && follow(plan, head);
+            let mut keep = plan.board_dim == gtx.board_dim && follow(plan, head);
             if keep {
                 drop_spent_legs(plan);
                 keep = connects(plan, gtx.board_dim) && !blocked_ahead(plan, &obstacles);
+            }
+            if keep && plan.is_fallback() {
+                keep = self
+                    .opening
+                    .as_ref()
+                    .is_some_and(|opening| !opening.opened(apples, |pos| obstacles.blocks(pos)));
             }
             if keep {
                 // a target someone else ate (or one that expired) ends the plan
@@ -72,7 +113,8 @@ impl AppleSeeker {
             legs: vec![],
             board_dim: gtx.board_dim,
         });
-        while plan.legs.len() < self.targets {
+        // a fallback goes nowhere in particular, so there is nothing to extend
+        while !plan.is_fallback() && plan.legs.len() < self.targets {
             // each leg starts where the previous one ends, the first at the head
             let start = match plan.legs.last() {
                 Some(leg) => match leg.arrival(gtx.board_dim) {
@@ -97,10 +139,12 @@ impl AppleSeeker {
                 // A leg going nowhere in particular is as far as planning goes,
                 // and only worth having at all when there is nothing else: tack
                 // it onto a good plan and the whole plan counts as a fallback,
-                // to be thrown away and redone on the next tick.
+                // walked only until a real plan may be possible.
                 Some(leg) if leg.target.is_none() => {
                     if plan.legs.is_empty() {
                         plan.legs.push(leg);
+                        let obstacles = Obstacles::new(body, knowledge, other_snakes);
+                        self.opening = Some(Opening::new(head, apples, gtx.board_dim, |pos| obstacles.blocks(pos)));
                     }
                     break;
                 }
@@ -112,6 +156,9 @@ impl AppleSeeker {
         if plan.legs.is_empty() {
             println!("failed to find path");
             println!("apples: {}", apples.len());
+        }
+        if !plan.is_fallback() {
+            self.opening = None;
         }
         self.plan = (!plan.legs.is_empty()).then_some(plan);
     }
@@ -267,6 +314,7 @@ impl Controller for AppleSeeker {
 
     fn reset(&mut self, _dir: Dir) {
         self.plan = None;
+        self.opening = None;
     }
 }
 
@@ -339,6 +387,38 @@ mod tests {
         let legs = route.legs.len();
         promote_apples_on_route(&mut route, &[apple(2), apple(5), apple(8)]);
         assert_eq!(route.legs.len(), legs, "targets are not promoted twice");
+    }
+
+    /// A pocket of cells along a row, walled in by everything else.
+    fn pocket(cells: std::ops::RangeInclusive<isize>) -> HashSet<HexPoint> {
+        cells.map(cell).collect()
+    }
+
+    #[test]
+    fn a_crawl_is_kept_while_the_pocket_stays_shut() {
+        let open = pocket(0..=4);
+        let opening = Opening::new(cell(2), &[], BOARD, |pos| !open.contains(&pos));
+        assert!(!opening.opened(&[], |pos| !open.contains(&pos)));
+        // an apple outside the pocket is still out of reach
+        assert!(!opening.opened(&[apple(8)], |pos| !open.contains(&pos)));
+    }
+
+    #[test]
+    fn a_wall_freeing_up_is_worth_another_try() {
+        let open = pocket(0..=4);
+        let opening = Opening::new(cell(2), &[], BOARD, |pos| !open.contains(&pos));
+        let wider = pocket(0..=5);
+        assert!(opening.opened(&[], |pos| !wider.contains(&pos)));
+    }
+
+    #[test]
+    fn only_a_new_apple_in_the_pocket_is_worth_another_try() {
+        let open = pocket(0..=4);
+        let blocks = |pos| !open.contains(&pos);
+        // there already, and it couldn't be reached then
+        let opening = Opening::new(cell(2), &[apple(4)], BOARD, blocks);
+        assert!(!opening.opened(&[apple(4)], blocks));
+        assert!(opening.opened(&[apple(4), apple(1)], blocks));
     }
 
     /// The route is in the way of whatever is planned after it, except where it

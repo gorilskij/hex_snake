@@ -132,7 +132,10 @@ what the layout types — see below), then `next_frame().await`.
   the plan off the front and a new leg is appended at the back as targets are
   eaten, so the committed part of the route never moves. `Leg::target` is
   `None` for the survival crawl, which is what makes a plan a fallback (and is
-  only ever accepted as a plan's only leg). The route is an obstacle to its own
+  only ever accepted as a plan's only leg). The crawl is up to 20 cells, each
+  step into the free neighbour with the most room behind it; it is walked, not
+  recomputed, until an `Opening` says a target may be reachable: a blocked cell
+  walling in the reachable area frees up, or a new apple appears inside it. The route is an obstacle to its own
   later legs — cells it uses are `Blocked`, except targets, which will hold an
   eaten segment and are `Passable` when the snake's own eat mechanics say it
   can pass through one. An apple that appears **on** the route is promoted to a
@@ -429,9 +432,6 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
   freezes at `hunger::MIN_LENGTH`, `State::Starved`); a backing-up tail only goes
   straight (no obstacle avoidance).
-- **Perf:** LUT texture is recreated every frame per snake — switch to in-place
-  `Texture2D::update` when size is unchanged. Consider a single draw call for all
-  snakes via a LUT atlas + per-vertex snake index.
 - **Cross-snake z-ordering:** shaded snakes are drawn per-snake in sequence, so
   the old global z-index interleaving across *different* snakes is not preserved
   (fine for the single-player game; revisit for multi-snake).
@@ -444,10 +444,7 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   (`snake_control/pathfinder/weighted_bfs.rs`) is Dijkstra (`h = 0`); a
   *landmark* heuristic (this same search run backwards from each target) would
   make it A* — a closed-form hex distance can't work, since `wrap_around` isn't
-  a lattice translation. And a fallback plan (the survival crawl, a leg with no
-  target) is thrown away every tick, so it is recomputed every tick while the
-  snake is stuck; it should be kept and walked while only the main finder is
-  retried, which needs `PathFinder` to hold state (`&mut self`).
+  a lattice translation.
 - **Bad (shrink) apples, follow-ups:** the autopilot targets every apple
   (`view/targets.rs`) — it should only seek good apples and avoid bad ones; border
   hints report every apple as `Outcome::Apple` (green) — bad apples need their own
