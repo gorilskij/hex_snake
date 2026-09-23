@@ -420,6 +420,8 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   Reimplement as a hole opening/closing at the pinned end with the snake fading
   to black as it enters/leaves. Collision graphics (a crash effect) are a
   similar localized effect and want a shared approach.
+- **Head-to-head collisions:** the further snake should win. Today a snake
+  that would cut another's head kills both (`snake_management.rs`).
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
   freezes at `hunger::MIN_LENGTH`, `State::Starved`); a backing-up tail only goes
   straight (no obstacle avoidance).

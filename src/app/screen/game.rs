@@ -78,6 +78,25 @@ pub struct Game {
     last_mouse: (f32, f32),
 }
 
+/// Where the snakes without a spawn point of their own start: side by side
+/// across the middle of the board, facing alternately up and down.
+fn spawn_points(count: usize, board_dim: HexDim) -> impl Iterator<Item = (HexPoint, Dir)> {
+    const DISTANCE_BETWEEN_SNAKES: isize = 1;
+
+    let total_width = count.saturating_sub(1) as isize * DISTANCE_BETWEEN_SNAKES + 1;
+    assert!(total_width < board_dim.h, "snakes spread too wide");
+    let first = board_dim.h / 2 - total_width / 2;
+
+    (0..count as isize).map(move |i| {
+        let pos = HexPoint {
+            h: first + i * DISTANCE_BETWEEN_SNAKES,
+            v: board_dim.v / 2,
+        };
+        let dir = if i % 2 == 0 { Dir::U } else { Dir::D };
+        (pos, dir)
+    })
+}
+
 impl Game {
     pub fn new(
         cell_dim: CellDim,
@@ -204,52 +223,19 @@ impl Game {
             .iter()
             .filter(|seed| !matches!(seed.snake_type, Some(snake::Type::Simulated)))
             .count();
+        let mut spawn_points = spawn_points(unpositioned, env.gtx.board_dim);
 
-        // TODO: clean this mess
-        let mut unpositioned_dir = Dir::U;
-        let mut unpositioned_h_pos: Box<dyn Iterator<Item = isize>> = if unpositioned > 0 {
-            const DISTANCE_BETWEEN_SNAKES: isize = 1;
-
-            let total_width = (unpositioned - 1) as isize * DISTANCE_BETWEEN_SNAKES + 1;
-            assert!(total_width < env.gtx.board_dim.h, "snakes spread too wide");
-
-            let half = total_width / 2;
-            let middle = env.gtx.board_dim.h / 2;
-            let start = middle - half;
-            let end = start + total_width - 1;
-
-            Box::new((start..=end).step_by(DISTANCE_BETWEEN_SNAKES as usize))
-        } else {
-            Box::new(std::iter::empty())
-        };
-
-        for seed in self.seeds.iter() {
-            match seed.snake_type {
-                Some(snake::Type::Simulated) => {
-                    // expected to have initial position, direction, and length
-                    env.snakes.push(seed.build().unwrap());
-                }
+        for seed in &self.seeds {
+            let snake = match seed.snake_type {
+                // expected to have initial position, direction, and length
+                Some(snake::Type::Simulated) => seed.build(),
                 _ => {
-                    env.snakes.push(
-                        seed.clone()
-                            .pos(HexPoint {
-                                h: unpositioned_h_pos.next().unwrap(),
-                                v: env.gtx.board_dim.v / 2,
-                            })
-                            .dir(unpositioned_dir)
-                            .len(10)
-                            .build()
-                            .unwrap(),
-                    );
-
-                    // alternate
-                    unpositioned_dir = -unpositioned_dir;
+                    let (pos, dir) = spawn_points.next().expect("one spawn point per unpositioned seed");
+                    seed.clone().pos(pos).dir(dir).len(10).build()
                 }
-            }
+            };
+            env.snakes.push(snake.unwrap());
         }
-
-        let left = unpositioned_h_pos.count();
-        assert_eq!(left, 0, "unexpected iterator length");
 
         // the freshly built snakes start from their seeds, which don't know
         // the autopilot was turned on
@@ -843,5 +829,42 @@ impl Screen for Game {
         let HexDim { h, v } = self.env.gtx.board_dim;
         self.display_notification(format!("{h}x{v}"));
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_lone_snake_starts_in_the_middle_facing_up() {
+        let board_dim = HexDim { h: 20, v: 10 };
+        let points: Vec<_> = spawn_points(1, board_dim).collect();
+        assert_eq!(points, [(HexPoint { h: 10, v: 5 }, Dir::U)]);
+    }
+
+    #[test]
+    fn snakes_stand_side_by_side_around_the_middle_facing_alternately() {
+        let board_dim = HexDim { h: 20, v: 10 };
+        let points: Vec<_> = spawn_points(3, board_dim).collect();
+        assert_eq!(
+            points,
+            [
+                (HexPoint { h: 9, v: 5 }, Dir::U),
+                (HexPoint { h: 10, v: 5 }, Dir::D),
+                (HexPoint { h: 11, v: 5 }, Dir::U),
+            ]
+        );
+    }
+
+    #[test]
+    fn no_snakes_need_no_spawn_points() {
+        assert_eq!(spawn_points(0, HexDim { h: 20, v: 10 }).count(), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "snakes spread too wide")]
+    fn snakes_wider_than_the_board_are_refused() {
+        spawn_points(20, HexDim { h: 20, v: 10 }).count();
     }
 }
