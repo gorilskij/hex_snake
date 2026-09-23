@@ -66,7 +66,7 @@ varying float along;
 uniform sampler2D Texture;
 const float AMBIENT = 0.45;
 const float DIFFUSE = 0.55;
-const float SPECULAR = 0.3;
+const float SPECULAR = 0.2;
 const float SHININESS = 24.0;
 void main() {
     float u = clamp(uv.x, seg_bounds.x, seg_bounds.y);
