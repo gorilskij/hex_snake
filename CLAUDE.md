@@ -13,6 +13,8 @@ single backend: **macroquad**.
 > is implemented and picked on the start screen. Most
 > recently (`menus` branch, merged): a start screen, in-game menus and
 > rebindable, layout-aware controls — see [Screens & menus](#screens--menus).
+> In progress (`graphics-updates` branch, paused): lighting the snake as a
+> round tube with pill-shaped ends — see [Snake coloring](#snake-coloring-shader-based).
 
 ## Build / run / test
 
@@ -457,9 +459,14 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   similar localized effect and want a shared approach.
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
   freezes at `hunger::MIN_LENGTH`, `State::Starved`).
-- **Snake lighting follow-ups:** a light from a fixed direction on screen
-  (off-center highlight; needs each vertex's across direction), passability
-  marks as part of the tube instead of a flat overlay, and the hexagon style.
+- **Snake lighting follow-ups** (`graphics-updates`, paused): the first pass
+  (light straight from above) is in but **untuned and not yet looked at**:
+  the four constants at the top of the fragment shader were picked by
+  reasoning, not by eye. Then: a light from a fixed direction on screen
+  (off-center highlight; needs each vertex's across direction — the vertex
+  color is free for it), passability marks as part of the tube instead of a
+  flat 2D overlay (they'd take the body's `uv.y` where they sit), and the
+  hexagon style (flat for now, `uv.y` fixed at 0.5).
 - **Perf, more generally:** each frame rebuilds the snake mesh and the border
   hints; worth trimming if frame work ever matters (it measured ≤ 2 ms in a
   release wasm build at 120 Hz).
