@@ -186,7 +186,9 @@ fn outcome_for(snake: &Snake, other: &Snake, itself: bool, segment_index: usize,
     };
     match behavior {
         Crash | Die => Outcome::Crash,
-        // cutting another snake at its head kills both
+        // cutting a snake at its head kills the cutter, unless it is further
+        // through the cell (see `handle_snake_collisions`), which entering a
+        // cell never is
         Cut if !itself && segment_index == 0 => Outcome::Crash,
         Cut => Outcome::Cut,
         PassUnder | PassOver => Outcome::Pass,
@@ -257,79 +259,93 @@ pub fn handle_apple_collisions<Rng: rand::Rng>(
     spawn_snakes
 }
 
+/// Two living heads within this much of a cell of each other's progress
+/// through their cells when they meet both lose; otherwise the one further
+/// through its cell wins.
+const HEAD_ON_TIE: f32 = 0.15;
+
 /// Resolve every snake-snake and self collision via the snakes' eat mechanics.
 /// Returns whether a snake crashed and ended the game.
+///
+/// Two living snakes meeting head to head are settled as a pair (see
+/// [`HEAD_ON_TIE`]): the winner carries on as if nothing happened and each
+/// loser suffers what its eat mechanics say about the other's head. The
+/// pair's mirror collision, if there is one, is then skipped.
 #[must_use]
 pub fn handle_snake_collisions<Rng>(env: &mut Environment<Rng>, collisions: &[Collision]) -> bool {
-    use EatBehavior::*;
-
     let snakes = &mut env.snakes;
     let mut game_over = false;
+    // as they were when they met, not as the pair's first half left them
+    let living: Vec<bool> = snakes.iter().map(|snake| snake.state == State::Living).collect();
+    let mut head_ons = HashSet::new();
     for collision in collisions.iter().copied() {
         match collision {
             Collision::Apple { .. } => {}
             Collision::Snake {
                 snake1_index,
                 snake2_index,
-                snake2_segment_index,
-            } => {
-                let snake1 = &snakes[snake1_index];
-                let snake2 = &snakes[snake2_index];
-                let snake2_type = snake2.snake_type;
-                let snake2_segment_type = snake2.body.segments[snake2_segment_index].segment_type;
-                let behavior = snake1.eat_mechanics.eat_other(snake2_type, snake2_segment_type);
-
-                match behavior {
-                    Cut => {
-                        // if it's a head-head collision, both snakes die
-                        if snake2_segment_index == 0 {
-                            snakes[snake1_index].die();
-                            snakes[snake2_index].die();
-                        } else {
-                            snakes[snake2_index].cut_at(snake2_segment_index)
-                        }
-                    }
-                    Crash => {
-                        snakes[snake1_index].crash();
-                        game_over = true;
-                    }
-                    Die => snakes[snake1_index].die(),
-                    PassUnder => {
-                        snakes[snake1_index].body.segments[0].z_index =
-                            snakes[snake2_index].body.segments[snake2_segment_index].z_index - 1
-                    }
-                    PassOver => {
-                        snakes[snake1_index].body.segments[0].z_index =
-                            snakes[snake2_index].body.segments[snake2_segment_index].z_index + 1
-                    }
+                snake2_segment_index: 0,
+            } if living[snake2_index] => {
+                let pair = (snake1_index.min(snake2_index), snake1_index.max(snake2_index));
+                if !head_ons.insert(pair) {
+                    continue;
+                }
+                let lead = snakes[snake1_index].body.head_fraction - snakes[snake2_index].body.head_fraction;
+                let losers = if lead.abs() <= HEAD_ON_TIE {
+                    [Some((snake1_index, snake2_index)), Some((snake2_index, snake1_index))]
+                } else if lead > 0. {
+                    [Some((snake2_index, snake1_index)), None]
+                } else {
+                    [Some((snake1_index, snake2_index)), None]
+                };
+                for (loser, other) in losers.into_iter().flatten() {
+                    game_over |= run_into(snakes, loser, other, 0);
                 }
             }
+            Collision::Snake {
+                snake1_index,
+                snake2_index,
+                snake2_segment_index,
+            } => game_over |= run_into(snakes, snake1_index, snake2_index, snake2_segment_index),
             Collision::Itself { snake_index, snake_segment_index } => {
-                let snake = &snakes[snake_index];
-                let segment_type = snake.body.segments[snake_segment_index].segment_type;
-                let behavior = snake.eat_mechanics.eat_self(segment_type);
-                match behavior {
-                    Cut => snakes[snake_index].cut_at(snake_segment_index),
-                    Crash => {
-                        snakes[snake_index].crash();
-                        game_over = true;
-                    }
-                    Die => snakes[snake_index].die(),
-                    PassUnder => {
-                        snakes[snake_index].body.segments[0].z_index =
-                            snakes[snake_index].body.segments[snake_segment_index].z_index - 1
-                    }
-                    PassOver => {
-                        snakes[snake_index].body.segments[0].z_index =
-                            snakes[snake_index].body.segments[snake_segment_index].z_index + 1
-                    }
-                }
+                game_over |= run_into(snakes, snake_index, snake_index, snake_segment_index)
             }
             Collision::Portal(_behavior) => todo!(),
         }
     }
 
     game_over
+}
+
+/// Apply what `snakes[snake_index]`'s eat mechanics say about running into
+/// segment `segment_index` of `snakes[other_index]` (itself when the indices
+/// are equal). Returns whether it crashed and ended the game.
+fn run_into(snakes: &mut [Snake], snake_index: usize, other_index: usize, segment_index: usize) -> bool {
+    use EatBehavior::*;
+
+    let snake = &snakes[snake_index];
+    let other = &snakes[other_index];
+    let segment = &other.body.segments[segment_index];
+    let behavior = if snake_index == other_index {
+        snake.eat_mechanics.eat_self(segment.segment_type)
+    } else {
+        snake.eat_mechanics.eat_other(other.snake_type, segment.segment_type)
+    };
+    let z_index = segment.z_index;
+
+    match behavior {
+        // cutting a snake at its head would leave nothing of it
+        Cut if segment_index == 0 => snakes[snake_index].die(),
+        Cut => snakes[other_index].cut_at(segment_index),
+        Crash => {
+            snakes[snake_index].crash();
+            return true;
+        }
+        Die => snakes[snake_index].die(),
+        PassUnder => snakes[snake_index].body.segments[0].z_index = z_index - 1,
+        PassOver => snakes[snake_index].body.segments[0].z_index = z_index + 1,
+    }
+    false
 }
 
 pub fn spawn_snakes(env: &mut Environment, snake_builders: Vec<SnakeBuilder>) -> Result<()> {
@@ -483,4 +499,98 @@ pub fn relocate_covered_apples<Rng: rand::Rng>(env: &mut Environment<Rng>) {
         }
     }
     env.remove_apples(no_room);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::game_context::GameContext;
+    use crate::app::prefs::Prefs;
+    use crate::apple::spawn::SpawnPolicy;
+    use crate::basic::{CellDim, HexDim};
+
+    const BOARD: HexDim = HexDim { h: 20, v: 20 };
+    const MEETING: HexPoint = HexPoint { h: 10, v: 10 };
+
+    /// Two snakes whose heads share a cell, coming from opposite sides, with
+    /// the given progress through it. Cell-based collisions, so only the
+    /// cells decide who touches whom.
+    fn head_on(behavior: EatBehavior, fractions: [f32; 2]) -> Environment<()> {
+        let snakes = [Dir::U, Dir::D]
+            .into_iter()
+            .zip(fractions)
+            .map(|(dir, fraction)| {
+                let mut snake = SnakeBuilder::default()
+                    .snake_type(snake::Type::Competitor { life: None })
+                    .eat_mechanics(EatMechanics::always(behavior))
+                    .palette(snake::PaletteTemplate::rainbow())
+                    .controller(snake_control::Template::Programmed(vec![]))
+                    .pos(MEETING)
+                    .dir(dir)
+                    .len(3)
+                    .speed(1.)
+                    .build()
+                    .unwrap();
+                snake.body.head_fraction = fraction;
+                snake
+            })
+            .collect();
+
+        let mut prefs = Prefs::default();
+        prefs.draw_style = rendering::Style::Hexagon;
+        Environment {
+            snakes,
+            apples: vec![],
+            portals: vec![],
+            gtx: GameContext::new(
+                BOARD,
+                CellDim::from(10.),
+                crate::app::Palette::dark(),
+                prefs,
+                SpawnPolicy::None,
+                GameMode::Classic,
+            ),
+            rng: (),
+        }
+    }
+
+    fn collide(env: &mut Environment<()>) -> ([State; 2], bool) {
+        let collisions = find_collisions(env);
+        let game_over = handle_snake_collisions(env, &collisions);
+        ([env.snakes[0].state, env.snakes[1].state], game_over)
+    }
+
+    #[test]
+    fn the_snake_further_through_the_cell_wins() {
+        let mut env = head_on(EatBehavior::Crash, [0.6, 0.2]);
+        assert_eq!(collide(&mut env), ([State::Living, State::Crashed], true));
+
+        let mut env = head_on(EatBehavior::Crash, [0.2, 0.6]);
+        assert_eq!(collide(&mut env), ([State::Crashed, State::Living], true));
+    }
+
+    #[test]
+    fn heads_about_as_far_through_both_lose() {
+        let mut env = head_on(EatBehavior::Crash, [0.5, 0.4]);
+        assert_eq!(collide(&mut env), ([State::Crashed, State::Crashed], true));
+
+        let mut env = head_on(EatBehavior::Crash, [0.3, 0.45]);
+        assert_eq!(collide(&mut env), ([State::Crashed, State::Crashed], true));
+    }
+
+    #[test]
+    fn a_loser_suffers_its_own_eat_mechanics() {
+        let mut env = head_on(EatBehavior::Die, [0.6, 0.2]);
+        assert_eq!(collide(&mut env), ([State::Living, State::Dying], false));
+
+        // a head can't be cut off, so cutting one kills the cutter
+        let mut env = head_on(EatBehavior::Cut, [0.2, 0.6]);
+        assert_eq!(collide(&mut env), ([State::Dying, State::Living], false));
+    }
+
+    #[test]
+    fn snakes_that_pass_each_other_are_untouched() {
+        let mut env = head_on(EatBehavior::PassOver, [0.5, 0.45]);
+        assert_eq!(collide(&mut env), ([State::Living, State::Living], false));
+    }
 }

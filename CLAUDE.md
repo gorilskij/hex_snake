@@ -96,8 +96,8 @@ what the layout types — see below), then `next_frame().await`.
     constants; `main.rs`'s `GAME_MODE` picks one, no selection UI yet),
     `prefs.rs` (`Prefs`, saved on every change: display settings, key
     bindings, single-player side; default draw_style = Smooth, grid+border on),
-    `stats.rs` (the stats overlay: polygons built this frame + the player's
-    exact `length`), `message.rs` (text overlays, multi-line, optionally on a
+    `stats.rs` (the stats overlay: polygons drawn this frame, counted by
+    each `Mesh`, + the player's exact `length`), `message.rs` (text overlays, multi-line, optionally on a
     dimmed box), `palette.rs` (board/bg
     colors, distinct from snake palette), `snake_management.rs` (advance, spawn,
     collisions — see [Collision](#collision-appsnake_managementrs) — and
@@ -114,8 +114,8 @@ what the layout types — see below), then `next_frame().await`.
     against the board's zigzag edge and slides along it. `HintStyle`, cycled from the
     options menu), `distance_grid.rs`,
     `portal/`, `board_dim.rs`.
-  - `screen/{snake_control_creator_screen,debug_scenario}.rs` — **out of the
-    module tree** (not compiled).
+  - `screen/snake_control_creator_screen.rs` — **out of the module tree**
+    (not compiled).
 - **`snake/`** — snake model. `mod.rs` (`Snake`, `Body`, `Segment`,
   `SegmentType`; the float-length model — see [Snake length model](#snake-length-model-snakemodrs)),
   `builder.rs`, `eat_mechanics.rs`, **`palette.rs`** (snake coloring: `Palette`
@@ -341,6 +341,12 @@ the ribbon is continuous and the head also touches that segment's `Normal`
 neighbours. The hexagon style stays purely cell-based: segments fill their cell,
 so there cells *are* the shape.
 
+**Head to head**, two living snakes are settled as a pair: the one further
+through its cell wins and carries on untouched, unless their `head_fraction`s
+are within `HEAD_ON_TIE` (0.15), in which case both lose. A loser suffers what
+its own eat mechanics say about the other's head (the player crashes, AI
+snakes die; cutting a head kills the cutter).
+
 The smooth ribbon has **constant width `side`**: a straight segment spans
 `x ∈ [cos, cos+side]`, and a turn's cross-sections are radial with
 `outer_radius - inner_radius == side` for every sharpness (a sharp turn is the
@@ -420,8 +426,6 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   Reimplement as a hole opening/closing at the pinned end with the snake fading
   to black as it enters/leaves. Collision graphics (a crash effect) are a
   similar localized effect and want a shared approach.
-- **Head-to-head collisions:** the further snake should win. Today a snake
-  that would cut another's head kills both (`snake_management.rs`).
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
   freezes at `hunger::MIN_LENGTH`, `State::Starved`); a backing-up tail only goes
   straight (no obstacle avoidance).
