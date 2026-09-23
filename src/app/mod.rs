@@ -1,7 +1,7 @@
 pub use palette::Palette;
 
 mod border_hints;
-mod distance_grid;
+pub(crate) mod distance_grid;
 pub(crate) mod fps_control;
 pub mod game_context;
 pub mod game_mode;

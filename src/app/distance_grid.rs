@@ -1,21 +1,15 @@
-use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use itertools::Itertools;
-use macroquad::color::Color;
 
-use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::color::lerp;
-use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
 use crate::snake_control::pathfinder::Obstacles;
-use crate::support::mesh::{build_polygon, DrawMode, Mesh};
 use crate::view::snakes::Snakes;
 
-type Distance = f32;
+pub type Distance = f32;
 type GridData = HashMap<HexPoint, Distance>;
 
 struct Iter {
@@ -102,51 +96,6 @@ fn find_distances(player_snake: &Snake, other_snakes: impl Snakes, board_dim: He
     .collect()
 }
 
-/// `fade` runs from 0 (show the first distance of each triple) to 1 (the
-/// second).
-fn generate_mesh(
-    iter: impl Iterator<Item = (HexPoint, Distance, Option<Distance>)>,
-    fade: f32,
-    gtx: &GameContext,
-) -> Mesh {
-    // not actually max distance but a good estimate, anything
-    // higher gets the same color
-    let max_dist = max(gtx.board_dim.h, gtx.board_dim.v) as f64;
-
-    let parts = iter.map(|(pos, dist_a, dist_b)| {
-        const ALPHA: f32 = 0.3;
-        const CLOSEST_COLOR: Color = Color::from_rgba(51, 204, 51, 255).with_alpha(ALPHA);
-        const MIDWAY_COLOR: Color = Color::from_rgba(255, 255, 0, 255).with_alpha(ALPHA);
-        const FARTHEST_COLOR: Color = Color::from_rgba(204, 0, 0, 255).with_alpha(ALPHA);
-
-        let calculate_color = |dist: Distance| -> Color {
-            let mut ratio = dist as f64 / max_dist;
-            if ratio > 1.0 {
-                ratio = 1.0
-            }
-            if ratio < 0.5 {
-                let ratio = ratio * 2.0;
-                lerp(CLOSEST_COLOR, MIDWAY_COLOR, ratio as f32)
-            } else {
-                let ratio = ratio * 2.0 - 1.0;
-                lerp(MIDWAY_COLOR, FARTHEST_COLOR, ratio as f32)
-            }
-        };
-
-        let color_a = calculate_color(dist_a);
-        let color_b = match dist_b {
-            None => crate::color::BLACK,
-            Some(d) => calculate_color(d),
-        };
-
-        let color = lerp(color_a, color_b, fade);
-
-        let hexagon = Hexagon::new(gtx.cell_dim).translate(pos.to_cartesian(gtx.cell_dim));
-        build_polygon(DrawMode::fill(), &hexagon, color)
-    });
-    Mesh::combine(parts)
-}
-
 pub struct DistanceGrid {
     last: Option<GridData>,
     current: Option<GridData>,
@@ -163,38 +112,77 @@ impl DistanceGrid {
         }
     }
 
-    // TODO: move to rendering module
-    pub fn mesh(&mut self, player_snake: &Snake, other_snakes: impl Snakes, gtx: &GameContext) -> Mesh {
-        // Distances are measured from the head's cell, so they only change when
-        // the head reaches a new one. In between, the colors fade from the
-        // previous map to the new one as the head crosses its cell.
+    /// Distances are measured from the head's cell, so they only change when
+    /// the head reaches a new one; in between, they fade from the previous map
+    /// to the new one as the head crosses its cell (see [`Self::cells`]).
+    pub fn update(&mut self, player_snake: &Snake, other_snakes: impl Snakes, board_dim: HexDim) {
         let head = player_snake.head().pos;
         if self.current.is_none() || self.measured_from != Some(head) {
             self.measured_from = Some(head);
-            self.last = self
-                .current
-                .replace(find_distances(player_snake, other_snakes, gtx.board_dim));
+            self.last = self.current.replace(find_distances(player_snake, other_snakes, board_dim));
         }
-        let current = self.current.as_ref().expect("measured just above");
-        let fade = player_snake.body.head_fraction;
+    }
 
-        match &self.last {
-            None => {
-                // TODO: this is a terrible hack, rewrite this
-                generate_mesh(current.iter().map(|(pos, dist)| (*pos, *dist, Some(*dist))), fade, gtx)
-            }
-            Some(last) => {
-                let iter = last.iter().map(|(pos, &dist_a)| {
-                    let dist_b = current.get(pos).copied();
-                    (*pos, dist_a, dist_b)
-                });
-                generate_mesh(iter, fade, gtx)
-            }
-        }
+    /// Every cell with a distance in the previous map or the current one, as
+    /// `(cell, previous distance, current distance)`. Without a previous map
+    /// the current one stands in for it, so nothing fades.
+    pub fn cells(&self) -> impl Iterator<Item = (HexPoint, Option<Distance>, Option<Distance>)> + '_ {
+        let current = self.current.as_ref();
+        let last = self.last.as_ref().or(current);
+        let before = last
+            .into_iter()
+            .flatten()
+            .map(move |(pos, &dist)| (*pos, Some(dist), current.and_then(|current| current.get(pos).copied())));
+        let new = current
+            .into_iter()
+            .flatten()
+            .filter(move |(pos, _)| !last.is_some_and(|last| last.contains_key(pos)))
+            .map(|(pos, &dist)| (*pos, None, Some(dist)));
+        before.chain(new)
     }
 
     pub fn invalidate(&mut self) {
         self.last = None;
         self.current = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cell(h: isize) -> HexPoint {
+        HexPoint { h, v: 0 }
+    }
+
+    fn sorted_cells(grid: &DistanceGrid) -> Vec<(HexPoint, Option<Distance>, Option<Distance>)> {
+        grid.cells().sorted_by_key(|(pos, _, _)| *pos).collect()
+    }
+
+    #[test]
+    fn cells_in_either_map_fade_in_or_out() {
+        let grid = DistanceGrid {
+            last: Some(HashMap::from([(cell(0), 1.), (cell(1), 2.)])),
+            current: Some(HashMap::from([(cell(1), 3.), (cell(2), 4.)])),
+            measured_from: None,
+        };
+        assert_eq!(
+            sorted_cells(&grid),
+            [
+                (cell(0), Some(1.), None),
+                (cell(1), Some(2.), Some(3.)),
+                (cell(2), None, Some(4.)),
+            ]
+        );
+    }
+
+    #[test]
+    fn without_a_previous_map_nothing_fades() {
+        let grid = DistanceGrid {
+            last: None,
+            current: Some(HashMap::from([(cell(0), 1.)])),
+            measured_from: None,
+        };
+        assert_eq!(sorted_cells(&grid), [(cell(0), Some(1.), Some(1.))]);
     }
 }

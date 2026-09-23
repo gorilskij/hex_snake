@@ -653,7 +653,9 @@ impl Screen for Game {
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
         if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
-            self.distance_grid_mesh = Some(self.distance_grid.mesh(player_snake, other_snakes, &env.gtx));
+            self.distance_grid.update(player_snake, other_snakes, env.gtx.board_dim);
+            let fade = player_snake.body.head_fraction;
+            self.distance_grid_mesh = Some(rendering::distance_grid_mesh(&self.distance_grid, fade, &env.gtx));
         }
 
         if env.gtx.prefs.draw_player_path && (self.player_path_mesh.is_none() || playing) {
