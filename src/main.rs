@@ -12,7 +12,6 @@ use enum_map_lite::enum_map;
 use macroquad::input::get_keys_released;
 use macroquad::window::{next_frame, screen_height, screen_width, Conf};
 
-use crate::app::game_mode::GameMode;
 use crate::app::key::KeyInput;
 use crate::app::screen::{Screen, StartScreen, Transition};
 use crate::app::Palette;
@@ -36,9 +35,6 @@ mod view;
 mod apple;
 mod rendering;
 pub mod snake_control;
-
-/// The rules the game is played by (there is no mode selection yet).
-const GAME_MODE: GameMode = GameMode::Classic;
 
 // On wasm32-unknown-unknown there is no default `getrandom` backend; supply one
 // backed by macroquad's PRNG so `rand`/`thread_rng` work without wasm-bindgen.
@@ -72,7 +68,8 @@ fn window_conf() -> Conf {
 
 /// Build a single keyboard-controlled player snake (mirrors the seed that
 /// `App::new` used to construct).
-fn player_seed(side: Side, mode: GameMode) -> snake::builder::Builder {
+/// The game mode's starvation is set when the game starts.
+fn player_seed(side: Side) -> snake::builder::Builder {
     let eat_mechanics = EatMechanics::new(
         enum_map! {
             SegmentType::Eaten { .. } => EatBehavior::PassOver,
@@ -91,7 +88,6 @@ fn player_seed(side: Side, mode: GameMode) -> snake::builder::Builder {
         .palette(snake::PaletteTemplate::rainbow())
         .controller(snake_control::Template::Keyboard { side: Some(side) })
         .speed(5.)
-        .starvation(mode.starvation())
         .autopilot(pathfinder::Template::WithBackup {
             main: Box::new(pathfinder::Template::WeightedBFS(pathfinder::Weights {
                 teleport: 0,
@@ -118,14 +114,13 @@ async fn main() {
 
     let cell_dim = CellDim::from(50.);
     // one player per side of the keyboard, in screen order
-    let seeds = vec![player_seed(Side::Left, GAME_MODE), player_seed(Side::Right, GAME_MODE)];
+    let seeds = vec![player_seed(Side::Left), player_seed(Side::Right)];
 
     let mut screens: Vec<Box<dyn Screen>> = vec![Box::new(StartScreen::new(
         cell_dim,
         seeds,
         Palette::dark(),
         SpawnPolicy::Random { apple_count: 3 },
-        GAME_MODE,
     ))];
 
     let mut last_size = (screen_width(), screen_height());

@@ -341,17 +341,18 @@ impl SnakeDemo {
     }
 }
 
-/// The screen shown before a game: choose the number of players and each
-/// player's palette, then start.
+/// The screen shown before a game: choose the number of players, the game
+/// mode and each player's palette, then start.
 pub struct StartScreen {
     /// One seed per possible player; the first `players` are used
     seeds: Vec<SnakeBuilder>,
     cell_dim: CellDim,
     palette: app::Palette,
     spawn_policy: SpawnPolicy,
-    mode: GameMode,
 
     players_button: Button,
+    /// Which [`GameMode`] the game is played in, in [`Self::MODES`] order
+    mode_button: Button,
     options_button: Button,
     start_button: Button,
     /// The options menu, over the start screen
@@ -375,7 +376,6 @@ impl StartScreen {
         seeds: Vec<SnakeBuilder>,
         palette: app::Palette,
         spawn_policy: SpawnPolicy,
-        mode: GameMode,
     ) -> Self {
         assert!(!seeds.is_empty(), "No players specified");
 
@@ -388,6 +388,10 @@ impl StartScreen {
         let player_options = ["One player", "Two players"][..seeds.len().min(2)]
             .iter()
             .map(|text| button(&players_shape, text))
+            .collect();
+        let mode_options = Self::MODES
+            .iter()
+            .map(|&(_, text)| button(&players_shape, text))
             .collect();
 
         let mut demos: Vec<SnakeDemo> = seeds
@@ -414,10 +418,10 @@ impl StartScreen {
             cell_dim,
             palette,
             spawn_policy,
-            mode,
 
             // placed by `layout`
             players_button: Button::rotate(Point::zero(), player_options),
+            mode_button: Button::rotate(Point::zero(), mode_options),
             options_button: Button::click(Point::zero(), button(&players_shape, "Options")),
             start_button: Button::click(Point::zero(), button(&WideHexagon::new(BUTTON_CELL_DIM), "Start")),
             menu: Menu::Closed,
@@ -437,6 +441,12 @@ impl StartScreen {
         self.players_button.index() + 1
     }
 
+    const MODES: [(GameMode, &'static str); 2] = [(GameMode::Classic, "Classic"), (GameMode::Hunger, "Hunger")];
+
+    fn mode(&self) -> GameMode {
+        Self::MODES[self.mode_button.index()].0
+    }
+
     const HINT: &'static str = "Enter to start";
     const HINT_SIZE: f32 = 20.;
     /// Space below the hint, and between it and the start button
@@ -448,7 +458,7 @@ impl StartScreen {
         height - Self::HINT_MARGIN - measure_text(Self::HINT, Self::HINT_SIZE).height
     }
 
-    /// Place everything relative to the window: the players and options
+    /// Place everything relative to the window: the players, mode and options
     /// buttons side by side at the top, the demos of the active players side by side in the middle, the
     /// start button at the bottom.
     fn layout(&mut self) {
@@ -458,12 +468,14 @@ impl StartScreen {
         let margin = BUTTON_CELL_DIM.side;
         let button_height = BUTTON_CELL_DIM.height();
 
-        // the two top buttons are the same width, centered together
+        // the top buttons are the same width, centered together
         let top_width = self.players_button.size().x;
         let top_gap = 2. * margin;
-        let top_left = (width - 2. * top_width - top_gap) / 2.;
-        self.players_button.pos = Point { x: top_left, y: margin };
-        self.options_button.pos = Point { x: top_left + top_width + top_gap, y: margin };
+        let top_left = (width - 3. * top_width - 2. * top_gap) / 2.;
+        let top_buttons = [&mut self.players_button, &mut self.mode_button, &mut self.options_button];
+        for (i, button) in top_buttons.into_iter().enumerate() {
+            button.pos = Point { x: top_left + i as f32 * (top_width + top_gap), y: margin };
+        }
 
         // the start button sits above the hint
         let start_y = Self::hint_top(height) - Self::HINT_GAP - button_height;
@@ -547,6 +559,7 @@ impl Screen for StartScreen {
                 // the demos rearrange for the new number of players
                 self.layout();
             }
+            self.mode_button.draw();
             if self.options_button.draw() {
                 self.menu.open();
             }
@@ -555,6 +568,7 @@ impl Screen for StartScreen {
             }
         } else {
             self.players_button.draw_idle();
+            self.mode_button.draw_idle();
             self.options_button.draw_idle();
             self.start_button.draw_idle();
         }
@@ -601,13 +615,14 @@ impl Screen for StartScreen {
         self.start_game = false;
 
         let players = self.players();
+        let mode = self.mode();
         let seeds = self
             .seeds
             .iter()
             .zip(&self.demos)
             .take(players)
             .map(|(seed, demo)| {
-                let mut seed = seed.clone().palette(demo.palette());
+                let mut seed = seed.clone().palette(demo.palette()).starvation(mode.starvation());
                 // a single player uses whichever keys the preferences pick
                 if players == 1 {
                     if let Some(Template::Keyboard { side, .. }) = &mut seed.controller {
@@ -623,7 +638,7 @@ impl Screen for StartScreen {
             seeds,
             self.palette.clone(),
             self.spawn_policy.clone(),
-            self.mode,
+            mode,
         ))))
     }
 

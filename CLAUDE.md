@@ -10,7 +10,7 @@ single backend: **macroquad**.
 > the GPU (see [Snake coloring](#snake-coloring-shader-based)), and the snake was
 > reworked into a float-length model (see [Snake length model](#snake-length-model-snakemodrs)).
 > Game modes and new apple types came next: Hunger mode (`app/game_mode.rs`)
-> is implemented, but `main.rs`'s `GAME_MODE` is currently Classic. Most
+> is implemented and picked on the start screen. Most
 > recently (`menus` branch, merged): a start screen, in-game menus and
 > rebindable, layout-aware controls — see [Screens & menus](#screens--menus).
 
@@ -98,7 +98,8 @@ what the layout types — see below), then `next_frame().await`.
     with `[` / `]`; `Game::update` splits fast frames into ticks of ≤ half a cell).
   - `game_context.rs` (`GameContext`: cell_dim, board_dim, prefs, palette, mode),
     `game_mode.rs` (`GameMode` — Classic / Hunger — and the `hunger` tuning
-    constants; `main.rs`'s `GAME_MODE` picks one, no selection UI yet),
+    constants; picked on the start screen, which sets each player seed's
+    starvation from it when the game starts),
     `prefs.rs` (`Prefs`, saved on every change: display settings, key
     bindings, single-player side; default draw_style = Smooth, grid+border on),
     `stats.rs` (the stats overlay: polygons drawn this frame, counted by
@@ -173,7 +174,8 @@ what the layout types — see below), then `next_frame().await`.
 - **Screen stack** (`main.rs`, `Transition`): `StartScreen` stays at the bottom;
   starting a game pushes a `Game`; "Main menu" pops it, back to the start screen
   as it was left (`resume` reloads prefs, which the game may have changed).
-- **Start screen:** players (one/two) and Options buttons, one demo per player
+- **Start screen:** players (one/two), mode (Classic/Hunger, not saved) and
+  Options buttons, one demo per player
   (a hexagonal board one cell wider than the snake's programmed loop, defined
   by a center + loop radius; follows the snake style, grid and border
   settings; grid/border built once per size), palette arrows under each. ←/→
