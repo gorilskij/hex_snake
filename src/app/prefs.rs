@@ -22,34 +22,13 @@ pub enum DrawGrid {
     None,
 }
 
-/// How wrap-around edges hint at what lies on the other side (see
-/// `app::border_hints`).
-#[derive(Copy, Clone, Eq, PartialEq, EnumRotate)]
-pub enum HintStyle {
-    /// Recolor the edge's stretch of the border
-    Border,
-    /// A gradient fading from the edge into its cell
-    Gradient,
-    /// Where the head would come out if it teleported: the exit edges thicken
-    /// and tint, the closer the head is to being able to use them
-    Teleport,
-    /// One line along each of the three axes, from under the head out to the
-    /// borders it would leave through, snapped to the head's cell
-    Lines,
-    /// The same, following the head itself rather than its cell
-    SmoothLines,
-    /// The grid and border stay dark except where a light on the border near
-    /// the head shows them, brighter the closer the head is
-    Light,
-    None,
-}
-
 pub struct Prefs {
     pub draw_grid: DrawGrid,
     pub draw_border: bool,
     pub draw_distance_grid: bool,
     pub draw_player_path: bool,
-    pub hint_style: HintStyle,
+    /// Light up the grid and border near the head (see `app::light_hints`)
+    pub hints: bool,
 
     pub display_fps: bool,
     pub display_stats: bool,
@@ -79,7 +58,7 @@ impl Default for Prefs {
             draw_border: true,
             draw_distance_grid: false,
             draw_player_path: false,
-            hint_style: HintStyle::Border,
+            hints: true,
 
             display_fps: false,
             display_stats: false,
@@ -106,7 +85,7 @@ impl Default for Prefs {
 /// on the enums because they are a file-format concern: renaming a variant
 /// should not silently invalidate everyone's saved preferences.
 mod names {
-    use super::{rendering, Dir, DrawGrid, HintStyle, Side};
+    use super::{rendering, Dir, DrawGrid, Side};
 
     pub fn draw_grid(value: DrawGrid) -> &'static str {
         match value {
@@ -121,31 +100,6 @@ mod names {
             "grid" => Some(DrawGrid::Grid),
             "dots" => Some(DrawGrid::Dots),
             "none" => Some(DrawGrid::None),
-            _ => None,
-        }
-    }
-
-    pub fn hint_style(value: HintStyle) -> &'static str {
-        match value {
-            HintStyle::Border => "border",
-            HintStyle::Gradient => "gradient",
-            HintStyle::Teleport => "teleport",
-            HintStyle::Lines => "lines",
-            HintStyle::SmoothLines => "smooth_lines",
-            HintStyle::Light => "light",
-            HintStyle::None => "none",
-        }
-    }
-
-    pub fn read_hint_style(text: &str) -> Option<HintStyle> {
-        match text {
-            "border" => Some(HintStyle::Border),
-            "gradient" => Some(HintStyle::Gradient),
-            "teleport" => Some(HintStyle::Teleport),
-            "lines" => Some(HintStyle::Lines),
-            "smooth_lines" => Some(HintStyle::SmoothLines),
-            "light" => Some(HintStyle::Light),
-            "none" => Some(HintStyle::None),
             _ => None,
         }
     }
@@ -231,7 +185,7 @@ impl Prefs {
             ("draw_border", self.draw_border.to_string()),
             ("draw_distance_grid", self.draw_distance_grid.to_string()),
             ("draw_player_path", self.draw_player_path.to_string()),
-            ("hint_style", names::hint_style(self.hint_style).to_string()),
+            ("hints", self.hints.to_string()),
             ("display_fps", self.display_fps.to_string()),
             ("display_stats", self.display_stats.to_string()),
             ("message_duration_ms", self.message_duration.as_millis().to_string()),
@@ -271,14 +225,12 @@ impl Prefs {
         prefs.draw_grid = field("draw_grid")
             .and_then(names::read_draw_grid)
             .unwrap_or(prefs.draw_grid);
-        prefs.hint_style = field("hint_style")
-            .and_then(names::read_hint_style)
-            .unwrap_or(prefs.hint_style);
         prefs.draw_style = field("draw_style")
             .and_then(names::read_draw_style)
             .unwrap_or(prefs.draw_style);
 
         prefs.draw_border = flag("draw_border", prefs.draw_border);
+        prefs.hints = flag("hints", prefs.hints);
         prefs.draw_distance_grid = flag("draw_distance_grid", prefs.draw_distance_grid);
         prefs.draw_player_path = flag("draw_player_path", prefs.draw_player_path);
         prefs.display_fps = flag("display_fps", prefs.display_fps);
@@ -346,7 +298,7 @@ mod tests {
     fn a_saved_file_reads_back_the_same() {
         let prefs = Prefs {
             draw_grid: DrawGrid::Dots,
-            hint_style: HintStyle::Gradient,
+            hints: false,
             draw_style: rendering::Style::Hexagon,
             draw_border: false,
             display_fps: true,

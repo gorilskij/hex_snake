@@ -15,7 +15,7 @@ use macroquad::color::Color;
 use macroquad::material::{load_material, Material, MaterialParams};
 use macroquad::math::vec4;
 use macroquad::miniquad::{
-    BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource, UniformDesc, UniformType,
+    BlendFactor, BlendState, BlendValue, Comparison, Equation, PipelineParams, ShaderSource, UniformDesc, UniformType,
 };
 use macroquad::texture::{FilterMode, Texture2D};
 
@@ -163,6 +163,8 @@ pub fn ball_material() -> Result<Material> {
     .context("compiling ball shader")
 }
 
+// Every vertex at the material's own depth, DEPTH (spliced in by
+// light_material; the board camera is orthographic, so w is 1).
 const LIT_VERTEX: &str = r#"#version 100
 precision highp float;
 attribute vec3 position;
@@ -173,6 +175,7 @@ uniform mat4 Model;
 uniform mat4 Projection;
 void main() {
     gl_Position = Projection * Model * vec4(position, 1);
+    gl_Position.z = DEPTH;
     board = position.xy;
     color = color0 / 255.0;
 }"#;
@@ -190,6 +193,7 @@ varying vec2 board;
 varying vec4 color;
 uniform vec4 lights[MAX_LIGHTS];
 uniform float radius;
+uniform vec4 tint;
 void main() {
     float lit = 0.0;
     for (int k = 0; k < MAX_LIGHTS; k++) {
@@ -197,23 +201,40 @@ void main() {
         float f = max(0.0, 1.0 - dot(d, d));
         lit += lights[k].z * f * f;
     }
-    gl_FragColor = vec4(color.rgb, color.a * min(lit, 1.0));
+    // a tint (alpha 1) replaces the shape's own color
+    vec3 rgb = mix(color.rgb, tint.rgb, tint.a);
+    gl_FragColor = vec4(rgb, color.a * min(lit, 1.0));
 }"#;
 
 /// Draws ordinary (vertex-colored) meshes in the dark, showing them only where
 /// the lights set with [`set_lights`] reach: the light hints' grid and border.
-pub fn light_material() -> Result<Material> {
+///
+/// Where a mesh overlaps itself (strokes meeting at a corner), its
+/// translucent pixels would be blended twice and come out brighter, so each
+/// pixel is drawn only once: everything the material draws is at `depth`
+/// (in `-1..1`, lower in front), and the depth test lets through only what is
+/// strictly in front of what is already there. Give each mesh drawn this way
+/// its own material and depth, the one drawn later in front, or it disappears
+/// wherever it crosses the earlier one. The depth buffer is cleared with the
+/// screen, and nothing else tests against it.
+pub fn light_material(depth: f32) -> Result<Material> {
+    let vertex = LIT_VERTEX.replace("DEPTH", &format!("{depth:?}"));
     let fragment = LIT_FRAGMENT.replace("MAX_LIGHTS", &MAX_LIGHTS.to_string());
     load_material(
         ShaderSource::Glsl {
-            vertex: LIT_VERTEX,
+            vertex: &vertex,
             fragment: &fragment,
         },
         MaterialParams {
-            pipeline_params: alpha_blending(),
+            pipeline_params: PipelineParams {
+                depth_test: Comparison::Less,
+                depth_write: true,
+                ..alpha_blending()
+            },
             uniforms: vec![
                 UniformDesc::new("lights", UniformType::Float4).array(MAX_LIGHTS),
                 UniformDesc::new("radius", UniformType::Float1),
+                UniformDesc::new("tint", UniformType::Float4),
             ],
             ..Default::default()
         },
@@ -222,8 +243,9 @@ pub fn light_material() -> Result<Material> {
 }
 
 /// Set the lights (board position, intensity) of a [`light_material`], at
-/// most [`MAX_LIGHTS`] of them, and how far each one reaches.
-pub fn set_lights(material: &Material, lights: &[(Point, f32)], radius: f32) {
+/// most [`MAX_LIGHTS`] of them, how far each one reaches, and what color
+/// they show shapes in (their own, if `None`).
+pub fn set_lights(material: &Material, lights: &[(Point, f32)], radius: f32, tint: Option<Color>) {
     assert!(
         lights.len() <= MAX_LIGHTS,
         "{} lights, room for {MAX_LIGHTS}",
@@ -235,6 +257,8 @@ pub fn set_lights(material: &Material, lights: &[(Point, f32)], radius: f32) {
     }
     material.set_uniform_array("lights", &uniform[..]);
     material.set_uniform("radius", radius);
+    let tint = tint.map_or(vec4(0., 0., 0., 0.), |c| vec4(c.r, c.g, c.b, 1.));
+    material.set_uniform("tint", tint);
 }
 
 /// The default alpha-over blending the standard mesh path uses, so

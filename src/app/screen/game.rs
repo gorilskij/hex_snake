@@ -9,16 +9,14 @@ use macroquad::material::Material;
 use macroquad::window::clear_background;
 use rand::prelude::*;
 
-use crate::app::border_hints::{self, BorderHints};
 use crate::app::distance_grid::DistanceGrid;
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
 use crate::app::game_mode::GameMode;
 use crate::app::key::Key;
-use crate::app::message;
 use crate::app::message::{Message, MessageDrawable, MessageID};
 use crate::app::palette::Palette;
-use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
+use crate::app::prefs::{DrawGrid, Prefs};
 use crate::app::screen::board_dim::{calculate_board_dim, calculate_offset};
 use crate::app::screen::menu::{Menu, MenuEvent, Toggle};
 use crate::app::screen::{Environment, Screen, Transition};
@@ -27,6 +25,7 @@ use crate::app::snake_management::{
     spawn_snakes, update_snake_dirs,
 };
 use crate::app::stats::Stats;
+use crate::app::{light_hints, message};
 use crate::apple::spawn::{expire_apples, food_apple, spawn_apples, spawn_bad_apples, SpawnPolicy};
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::snake::builder::Builder as SnakeBuilder;
@@ -53,10 +52,11 @@ pub struct Game {
     animated_apples: bool,
 
     distance_grid: DistanceGrid,
-    border_hints: BorderHints,
 
     messages: HashMap<MessageID, Message>,
 
+    /// The grid and border, as drawn and as lit by the hints: built when
+    /// either needs them (a hidden grid is lit as lines)
     grid_mesh: Option<Mesh>,
     border_mesh: Option<Mesh>,
     portal_mesh: Option<Mesh>,
@@ -65,7 +65,9 @@ pub struct Game {
     /// lazily on first draw (needs a live GL context).
     snake_material: Option<Material>,
     ball_material: Option<Material>,
-    light_material: Option<Material>,
+    /// The light hints' materials, for the grid and the border (each needs
+    /// its own depth, see `light_material`)
+    light_materials: Option<[Material; 2]>,
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
@@ -136,7 +138,6 @@ impl Game {
             animated_apples: false,
 
             distance_grid: DistanceGrid::new(),
-            border_hints: BorderHints::new(),
 
             messages: HashMap::new(),
 
@@ -146,7 +147,7 @@ impl Game {
             snake_render: None,
             snake_material: None,
             ball_material: None,
-            light_material: None,
+            light_materials: None,
             apple_mesh: None,
             distance_grid_mesh: None,
             player_path_mesh: None,
@@ -203,7 +204,6 @@ impl Game {
             self.snake_render = None;
             self.distance_grid_mesh = None;
             self.distance_grid.invalidate();
-            self.border_hints.clear();
             self.player_path_mesh = None;
             self.player_path_over_mesh = None;
         }
@@ -460,18 +460,10 @@ impl Game {
                 self.display_notification(text);
             }
             Toggle::Hints => {
-                let text = match prefs.hint_style {
-                    HintStyle::Border => "Border hints",
-                    HintStyle::Gradient => "Gradient hints",
-                    HintStyle::Teleport => "Teleport hints",
-                    HintStyle::Lines => "Line hints",
-                    HintStyle::SmoothLines => "Smooth line hints",
-                    HintStyle::Light => "Light hints",
-                    HintStyle::None => "Hints off",
-                };
-                // start the new style fresh rather than fading from the old one's colors
-                self.border_hints.clear();
-                self.display_notification(text);
+                // the grid and border may be needed for the hints alone
+                self.grid_mesh = None;
+                self.border_mesh = None;
+                self.display_notification(if prefs.hints { "Hints on" } else { "Hints off" });
             }
             Toggle::DistanceGrid => {
                 let text = if prefs.draw_distance_grid {
@@ -609,15 +601,18 @@ impl Screen for Game {
         let env = &mut self.env;
         let playing = self.fps_control.state() == fps_control::State::Playing;
 
+        let prefs = &env.gtx.prefs;
+        let (draw_grid, draw_border, hints) = (prefs.draw_grid != DrawGrid::None, prefs.draw_border, prefs.hints);
         if self.grid_mesh.is_none() {
-            match env.gtx.prefs.draw_grid {
+            match prefs.draw_grid {
                 DrawGrid::Grid => self.grid_mesh = Some(rendering::grid_mesh(&env.gtx)?),
                 DrawGrid::Dots => self.grid_mesh = Some(rendering::grid_dot_mesh(&env.gtx)?),
-                _ => {}
+                DrawGrid::None if hints => self.grid_mesh = Some(rendering::grid_mesh(&env.gtx)?),
+                DrawGrid::None => {}
             }
         }
 
-        if env.gtx.prefs.draw_border && self.border_mesh.is_none() {
+        if (draw_border || hints) && self.border_mesh.is_none() {
             self.border_mesh = Some(rendering::border_mesh(&env.gtx)?);
         }
 
@@ -643,18 +638,6 @@ impl Screen for Game {
         let player_idx = self.first_player_snake_idx().expect("no player snake");
         let env = &mut self.env;
 
-        // rebuilt every frame: hints fade in real time, even while paused
-        let hint_style = env.gtx.prefs.hint_style;
-        let hint_mesh = Some(self.border_hints.mesh(env, player_idx, hint_style));
-        // gradients go under the grid (so its lines stay untinted), recolored
-        // border stretches right on top of the border, and the lines over the
-        // snake, so the body never hides one crossing it
-        let (gradient_hint_mesh, over_snake_hint_mesh, border_hint_mesh) = match hint_style {
-            HintStyle::Gradient => (hint_mesh, None, None),
-            HintStyle::Lines | HintStyle::SmoothLines => (None, hint_mesh, None),
-            HintStyle::Border | HintStyle::Teleport | HintStyle::Light | HintStyle::None => (None, None, hint_mesh),
-        };
-
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
 
         if env.gtx.prefs.draw_distance_grid && (self.distance_grid_mesh.is_none() || playing) {
@@ -676,45 +659,55 @@ impl Screen for Game {
         if self.ball_material.is_none() {
             self.ball_material = Some(ball_material()?);
         }
-        // the light hints show the grid and border only where their lights are
-        let lit = hint_style == HintStyle::Light;
-        if lit {
-            if self.light_material.is_none() {
-                self.light_material = Some(light_material()?);
+        // the hints light up the grid and border near the head: in red over
+        // them where they are drawn anyway, in their own colors where not
+        if hints {
+            if self.light_materials.is_none() {
+                // the border is drawn after the grid, so it goes in front
+                self.light_materials = Some([light_material(0.5)?, light_material(0.)?]);
             }
             let body = &self.env.snakes[player_idx].body;
-            let lights = border_hints::border_lights(body, &self.env.gtx).map(|light| (light.pos, light.intensity));
-            let radius = border_hints::LIGHT_RADIUS * self.env.gtx.cell_dim.height();
-            set_lights(self.light_material.as_ref().unwrap(), &lights, radius);
+            let lights = light_hints::border_lights(body, &self.env.gtx).map(|light| (light.pos, light.intensity));
+            let radius = light_hints::LIGHT_RADIUS * self.env.gtx.cell_dim.height();
+            let red = self.env.gtx.palette.light_hint_color;
+            let [grid, border] = self.light_materials.as_ref().unwrap();
+            set_lights(grid, &lights, radius, draw_grid.then_some(red));
+            set_lights(border, &lights, radius, draw_border.then_some(red));
         }
-        let light = self.light_material.as_ref().filter(|_| lit);
-        let draw_lit = |mesh: &Option<Mesh>| match (mesh, light) {
-            (Some(mesh), Some(material)) => mesh.draw_shaded(material),
-            (Some(mesh), None) => mesh.draw(),
-            (None, _) => {}
+        let [grid_light, border_light] = match &self.light_materials {
+            Some([grid, border]) if hints => [Some(grid), Some(border)],
+            _ => [None, None],
         };
+        // drawn plainly if shown, then lit if hinting
+        let grid = [&self.grid_mesh].map(|mesh| mesh.as_ref().filter(|_| draw_grid));
+        let lit_grid = [&self.grid_mesh].map(|mesh| mesh.as_ref().filter(|_| hints));
+        let border = [&self.border_mesh].map(|mesh| mesh.as_ref().filter(|_| draw_border));
+        let lit_border = [&self.border_mesh].map(|mesh| mesh.as_ref().filter(|_| hints));
 
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
-        let before_grid = [&self.distance_grid_mesh, &gradient_hint_mesh];
-        let grid = [&self.grid_mesh];
-        let before_snake = [&self.player_path_mesh];
-        let over_snake = [&over_snake_hint_mesh, &self.player_path_over_mesh];
-        let apples = [&self.apple_mesh];
-        let border = [&self.border_mesh];
-        let after_border = [&border_hint_mesh, &self.portal_mesh];
-
-        if self.env.gtx.prefs.display_stats {
-            let meshes = before_grid
+        let before_grid = [self.distance_grid_mesh.as_ref()];
+        let before_snake = [self.player_path_mesh.as_ref()];
+        let over_snake = [self.player_path_over_mesh.as_ref()];
+        let apples = [self.apple_mesh.as_ref()];
+        let after_border = [self.portal_mesh.as_ref()];
+        let all_meshes = || {
+            before_grid
                 .iter()
                 .chain(&grid)
+                .chain(&lit_grid)
                 .chain(&before_snake)
                 .chain(&over_snake)
                 .chain(&apples)
                 .chain(&border)
+                .chain(&lit_border)
                 .chain(&after_border)
                 .copied()
-                .flatten();
+                .flatten()
+        };
+
+        if self.env.gtx.prefs.display_stats {
+            let meshes = all_meshes();
             let snake_meshes = self.snake_render.iter().flat_map(|render| render.pieces.iter());
             let stats = Stats {
                 polygons: meshes.chain(snake_meshes).map(Mesh::polygons).sum(),
@@ -726,15 +719,7 @@ impl Screen for Game {
         let message_drawables = Self::get_message_drawables(&mut self.messages);
 
         let has_snake = self.snake_render.as_ref().is_some_and(|r| !r.pieces.is_empty());
-        let has_plain = before_grid
-            .iter()
-            .chain(&grid)
-            .chain(&before_snake)
-            .chain(&over_snake)
-            .chain(&apples)
-            .chain(&border)
-            .chain(&after_border)
-            .any(|m| m.is_some());
+        let has_plain = all_meshes().next().is_some();
 
         if !message_drawables.is_empty() || has_snake || has_plain {
             clear_background(self.env.gtx.palette.background_color);
@@ -747,7 +732,12 @@ impl Screen for Game {
             for mesh in before_grid.into_iter().flatten() {
                 mesh.draw();
             }
-            draw_lit(&self.grid_mesh);
+            for mesh in grid.into_iter().flatten() {
+                mesh.draw();
+            }
+            if let (Some(mesh), Some(material)) = (lit_grid[0], grid_light) {
+                mesh.draw_shaded(material);
+            }
             for mesh in before_snake.into_iter().flatten() {
                 mesh.draw();
             }
@@ -770,7 +760,12 @@ impl Screen for Game {
                 }
             }
 
-            draw_lit(&self.border_mesh);
+            for mesh in border.into_iter().flatten() {
+                mesh.draw();
+            }
+            if let (Some(mesh), Some(material)) = (lit_border[0], border_light) {
+                mesh.draw_shaded(material);
+            }
             for mesh in after_border.into_iter().flatten() {
                 mesh.draw();
             }

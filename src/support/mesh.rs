@@ -81,20 +81,6 @@ pub fn build_line(points: &[Point], width: f32, color: impl Into<MqColor>) -> Me
     Mesh::raw(vertices, indices)
 }
 
-/// Build a convex polygon with a color per vertex, interpolated across it.
-pub fn build_colored_polygon(points: &[(Point, MqColor)]) -> Mesh {
-    if points.len() < 3 {
-        return Mesh::empty();
-    }
-    let vertices = points
-        .iter()
-        .map(|&(p, color)| Vertex::new(p.x, p.y, 0., 0., 0., color))
-        .collect();
-    // a fan around the first vertex
-    let indices = (1..points.len() as u16 - 1).flat_map(|i| [0, i, i + 1]).collect();
-    Mesh::raw(vertices, indices)
-}
-
 /// How the snake shader lights a surface (passed in `normal.w`).
 #[derive(Copy, Clone)]
 pub enum Surface<'a> {

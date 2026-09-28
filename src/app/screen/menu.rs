@@ -10,7 +10,7 @@ use macroquad::input::KeyCode;
 use super::controls_menu::{self, ControlsAction, ControlsScreen};
 use super::options_menu::{self, Line};
 use crate::app::key::Key;
-use crate::app::prefs::{DrawGrid, HintStyle, Prefs};
+use crate::app::prefs::{DrawGrid, Prefs};
 use crate::basic::Side;
 use crate::rendering;
 use crate::support::flip::Flip;
@@ -58,18 +58,7 @@ impl Toggle {
                 }
             ),
             Toggle::Border => format!("Border: {}", on_off(prefs.draw_border)),
-            Toggle::Hints => format!(
-                "Edge hints: {}",
-                match prefs.hint_style {
-                    HintStyle::Border => "border",
-                    HintStyle::Gradient => "gradient",
-                    HintStyle::Teleport => "teleport",
-                    HintStyle::Lines => "lines",
-                    HintStyle::SmoothLines => "smooth lines",
-                    HintStyle::Light => "light",
-                    HintStyle::None => "off",
-                }
-            ),
+            Toggle::Hints => format!("Edge hints: {}", on_off(prefs.hints)),
             Toggle::DrawStyle => format!(
                 "Snake style: {}",
                 match prefs.draw_style {
@@ -99,7 +88,7 @@ impl Toggle {
                 prefs.draw_border.flip();
             }
             Toggle::Hints => {
-                prefs.hint_style.rotate_next();
+                prefs.hints.flip();
             }
             Toggle::DrawStyle => {
                 prefs.draw_style = match prefs.draw_style {

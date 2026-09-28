@@ -109,30 +109,21 @@ what the layout types — see below), then `next_frame().await`.
     each `Mesh`, + the player's exact `length`), `message.rs` (text overlays, multi-line, optionally on a
     dimmed box), `palette.rs` (board/bg
     colors, distinct from snake palette), `snake_management.rs` (advance, spawn,
-    collisions — see [Collision](#collision-appsnake_managementrs) — and
-    `outcome_at`), `border_hints.rs` (marks wrap-around edges —
-    by what the player would hit on the other side, as recolored border
-    stretches or gradients into the cell; or by where the head would come out,
-    recoloring both ends of each wrap it could reach (one per direction) and
-    growing a triangle inwards from the arrival end as it closes, both ends
-    sweeping down the hues from purple to red in step with the triangle; or
-    by the way out, as one translucent grey line per axis from the head out to
-    the borders, drawn over the snake — snapped to the head's cell, or through
-    the tip of the drawn head (`Centerline::head_tip`, the cap's apex, so the
-    origin follows the arc through a turn), in which case each end is clipped
-    against the board's zigzag edge and slides along it; or as a light in the
-    dark — `HintStyle::Light` leaves the grid and border unseen except where
-    lights on the border show them (`border_lights` → `light_material`,
-    through which `game.rs` draws the grid and border): one per side of the
-    board, level with the head's tip on a straight line through the middle of
-    that side's zigzag (the nearest point on the zigzag itself hops from tooth
-    to tooth), brighter as the head closes in from `LIGHT_RANGE` (3 cells),
-    reaching `LIGHT_RADIUS` (3 cells); and one per direction where the head
-    would come out, as bright as where it would leave: every line of cells
-    wraps onto itself, so that is where the line through the head's tip
+    collisions — see [Collision](#collision-appsnake_managementrs)),
+    `light_hints.rs` (the edge hints, on or off: lights on the border that
+    show the grid and border near the head — in their own colors where they
+    are hidden (a hidden grid is lit as lines), in red (`light_hint_color`)
+    over them where they are drawn — through `light_material`: one per side
+    of the board, level with the head's tip on a straight line through the
+    middle of that side's zigzag (the nearest point on the zigzag itself hops
+    from tooth to tooth), brighter as the head closes in from `LIGHT_RANGE`
+    (3 cells), reaching `LIGHT_RADIUS` (3 cells); and one per direction where
+    the head would come out, as bright as where it would leave: every line of
+    cells wraps onto itself, so that is where the line through the head's tip
     leaves the smoothed border going the other way (all six directions, so
-    none pops on or off as the head turns). `HintStyle`, cycled from the
-    options menu), `distance_grid.rs`,
+    none pops on or off as the head turns). Each lit mesh is drawn at its own
+    depth with the depth test on, so where it overlaps itself a translucent
+    pixel is blended once, not twice), `distance_grid.rs`,
     `portal/`, `board_dim.rs`.
   - `screen/snake_control_creator_screen.rs` — **out of the module tree**
     (not compiled).
@@ -167,8 +158,7 @@ what the layout types — see below), then `next_frame().await`.
   `Knowledge` is per segment kind): positive apples are `Goals::targets`,
   negative ones `Goals::avoid` — that much extra cost to cross their cell. The
   player's autopilot avoids shrink apples at −15 (`autopilot_appetite`); one
-  landing on the route triggers a single replan. Border hints show them as
-  `Outcome::BadApple`, in the bad apples' green.
+  landing on the route triggers a single replan.
 - **`rendering/`** — turns the world into meshes (see next section).
 - **`basic/`** — `Point` (f32 x/y, cartesian), `HexPoint` (hex grid coord),
   `Dir`/`Dir12` (hex directions), `CellDim` (side/sin/cos, `height()`, `center()`),
@@ -287,9 +277,9 @@ z-order onto a `Canvas`:
 3. Snakes are special — drawn through a shader (below).
 
 Draw order (default material, split around the snake): distance_grid,
-hints (gradient style), grid, player_path → **snake (shaded)** → player_path
-over the player's own eaten segments (which it passes through), apple, border,
-hints (border style), portal → message text.
+grid (then lit by the hints), player_path → **snake (shaded)** → player_path
+over the player's own eaten segments (which it passes through), apples (balls),
+border (then lit by the hints), portal → message text.
 
 ### Snake coloring (shader-based)
 
