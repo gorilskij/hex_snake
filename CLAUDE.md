@@ -10,12 +10,13 @@ single backend: **macroquad**.
 > the GPU (see [Snake coloring](#snake-coloring-shader-based)), and the snake was
 > reworked into a float-length model (see [Snake length model](#snake-length-model-snakemodrs)).
 > Game modes and new apple types came next: Hunger mode (`app/game_mode.rs`)
-> is implemented and picked on the start screen. Most
-> recently (`menus` branch, merged): a start screen, in-game menus and
-> rebindable, layout-aware controls — see [Screens & menus](#screens--menus).
-> In progress (`graphics-updates` branch): lighting the snake as a
-> round tube with pill-shaped ends and the apples as balls, and an OkLab
-> constant-lightness rainbow — see [Snake coloring](#snake-coloring-shader-based).
+> is implemented and picked on the start screen. Then (`menus` branch):
+> a start screen, in-game menus and rebindable, layout-aware controls — see
+> [Screens & menus](#screens--menus). Most recently (`graphics-updates` and
+> `light-hints`, both merged): the snake lit as a round tube with
+> pill-shaped ends, the apples as balls, an OkLab constant-lightness rainbow
+> (see [Snake coloring](#snake-coloring-shader-based)), and the edge hints
+> reduced to one: lights on the border near the head (`app/light_hints.rs`).
 
 ## Build / run / test
 
@@ -79,13 +80,18 @@ what the layout types — see below), then `next_frame().await`.
   `clear_background`, cameras), and the few helpers that remain live here.
   - `mesh.rs` — **the core of rendering**: `Mesh` (chunked macroquad meshes,
     each counting its polygons), the `build_*` functions (lyon fill/stroke
-    → a `Mesh`: `build_polygon`, `build_circle`, `build_line`, and the shaded
+    → a `Mesh`: `build_polygon`, `build_circle`, `build_line`, `build_ball`
+    (a circle whose uv is the position on it, for the ball shader), and the shaded
     `build_shaded_polygon` / `build_shaded_ribbon` for snakes), `Mesh::combine`,
     `DrawMode`, `Surface`, and `set_board_camera` (the board-offset
     `Camera2D`). `mesh.draw()` / `mesh.draw_shaded(material)` replace the old
     `Canvas`.
-  - `material.rs` — custom GLSL shader (`SnakeMaterial` via `snake_material()`) +
-    palette LUT texture (`PaletteLut`) for snake coloring.
+  - `material.rs` — the custom GLSL shaders: the snake's (`snake_material()`,
+    sampling a palette LUT texture, `PaletteLut`), the apples' balls
+    (`ball_material()`), both lit by the shared `lighting!` snippet, and the
+    light hints' (`light_material(depth)` + `set_lights`: vertex-colored
+    shapes shown only where up to `MAX_LIGHTS` lights reach, optionally
+    tinted, depth-tested so a self-overlap is blended once).
   - `time.rs` — `Instant` over `macroquad::time::get_time()` (std `Instant`
     panics on wasm). Also `partial_min_max` (NaN-safe), `flip`.
   - `text.rs` — all text, in the bundled font, rasterized at a few fixed sizes
@@ -259,7 +265,7 @@ removed once `state == Dying && on_board() <= 0`.
 ## Rendering pipeline
 
 `Game::draw` (`app/screen/game.rs`) lazily builds cached meshes and draws them in
-z-order onto a `Canvas`:
+z-order:
 
 1. Each `rendering::*_mesh` fn builds a `support::mesh::Mesh` (grid, border —
    drawn edge by edge for any set of cells, `region_grid_mesh`/`region_border_mesh`,
@@ -429,7 +435,7 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
 - **std `Instant::now()` panics on wasm** → `support::time::Instant` over macroquad's
   clock; `fps_control` uses it.
 - **macroquad clamps each `draw_mesh`** to 10000 verts / 5000 indices, silently
-  dropping overflow. `Mesh::from_data` chunks under that.
+  dropping overflow. `Mesh::combine` chunks under that.
 - **Board camera is y-down** for `draw_mesh`; `zoom.y` positive (negative flips the
   board — the snake appears to move the wrong way).
 - **lyon triangulates arbitrarily** — do NOT feed a curved outline to lyon fill and
@@ -483,16 +489,15 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   similar localized effect and want a shared approach.
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
   freezes at `hunger::MIN_LENGTH`, `State::Starved`).
-- **Snake lighting follow-ups** (`graphics-updates`): the first pass
-  (light straight from above) is in but **untuned and not yet looked at**:
-  the four constants at the top of the fragment shader were picked by
-  reasoning, not by eye. Then: a light from a fixed direction on screen
+- **Snake lighting follow-ups:** the first pass (light straight from above)
+  is in and looked at once (the highlight dimmed to `SPECULAR` 0.2); the
+  other constants in `lighting!` were picked by reasoning, not by eye. Then: a light from a fixed direction on screen
   (off-center highlight; needs each vertex's across direction — the vertex
   color is free for it), passability marks as part of the tube instead of a
   flat 2D overlay (they'd take the body's `uv.y` where they sit), and the
   hexagon style (flat for now, `uv.y` fixed at 0.5).
-- **Perf, more generally:** each frame rebuilds the snake mesh and the border
-  hints; worth trimming if frame work ever matters (it measured ≤ 2 ms in a
+- **Perf, more generally:** each frame rebuilds the snake mesh (the light
+  hints only recompute their 10 lights); worth trimming if frame work ever matters (it measured ≤ 2 ms in a
   release wasm build at 120 Hz).
 - **Autopilot pathfinding follow-ups:** the search
   (`snake_control/pathfinder/weighted_bfs.rs`) is Dijkstra (`h = 0`); a
