@@ -6,8 +6,8 @@
 //! screen space: the caller sets the default camera first.
 
 use macroquad::color::Color;
-use macroquad::text::TextDimensions;
 use macroquad::input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton};
+use macroquad::text::TextDimensions;
 
 use crate::basic::Point;
 
@@ -174,7 +174,10 @@ impl ButtonData {
 pub enum ButtonType {
     Click(ButtonData),
     /// Cycles through `options` on each click
-    Rotate { options: Vec<ButtonData>, index: usize },
+    Rotate {
+        options: Vec<ButtonData>,
+        index: usize,
+    },
 }
 
 pub struct Button {
@@ -185,7 +188,10 @@ pub struct Button {
 
 impl Button {
     pub fn click(pos: Point, data: ButtonData) -> Self {
-        Self { pos, button_type: ButtonType::Click(data) }
+        Self {
+            pos,
+            button_type: ButtonType::Click(data),
+        }
     }
 
     pub fn rotate(pos: Point, options: Vec<ButtonData>) -> Self {

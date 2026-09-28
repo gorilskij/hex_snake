@@ -628,8 +628,16 @@ mod tests {
             let colors = rainbow_colors(lightness);
             // what is left is rounding to bytes
             for (color, chroma) in &colors {
-                assert!((color.l - lightness).abs() < 0.005, "lightness {} for {lightness}", color.l);
-                assert!((color.to_lch().1 - chroma).abs() < 0.01, "chroma {} for {chroma}", color.to_lch().1);
+                assert!(
+                    (color.l - lightness).abs() < 0.005,
+                    "lightness {} for {lightness}",
+                    color.l
+                );
+                assert!(
+                    (color.to_lch().1 - chroma).abs() < 0.01,
+                    "chroma {} for {chroma}",
+                    color.to_lch().1
+                );
             }
             let most = colors.iter().map(|&(_, chroma)| chroma).fold(0., f64::max);
             assert!((most - MAX_CHROMA).abs() < 1e-9, "the vivid hues reach the cap: {most}");

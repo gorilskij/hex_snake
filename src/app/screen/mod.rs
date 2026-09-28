@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 pub use game::Game;
-pub use start_screen::StartScreen;
 use macroquad::input::KeyCode;
 use rand::rngs::ThreadRng;
+pub use start_screen::StartScreen;
 
 use crate::app::game_context::GameContext;
 use crate::app::key::Key;

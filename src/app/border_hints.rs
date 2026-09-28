@@ -17,6 +17,9 @@
 //! the border it would leave through and the one it would arrive at. Nearer in,
 //! the arrival end also grows a triangle pointing into its cell, so a wrap the
 //! head is about to take reads quite differently from one merely in range.
+//!
+//! [`HintStyle::Light`] leaves the grid and border in the dark, except where a
+//! light on the border near the head shows them (see [`border_lights`]).
 
 use std::collections::HashMap;
 
@@ -130,7 +133,9 @@ impl BorderHints {
     /// mesh in the given style.
     pub fn mesh(&mut self, env: &Environment, player_idx: usize, style: HintStyle) -> Mesh {
         let palette = &env.gtx.palette;
-        if style == HintStyle::None {
+        // the light has no mesh of its own: it lights the grid and border (see
+        // border_lights)
+        if let HintStyle::None | HintStyle::Light = style {
             self.clear();
             return Mesh::empty();
         }
@@ -160,7 +165,9 @@ impl BorderHints {
                 let body = &env.snakes[player_idx].body;
                 teleport_hints(body, env.gtx.board_dim, palette.teleport_hint_colors)
             }
-            HintStyle::Lines | HintStyle::SmoothLines | HintStyle::None => unreachable!("returned above"),
+            HintStyle::Lines | HintStyle::SmoothLines | HintStyle::Light | HintStyle::None => {
+                unreachable!("returned above")
+            }
         };
 
         let draw_border = env.gtx.prefs.draw_border;
@@ -259,7 +266,9 @@ impl BorderHints {
                         (inward(start), clear),
                     ])
                 }
-                HintStyle::Lines | HintStyle::SmoothLines | HintStyle::None => unreachable!("returned above"),
+                HintStyle::Lines | HintStyle::SmoothLines | HintStyle::Light | HintStyle::None => {
+                    unreachable!("returned above")
+                }
             }
         }))
     }
@@ -408,6 +417,79 @@ fn ray_to_border(
         cells += 1.;
     }
     origin + step * (cells + 0.5)
+}
+
+/// How close to a side of the board the head has to be for its light to come
+/// on at all, in cell heights.
+const LIGHT_RANGE: f32 = 3.;
+
+/// How far a light reaches from its center, in cell heights.
+pub const LIGHT_RADIUS: f32 = 3.;
+
+/// A light on the border, for [`light_material`].
+///
+/// [`light_material`]: crate::support::material::light_material
+#[derive(Copy, Clone, Debug)]
+pub struct Light {
+    pub pos: Point,
+    /// 0 (off) to 1
+    pub intensity: f32,
+}
+
+/// One light per side of the board (top, bottom, left, right), each on that
+/// side's border level with the tip of the drawn head, and brighter the closer
+/// it is: off from [`LIGHT_RANGE`] cells away, full on the border.
+///
+/// A light per side rather than one on the nearest border point, so a light
+/// never jumps: going into a corner, the second one fades in beside the first.
+///
+/// TODO: the same lights where the head would come out on the other side.
+pub fn border_lights(body: &Body, gtx: &GameContext) -> [Light; 4] {
+    let (board_dim, cell_dim) = (gtx.board_dim, gtx.cell_dim);
+    let head = Centerline::of(body, gtx)
+        .head_tip()
+        .unwrap_or_else(|| body.segments[0].pos.to_cartesian(cell_dim) + Hexagon::center(cell_dim));
+    lights_at(head, board_dim, cell_dim)
+}
+
+/// The border lights for a head at `head`.
+///
+/// Each side of the border zigzags, so the point on it nearest the head hops
+/// from one tooth to the next as the head slides along, and the light with it.
+/// Instead, each side is taken as the straight line through the middle of its
+/// zigzag: the light is where the head is level with it, which moves exactly
+/// as the head does, and its brightness goes by the head's distance from it.
+fn lights_at(head: Point, board_dim: HexDim, cell_dim: CellDim) -> [Light; 4] {
+    let (mut min, mut max) = (
+        Point::from((f32::INFINITY, f32::INFINITY)),
+        Point::from((-f32::INFINITY, -f32::INFINITY)),
+    );
+    for (a, b, _) in border_segments(board_dim, cell_dim) {
+        for p in [a, b] {
+            (min.x, min.y) = (min.x.min(p.x), min.y.min(p.y));
+            (max.x, max.y) = (max.x.max(p.x), max.y.max(p.y));
+        }
+    }
+    // the top and bottom zigzag by half a cell (`sin`) between neighbouring
+    // columns, the left and right by `cos` between a corner and a side
+    let (top, bottom) = (min.y + cell_dim.sin / 2., max.y - cell_dim.sin / 2.);
+    let (left, right) = (min.x + cell_dim.cos / 2., max.x - cell_dim.cos / 2.);
+    let (x, y) = (head.x.clamp(min.x, max.x), head.y.clamp(min.y, max.y));
+    let sides = [
+        (Point::from((x, top)), (head.y - top).abs()),
+        (Point::from((x, bottom)), (head.y - bottom).abs()),
+        (Point::from((left, y)), (head.x - left).abs()),
+        (Point::from((right, y)), (head.x - right).abs()),
+    ];
+
+    let range = LIGHT_RANGE * cell_dim.height();
+    sides.map(|(pos, distance)| {
+        let t = (1. - distance / range).clamp(0., 1.);
+        Light {
+            pos,
+            intensity: t * t * (3. - 2. * t),
+        }
+    })
 }
 
 /// What the player would run into across each wrapping edge, marked on the edge
@@ -654,7 +736,14 @@ mod tests {
     /// that is no longer a cell side's middle: the ends slide along the edge.
     #[test]
     fn line_ends_stay_on_the_border_wherever_the_head_is() {
-        for (h, v) in [(3, 4), (0, 0), (0, 9), (9, 0), (BOARD.h - 1, BOARD.v - 1), (5, BOARD.v - 1)] {
+        for (h, v) in [
+            (3, 4),
+            (0, 0),
+            (0, 9),
+            (9, 0),
+            (BOARD.h - 1, BOARD.v - 1),
+            (5, BOARD.v - 1),
+        ] {
             let head = HexPoint { h, v };
             for heading in Dir::iter() {
                 for fraction in [0., 0.25, 0.5, 0.75, 1.] {
@@ -914,5 +1003,59 @@ mod tests {
         // the middle of a board far bigger than the range reaches nothing
         let body = body_at(HexPoint { h: 40, v: 40 }, Dir::U, 0.5);
         assert!(teleport_hints(&body, BIG, TINT).is_empty());
+    }
+
+    #[test]
+    fn a_light_brightens_on_the_border_nearest_the_head() {
+        let far = lights_at(cell_center(HexPoint { h: 10, v: 10 }), BOARD, CELL_DIM);
+        assert!(
+            far.iter().all(|light| light.intensity == 0.),
+            "the middle of the board is dark"
+        );
+
+        // a column up from the bottom-left corner, left of the middle: only the
+        // left side's light is on, and more so the closer the head is
+        let intensity = |h| lights_at(cell_center(HexPoint { h, v: 10 }), BOARD, CELL_DIM)[2];
+        let (near, nearer) = (intensity(2), intensity(0));
+        assert!(
+            0. < near.intensity && near.intensity < nearer.intensity,
+            "{near:?} {nearer:?}"
+        );
+        assert!(nearer.intensity > 0.9, "{nearer:?}");
+        assert_eq!(intensity(3).intensity, 0., "out of range");
+        // on the border, level with the head
+        assert!(
+            (near.pos.y - cell_center(HexPoint { h: 2, v: 10 }).y).abs() < 1e-3,
+            "{near:?}"
+        );
+        assert!(
+            near.pos.x < cell_center(HexPoint { h: 0, v: 10 }).x - CELL_DIM.cos,
+            "{near:?}"
+        );
+        let lights = lights_at(cell_center(HexPoint { h: 0, v: 10 }), BOARD, CELL_DIM);
+        for side in [0, 1, 3] {
+            assert_eq!(lights[side].intensity, 0., "side {side} is out of range");
+        }
+    }
+
+    /// Sliding along the border a little at a time, the light keeps up with the
+    /// head without ever jumping: it never moves more than the head does, and
+    /// its brightness stays put (the head stays level with the border).
+    #[test]
+    fn a_light_moves_smoothly_with_the_head() {
+        let start = cell_center(HexPoint { h: 2, v: 0 });
+        let step = 1.;
+        let mut last = lights_at(start, BOARD, CELL_DIM)[0];
+        assert!(last.intensity > 0., "{last:?}");
+        for k in 1..300 {
+            let head = start + Point::from((k as f32 * step, 0.));
+            let light = lights_at(head, BOARD, CELL_DIM)[0];
+            assert!(
+                (light.pos - last.pos).magnitude() <= step + 1e-3,
+                "{last:?} -> {light:?}"
+            );
+            assert!((light.intensity - last.intensity).abs() < 1e-6, "{last:?} -> {light:?}");
+            last = light;
+        }
     }
 }

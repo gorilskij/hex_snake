@@ -121,8 +121,9 @@ impl Controller for Programmed {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use Dir::*;
+
+    use super::*;
 
     fn pattern() -> Programmed {
         Programmed::new(vec![Move::Turn(U), Move::Wait(2), Move::Turn(Ur), Move::Wait(3)], D)

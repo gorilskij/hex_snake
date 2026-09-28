@@ -52,7 +52,9 @@ pub struct KeyInput {
 
 impl KeyInput {
     pub fn new() -> Self {
-        Self { subscriber: register_input_subscriber() }
+        Self {
+            subscriber: register_input_subscriber(),
+        }
     }
 
     /// The key presses since the last call. Call once per frame.
@@ -117,7 +119,13 @@ impl Key {
         use KeyCode::*;
 
         let code = match self {
-            Self::Char(c) => return KeyLabel { side: None, name: c.to_string(), small: false },
+            Self::Char(c) => {
+                return KeyLabel {
+                    side: None,
+                    name: c.to_string(),
+                    small: false,
+                }
+            }
             Self::Code(code) => code,
         };
 
@@ -142,19 +150,37 @@ impl Key {
             Up => return symbol("↑"),
             Right => return symbol("→"),
             Down => return symbol("↓"),
-            _ => return KeyLabel { side: None, name: code_name(code).to_string(), small: true },
+            _ => {
+                return KeyLabel {
+                    side: None,
+                    name: code_name(code).to_string(),
+                    small: true,
+                }
+            }
         };
 
         if mac {
-            KeyLabel { side, name: symbol.to_string(), small: false }
+            KeyLabel {
+                side,
+                name: symbol.to_string(),
+                small: false,
+            }
         } else {
-            KeyLabel { side, name: word.to_string(), small: true }
+            KeyLabel {
+                side,
+                name: word.to_string(),
+                small: true,
+            }
         }
     }
 }
 
 fn symbol(name: &str) -> KeyLabel {
-    KeyLabel { side: None, name: name.to_string(), small: false }
+    KeyLabel {
+        side: None,
+        name: name.to_string(),
+        small: false,
+    }
 }
 
 /// Every key code by name, for the stored preferences (a key code has no
@@ -240,7 +266,10 @@ impl Controls {
             Side::Right => ['J', 'K', 'L', 'M', ',', '.'],
         };
         let mut this = Self { keys: [None; 6] };
-        for (dir, c) in [Dir::Ul, Dir::U, Dir::Ur, Dir::Dl, Dir::D, Dir::Dr].into_iter().zip(chars) {
+        for (dir, c) in [Dir::Ul, Dir::U, Dir::Ur, Dir::Dl, Dir::D, Dir::Dr]
+            .into_iter()
+            .zip(chars)
+        {
             this.set(dir, Some(Key::Char(c)));
         }
         this
@@ -279,7 +308,12 @@ mod tests {
 
     #[test]
     fn stored_keys_read_back() {
-        for key in [Key::Char('J'), Key::Char(','), Key::Char('='), Key::Code(KeyCode::RightShift)] {
+        for key in [
+            Key::Char('J'),
+            Key::Char(','),
+            Key::Char('='),
+            Key::Code(KeyCode::RightShift),
+        ] {
             assert_eq!(Key::from_text(&key.to_text()), Some(key));
         }
         assert_eq!(Key::from_text("code:Nonsense"), None);

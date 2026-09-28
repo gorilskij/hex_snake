@@ -11,8 +11,8 @@ use crate::snake_control::appetite::Appetite;
 use crate::snake_control::pathfinder::Plan;
 use crate::view::snakes::Snakes;
 
-mod apple_seeker;
 pub mod appetite;
+mod apple_seeker;
 mod keyboard;
 mod killer;
 mod mouse;
@@ -179,11 +179,7 @@ impl Template {
             Template::Mouse => Box::new(Mouse),
             Template::Programmed(move_sequence) => Box::new(Programmed::new(move_sequence, start_dir)),
             Template::Killer => Box::new(Killer),
-            Template::AppleSeeker {
-                pathfinder,
-                targets,
-                appetite,
-            } => Box::new(AppleSeeker {
+            Template::AppleSeeker { pathfinder, targets, appetite } => Box::new(AppleSeeker {
                 pathfinder: pathfinder.into_pathfinder(),
                 targets,
                 appetite,

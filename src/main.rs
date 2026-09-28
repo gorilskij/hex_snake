@@ -98,10 +98,7 @@ fn player_seed(side: Side) -> snake::builder::Builder {
         // plan a route through the next three apples, not just the nearest one
         .autopilot_targets(3)
         // and go around the ones that would shrink it
-        .autopilot_appetite(Appetite {
-            shrink: -15,
-            ..Default::default()
-        })
+        .autopilot_appetite(Appetite { shrink: -15, ..Default::default() })
 }
 
 #[macroquad::main(window_conf)]

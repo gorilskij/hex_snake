@@ -27,17 +27,24 @@ const SECTION_GAP: f32 = 0.5;
 
 /// Dim the whole window, for a menu to be drawn over the game.
 pub fn draw_overlay() {
-    draw_rectangle(0., 0., screen_width(), screen_height(), Color::new(0., 0., 0., OVERLAY_ALPHA));
+    draw_rectangle(
+        0.,
+        0.,
+        screen_width(),
+        screen_height(),
+        Color::new(0., 0., 0., OVERLAY_ALPHA),
+    );
 }
 
 /// A full-size wide hexagon button `width` wide
 pub fn wide_button(width: f32, text: &str) -> ButtonData {
     let h_side = (width - 2. * BUTTON_CELL_DIM.cos).max(0.);
-    ButtonData::new(WideHexagon::with_h_side(BUTTON_CELL_DIM, h_side), STROKE_THICKNESS, BUTTON_COLOR).text(
-        text,
-        FONT_SIZE,
+    ButtonData::new(
+        WideHexagon::with_h_side(BUTTON_CELL_DIM, h_side),
+        STROKE_THICKNESS,
         BUTTON_COLOR,
     )
+    .text(text, FONT_SIZE, BUTTON_COLOR)
 }
 
 /// An "are you sure?" screen: `question` over Yes and No. Returns the answer
@@ -49,7 +56,13 @@ pub fn draw_confirm(question: &str) -> Option<bool> {
     let dims = measure_text(question, FONT_SIZE);
     let button_height = BUTTON_CELL_DIM.height();
     let text_y = height / 2. - button_height;
-    draw_text(question, (width - dims.width) / 2., text_y, FONT_SIZE, BUTTON_COLOR.normal);
+    draw_text(
+        question,
+        (width - dims.width) / 2.,
+        text_y,
+        FONT_SIZE,
+        BUTTON_COLOR.normal,
+    );
 
     let button_width = BUTTON_CELL_DIM.side * 5.;
     let gap = BUTTON_CELL_DIM.side * 2.;

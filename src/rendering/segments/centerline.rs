@@ -438,7 +438,11 @@ mod tests {
         use crate::basic::Dir;
 
         let gtx = gtx();
-        let tip_at = |fraction| Centerline::of(&turning_body(Dir::Ur, fraction), &gtx).head_tip().unwrap();
+        let tip_at = |fraction| {
+            Centerline::of(&turning_body(Dir::Ur, fraction), &gtx)
+                .head_tip()
+                .unwrap()
+        };
 
         // the tip moves smoothly all the way through the turn and out of it:
         // no step is much longer than the average one

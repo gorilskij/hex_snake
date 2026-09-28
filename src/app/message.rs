@@ -133,9 +133,19 @@ impl Message {
                 Position::TopLeft => self.h_margin,
                 Position::TopRight => screen_w - self.h_margin - width,
             };
-            (x - padding, self.v_margin - padding, width + 2. * padding, height + 2. * padding)
+            (
+                x - padding,
+                self.v_margin - padding,
+                width + 2. * padding,
+                height + 2. * padding,
+            )
         });
 
-        Some(MessageDrawable { lines, font_size: size, color, background })
+        Some(MessageDrawable {
+            lines,
+            font_size: size,
+            color,
+            background,
+        })
     }
 }

@@ -45,7 +45,10 @@ mod tests {
         let cell_dim = CellDim::from(10.);
         let hexagon = Hexagon::new(cell_dim);
         // straight below this point lies the hexagon's bottom-left vertex
-        let point = Point { x: cell_dim.cos, y: cell_dim.height() / 2. };
+        let point = Point {
+            x: cell_dim.cos,
+            y: cell_dim.height() / 2.,
+        };
         assert!(shape_point(&hexagon, point));
     }
 }

@@ -35,13 +35,18 @@ fn raster(font_size: f32) -> (u16, f32) {
 pub fn draw_text(text: &str, x: f32, y: f32, font_size: f32, color: Color) {
     let font = font();
     let (size, scale) = raster(font_size);
-    text::draw_text_ex(text, x, y, TextParams {
-        font: Some(&font),
-        font_size: size,
-        font_scale: scale,
-        color,
-        ..Default::default()
-    });
+    text::draw_text_ex(
+        text,
+        x,
+        y,
+        TextParams {
+            font: Some(&font),
+            font_size: size,
+            font_scale: scale,
+            color,
+            ..Default::default()
+        },
+    );
 }
 
 pub fn measure_text(text: &str, font_size: f32) -> TextDimensions {

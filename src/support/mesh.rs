@@ -66,7 +66,9 @@ pub fn build_ball(center: Point, radius: f32, color: impl Into<MqColor>) -> Mesh
         let disc = (p - center) / radius;
         Vertex::new(p.x, p.y, 0., disc.x, disc.y, color)
     };
-    let vertices = std::iter::once(vertex(center)).chain(rim.iter().map(|&p| vertex(p))).collect();
+    let vertices = std::iter::once(vertex(center))
+        .chain(rim.iter().map(|&p| vertex(p)))
+        .collect();
     // a fan around the center
     let n = rim.len() as u16;
     let indices = (0..n).flat_map(|i| [0, i + 1, (i + 1) % n + 1]).collect();
@@ -174,7 +176,11 @@ where
     }
     let white = MqColor::new(1., 1., 1., 1.);
     if let Surface::End(along) = surface {
-        assert_eq!(along.len(), cross_sections.len(), "one position along the end per cross-section");
+        assert_eq!(
+            along.len(),
+            cross_sections.len(),
+            "one position along the end per cross-section"
+        );
     }
     let mut vertices = Vec::with_capacity(cross_sections.len() * 2);
     for (k, &(inner, outer, frac)) in cross_sections.iter().enumerate() {

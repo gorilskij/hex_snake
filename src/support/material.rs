@@ -13,8 +13,13 @@
 use anyhow::{Context, Result};
 use macroquad::color::Color;
 use macroquad::material::{load_material, Material, MaterialParams};
-use macroquad::miniquad::{BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource};
+use macroquad::math::vec3;
+use macroquad::miniquad::{
+    BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource, UniformDesc, UniformType,
+};
 use macroquad::texture::{FilterMode, Texture2D};
+
+use crate::basic::Point;
 
 const VERTEX: &str = r#"#version 100
 precision highp float;
@@ -146,13 +151,84 @@ void main() {
 /// [`build_ball`]: crate::support::mesh::build_ball
 pub fn ball_material() -> Result<Material> {
     load_material(
-        ShaderSource::Glsl { vertex: BALL_VERTEX, fragment: BALL_FRAGMENT },
+        ShaderSource::Glsl {
+            vertex: BALL_VERTEX,
+            fragment: BALL_FRAGMENT,
+        },
         MaterialParams {
             pipeline_params: alpha_blending(),
             ..Default::default()
         },
     )
     .context("compiling ball shader")
+}
+
+const LIT_VERTEX: &str = r#"#version 100
+precision highp float;
+attribute vec3 position;
+attribute vec4 color0;
+varying vec2 board;
+varying vec4 color;
+uniform mat4 Model;
+uniform mat4 Projection;
+void main() {
+    gl_Position = Projection * Model * vec4(position, 1);
+    board = position.xy;
+    color = color0 / 255.0;
+}"#;
+
+// Shapes in the dark, showing only where the lights reach. Each light is its
+// position on the board and its intensity (0..1); it falls off smoothly to
+// nothing at `radius` from its center, and overlapping lights add up.
+const LIT_FRAGMENT: &str = r#"#version 100
+precision highp float;
+varying vec2 board;
+varying vec4 color;
+uniform vec3 light0;
+uniform vec3 light1;
+uniform vec3 light2;
+uniform vec3 light3;
+uniform float radius;
+float shine(vec3 light) {
+    vec2 d = (board - light.xy) / radius;
+    float f = max(0.0, 1.0 - dot(d, d));
+    return light.z * f * f;
+}
+void main() {
+    float lit = shine(light0) + shine(light1) + shine(light2) + shine(light3);
+    gl_FragColor = vec4(color.rgb, color.a * min(lit, 1.0));
+}"#;
+
+/// Draws ordinary (vertex-colored) meshes in the dark, showing them only where
+/// the lights set with [`set_lights`] reach: the light hints' grid and border.
+pub fn light_material() -> Result<Material> {
+    load_material(
+        ShaderSource::Glsl {
+            vertex: LIT_VERTEX,
+            fragment: LIT_FRAGMENT,
+        },
+        MaterialParams {
+            pipeline_params: alpha_blending(),
+            uniforms: vec![
+                UniformDesc::new("light0", UniformType::Float3),
+                UniformDesc::new("light1", UniformType::Float3),
+                UniformDesc::new("light2", UniformType::Float3),
+                UniformDesc::new("light3", UniformType::Float3),
+                UniformDesc::new("radius", UniformType::Float1),
+            ],
+            ..Default::default()
+        },
+    )
+    .context("compiling light shader")
+}
+
+/// Set the lights (board position, intensity) of a [`light_material`], and how
+/// far each one reaches.
+pub fn set_lights(material: &Material, lights: [(Point, f32); 4], radius: f32) {
+    for (k, (pos, intensity)) in lights.into_iter().enumerate() {
+        material.set_uniform(&format!("light{k}"), vec3(pos.x, pos.y, intensity));
+    }
+    material.set_uniform("radius", radius);
 }
 
 /// The default alpha-over blending the standard mesh path uses, so

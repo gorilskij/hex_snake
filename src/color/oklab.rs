@@ -19,12 +19,20 @@ use std::f64::consts::TAU;
 
 /// sRGB's transfer function, from an encoded channel in `[0, 1]` to linear light.
 fn decode(c: f64) -> f64 {
-    if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
 }
 
 /// And back.
 fn encode(c: f64) -> f64 {
-    if c <= 0.0031308 { c * 12.92 } else { 1.055 * c.powf(1. / 2.4) - 0.055 }
+    if c <= 0.0031308 {
+        c * 12.92
+    } else {
+        1.055 * c.powf(1. / 2.4) - 0.055
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

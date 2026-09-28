@@ -120,7 +120,14 @@ what the layout types — see below), then `next_frame().await`.
     the borders, drawn over the snake — snapped to the head's cell, or through
     the tip of the drawn head (`Centerline::head_tip`, the cap's apex, so the
     origin follows the arc through a turn), in which case each end is clipped
-    against the board's zigzag edge and slides along it. `HintStyle`, cycled from the
+    against the board's zigzag edge and slides along it; or as a light in the
+    dark — `HintStyle::Light` leaves the grid and border unseen except where
+    lights on the border show them (`border_lights` → `light_material`,
+    through which `game.rs` draws the grid and border): one per side of the
+    board, level with the head's tip on a straight line through the middle of
+    that side's zigzag (the nearest point on the zigzag itself hops from tooth
+    to tooth), brighter as the head closes in from `LIGHT_RANGE` (3 cells),
+    reaching `LIGHT_RADIUS` (3 cells). `HintStyle`, cycled from the
     options menu), `distance_grid.rs`,
     `portal/`, `board_dim.rs`.
   - `screen/snake_control_creator_screen.rs` — **out of the module tree**

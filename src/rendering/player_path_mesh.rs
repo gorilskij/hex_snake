@@ -116,7 +116,12 @@ pub fn player_path_mesh(
             [
                 (coming_from, -coming_from, SegmentFraction { start, end: 0.5 }, leg_idx),
                 // `start` matters here too: the head can be past the center
-                (-going_to, going_to, SegmentFraction { start: start.max(0.5), end }, leg_idx + 1),
+                (
+                    -going_to,
+                    going_to,
+                    SegmentFraction { start: start.max(0.5), end },
+                    leg_idx + 1,
+                ),
             ]
         } else {
             [
