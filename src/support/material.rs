@@ -13,7 +13,7 @@
 use anyhow::{Context, Result};
 use macroquad::color::Color;
 use macroquad::material::{load_material, Material, MaterialParams};
-use macroquad::math::vec3;
+use macroquad::math::vec4;
 use macroquad::miniquad::{
     BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource, UniformDesc, UniformType,
 };
@@ -177,43 +177,42 @@ void main() {
     color = color0 / 255.0;
 }"#;
 
+/// How many lights a [`light_material`] has room for.
+pub const MAX_LIGHTS: usize = 10;
+
 // Shapes in the dark, showing only where the lights reach. Each light is its
-// position on the board and its intensity (0..1); it falls off smoothly to
-// nothing at `radius` from its center, and overlapping lights add up.
+// position on the board and its intensity (0..1, in z); it falls off smoothly
+// to nothing at `radius` from its center, and overlapping lights add up.
+// MAX_LIGHTS is spliced in by light_material.
 const LIT_FRAGMENT: &str = r#"#version 100
 precision highp float;
 varying vec2 board;
 varying vec4 color;
-uniform vec3 light0;
-uniform vec3 light1;
-uniform vec3 light2;
-uniform vec3 light3;
+uniform vec4 lights[MAX_LIGHTS];
 uniform float radius;
-float shine(vec3 light) {
-    vec2 d = (board - light.xy) / radius;
-    float f = max(0.0, 1.0 - dot(d, d));
-    return light.z * f * f;
-}
 void main() {
-    float lit = shine(light0) + shine(light1) + shine(light2) + shine(light3);
+    float lit = 0.0;
+    for (int k = 0; k < MAX_LIGHTS; k++) {
+        vec2 d = (board - lights[k].xy) / radius;
+        float f = max(0.0, 1.0 - dot(d, d));
+        lit += lights[k].z * f * f;
+    }
     gl_FragColor = vec4(color.rgb, color.a * min(lit, 1.0));
 }"#;
 
 /// Draws ordinary (vertex-colored) meshes in the dark, showing them only where
 /// the lights set with [`set_lights`] reach: the light hints' grid and border.
 pub fn light_material() -> Result<Material> {
+    let fragment = LIT_FRAGMENT.replace("MAX_LIGHTS", &MAX_LIGHTS.to_string());
     load_material(
         ShaderSource::Glsl {
             vertex: LIT_VERTEX,
-            fragment: LIT_FRAGMENT,
+            fragment: &fragment,
         },
         MaterialParams {
             pipeline_params: alpha_blending(),
             uniforms: vec![
-                UniformDesc::new("light0", UniformType::Float3),
-                UniformDesc::new("light1", UniformType::Float3),
-                UniformDesc::new("light2", UniformType::Float3),
-                UniformDesc::new("light3", UniformType::Float3),
+                UniformDesc::new("lights", UniformType::Float4).array(MAX_LIGHTS),
                 UniformDesc::new("radius", UniformType::Float1),
             ],
             ..Default::default()
@@ -222,12 +221,19 @@ pub fn light_material() -> Result<Material> {
     .context("compiling light shader")
 }
 
-/// Set the lights (board position, intensity) of a [`light_material`], and how
-/// far each one reaches.
-pub fn set_lights(material: &Material, lights: [(Point, f32); 4], radius: f32) {
-    for (k, (pos, intensity)) in lights.into_iter().enumerate() {
-        material.set_uniform(&format!("light{k}"), vec3(pos.x, pos.y, intensity));
+/// Set the lights (board position, intensity) of a [`light_material`], at
+/// most [`MAX_LIGHTS`] of them, and how far each one reaches.
+pub fn set_lights(material: &Material, lights: &[(Point, f32)], radius: f32) {
+    assert!(
+        lights.len() <= MAX_LIGHTS,
+        "{} lights, room for {MAX_LIGHTS}",
+        lights.len()
+    );
+    let mut uniform = [vec4(0., 0., 0., 0.); MAX_LIGHTS];
+    for (slot, &(pos, intensity)) in uniform.iter_mut().zip(lights) {
+        *slot = vec4(pos.x, pos.y, intensity, 0.);
     }
+    material.set_uniform_array("lights", &uniform[..]);
     material.set_uniform("radius", radius);
 }
 

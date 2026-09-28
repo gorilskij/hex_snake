@@ -127,7 +127,11 @@ what the layout types — see below), then `next_frame().await`.
     board, level with the head's tip on a straight line through the middle of
     that side's zigzag (the nearest point on the zigzag itself hops from tooth
     to tooth), brighter as the head closes in from `LIGHT_RANGE` (3 cells),
-    reaching `LIGHT_RADIUS` (3 cells). `HintStyle`, cycled from the
+    reaching `LIGHT_RADIUS` (3 cells); and one per direction where the head
+    would come out, as bright as where it would leave: every line of cells
+    wraps onto itself, so that is where the line through the head's tip
+    leaves the smoothed border going the other way (all six directions, so
+    none pops on or off as the head turns). `HintStyle`, cycled from the
     options menu), `distance_grid.rs`,
     `portal/`, `board_dim.rs`.
   - `screen/snake_control_creator_screen.rs` — **out of the module tree**

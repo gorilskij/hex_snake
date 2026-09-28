@@ -685,7 +685,7 @@ impl Screen for Game {
             let body = &self.env.snakes[player_idx].body;
             let lights = border_hints::border_lights(body, &self.env.gtx).map(|light| (light.pos, light.intensity));
             let radius = border_hints::LIGHT_RADIUS * self.env.gtx.cell_dim.height();
-            set_lights(self.light_material.as_ref().unwrap(), lights, radius);
+            set_lights(self.light_material.as_ref().unwrap(), &lights, radius);
         }
         let light = self.light_material.as_ref().filter(|_| lit);
         let draw_lit = |mesh: &Option<Mesh>| match (mesh, light) {
