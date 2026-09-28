@@ -16,7 +16,7 @@ use crate::basic::Point;
 use crate::rendering::segments::descriptions::SegmentDescription;
 use crate::rendering::segments::smooth_segments::{cross_section_at, full_path_length};
 use crate::snake::SegmentType;
-use crate::support::mesh::{Mesh, build_shaded_ribbon};
+use crate::support::mesh::{Mesh, Surface, build_shaded_ribbon};
 
 /// Target on-screen spacing (px) between successive cap cross-sections.
 const CAP_STEP: f32 = 3.0;
@@ -208,10 +208,15 @@ fn build_cap(
         let phi_base_side = phi_of(span.tip_dist + span.len);
         let steps = ((radius * (phi_tip_side - phi_base_side) / CAP_STEP).ceil() as usize).clamp(2, 32);
 
-        let sections: Vec<(Point, Point, f32)> = (0..=steps)
+        let phis: Vec<f32> = (0..=steps)
             .map(|k| {
                 let t = k as f32 / steps as f32;
-                let phi = phi_base_side + (phi_tip_side - phi_base_side) * t;
+                phi_base_side + (phi_tip_side - phi_base_side) * t
+            })
+            .collect();
+        let sections: Vec<(Point, Point, f32)> = phis
+            .iter()
+            .map(|&phi| {
                 let dist_from_tip = radius * (1. - phi.sin());
                 let frac = span.tip_frac + end.away_sign() * (dist_from_tip - span.tip_dist) / lens[span.desc_idx];
 
@@ -223,10 +228,13 @@ fn build_cap(
             })
             .collect();
 
+        // lit as a hemisphere: sin φ is how far along the end a cross-section is
+        let along: Vec<f32> = phis.iter().map(|phi| phi.sin().clamp(0., 1.)).collect();
         build_shaded_ribbon(
             &sections,
             desc.seg_bounds(num_segments, lut_size),
             1.,
+            Surface::End(&along),
             desc.u_of(num_segments),
             desc.board_transform(),
         )

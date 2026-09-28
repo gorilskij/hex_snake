@@ -8,7 +8,7 @@ use macroquad::input::{KeyCode, mouse_position, show_mouse};
 use macroquad::material::Material;
 use macroquad::window::clear_background;
 
-use crate::app::border_hints::BorderHints;
+use crate::app::border_hints::{self, BorderHints};
 use crate::app::distance_grid::DistanceGrid;
 use crate::app::fps_control::{self, FpsControl};
 use crate::app::game_context::GameContext;
@@ -31,7 +31,7 @@ use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
-use crate::support::material::snake_material;
+use crate::support::material::{ball_material, light_material, set_lights, snake_material};
 use crate::support::mesh::{Mesh, set_board_camera};
 use crate::view::snakes::OtherSnakes;
 use crate::{apple, rendering};
@@ -63,6 +63,8 @@ pub struct Game {
     /// Shader material for coloring snakes from their palette LUT. Compiled
     /// lazily on first draw (needs a live GL context).
     snake_material: Option<Material>,
+    ball_material: Option<Material>,
+    light_material: Option<Material>,
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
@@ -142,6 +144,8 @@ impl Game {
             portal_mesh: None,
             snake_render: None,
             snake_material: None,
+            ball_material: None,
+            light_material: None,
             apple_mesh: None,
             distance_grid_mesh: None,
             player_path_mesh: None,
@@ -461,6 +465,7 @@ impl Game {
                     HintStyle::Teleport => "Teleport hints",
                     HintStyle::Lines => "Line hints",
                     HintStyle::SmoothLines => "Smooth line hints",
+                    HintStyle::Light => "Light hints",
                     HintStyle::None => "Hints off",
                 };
                 // start the new style fresh rather than fading from the old one's colors
@@ -646,7 +651,7 @@ impl Screen for Game {
         let (gradient_hint_mesh, over_snake_hint_mesh, border_hint_mesh) = match hint_style {
             HintStyle::Gradient => (hint_mesh, None, None),
             HintStyle::Lines | HintStyle::SmoothLines => (None, hint_mesh, None),
-            HintStyle::Border | HintStyle::Teleport | HintStyle::None => (None, None, hint_mesh),
+            HintStyle::Border | HintStyle::Teleport | HintStyle::Light | HintStyle::None => (None, None, hint_mesh),
         };
 
         let (player_snake, other_snakes) = OtherSnakes::split_snakes(&mut env.snakes, player_idx);
@@ -667,26 +672,48 @@ impl Screen for Game {
         if self.snake_material.is_none() {
             self.snake_material = Some(snake_material()?);
         }
+        if self.ball_material.is_none() {
+            self.ball_material = Some(ball_material()?);
+        }
+        // the light hints show the grid and border only where their lights are
+        let lit = hint_style == HintStyle::Light;
+        if lit {
+            if self.light_material.is_none() {
+                self.light_material = Some(light_material()?);
+            }
+            let body = &self.env.snakes[player_idx].body;
+            let lights = border_hints::border_lights(body, &self.env.gtx).map(|light| (light.pos, light.intensity));
+            let radius = border_hints::LIGHT_RADIUS * self.env.gtx.cell_dim.height();
+            set_lights(self.light_material.as_ref().unwrap(), &lights, radius);
+        }
+        let light = self.light_material.as_ref().filter(|_| lit);
+        let draw_lit = |mesh: &Option<Mesh>| match (mesh, light) {
+            (Some(mesh), Some(material)) => mesh.draw_shaded(material),
+            (Some(mesh), None) => mesh.draw(),
+            (None, _) => {}
+        };
 
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
-        let before_snake = [
-            &self.distance_grid_mesh,
-            &gradient_hint_mesh,
-            &self.grid_mesh,
-            &self.player_path_mesh,
-        ];
-        let after_snake = [
-            &over_snake_hint_mesh,
-            &self.player_path_over_mesh,
-            &self.apple_mesh,
-            &self.border_mesh,
-            &border_hint_mesh,
-            &self.portal_mesh,
-        ];
+        let before_grid = [&self.distance_grid_mesh, &gradient_hint_mesh];
+        let grid = [&self.grid_mesh];
+        let before_snake = [&self.player_path_mesh];
+        let over_snake = [&over_snake_hint_mesh, &self.player_path_over_mesh];
+        let apples = [&self.apple_mesh];
+        let border = [&self.border_mesh];
+        let after_border = [&border_hint_mesh, &self.portal_mesh];
 
         if self.env.gtx.prefs.display_stats {
-            let meshes = before_snake.iter().chain(after_snake.iter()).copied().flatten();
+            let meshes = before_grid
+                .iter()
+                .chain(&grid)
+                .chain(&before_snake)
+                .chain(&over_snake)
+                .chain(&apples)
+                .chain(&border)
+                .chain(&after_border)
+                .copied()
+                .flatten();
             let snake_meshes = self.snake_render.iter().flat_map(|render| render.pieces.iter());
             let stats = Stats {
                 polygons: meshes.chain(snake_meshes).map(Mesh::polygons).sum(),
@@ -698,7 +725,15 @@ impl Screen for Game {
         let message_drawables = Self::get_message_drawables(&mut self.messages);
 
         let has_snake = self.snake_render.as_ref().is_some_and(|r| !r.pieces.is_empty());
-        let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
+        let has_plain = before_grid
+            .iter()
+            .chain(&grid)
+            .chain(&before_snake)
+            .chain(&over_snake)
+            .chain(&apples)
+            .chain(&border)
+            .chain(&after_border)
+            .any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
             clear_background(self.env.gtx.palette.background_color);
@@ -708,6 +743,10 @@ impl Screen for Game {
             // batch, so per-mesh camera sets were the bulk of the frame's cost.
             set_board_camera(self.offset);
 
+            for mesh in before_grid.into_iter().flatten() {
+                mesh.draw();
+            }
+            draw_lit(&self.grid_mesh);
             for mesh in before_snake.into_iter().flatten() {
                 mesh.draw();
             }
@@ -719,7 +758,19 @@ impl Screen for Game {
                 }
             }
 
-            for mesh in after_snake.into_iter().flatten() {
+            for mesh in over_snake.into_iter().flatten() {
+                mesh.draw();
+            }
+
+            if let Some(mesh) = &self.apple_mesh {
+                match self.env.gtx.prefs.draw_style {
+                    rendering::Style::Smooth => mesh.draw_shaded(self.ball_material.as_ref().unwrap()),
+                    rendering::Style::Hexagon => mesh.draw(),
+                }
+            }
+
+            draw_lit(&self.border_mesh);
+            for mesh in after_border.into_iter().flatten() {
                 mesh.draw();
             }
 

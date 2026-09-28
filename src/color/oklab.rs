@@ -17,6 +17,24 @@
 
 use std::f64::consts::TAU;
 
+/// sRGB's transfer function, from an encoded channel in `[0, 1]` to linear light.
+fn decode(c: f64) -> f64 {
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+/// And back.
+fn encode(c: f64) -> f64 {
+    if c <= 0.0031308 {
+        c * 12.92
+    } else {
+        1.055 * c.powf(1. / 2.4) - 0.055
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OkLab {
     pub l: f64,
@@ -27,9 +45,9 @@ pub struct OkLab {
 impl From<(u8, u8, u8)> for OkLab {
     #[allow(clippy::many_single_char_names)]
     fn from(rgb: (u8, u8, u8)) -> Self {
-        let r = rgb.0 as f64 / 255.;
-        let g = rgb.1 as f64 / 255.;
-        let b = rgb.2 as f64 / 255.;
+        let r = decode(rgb.0 as f64 / 255.);
+        let g = decode(rgb.1 as f64 / 255.);
+        let b = decode(rgb.2 as f64 / 255.);
 
         let l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
         let m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
@@ -67,8 +85,9 @@ impl OkLab {
         )
     }
 
+    /// Linear-light sRGB, each channel in `[0, 1]` when the color is in gamut.
     #[allow(clippy::many_single_char_names)]
-    pub fn to_rgb(self) -> (u8, u8, u8) {
+    fn to_linear_rgb(self) -> (f64, f64, f64) {
         let OkLab { l, a, b } = self;
 
         let l_ = l + 0.3963377774 * a + 0.2158037573 * b;
@@ -79,10 +98,67 @@ impl OkLab {
         let m = m_ * m_ * m_;
         let s = s_ * s_ * s_;
 
-        let r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
-        let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
-        let b = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+        (
+            4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+            -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+            -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+        )
+    }
 
-        ((r * 255.) as u8, (g * 255.) as u8, (b * 255.) as u8)
+    /// Whether the color can be shown in sRGB as it is.
+    pub fn in_gamut(self) -> bool {
+        const EPSILON: f64 = 1e-9;
+        let (r, g, b) = self.to_linear_rgb();
+        [r, g, b].iter().all(|c| (-EPSILON..=1. + EPSILON).contains(c))
+    }
+
+    /// The most chroma a color of this lightness and hue can have in sRGB.
+    pub fn max_chroma(lightness: f64, hue: f64) -> f64 {
+        let (mut lo, mut hi) = (0., 0.5);
+        for _ in 0..32 {
+            let mid = (lo + hi) / 2.;
+            if Self::from_lch(lightness, mid, hue).in_gamut() {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    }
+
+    /// sRGB bytes; channels outside the gamut are clipped.
+    pub fn to_rgb(self) -> (u8, u8, u8) {
+        let (r, g, b) = self.to_linear_rgb();
+        let byte = |c: f64| (encode(c.clamp(0., 1.)) * 255.).round() as u8;
+        (byte(r), byte(g), byte(b))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn srgb_colors_come_back_as_they_went_in() {
+        for rgb in [(0, 0, 0), (255, 255, 255), (255, 0, 0), (12, 200, 99), (128, 128, 128)] {
+            assert_eq!(OkLab::from(rgb).to_rgb(), rgb);
+        }
+    }
+
+    #[test]
+    fn white_is_lightness_one_and_grey_has_no_chroma() {
+        let white = OkLab::from((255, 255, 255));
+        assert!((white.l - 1.).abs() < 1e-3 && white.a.abs() < 1e-3 && white.b.abs() < 1e-3);
+        let (_, chroma, _) = OkLab::from((128, 128, 128)).to_lch();
+        assert!(chroma < 1e-3);
+    }
+
+    #[test]
+    fn the_most_chroma_there_is_is_just_in_gamut() {
+        for hue in [0., 60., 120., 200., 264., 320.] {
+            let max = OkLab::max_chroma(0.75, hue);
+            assert!(OkLab::from_lch(0.75, max, hue).in_gamut());
+            assert!(!OkLab::from_lch(0.75, max + 0.01, hue).in_gamut());
+        }
     }
 }

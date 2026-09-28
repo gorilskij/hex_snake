@@ -13,6 +13,9 @@ single backend: **macroquad**.
 > is implemented and picked on the start screen. Most
 > recently (`menus` branch, merged): a start screen, in-game menus and
 > rebindable, layout-aware controls — see [Screens & menus](#screens--menus).
+> In progress (`graphics-updates` branch): lighting the snake as a
+> round tube with pill-shaped ends and the apples as balls, and an OkLab
+> constant-lightness rainbow — see [Snake coloring](#snake-coloring-shader-based).
 
 ## Build / run / test
 
@@ -123,7 +126,18 @@ what the layout types — see below), then `next_frame().await`.
     the borders, drawn over the snake — snapped to the head's cell, or through
     the tip of the drawn head (`Centerline::head_tip`, the cap's apex, so the
     origin follows the arc through a turn), in which case each end is clipped
-    against the board's zigzag edge and slides along it. `HintStyle`, cycled from the
+    against the board's zigzag edge and slides along it; or as a light in the
+    dark — `HintStyle::Light` leaves the grid and border unseen except where
+    lights on the border show them (`border_lights` → `light_material`,
+    through which `game.rs` draws the grid and border): one per side of the
+    board, level with the head's tip on a straight line through the middle of
+    that side's zigzag (the nearest point on the zigzag itself hops from tooth
+    to tooth), brighter as the head closes in from `LIGHT_RANGE` (3 cells),
+    reaching `LIGHT_RADIUS` (3 cells); and one per direction where the head
+    would come out, as bright as where it would leave: every line of cells
+    wraps onto itself, so that is where the line through the head's tip
+    leaves the smoothed border going the other way (all six directions, so
+    none pops on or off as the head turns). `HintStyle`, cycled from the
     options menu), `distance_grid.rs`,
     `portal/` (dormant: nothing creates a portal), `board_dim.rs`,
     `benchmark.rs` (test only).
@@ -165,7 +179,9 @@ what the layout types — see below), then `next_frame().await`.
   `Dir`/`Dir12` (hex directions), `CellDim` (side/sin/cos, `height()`, `center()`),
   `board.rs`.
 - **`color/`** — `Color` newtype over `macroquad::color::Color` with arithmetic
-  ops; `oklab.rs`, `to_color.rs` (HSL→Color).
+  ops; `oklab.rs` (OkLab ↔ sRGB, with the sRGB transfer function, and
+  `max_chroma`: the most chroma a lightness + hue has in gamut, by bisection),
+  `to_color.rs` (HSL→Color).
 - **`view/`** — `OtherSnakes`/`Snakes` borrowing helpers (`split_snakes`).
 - **`button/`** — immediate-mode polygon buttons (`Button`, `ButtonData`:
   outline, inner shapes, text spans; hit-tested on the exact outline) and the
@@ -303,6 +319,11 @@ That's **gone**. Now:
   segment owns a fixed slot of `lut_texels_per_segment` texels (so segment
   boundaries sit on texel edges regardless of length). This reuses all the
   existing HSL/OkLab/gradient math; the LUT *is* the whole-body gradient.
+  The default `rainbow()` is an OkLab sweep (`oklab_gradient`) at constant
+  lightness (0.62; eaten segments 0.8), each hue as saturated as the sRGB
+  gamut allows at that lightness, capped at chroma 0.2 — so reds, blues and
+  purples reach the cap while cyan (~0.1) and yellow (~0.135) are softer:
+  constant lightness *and* constant chroma would be limited by cyan.
 - **Draw** (`rendering/snake_mesh.rs` → `SnakeRender`): one `PaletteLut` per
   snake, baked as the `texture` of its shaded meshes. A snake is one mesh unless
   it crosses something: a crossing sets the crossing segment's `z_index` to the
@@ -314,8 +335,15 @@ That's **gone**. Now:
   lazily and calls `draw_shaded` per piece. The fragment shader samples the LUT by `uv.x`, clamped to the segment's
   own slot (`normal.xy`), and scales it by a per-vertex brightness (`normal.z`;
   1 for the body, lower for details like passability marks) (linear filtered →
-  smooth gradients; hard segment boundaries stay sharp). `uv.y` is currently
-  unused (reserved for across-width shading).
+  smooth gradients; hard segment boundaries stay sharp). Then it lights the
+  smooth body as a round tube from straight above, by `uv.y` (across the
+  width), and the round caps as hemispheres, like a pill's ends, by `normal.w`
+  (`Surface`: how far along the cap, `sin φ`; −1 for flat surfaces). Lambert
+  diffuse + a Blinn-Phong highlight down the middle; the constants are at the
+  top of the fragment shader (`lighting!`, shared with the apples: in the
+  smooth style they are balls lit the same way, `build_ball` +
+  `ball_material`, from their vertex color). Passability marks and the
+  hexagon style (snakes and apples) stay flat for now.
 
 Key files: `support/material.rs`, `snake/palette.rs` (`build_snake_lut`),
 `rendering/snake_mesh.rs`, `rendering/segments/{smooth_segments/mod,point_factory,
@@ -465,8 +493,14 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   similar localized effect and want a shared approach.
 - **Hunger mode follow-ups** — starving has no animation yet (the game just
   freezes at `hunger::MIN_LENGTH`, `State::Starved`).
-- **`uv.y` (across-width)** is emitted but unused — hook for tube/curvature
-  shading later.
+- **Snake lighting follow-ups** (`graphics-updates`): the first pass
+  (light straight from above) is in but **untuned and not yet looked at**:
+  the four constants at the top of the fragment shader were picked by
+  reasoning, not by eye. Then: a light from a fixed direction on screen
+  (off-center highlight; needs each vertex's across direction — the vertex
+  color is free for it), passability marks as part of the tube instead of a
+  flat 2D overlay (they'd take the body's `uv.y` where they sit), and the
+  hexagon style (flat for now, `uv.y` fixed at 0.5).
 - **Perf, more generally:** each frame rebuilds the snake mesh and the border
   hints; worth trimming if frame work ever matters (it measured ≤ 2 ms in a
   release wasm build at 120 Hz).

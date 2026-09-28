@@ -55,6 +55,26 @@ pub fn build_circle(mode: DrawMode, center: Point, radius: f32, color: impl Into
     build_polygon(mode, &circle_points(center, radius), color)
 }
 
+/// Build a ball for the ball shader ([`ball_material`]): a circle whose `uv` is
+/// where each vertex is on it, from the center `(0, 0)` to the rim (length 1).
+///
+/// [`ball_material`]: crate::support::material::ball_material
+pub fn build_ball(center: Point, radius: f32, color: impl Into<MqColor>) -> Mesh {
+    let color = color.into();
+    let rim = circle_points(center, radius);
+    let vertex = |p: Point| {
+        let disc = (p - center) / radius;
+        Vertex::new(p.x, p.y, 0., disc.x, disc.y, color)
+    };
+    let vertices = std::iter::once(vertex(center))
+        .chain(rim.iter().map(|&p| vertex(p)))
+        .collect();
+    // a fan around the center
+    let n = rim.len() as u16;
+    let indices = (0..n).flat_map(|i| [0, i + 1, (i + 1) % n + 1]).collect();
+    Mesh::raw(vertices, indices)
+}
+
 /// Build a flat-colored open stroke (polyline) of width `width`.
 pub fn build_line(points: &[Point], width: f32, color: impl Into<MqColor>) -> Mesh {
     let (vertices, indices) = tessellate_stroke(points, width, false, color.into());
@@ -75,6 +95,23 @@ pub fn build_colored_polygon(points: &[(Point, MqColor)]) -> Mesh {
     Mesh::raw(vertices, indices)
 }
 
+/// How the snake shader lights a surface (passed in `normal.w`).
+#[derive(Copy, Clone)]
+pub enum Surface<'a> {
+    /// The palette color as it is (details drawn over the body, hexagons).
+    Flat,
+    /// A round tube lit from above, across `uv.y`: the body.
+    Tube,
+    /// The rounded end of a tube, like the end of a pill: each cross-section's
+    /// position along the end, from 0 where it joins the body to 1 at its tip
+    /// (the sine of the angle over the hemisphere).
+    End(&'a [f32]),
+}
+
+/// What `normal.w` holds for a flat surface; a tube's is its position along
+/// its end, in `[0, 1]`.
+const FLAT: f32 = -1.;
+
 /// Build a filled polygon whose color comes from a shader (via a palette LUT)
 /// rather than a flat vertex color. `default_points` are the polygon outline in
 /// the segment's *default orientation*; `uv_of` maps each tessellated vertex
@@ -82,6 +119,7 @@ pub fn build_colored_polygon(points: &[(Point, MqColor)]) -> Mesh {
 /// `transform` places the vertex on the board. Computing uv before the transform
 /// keeps it in body space (rotation/translation invariant); the vertex color is
 /// unused by the snake shader, so it is left white. `brightness` scales the sampled color.
+/// The polygon is drawn [`Surface::Flat`].
 pub fn build_shaded_polygon<U, T>(default_points: &[Point], brightness: f32, uv_of: U, transform: T) -> Mesh
 where
     U: Fn(Point) -> (f32, f32),
@@ -93,7 +131,7 @@ where
     }
     let white = MqColor::new(1., 1., 1., 1.);
     // seg_bounds (0,1) → the shader's clamp is a no-op (flat color per poly)
-    let bounds = vec4(0., 1., brightness, 0.);
+    let bounds = vec4(0., 1., brightness, FLAT);
     let vertices = positions
         .into_iter()
         .map(|p| {
@@ -118,11 +156,14 @@ where
 /// `seg_bounds` is this segment's `(lo, hi)` uv range; it is passed to every
 /// vertex (in `normal.xy`) so the shader can clamp the LUT lookup to it, keeping
 /// color boundaries on the geometry seam instead of a texel. `brightness`
-/// (passed in `normal.z`) scales the sampled color.
+/// (passed in `normal.z`) scales the sampled color, and `surface` (in
+/// `normal.w`) says how it is lit; an [`Surface::End`] has one value per
+/// cross-section.
 pub fn build_shaded_ribbon<U, T>(
     cross_sections: &[(Point, Point, f32)],
     seg_bounds: (f32, f32),
     brightness: f32,
+    surface: Surface,
     u_of: U,
     transform: T,
 ) -> Mesh
@@ -134,9 +175,21 @@ where
         return Mesh::empty();
     }
     let white = MqColor::new(1., 1., 1., 1.);
-    let bounds = vec4(seg_bounds.0, seg_bounds.1, brightness, 0.);
+    if let Surface::End(along) = surface {
+        assert_eq!(
+            along.len(),
+            cross_sections.len(),
+            "one position along the end per cross-section"
+        );
+    }
     let mut vertices = Vec::with_capacity(cross_sections.len() * 2);
-    for &(inner, outer, frac) in cross_sections {
+    for (k, &(inner, outer, frac)) in cross_sections.iter().enumerate() {
+        let lighting = match surface {
+            Surface::Flat => FLAT,
+            Surface::Tube => 0.,
+            Surface::End(along) => along[k],
+        };
+        let bounds = vec4(seg_bounds.0, seg_bounds.1, brightness, lighting);
         let u = u_of(frac);
         let ti = transform(inner);
         let to = transform(outer);

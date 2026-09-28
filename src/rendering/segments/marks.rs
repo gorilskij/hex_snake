@@ -16,7 +16,7 @@ use crate::rendering;
 use crate::rendering::segments::descriptions::{SegmentDescription, TurnType};
 use crate::rendering::segments::smooth_segments::{ArcParams, arc_params, cross_section_at};
 use crate::rendering::shape::{Hexagon, Shape};
-use crate::support::mesh::{Mesh, build_shaded_polygon, build_shaded_ribbon};
+use crate::support::mesh::{Mesh, Surface, build_shaded_polygon, build_shaded_ribbon};
 
 // Dimensions are first guesses, to be tuned by eye.
 
@@ -157,6 +157,8 @@ fn build_line(
         &sections,
         desc.seg_bounds(num_segments, lut_size),
         BRIGHTNESS,
+        // a plain 2D overlay for now, not part of the tube
+        Surface::Flat,
         desc.u_of(num_segments),
         desc.board_transform(),
     )

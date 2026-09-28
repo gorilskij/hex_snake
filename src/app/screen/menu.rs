@@ -66,6 +66,7 @@ impl Toggle {
                     HintStyle::Teleport => "teleport",
                     HintStyle::Lines => "lines",
                     HintStyle::SmoothLines => "smooth lines",
+                    HintStyle::Light => "light",
                     HintStyle::None => "off",
                 }
             ),

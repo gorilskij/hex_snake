@@ -38,6 +38,9 @@ pub enum HintStyle {
     Lines,
     /// The same, following the head itself rather than its cell
     SmoothLines,
+    /// The grid and border stay dark except where a light on the border near
+    /// the head shows them, brighter the closer the head is
+    Light,
     None,
 }
 
@@ -129,6 +132,7 @@ mod names {
             HintStyle::Teleport => "teleport",
             HintStyle::Lines => "lines",
             HintStyle::SmoothLines => "smooth_lines",
+            HintStyle::Light => "light",
             HintStyle::None => "none",
         }
     }
@@ -140,6 +144,7 @@ mod names {
             "teleport" => Some(HintStyle::Teleport),
             "lines" => Some(HintStyle::Lines),
             "smooth_lines" => Some(HintStyle::SmoothLines),
+            "light" => Some(HintStyle::Light),
             "none" => Some(HintStyle::None),
             _ => None,
         }
