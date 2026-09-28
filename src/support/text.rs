@@ -8,7 +8,7 @@
 //! few fixed sizes, and scaled from the nearest one above.
 
 use macroquad::color::Color;
-use macroquad::text::{self, load_ttf_font_from_bytes, Font, TextDimensions, TextParams};
+use macroquad::text::{self, Font, TextDimensions, TextParams, load_ttf_font_from_bytes};
 
 thread_local! {
     static FONT: Font = load_ttf_font_from_bytes(include_bytes!("../../assets/fonts/DejaVuSans.ttf"))

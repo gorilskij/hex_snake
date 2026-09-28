@@ -4,10 +4,9 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
-use macroquad::input::{mouse_position, show_mouse, KeyCode};
+use macroquad::input::{KeyCode, mouse_position, show_mouse};
 use macroquad::material::Material;
 use macroquad::window::clear_background;
-use rand::prelude::*;
 
 use crate::app::distance_grid::DistanceGrid;
 use crate::app::fps_control::{self, FpsControl};
@@ -26,13 +25,13 @@ use crate::app::snake_management::{
 };
 use crate::app::stats::Stats;
 use crate::app::{light_hints, message};
-use crate::apple::spawn::{expire_apples, food_apple, spawn_apples, spawn_bad_apples, SpawnPolicy};
+use crate::apple::spawn::{SpawnPolicy, expire_apples, food_apple, spawn_apples, spawn_bad_apples};
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
 use crate::support::material::{ball_material, light_material, set_lights, snake_material};
-use crate::support::mesh::{set_board_camera, Mesh};
+use crate::support::mesh::{Mesh, set_board_camera};
 use crate::view::snakes::OtherSnakes;
 use crate::{apple, rendering};
 
@@ -126,7 +125,7 @@ impl Game {
                     apple_spawn_policy,
                     mode,
                 ),
-                rng: thread_rng(),
+                rng: rand::rng(),
             },
             fps_control: FpsControl::new(),
 

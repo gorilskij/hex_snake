@@ -1,9 +1,10 @@
-use std::cmp::{max, Ordering};
+use std::cmp::{Ordering, max};
 use std::fmt::{Debug, Error, Formatter};
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-use num_traits::Zero;
 use Dir::*;
+use derive_more::{Add, Div};
+use num_traits::Zero;
 
 use super::dir::{Axis, Dir};
 use crate::basic::{CellDim, Point};

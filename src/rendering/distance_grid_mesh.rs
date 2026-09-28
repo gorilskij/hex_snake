@@ -6,7 +6,7 @@ use crate::app::distance_grid::{Distance, DistanceGrid};
 use crate::app::game_context::GameContext;
 use crate::color::lerp;
 use crate::rendering::shape::{Hexagon, Shape};
-use crate::support::mesh::{build_polygon, DrawMode, Mesh};
+use crate::support::mesh::{DrawMode, Mesh, build_polygon};
 
 const ALPHA: f32 = 0.3;
 const CLOSEST_COLOR: Color = Color::from_rgba(51, 204, 51, 255).with_alpha(ALPHA);

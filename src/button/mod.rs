@@ -6,7 +6,7 @@
 //! screen space: the caller sets the default camera first.
 
 use macroquad::color::Color;
-use macroquad::input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton};
+use macroquad::input::{MouseButton, is_mouse_button_down, is_mouse_button_pressed, mouse_position};
 use macroquad::text::TextDimensions;
 
 use crate::basic::Point;
@@ -30,9 +30,9 @@ pub mod style {
     /// Cell size of a full-size button, independent of the window size
     pub const BUTTON_CELL_DIM: CellDim = CellDim { side: 30., sin: 25.980762, cos: 15. };
 }
-use crate::rendering::shape::collisions::shape_point;
 use crate::rendering::shape::ShapePoints;
-use crate::support::mesh::{build_polygon, DrawMode, Mesh};
+use crate::rendering::shape::collisions::shape_point;
+use crate::support::mesh::{DrawMode, Mesh, build_polygon};
 use crate::support::text::{draw_text, measure_text};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -240,10 +240,8 @@ impl Button {
         let hovered = self.is_hovered();
         let clicked = hovered && is_mouse_button_pressed(MouseButton::Left);
 
-        if clicked {
-            if let ButtonType::Rotate { options, index } = &mut self.button_type {
-                *index = (*index + 1) % options.len();
-            }
+        if clicked && let ButtonType::Rotate { options, index } = &mut self.button_type {
+            *index = (*index + 1) % options.len();
         }
 
         let state = match (hovered, is_mouse_button_down(MouseButton::Left)) {

@@ -4,8 +4,8 @@ use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use super::{Committed, Goals, Leg, Obstacle, Obstacles, Path, PathFinder, Start};
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexPoint};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::view::snakes::Snakes;
 
 /// The cost of each thing a path does. The search finds the cheapest path to

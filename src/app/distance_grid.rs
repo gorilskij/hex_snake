@@ -4,8 +4,8 @@ use std::mem;
 use itertools::Itertools;
 
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Snake;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::snake_control::pathfinder::Obstacles;
 use crate::view::snakes::Snakes;
 

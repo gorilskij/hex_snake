@@ -1,24 +1,16 @@
-#![feature(stmt_expr_attributes)]
-#![feature(exhaustive_patterns)]
 #![deny(unused_must_use)]
-
-#[macro_use]
-extern crate derive_more;
-#[macro_use]
-extern crate lazy_static;
-extern crate core;
 
 use enum_map_lite::enum_map;
 use macroquad::input::get_keys_released;
-use macroquad::window::{next_frame, screen_height, screen_width, Conf};
+use macroquad::window::{Conf, next_frame, screen_height, screen_width};
 
+use crate::app::Palette;
 use crate::app::key::KeyInput;
 use crate::app::screen::{Screen, StartScreen, Transition};
-use crate::app::Palette;
 use crate::apple::spawn::SpawnPolicy;
 use crate::basic::{CellDim, Side};
-use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::SegmentType;
+use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake_control::appetite::Appetite;
 use crate::snake_control::pathfinder;
 
@@ -36,18 +28,21 @@ mod apple;
 mod rendering;
 pub mod snake_control;
 
-// On wasm32-unknown-unknown there is no default `getrandom` backend; supply one
-// backed by macroquad's PRNG so `rand`/`thread_rng` work without wasm-bindgen.
-// On native targets the OS backend is used and this is ignored.
-getrandom::register_custom_getrandom!(macroquad_getrandom);
-
-#[allow(dead_code)]
-fn macroquad_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+/// On wasm32-unknown-unknown there is no default `getrandom` backend; this is
+/// the custom one `.cargo/config.toml` selects there, backed by macroquad's
+/// PRNG, so `rand` works without wasm-bindgen. Native targets use the OS.
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+unsafe extern "Rust" fn __getrandom_v03_custom(dest: *mut u8, len: usize) -> Result<(), getrandom::Error> {
+    // SAFETY: getrandom hands over `len` writable bytes at `dest` (possibly
+    // uninitialized, hence written before the slice is made)
+    let buf = unsafe {
+        std::ptr::write_bytes(dest, 0, len);
+        std::slice::from_raw_parts_mut(dest, len)
+    };
     for chunk in buf.chunks_mut(4) {
         let bytes = macroquad::rand::rand().to_le_bytes();
-        for (b, rb) in chunk.iter_mut().zip(bytes.iter()) {
-            *b = *rb;
-        }
+        chunk.copy_from_slice(&bytes[..chunk.len()]);
     }
     Ok(())
 }
@@ -104,7 +99,7 @@ fn player_seed(side: Side) -> snake::builder::Builder {
 #[macroquad::main(window_conf)]
 async fn main() {
     // macroquad's PRNG starts from a fixed state, and on wasm it's also what
-    // backs `thread_rng` (see `macroquad_getrandom`), so every page load would
+    // backs `rand::rng()` (see `__getrandom_v03_custom`), so every page load would
     // replay the same apples. Seed it from the wall clock (`get_time` counts
     // from startup, so it wouldn't vary).
     macroquad::rand::srand(macroquad::miniquad::date::now().to_bits());

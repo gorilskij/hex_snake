@@ -5,10 +5,9 @@ use anyhow::Result;
 use enum_map_lite::enum_map;
 use macroquad::camera::set_default_camera;
 use macroquad::color::Color;
-use macroquad::input::{show_mouse, KeyCode};
+use macroquad::input::{KeyCode, show_mouse};
 use macroquad::material::Material;
 use macroquad::window::{clear_background, screen_height, screen_width};
-use rand::prelude::*;
 
 use super::Game;
 use crate::app::fps_control::FpsControl;
@@ -31,7 +30,7 @@ use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
 use crate::snake::{self, PaletteTemplate, Snake};
 use crate::snake_control::Template;
 use crate::support::material::snake_material;
-use crate::support::mesh::{set_board_camera, Mesh};
+use crate::support::mesh::{Mesh, set_board_camera};
 use crate::support::text::{draw_text, measure_text};
 
 /// Palettes a player can pick from
@@ -120,7 +119,7 @@ impl SnakeDemo {
                     SpawnPolicy::None,
                     GameMode::Classic,
                 ),
-                rng: thread_rng(),
+                rng: rand::rng(),
             },
             palettes,
             current_palette: 0,
@@ -638,10 +637,10 @@ impl Screen for StartScreen {
             .map(|(seed, demo)| {
                 let mut seed = seed.clone().palette(demo.palette()).starvation(mode.starvation());
                 // a single player uses whichever keys the preferences pick
-                if players == 1 {
-                    if let Some(Template::Keyboard { side, .. }) = &mut seed.controller {
-                        *side = None;
-                    }
+                if players == 1
+                    && let Some(Template::Keyboard { side, .. }) = &mut seed.controller
+                {
+                    *side = None;
                 }
                 seed
             })

@@ -30,6 +30,8 @@ pub trait Shape {
         center_of(&Self::raw_points(cell_dim))
     }
 
+    // a shape is only ever its points
+    #[allow(clippy::new_ret_no_self)]
     fn new(cell_dim: CellDim) -> ShapePoints {
         ShapePoints {
             points: Self::raw_points(cell_dim),

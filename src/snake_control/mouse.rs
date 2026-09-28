@@ -5,8 +5,8 @@ use macroquad::input::mouse_position;
 use crate::app::game_context::GameContext;
 use crate::apple::Apple;
 use crate::basic::{CellDim, Dir, HexPoint, Point};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 

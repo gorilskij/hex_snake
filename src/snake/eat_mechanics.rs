@@ -1,4 +1,4 @@
-use enum_map_lite::{enum_map, EnumMap};
+use enum_map_lite::{EnumMap, enum_map};
 
 use crate::snake::{self, Segment, SegmentType};
 

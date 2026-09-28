@@ -5,11 +5,11 @@ use crate::apple::Apple;
 use crate::basic::{Dir, HexDim, HexPoint};
 use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::{Body, SegmentType};
+use crate::snake_control::Controller;
 use crate::snake_control::appetite::Appetite;
 use crate::snake_control::pathfinder::{
-    surroundings, Committed, Goals, Leg, Obstacle, Obstacles, Path, PathFinder, Plan,
+    Committed, Goals, Leg, Obstacle, Obstacles, Path, PathFinder, Plan, surroundings,
 };
-use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 
 /// More targets than this is a planning mistake, not a configuration: each one

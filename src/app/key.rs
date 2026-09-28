@@ -7,8 +7,8 @@
 //! (modifiers, arrows, …) keep their key code. Nothing here knows the layout;
 //! the character arrives from the OS right after the key press.
 
-use macroquad::input::utils::{register_input_subscriber, repeat_all_miniquad_input};
 use macroquad::input::KeyCode;
+use macroquad::input::utils::{register_input_subscriber, repeat_all_miniquad_input};
 use macroquad::miniquad::{EventHandler, KeyMods};
 
 use crate::basic::{Dir, Side};
@@ -76,10 +76,10 @@ struct Collector {
 
 impl Collector {
     fn flush(&mut self) {
-        if let Some((code, repeat)) = self.pending.take() {
-            if !repeat {
-                self.presses.push(Key::Code(code));
-            }
+        if let Some((code, repeat)) = self.pending.take()
+            && !repeat
+        {
+            self.presses.push(Key::Code(code));
         }
     }
 }
@@ -124,7 +124,7 @@ impl Key {
                     side: None,
                     name: c.to_string(),
                     small: false,
-                }
+                };
             }
             Self::Code(code) => code,
         };
@@ -155,7 +155,7 @@ impl Key {
                     side: None,
                     name: code_name(code).to_string(),
                     small: true,
-                }
+                };
             }
         };
 

@@ -85,7 +85,7 @@ impl Default for Prefs {
 /// on the enums because they are a file-format concern: renaming a variant
 /// should not silently invalidate everyone's saved preferences.
 mod names {
-    use super::{rendering, Dir, DrawGrid, Side};
+    use super::{Dir, DrawGrid, Side, rendering};
 
     pub fn draw_grid(value: DrawGrid) -> &'static str {
         match value {

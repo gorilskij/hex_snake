@@ -3,7 +3,7 @@
 //! come back in (see [`border_lights`]).
 
 use crate::app::game_context::GameContext;
-use crate::basic::{board, CellDim, Dir, HexDim, HexPoint, Point};
+use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point, board};
 use crate::rendering::segments::centerline::Centerline;
 use crate::rendering::shape::{Hexagon, Shape};
 use crate::snake::Body;

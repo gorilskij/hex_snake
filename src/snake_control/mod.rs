@@ -1,12 +1,12 @@
-use itertools::{repeat_n, Itertools};
+use itertools::{Itertools, repeat_n};
 pub use programmed::Move;
 
 use crate::app::game_context::GameContext;
 use crate::app::key::Key;
 use crate::apple::Apple;
 use crate::basic::{Dir, Side};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::snake_control::appetite::Appetite;
 use crate::snake_control::pathfinder::Plan;
 use crate::view::snakes::Snakes;

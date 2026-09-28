@@ -8,7 +8,7 @@ use crate::apple::Apple;
 use crate::color::to_color::ToColor;
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape};
-use crate::support::mesh::{build_ball, build_polygon, DrawMode, Mesh};
+use crate::support::mesh::{DrawMode, Mesh, build_ball, build_polygon};
 
 /// The apples: flat hexagons in the hexagon style, and balls (for
 /// [`ball_material`]) in the smooth one.

@@ -11,8 +11,8 @@ use with_backup::WithBackup;
 
 use crate::app::game_context::GameContext;
 use crate::basic::{Dir, HexDim, HexPoint};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::view::snakes::Snakes;
 
 pub type Path = VecDeque<HexPoint>;
@@ -113,6 +113,7 @@ pub struct Goals {
 /// Collecting several targets is not a mode of the search — it is the caller
 /// chaining legs, each starting where the last one ended (see [`Plan`]).
 pub trait PathFinder {
+    #[allow(clippy::too_many_arguments)]
     fn get_path(
         &self,
         start: Start,

@@ -13,11 +13,11 @@ use lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, LineCap, LineJoin, StrokeOptions, StrokeTessellator,
     StrokeVertex, VertexBuffers,
 };
-use macroquad::camera::{set_camera, Camera2D};
+use macroquad::camera::{Camera2D, set_camera};
 use macroquad::color::Color as MqColor;
-use macroquad::material::{gl_use_default_material, gl_use_material, Material};
+use macroquad::material::{Material, gl_use_default_material, gl_use_material};
 use macroquad::math::{vec2, vec4};
-use macroquad::models::{draw_mesh, Mesh as MqMesh, Vertex};
+use macroquad::models::{Mesh as MqMesh, Vertex, draw_mesh};
 use macroquad::texture::Texture2D;
 use macroquad::window::{screen_height, screen_width};
 

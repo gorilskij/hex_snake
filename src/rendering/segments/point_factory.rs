@@ -3,7 +3,7 @@ use crate::rendering;
 use crate::rendering::segments::descriptions::{SegmentDescription, TurnDirection, TurnType};
 use crate::rendering::segments::hexagon_segments::hexagon_outline;
 use crate::rendering::segments::smooth_segments::segment_cross_sections;
-use crate::support::mesh::{build_shaded_polygon, build_shaded_ribbon, Mesh, Surface};
+use crate::support::mesh::{Mesh, Surface, build_shaded_polygon, build_shaded_ribbon};
 
 impl SegmentDescription {
     /// Whether this segment's default-orientation geometry must be mirrored
@@ -19,7 +19,7 @@ impl SegmentDescription {
 
     /// The flip/rotate/translate that places default-orientation points on the
     /// board (mirrors the old `ShapePoints` transform chain).
-    pub fn board_transform(&self) -> impl Fn(Point) -> Point {
+    pub fn board_transform(&self) -> impl Fn(Point) -> Point + use<> {
         let flip = self.is_flipped();
         let center = self.cell_dim.center();
         let rotation_angle = Dir::U.clockwise_angle_to(self.turn.coming_from);
@@ -40,7 +40,7 @@ impl SegmentDescription {
     /// point into this segment's default orientation. All three steps are
     /// isometries, so distances are the same in either space — which lets a
     /// distance query run against the default-orientation geometry directly.
-    pub fn inverse_board_transform(&self) -> impl Fn(Point) -> Point {
+    pub fn inverse_board_transform(&self) -> impl Fn(Point) -> Point + use<> {
         let flip = self.is_flipped();
         let center = self.cell_dim.center();
         let rotation_angle = Dir::U.clockwise_angle_to(self.turn.coming_from);
@@ -62,7 +62,7 @@ impl SegmentDescription {
     /// Body coordinate runs head→tail. The head-side of a segment is at
     /// frac == 1, so its head→tail offset is (1 - frac); the global coordinate
     /// is seg_idx + that.
-    pub fn u_of(&self, num_segments: usize) -> impl Fn(f32) -> f32 {
+    pub fn u_of(&self, num_segments: usize) -> impl Fn(f32) -> f32 + use<> {
         let seg_idx = self.segment_idx as f32;
         let num = num_segments.max(1) as f32;
         move |frac: f32| (seg_idx + (1.0 - frac)) / num

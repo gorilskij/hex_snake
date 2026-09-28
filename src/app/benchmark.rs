@@ -5,8 +5,6 @@
 
 use std::time::{Duration, Instant};
 
-use rand::thread_rng;
-
 use crate::app::game_context::GameContext;
 use crate::app::game_mode::GameMode;
 use crate::app::prefs::Prefs;
@@ -15,7 +13,7 @@ use crate::app::snake_management::{
     advance_snakes, find_collisions, handle_apple_collisions, handle_snake_collisions, relocate_covered_apples,
     spawn_snakes, update_snake_dirs,
 };
-use crate::apple::spawn::{expire_apples, spawn_apples, spawn_bad_apples, SpawnPolicy};
+use crate::apple::spawn::{SpawnPolicy, expire_apples, spawn_apples, spawn_bad_apples};
 use crate::basic::{CellDim, HexDim};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::eat_mechanics::{EatBehavior, EatMechanics};
@@ -55,8 +53,10 @@ struct Timings {
 /// One game's worth of ticks, as `Game::update` runs them, minus drawing.
 fn run(targets: usize) -> Timings {
     // plain apples only: no snakes spawning, killers need a player to chase
-    let mut prefs = Prefs::default();
-    prefs.special_apples = false;
+    let prefs = Prefs {
+        special_apples: false,
+        ..Default::default()
+    };
     let mut env = Environment {
         snakes: vec![],
         apples: vec![],
@@ -69,7 +69,7 @@ fn run(targets: usize) -> Timings {
             SpawnPolicy::Random { apple_count: APPLES },
             GameMode::Classic,
         ),
-        rng: thread_rng(),
+        rng: rand::rng(),
     };
     let seed = competitor(targets);
     spawn_snakes(&mut env, vec![seed.clone(); SNAKES]).unwrap();

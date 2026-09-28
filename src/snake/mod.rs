@@ -10,7 +10,7 @@ use crate::apple::Apple;
 use crate::basic::{Dir, Frames, HexDim, HexPoint};
 use crate::snake::eat_mechanics::{EatMechanics, Knowledge};
 use crate::snake_control;
-use crate::snake_control::{pathfinder, Controller};
+use crate::snake_control::{Controller, pathfinder};
 use crate::view::snakes::Snakes;
 
 pub mod builder;

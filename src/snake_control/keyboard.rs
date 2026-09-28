@@ -4,8 +4,8 @@ use crate::app::game_context::GameContext;
 use crate::app::key::Key;
 use crate::apple::Apple;
 use crate::basic::{Dir, Side};
-use crate::snake::eat_mechanics::Knowledge;
 use crate::snake::Body;
+use crate::snake::eat_mechanics::Knowledge;
 use crate::snake_control::Controller;
 use crate::view::snakes::Snakes;
 

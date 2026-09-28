@@ -5,7 +5,7 @@ use num_integer::Integer;
 use crate::app::game_context::GameContext;
 use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::rendering::shape::{Hexagon, Shape};
-use crate::support::mesh::{build_circle, build_line, DrawMode, Mesh};
+use crate::support::mesh::{DrawMode, Mesh, build_circle, build_line};
 
 /// The grid over the whole board, one line per cell edge.
 pub fn grid_mesh(gtx: &GameContext) -> Result<Mesh> {

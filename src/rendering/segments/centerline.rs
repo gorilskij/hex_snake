@@ -434,8 +434,8 @@ mod tests {
     /// the corner, and jumps back onto the path when the turn ends.
     #[test]
     fn the_tip_follows_the_turn() {
-        use crate::basic::board::cartesian_step;
         use crate::basic::Dir;
+        use crate::basic::board::cartesian_step;
 
         let gtx = gtx();
         let tip_at = |fraction| {
