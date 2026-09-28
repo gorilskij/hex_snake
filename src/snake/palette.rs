@@ -64,6 +64,8 @@ pub enum PaletteTemplate {
         tail_hue: f64,
         lightness: f64,
         eaten_lightness: f64,
+        /// The most chroma any hue gets (see [`OkLabGradient`])
+        max_chroma: f64,
     },
     /// Segments are fixed to the board
     AlternatingFixed {
@@ -107,23 +109,29 @@ impl PaletteTemplate {
         }
     }
 
-    pub fn oklab_gradient(head_hue: f64, tail_hue: f64, lightness: f64, eaten_lightness: f64) -> Self {
+    pub fn oklab_gradient(head_hue: f64, tail_hue: f64, lightness: f64, eaten_lightness: f64, max_chroma: f64) -> Self {
         Self::OkLabGradient {
             head_hue,
             tail_hue,
             lightness,
             eaten_lightness,
+            max_chroma,
         }
     }
 
     // red -> purple
     const HSL_RAINBOW: (f64, f64) = (-20., 290.);
+    /// The same two ends in OkLab hue.
+    const OKLAB_RED_TO_PURPLE: (f64, f64) = (15., 319.);
 
     // green -> red (yellows are very ugly in oklab)
     const OKLAB_RAINBOW: (f64, f64) = (147.3, 428.);
 
+    /// Red to purple at constant lightness, the HSL rainbow's hues (see
+    /// [`Self::HSL_RAINBOW`]) without its swings from dark blue to bright
+    /// yellow.
     pub fn rainbow() -> Self {
-        Self::hsl_gradient(Self::HSL_RAINBOW.0, Self::HSL_RAINBOW.1, 0.4, 0.7)
+        Self::oklab_gradient(Self::OKLAB_RED_TO_PURPLE.0, Self::OKLAB_RED_TO_PURPLE.1, 0.62, 0.8, 0.2)
     }
 
     pub fn pastel_rainbow() -> Self {
@@ -135,11 +143,11 @@ impl PaletteTemplate {
     }
 
     pub fn green_to_red() -> Self {
-        Self::oklab_gradient(Self::OKLAB_RAINBOW.0, Self::OKLAB_RAINBOW.1, 0.6, 0.7)
+        Self::oklab_gradient(Self::OKLAB_RAINBOW.0, Self::OKLAB_RAINBOW.1, 0.6, 0.7, 0.2)
     }
 
     pub fn dark_blue_to_red() -> Self {
-        Self::oklab_gradient(250., Self::OKLAB_RAINBOW.1, 0.3, 0.3)
+        Self::oklab_gradient(250., Self::OKLAB_RAINBOW.1, 0.3, 0.3, 0.2)
     }
 
     pub fn alternating_white() -> Self {
@@ -173,6 +181,8 @@ pub enum SegmentStyle {
         start_hue: f64,
         end_hue: f64,
         lightness: f64,
+        start_chroma: f64,
+        end_chroma: f64,
     },
 }
 
@@ -191,9 +201,16 @@ impl SegmentStyle {
                 }
                 .to_color()
             }),
-            SegmentStyle::OkLabGradient { start_hue, end_hue, lightness } => {
-                Box::new(move |f| OkLab::from_lch(lightness, 0.5, f * start_hue + (1. - f) * end_hue).to_color())
-            }
+            SegmentStyle::OkLabGradient {
+                start_hue,
+                end_hue,
+                lightness,
+                start_chroma,
+                end_chroma,
+            } => Box::new(move |f| {
+                let chroma = f * start_chroma + (1. - f) * end_chroma;
+                OkLab::from_lch(lightness, chroma, f * start_hue + (1. - f) * end_hue).to_color()
+            }),
         }
     }
 }
@@ -268,11 +285,13 @@ impl From<PaletteTemplate> for Box<dyn Palette + Send + Sync> {
                 tail_hue,
                 lightness,
                 eaten_lightness,
+                max_chroma,
             } => Box::new(OkLabGradient {
                 head_hue,
                 tail_hue,
                 lightness,
                 eaten_lightness,
+                max_chroma,
             }),
             PaletteTemplate::AlternatingFixed { color1, color2 } => Box::new(AlternatingFixed {
                 color1,
@@ -393,11 +412,23 @@ impl Palette for HSLGradient {
     }
 }
 
+/// A hue sweep at constant lightness: every part of the snake is equally
+/// light, as the eye sees it. Each hue is as saturated as sRGB allows at that
+/// lightness, up to `max_chroma`, so nothing clips. That can't be the same for
+/// every hue (cyan has the least room, a third of what purple has), so the
+/// cap keeps the vivid ones from standing out too far.
 pub struct OkLabGradient {
     head_hue: f64,
     tail_hue: f64,
     lightness: f64,
+    /// Eaten segments are the same sweep at another lightness.
     eaten_lightness: f64,
+    max_chroma: f64,
+}
+
+/// How much chroma a hue of the sweep gets at `lightness`.
+fn sweep_chroma(lightness: f64, hue: f64, max_chroma: f64) -> f64 {
+    OkLab::max_chroma(lightness, hue).min(max_chroma)
 }
 
 impl Palette for OkLabGradient {
@@ -411,21 +442,16 @@ impl Palette for OkLabGradient {
             let r = i as f64 + body.swallowed as f64 + body.head_fraction as f64;
             let start_hue = self.head_hue + (self.tail_hue - self.head_hue) * r / logical_len;
             let end_hue = self.head_hue + (self.tail_hue - self.head_hue) * (r + 1.) / logical_len;
+            let style = |lightness| SegmentStyle::OkLabGradient {
+                start_hue,
+                end_hue,
+                lightness,
+                start_chroma: sweep_chroma(lightness, start_hue, self.max_chroma),
+                end_chroma: sweep_chroma(lightness, end_hue, self.max_chroma),
+            };
             match segment.segment_type {
-                Normal => SegmentStyle::OkLabGradient {
-                    start_hue,
-                    end_hue,
-                    lightness: self.lightness,
-                },
-                Eaten { .. } => {
-                    // invert lightness twice
-                    let start_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, start_hue);
-                    let end_okl = OkLab::from_lch(1. - self.eaten_lightness, 0.5, end_hue);
-                    SegmentStyle::RGBGradient {
-                        start_color: invert_rgb(start_okl.to_color()),
-                        end_color: invert_rgb(end_okl.to_color()),
-                    }
-                }
+                Normal => style(self.lightness),
+                Eaten { .. } => style(self.eaten_lightness),
                 Crashed => SegmentStyle::Solid(*DEFAULT_CRASHED_COLOR),
             }
         }))
@@ -566,3 +592,47 @@ impl Palette for Alternating {
 //         }
 //     }
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MAX_CHROMA: f64 = 0.2;
+
+    /// The rainbow as it reaches the screen (sRGB bytes), all along the sweep,
+    /// with the chroma each hue was meant to have.
+    fn rainbow_colors(lightness: f64) -> Vec<(OkLab, f64)> {
+        let (from, to) = PaletteTemplate::OKLAB_RED_TO_PURPLE;
+        (0..=100)
+            .map(|k| {
+                // one short segment per sample, so the chroma is the hue's own
+                let hue = from + (to - from) * k as f64 / 100.;
+                let chroma = sweep_chroma(lightness, hue, MAX_CHROMA);
+                let style = SegmentStyle::OkLabGradient {
+                    start_hue: hue,
+                    end_hue: hue,
+                    lightness,
+                    start_chroma: chroma,
+                    end_chroma: chroma,
+                };
+                let color = style.color_at_fraction()(0.5);
+                let byte = |c: f32| (c * 255.).round() as u8;
+                (OkLab::from((byte(color.r), byte(color.g), byte(color.b))), chroma)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_rainbow_is_equally_light_throughout_and_as_saturated_as_it_can_be() {
+        for lightness in [0.62, 0.8] {
+            let colors = rainbow_colors(lightness);
+            // what is left is rounding to bytes
+            for (color, chroma) in &colors {
+                assert!((color.l - lightness).abs() < 0.005, "lightness {} for {lightness}", color.l);
+                assert!((color.to_lch().1 - chroma).abs() < 0.01, "chroma {} for {chroma}", color.to_lch().1);
+            }
+            let most = colors.iter().map(|&(_, chroma)| chroma).fold(0., f64::max);
+            assert!((most - MAX_CHROMA).abs() < 1e-9, "the vivid hues reach the cap: {most}");
+        }
+    }
+}
