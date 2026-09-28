@@ -32,7 +32,7 @@ use crate::basic::{CellDim, Dir, HexDim, HexPoint, Point};
 use crate::snake::builder::Builder as SnakeBuilder;
 use crate::snake::{self, Snake};
 use crate::support::flip::Flip;
-use crate::support::material::snake_material;
+use crate::support::material::{ball_material, snake_material};
 use crate::support::mesh::{set_board_camera, Mesh};
 use crate::view::snakes::OtherSnakes;
 use crate::{apple, rendering};
@@ -64,6 +64,7 @@ pub struct Game {
     /// Shader material for coloring snakes from their palette LUT. Compiled
     /// lazily on first draw (needs a live GL context).
     snake_material: Option<Material>,
+    ball_material: Option<Material>,
     apple_mesh: Option<Mesh>,
     distance_grid_mesh: Option<Mesh>,
     player_path_mesh: Option<Mesh>,
@@ -143,6 +144,7 @@ impl Game {
             portal_mesh: None,
             snake_render: None,
             snake_material: None,
+            ball_material: None,
             apple_mesh: None,
             distance_grid_mesh: None,
             player_path_mesh: None,
@@ -669,6 +671,9 @@ impl Screen for Game {
         if self.snake_material.is_none() {
             self.snake_material = Some(snake_material()?);
         }
+        if self.ball_material.is_none() {
+            self.ball_material = Some(ball_material()?);
+        }
 
         // Meshes drawn on the default material, split around the snake so the
         // snake keeps its old z-order (below apples/border, above grid/paths).
@@ -678,17 +683,18 @@ impl Screen for Game {
             &self.grid_mesh,
             &self.player_path_mesh,
         ];
-        let after_snake = [
-            &over_snake_hint_mesh,
-            &self.player_path_over_mesh,
-            &self.apple_mesh,
-            &self.border_mesh,
-            &border_hint_mesh,
-            &self.portal_mesh,
-        ];
+        let over_snake = [&over_snake_hint_mesh, &self.player_path_over_mesh];
+        let apples = [&self.apple_mesh];
+        let after_apples = [&self.border_mesh, &border_hint_mesh, &self.portal_mesh];
 
         if self.env.gtx.prefs.display_stats {
-            let meshes = before_snake.iter().chain(after_snake.iter()).copied().flatten();
+            let meshes = before_snake
+                .iter()
+                .chain(&over_snake)
+                .chain(&apples)
+                .chain(&after_apples)
+                .copied()
+                .flatten();
             let snake_meshes = self.snake_render.iter().flat_map(|render| render.pieces.iter());
             let stats = Stats {
                 polygons: meshes.chain(snake_meshes).map(Mesh::polygons).sum(),
@@ -700,7 +706,12 @@ impl Screen for Game {
         let message_drawables = Self::get_message_drawables(&mut self.messages);
 
         let has_snake = self.snake_render.as_ref().is_some_and(|r| !r.pieces.is_empty());
-        let has_plain = before_snake.iter().chain(after_snake.iter()).any(|m| m.is_some());
+        let has_plain = before_snake
+            .iter()
+            .chain(&over_snake)
+            .chain(&apples)
+            .chain(&after_apples)
+            .any(|m| m.is_some());
 
         if !message_drawables.is_empty() || has_snake || has_plain {
             clear_background(self.env.gtx.palette.background_color);
@@ -721,7 +732,18 @@ impl Screen for Game {
                 }
             }
 
-            for mesh in after_snake.into_iter().flatten() {
+            for mesh in over_snake.into_iter().flatten() {
+                mesh.draw();
+            }
+
+            if let Some(mesh) = &self.apple_mesh {
+                match self.env.gtx.prefs.draw_style {
+                    rendering::Style::Smooth => mesh.draw_shaded(self.ball_material.as_ref().unwrap()),
+                    rendering::Style::Hexagon => mesh.draw(),
+                }
+            }
+
+            for mesh in after_apples.into_iter().flatten() {
                 mesh.draw();
             }
 

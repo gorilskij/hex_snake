@@ -8,8 +8,12 @@ use crate::apple::Apple;
 use crate::color::to_color::ToColor;
 use crate::rendering;
 use crate::rendering::shape::{Hexagon, Shape};
-use crate::support::mesh::{build_circle, build_polygon, DrawMode, Mesh};
+use crate::support::mesh::{build_ball, build_polygon, DrawMode, Mesh};
 
+/// The apples: flat hexagons in the hexagon style, and balls (for
+/// [`ball_material`]) in the smooth one.
+///
+/// [`ball_material`]: crate::support::material::ball_material
 pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration) -> Result<Mesh> {
     assert!(!apples.is_empty(), "tried to draw a mesh with 0 apples");
 
@@ -36,7 +40,7 @@ pub fn apple_mesh(apples: &[Apple], gtx: &GameContext, elapsed_total: Duration) 
             rendering::Style::Smooth => {
                 let dest = apple.pos.to_cartesian(gtx.cell_dim) + gtx.cell_dim.center();
                 let radius = gtx.cell_dim.side / 2.;
-                parts.push(build_circle(DrawMode::fill(), dest, radius, color));
+                parts.push(build_ball(dest, radius, color));
             }
         }
     }

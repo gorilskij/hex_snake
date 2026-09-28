@@ -55,6 +55,24 @@ pub fn build_circle(mode: DrawMode, center: Point, radius: f32, color: impl Into
     build_polygon(mode, &circle_points(center, radius), color)
 }
 
+/// Build a ball for the ball shader ([`ball_material`]): a circle whose `uv` is
+/// where each vertex is on it, from the center `(0, 0)` to the rim (length 1).
+///
+/// [`ball_material`]: crate::support::material::ball_material
+pub fn build_ball(center: Point, radius: f32, color: impl Into<MqColor>) -> Mesh {
+    let color = color.into();
+    let rim = circle_points(center, radius);
+    let vertex = |p: Point| {
+        let disc = (p - center) / radius;
+        Vertex::new(p.x, p.y, 0., disc.x, disc.y, color)
+    };
+    let vertices = std::iter::once(vertex(center)).chain(rim.iter().map(|&p| vertex(p))).collect();
+    // a fan around the center
+    let n = rim.len() as u16;
+    let indices = (0..n).flat_map(|i| [0, i + 1, (i + 1) % n + 1]).collect();
+    Mesh::raw(vertices, indices)
+}
+
 /// Build a flat-colored open stroke (polyline) of width `width`.
 pub fn build_line(points: &[Point], width: f32, color: impl Into<MqColor>) -> Mesh {
     let (vertices, indices) = tessellate_stroke(points, width, false, color.into());

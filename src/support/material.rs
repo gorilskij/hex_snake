@@ -37,6 +37,24 @@ void main() {
     along = normal.w;
 }"#;
 
+// The light both shaders share: from straight above, with the eye there too,
+// so all that counts is how much a surface faces up (`up`, 0..1). Diffuse
+// light (Lambert) is that, and the specular highlight (Blinn-Phong) a power of
+// it.
+macro_rules! lighting {
+    () => {
+        r#"
+const float AMBIENT = 0.45;
+const float DIFFUSE = 0.55;
+const float SPECULAR = 0.2;
+const float SHININESS = 24.0;
+vec3 light(vec3 base, float up) {
+    return base * (AMBIENT + DIFFUSE * up) + SPECULAR * pow(up, SHININESS);
+}
+"#
+    };
+}
+
 // Samples the palette LUT by uv.x ("distance along body"). The LUT is a
 // single-row texture, so v is fixed at 0.5.
 //
@@ -50,24 +68,22 @@ void main() {
 // less for darker details drawn over it, like passability marks).
 //
 // Finally it is lit, unless the surface is flat (along < 0). The body is a
-// round tube lit from straight above: uv.y runs across it, so x = 2·uv.y − 1 is
-// where on the tube's cross-section the pixel is, and √(1 − x²) how much its
-// surface faces up. The ends are hemispheres, like a pill's: along (0 where an
-// end joins the body, 1 at its tip) tilts the surface away along the body too,
-// so it faces up by √(1 − along²)·√(1 − x²). Facing up is all that counts with
-// the light and the eye both straight above: diffuse light (Lambert) is that,
-// and the specular highlight (Blinn-Phong) a power of it.
-const FRAGMENT: &str = r#"#version 100
+// round tube: uv.y runs across it, so x = 2·uv.y − 1 is where on the tube's
+// cross-section the pixel is, and √(1 − x²) how much its surface faces up. The
+// ends are hemispheres, like a pill's: along (0 where an end joins the body, 1
+// at its tip) tilts the surface away along the body too, so it faces up by
+// √(1 − along²)·√(1 − x²).
+const FRAGMENT: &str = concat!(
+    r#"#version 100
 precision highp float;
 varying vec2 uv;
 varying vec2 seg_bounds;
 varying float brightness;
 varying float along;
 uniform sampler2D Texture;
-const float AMBIENT = 0.45;
-const float DIFFUSE = 0.55;
-const float SPECULAR = 0.2;
-const float SHININESS = 24.0;
+"#,
+    lighting!(),
+    r#"
 void main() {
     float u = clamp(uv.x, seg_bounds.x, seg_bounds.y);
     vec4 color = texture2D(Texture, vec2(u, 0.5));
@@ -78,28 +94,78 @@ void main() {
     }
     float x = uv.y * 2.0 - 1.0;
     float up = sqrt(max(0.0, 1.0 - x * x)) * sqrt(max(0.0, 1.0 - along * along));
-    vec3 lit = base * (AMBIENT + DIFFUSE * up) + SPECULAR * pow(up, SHININESS);
-    gl_FragColor = vec4(lit, color.a);
-}"#;
+    gl_FragColor = vec4(light(base, up), color.a);
+}"#
+);
 
 pub fn snake_material() -> Result<Material> {
     load_material(
         ShaderSource::Glsl { vertex: VERTEX, fragment: FRAGMENT },
         MaterialParams {
-            // Match the default alpha-over blending the standard mesh path
-            // uses, so semi-transparent segments composite the same way.
-            pipeline_params: PipelineParams {
-                color_blend: Some(BlendState::new(
-                    Equation::Add,
-                    BlendFactor::Value(BlendValue::SourceAlpha),
-                    BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
-                )),
-                ..Default::default()
-            },
+            pipeline_params: alpha_blending(),
             ..Default::default()
         },
     )
     .context("compiling snake shader")
+}
+
+const BALL_VERTEX: &str = r#"#version 100
+precision highp float;
+attribute vec3 position;
+attribute vec2 texcoord;
+attribute vec4 color0;
+varying vec2 disc;
+varying vec4 color;
+uniform mat4 Model;
+uniform mat4 Projection;
+void main() {
+    gl_Position = Projection * Model * vec4(position, 1);
+    disc = texcoord;
+    color = color0 / 255.0;
+}"#;
+
+// A ball in the vertex color, lit like the snake: disc is where on the ball
+// the pixel is, from its center (0, 0) to its rim (length 1), so its surface
+// faces up by √(1 − |disc|²).
+const BALL_FRAGMENT: &str = concat!(
+    r#"#version 100
+precision highp float;
+varying vec2 disc;
+varying vec4 color;
+"#,
+    lighting!(),
+    r#"
+void main() {
+    float up = sqrt(max(0.0, 1.0 - dot(disc, disc)));
+    gl_FragColor = vec4(light(color.rgb, up), color.a);
+}"#
+);
+
+/// Draws [`build_ball`] meshes (the apples) as balls lit like the snake.
+///
+/// [`build_ball`]: crate::support::mesh::build_ball
+pub fn ball_material() -> Result<Material> {
+    load_material(
+        ShaderSource::Glsl { vertex: BALL_VERTEX, fragment: BALL_FRAGMENT },
+        MaterialParams {
+            pipeline_params: alpha_blending(),
+            ..Default::default()
+        },
+    )
+    .context("compiling ball shader")
+}
+
+/// The default alpha-over blending the standard mesh path uses, so
+/// semi-transparent shapes composite the same way.
+fn alpha_blending() -> PipelineParams {
+    PipelineParams {
+        color_blend: Some(BlendState::new(
+            Equation::Add,
+            BlendFactor::Value(BlendValue::SourceAlpha),
+            BlendFactor::OneMinusValue(BlendValue::SourceAlpha),
+        )),
+        ..Default::default()
+    }
 }
 
 /// A 1-D palette lookup texture: one row of RGBA texels, sampled by body
