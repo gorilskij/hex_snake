@@ -359,18 +359,32 @@ Tested in `centerline.rs`: every vertex of the real rendered ribbon sits
   hints report every apple as `Outcome::Apple` (green) — bad apples need their own
   outcome/color.
 
-## Deploy (separate, in progress)
+## Deploy
 
-Meant to be served at `games.gorilskij.com/hexsnake` behind a Cloudflare Worker
-reverse-proxy (each game its own Pages project; the Astro site is the landing).
-See `web/cf-build.sh` (Cloudflare Pages build: installs Rust, release-builds,
-stages wasm) and the `pub-website`/`test-website` branches.
+Served at `gorilskij.com/games/hexsnake/` (test: `test.gorilskij.com/games/hexsnake/`,
+behind Access) by the Cloudflare Workers `hex-snake` / `hex-snake-test`
+(`wrangler.toml`): static assets from `web/dist`, staged by `web/cf-build.sh`
+under `games/hexsnake/`, on a Worker route in front of the site's Worker;
+`web/worker.js` only runs when no file matches and passes the request on to
+the site (its 404 page). No `*.workers.dev`/preview addresses. The whole
+hosting picture (all projects) is in the site repo's CLAUDE.md
+(`~/code/site/gorilskij.com`, Hosting). (Until the 2026-10 migration is cut
+over, prod is still the old Pages project behind the site's router at
+`games.gorilskij.com/hexsnake/`.)
 
-- **Branch flow:** work → `master` → merge into `test-website` (builds the
-  test.gorilskij.com version) → merge into `pub-website` (builds the
-  gorilskij.com version). Pages project `hex-snake`: production branch
-  `pub-website`, previews only for `test-website`; pushes to any other branch are
-  recorded as skipped deployments.
-- **Pages rejects files over 25 MiB.** The release profile keeps debuginfo (for
-  native profiling), so `cf-build.sh` builds with `CARGO_PROFILE_RELEASE_DEBUG=false`
-  (~1 MiB wasm instead of ~25 MiB).
+- **Branch flow:** work → `master` → merge into `test-website` (deploys test)
+  → merge into `pub-website` (deploys prod). Workers Builds: build
+  `bash web/cf-build.sh`, deploy `npx wrangler deploy` (`pub-website`) /
+  `npx wrangler deploy --env test` (`test-website`); other branches don't build.
+- **Only `web/dist` is published** (the page, the vendored JS and the wasm),
+  not the rest of `web/` (the build scripts were public under Pages).
+- **Static assets reject files over 25 MiB.** The release profile keeps debuginfo
+  (for native profiling), so `cf-build.sh` builds with `CARGO_PROFILE_RELEASE_DEBUG=false`
+  (~2 MiB wasm instead of ~25 MiB).
+- **Preferences live in the browser's localStorage, per origin**: moving the
+  game from `games.gorilskij.com` to `gorilskij.com` starts everyone with
+  default preferences once.
+- **Open:** the console logs `Plugin quad_storage version mismatch` (the
+  vendored `quad-storage.js` is 0.1.4; the crate reports another version).
+  Present on the old deploy too (2026-10-02); whether preferences still save
+  was not checked.
