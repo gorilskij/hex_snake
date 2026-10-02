@@ -31,7 +31,6 @@ changes; it has them now.
 | `test-website`, `pub-website` | deploy branches |
 | `autopilot-improvements`, `exact-digestion`, `game-modes`, `gameplay-improvements`, `graphics-updates`, `hints`, `light-hints`, `menus`, `shaders`, `snake-speed`, `storage`, `todo-backlog`, `dev`, `round-ends` | merged, kept as pointers |
 | `faster-graphics` (16 commits, 2024-05, "checkpoint, crashing"), `gameplay-proto` (3, 2026-07: dynamic wormholes, power apples), `alt-portals` (2, 2026-07), `pub` (2, 2026-06, the old `pub` before `pub-website`), `round-ends-ghetto-variant`, `round-ends-proper` (1 each) | **unmerged** experiments |
-| `workers` | the 2026-10-02 hosting change, merged; local only |
 
 The owner's main checkout (`~/code/rust/hex_snake`) is on `light-hints`, which equals `master`'s
 state of 2026-09-28.
