@@ -3,7 +3,16 @@ Snake on a hexagonal board.
 
 When you hit the wall, where you get teleported depends on the direction you were going, makes sense right?
 
-[Video Demo](https://youtu.be/REm_7UsyWT4)
+Play it in the browser: [gorilskij.com/games/hexsnake/](https://gorilskij.com/games/hexsnake/),
+or natively with `cargo run`.
+
+One or two players, two game modes — **Classic** (apples are digested: an eaten segment travels
+down your body, and you can pass through it until it is digested) and **Hunger** (apples grow you
+at once, you shrink steadily, bad apples shrink you more) — AI snakes that compete for apples or
+hunt you, an autopilot that plans several apples ahead, and hints on the border showing where you
+would come out.
+
+[Video Demo](https://youtu.be/REm_7UsyWT4) (an older version)
 
 ## Controls
 
@@ -45,6 +54,8 @@ Debug keys:
 
 ## Screenshots
 
+These are from an older version of the game; it looks different now.
+
 The head of the snake is red, the tail is purple.
 In Classic mode, eating an apple leaves a segment you can pass through
 until it has been digested.
@@ -57,3 +68,7 @@ Sometimes you will spawn an AI snake that will
 annoyingly compete for your apples (or one that will
 try to kill you, or both).
 ![](https://i.snipboard.io/5iRPYM.jpg)
+
+## Development
+
+Documentation for working on the game: [`docs/`](docs/README.md).

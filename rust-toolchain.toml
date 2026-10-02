@@ -1,7 +1,7 @@
 [toolchain]
-# The crate uses nightly-only features (see the `#![feature(...)]` attrs in
-# src/main.rs), so pin nightly. `targets` makes rustup auto-install the wasm
-# target on first build — important for the Cloudflare Pages builder, which
-# starts from a clean toolchain.
+# Nightly: the crate itself needs no nightly feature any more, but rustfmt.toml
+# uses nightly-only options. Not pinned to a date (see docs/backlog.md).
+# `targets` makes rustup auto-install the wasm target on first build — important
+# for the Cloudflare Workers builder, which starts from a clean toolchain.
 channel = "nightly"
 targets = ["wasm32-unknown-unknown"]
