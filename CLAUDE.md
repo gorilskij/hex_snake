@@ -368,9 +368,7 @@ under `games/hexsnake/`, on a Worker route in front of the site's Worker;
 `web/worker.js` only runs when no file matches and passes the request on to
 the site (its 404 page). No `*.workers.dev`/preview addresses. The whole
 hosting picture (all projects) is in the site repo's CLAUDE.md
-(`~/code/site/gorilskij.com`, Hosting). (Until the 2026-10 migration is cut
-over, prod is still the old Pages project behind the site's router at
-`games.gorilskij.com/hexsnake/`.)
+(`~/code/site/gorilskij.com`, Hosting).
 
 - **Branch flow:** work → `master` → merge into `test-website` (deploys test)
   → merge into `pub-website` (deploys prod). Workers Builds: build
